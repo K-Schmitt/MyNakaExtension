@@ -1,0 +1,6 @@
+{
+  "manifest_version": 3,
+  "name": "MyNakaExtension",
+  "version": "0.0.1",
+  "description": "Passerelle entre Naka et SensCritique : notes, listes et fin de visionnage."
+}

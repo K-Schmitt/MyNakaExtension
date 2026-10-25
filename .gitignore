@@ -1,0 +1,38 @@
+# Build artifacts and dependencies
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+
+# Editors
+.idea/
+.vscode/settings.json
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Recorded traffic and browser profiles (may contain session data)
+*.jsonl
+profile/
+
+# AI / agent context and workspace
+.superpowers/
+docs/superpowers/
+TASKS.md
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md
+.claude/
+.gitnexus/
+.history/
+.nodalis/
+.playwright-mcp/
+.cursor/
+.aider*
+.mcp.json
