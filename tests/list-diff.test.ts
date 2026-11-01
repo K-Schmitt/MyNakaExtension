@@ -129,14 +129,72 @@ describe("planListSync", () => {
     expect(fresh.addToSc).toEqual([P]);
   });
 
-  it("keeps distinct pairs that share one id", () => {
-    const a: Pair = { nakaId: 1, scId: 10 };
-    const b: Pair = { nakaId: 1, scId: 11 };
-    const c: Pair = { nakaId: 2, scId: 10 };
+  it("emits no add for a Naka id mapped to two SC ids", () => {
     const plan = planListSync(
-      input({ naka: new Set([1, 2]), mapping: [a, b, c] }),
+      input({
+        naka: new Set([1]),
+        sc: new Set([10]),
+        mapping: [P, { nakaId: 1, scId: 11 }],
+      }),
     );
-    expect(plan.addToSc).toEqual([a, b, c]);
+    expect(plan).toEqual({ ...EMPTY, resolveNaka: [1], resolveSc: [10] });
+  });
+
+  it("emits no add for an SC id mapped to two Naka ids", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1]),
+        sc: new Set([10]),
+        mapping: [P, { nakaId: 2, scId: 10 }],
+      }),
+    );
+    expect(plan).toEqual({ ...EMPTY, resolveNaka: [1], resolveSc: [10] });
+  });
+
+  it("emits no removal for a stale snapshot pair conflicting with the mapping", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1]),
+        sc: new Set([11]),
+        snapshot: [P],
+        mapping: [{ nakaId: 1, scId: 11 }],
+      }),
+    );
+    expect(plan).toEqual({ ...EMPTY, resolveNaka: [1], resolveSc: [11] });
+  });
+
+  it("lists conflicted ids only when present in the current lists", () => {
+    const plan = planListSync(input({ mapping: [P, { nakaId: 1, scId: 11 }] }));
+    expect(plan).toEqual(EMPTY);
+  });
+
+  it("orders unresolved ids first, then conflicted ids, without duplicates", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1, 7, 3]),
+        sc: new Set([10, 99, 30]),
+        mapping: [
+          { nakaId: 1, scId: 10 },
+          { nakaId: 1, scId: 11 },
+          { nakaId: 3, scId: 30 },
+          { nakaId: 3, scId: 31 },
+        ],
+      }),
+    );
+    expect(plan.resolveNaka).toEqual([7, 1, 3]);
+    expect(plan.resolveSc).toEqual([99, 10, 30]);
+  });
+
+  it("keeps acting on non-conflicted pairs next to conflicted ones", () => {
+    const ok: Pair = { nakaId: 5, scId: 50 };
+    const plan = planListSync(
+      input({
+        naka: new Set([1, 5]),
+        mapping: [P, { nakaId: 1, scId: 11 }, ok],
+      }),
+    );
+    expect(plan.addToSc).toEqual([ok]);
+    expect(plan.resolveNaka).toEqual([1]);
   });
 
   it("proposes no removal once the caller drops the pair from the snapshot", () => {

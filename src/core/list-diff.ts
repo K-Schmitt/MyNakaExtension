@@ -32,11 +32,31 @@ function knownPairs(
   return [...unique.values()];
 }
 
-function unresolvedIds(
-  ids: ReadonlySet<number>,
-  knownIds: ReadonlySet<number>,
+function countBy(ids: number[]): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return counts;
+}
+
+function conflictedPairs(pairs: Pair[]): Set<Pair> {
+  const byNaka = countBy(pairs.map((p) => p.nakaId));
+  const bySc = countBy(pairs.map((p) => p.scId));
+  return new Set(
+    pairs.filter(
+      (p) => (byNaka.get(p.nakaId) ?? 0) > 1 || (bySc.get(p.scId) ?? 0) > 1,
+    ),
+  );
+}
+
+function resolvableIds(
+  present: ReadonlySet<number>,
+  pairIds: number[],
+  conflictedIds: number[],
 ): number[] {
-  return [...ids].filter((id) => !knownIds.has(id));
+  const known = new Set(pairIds);
+  const unresolved = [...present].filter((id) => !known.has(id));
+  const conflicted = conflictedIds.filter((id) => present.has(id));
+  return [...new Set([...unresolved, ...conflicted])];
 }
 
 function classifyPair(
@@ -68,13 +88,21 @@ export function planListSync(input: SyncInput): SyncPlan {
   };
   const snapshotKeys = new Set(input.snapshot.map(pairKey));
   const pairs = knownPairs(input.mapping, input.snapshot);
+  const conflicted = conflictedPairs(pairs);
   for (const pair of pairs) {
+    if (conflicted.has(pair)) continue;
     classifyPair(pair, input, snapshotKeys.has(pairKey(pair)), plan);
   }
-  plan.resolveNaka = unresolvedIds(
+  const bad = pairs.filter((p) => conflicted.has(p));
+  plan.resolveNaka = resolvableIds(
     input.naka,
-    new Set(pairs.map((p) => p.nakaId)),
+    pairs.map((p) => p.nakaId),
+    bad.map((p) => p.nakaId),
   );
-  plan.resolveSc = unresolvedIds(input.sc, new Set(pairs.map((p) => p.scId)));
+  plan.resolveSc = resolvableIds(
+    input.sc,
+    pairs.map((p) => p.scId),
+    bad.map((p) => p.scId),
+  );
   return plan;
 }
