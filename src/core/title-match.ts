@@ -2,24 +2,18 @@ import { normalizeTitle } from "./normalize-title";
 
 export type MediaType = "film" | "serie";
 
-export type NakaTitle = {
+export type Titled = {
   title: string;
   originalTitle?: string;
   year?: number;
   type: MediaType;
 };
 
-export type ScCandidate = {
-  productId: number;
-  title: string;
-  originalTitle?: string;
-  year?: number;
-  type: MediaType;
-};
+export type Candidate = Titled & { id: number };
 
 export type MatchResult =
-  | { kind: "match"; productId: number }
-  | { kind: "ambiguous"; productIds: number[] }
+  | { kind: "match"; id: number }
+  | { kind: "ambiguous"; ids: number[] }
   | { kind: "none" };
 
 type Names = { title: string; originalTitle?: string };
@@ -29,54 +23,58 @@ function normalizedNames(entry: Names): Set<string> {
   return new Set(names.filter((name) => name !== ""));
 }
 
-function sharesName(naka: NakaTitle, candidate: ScCandidate): boolean {
-  const nakaNames = normalizedNames(naka);
+function sharesName(query: Titled, candidate: Candidate): boolean {
+  const queryNames = normalizedNames(query);
   for (const name of normalizedNames(candidate)) {
-    if (nakaNames.has(name)) return true;
+    if (queryNames.has(name)) return true;
   }
   return false;
 }
 
 function titleEqualCandidates(
-  naka: NakaTitle,
-  candidates: ScCandidate[],
-): ScCandidate[] {
+  query: Titled,
+  candidates: readonly Candidate[],
+): Candidate[] {
   return candidates.filter(
-    (candidate) => candidate.type === naka.type && sharesName(naka, candidate),
+    (candidate) =>
+      candidate.type === query.type && sharesName(query, candidate),
   );
 }
 
-function yearGap(naka: NakaTitle, candidate: ScCandidate): number {
-  if (naka.year === undefined || candidate.year === undefined) {
+function yearGap(query: Titled, candidate: Candidate): number {
+  if (query.year === undefined || candidate.year === undefined) {
     return Number.POSITIVE_INFINITY;
   }
-  return Math.abs(naka.year - candidate.year);
+  return Math.abs(query.year - candidate.year);
 }
 
-function ambiguous(candidates: ScCandidate[]): MatchResult {
-  return { kind: "ambiguous", productIds: candidates.map((c) => c.productId) };
+function ambiguous(candidates: readonly Candidate[]): MatchResult {
+  return { kind: "ambiguous", ids: candidates.map((c) => c.id) };
 }
 
-function matchByYear(naka: NakaTitle, candidates: ScCandidate[]): MatchResult {
-  const exact = candidates.filter((c) => yearGap(naka, c) === 0);
+function matchByYear(
+  query: Titled,
+  candidates: readonly Candidate[],
+): MatchResult {
+  const exact = candidates.filter((c) => yearGap(query, c) === 0);
   const [onlyExact] = exact;
   if (exact.length === 1 && onlyExact) {
-    return { kind: "match", productId: onlyExact.productId };
+    return { kind: "match", id: onlyExact.id };
   }
-  const near = candidates.filter((c) => yearGap(naka, c) <= 1);
+  const near = candidates.filter((c) => yearGap(query, c) <= 1);
   const [onlyNear] = near;
   if (near.length === 1 && onlyNear) {
-    return { kind: "match", productId: onlyNear.productId };
+    return { kind: "match", id: onlyNear.id };
   }
   return ambiguous(candidates);
 }
 
 export function matchTitle(
-  naka: NakaTitle,
-  candidates: ScCandidate[],
+  query: Titled,
+  candidates: readonly Candidate[],
 ): MatchResult {
-  const equal = titleEqualCandidates(naka, candidates);
+  const equal = titleEqualCandidates(query, candidates);
   if (equal.length === 0) return { kind: "none" };
-  if (naka.year === undefined) return ambiguous(equal);
-  return matchByYear(naka, equal);
+  if (query.year === undefined) return ambiguous(equal);
+  return matchByYear(query, equal);
 }

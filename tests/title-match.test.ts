@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalizeTitle } from "../src/core/normalize-title";
 import {
+  type Candidate,
   matchTitle,
-  type NakaTitle,
-  type ScCandidate,
+  type Titled,
 } from "../src/core/title-match";
 
 describe("normalizeTitle", () => {
@@ -16,23 +16,23 @@ describe("normalizeTitle", () => {
   });
 });
 
-const grinch: NakaTitle = {
+const grinch: Titled = {
   title: "Le Grinch",
   originalTitle: "How the Grinch Stole Christmas",
   year: 2000,
   type: "film",
 };
 
-const grinch2000: ScCandidate = {
-  productId: 1,
+const grinch2000: Candidate = {
+  id: 1,
   title: "Le Grinch",
   originalTitle: "How the Grinch Stole Christmas",
   year: 2000,
   type: "film",
 };
 
-const grinch2018: ScCandidate = {
-  productId: 2,
+const grinch2018: Candidate = {
+  id: 2,
   title: "Le Grinch",
   originalTitle: "The Grinch",
   year: 2018,
@@ -43,7 +43,7 @@ describe("matchTitle", () => {
   it("prefers the candidate with the exact year", () => {
     expect(matchTitle(grinch, [grinch2000, grinch2018])).toEqual({
       kind: "match",
-      productId: 1,
+      id: 1,
     });
   });
 
@@ -51,7 +51,7 @@ describe("matchTitle", () => {
     const naka = { ...grinch, year: undefined };
     expect(matchTitle(naka, [grinch2000, grinch2018])).toEqual({
       kind: "ambiguous",
-      productIds: [1, 2],
+      ids: [1, 2],
     });
   });
 
@@ -59,7 +59,7 @@ describe("matchTitle", () => {
     const candidate = { ...grinch2000, year: 2001 };
     expect(matchTitle(grinch, [candidate])).toEqual({
       kind: "match",
-      productId: 1,
+      id: 1,
     });
   });
 
@@ -67,14 +67,14 @@ describe("matchTitle", () => {
     const candidate = { ...grinch2000, year: 2005 };
     expect(matchTitle(grinch, [candidate])).toEqual({
       kind: "ambiguous",
-      productIds: [1],
+      ids: [1],
     });
   });
 
   it("ignores candidates of another type", () => {
-    const naka: NakaTitle = { title: "Batman", year: 1966, type: "serie" };
-    const film: ScCandidate = {
-      productId: 3,
+    const naka: Titled = { title: "Batman", year: 1966, type: "serie" };
+    const film: Candidate = {
+      id: 3,
       title: "Batman",
       year: 1989,
       type: "film",
@@ -87,9 +87,9 @@ describe("matchTitle", () => {
   });
 
   it("returns none for an empty Naka title", () => {
-    const naka: NakaTitle = { title: "", year: 2000, type: "film" };
-    const blank: ScCandidate = {
-      productId: 4,
+    const naka: Titled = { title: "", year: 2000, type: "film" };
+    const blank: Candidate = {
+      id: 4,
       title: "",
       year: 2000,
       type: "film",
@@ -98,33 +98,33 @@ describe("matchTitle", () => {
   });
 
   it("matches across accents", () => {
-    const naka: NakaTitle = { title: "Amélie", type: "film", year: 2001 };
-    const sc: ScCandidate = {
-      productId: 5,
+    const naka: Titled = { title: "Amélie", type: "film", year: 2001 };
+    const sc: Candidate = {
+      id: 5,
       title: "Amelie",
       year: 2001,
       type: "film",
     };
-    expect(matchTitle(naka, [sc])).toEqual({ kind: "match", productId: 5 });
+    expect(matchTitle(naka, [sc])).toEqual({ kind: "match", id: 5 });
   });
 
   it("matches across hyphens", () => {
-    const naka: NakaTitle = { title: "Spider-Man", type: "film", year: 2002 };
-    const sc: ScCandidate = {
-      productId: 6,
+    const naka: Titled = { title: "Spider-Man", type: "film", year: 2002 };
+    const sc: Candidate = {
+      id: 6,
       title: "Spider Man",
       year: 2002,
       type: "film",
     };
-    expect(matchTitle(naka, [sc])).toEqual({ kind: "match", productId: 6 });
+    expect(matchTitle(naka, [sc])).toEqual({ kind: "match", id: 6 });
   });
 });
 
-function film(productId: number, title: string, year?: number): ScCandidate {
-  return { productId, title, year, type: "film" };
+function film(id: number, title: string, year?: number): Candidate {
+  return { id, title, year, type: "film" };
 }
 
-const heat: NakaTitle = { title: "Heat", year: 2000, type: "film" };
+const heat: Titled = { title: "Heat", year: 2000, type: "film" };
 
 describe("matchTitle year branches", () => {
   it("prefers the exact year over a candidate one year off", () => {
@@ -132,7 +132,7 @@ describe("matchTitle year branches", () => {
       film(1, "Heat", 2001),
       film(2, "Heat", 2000),
     ]);
-    expect(result).toEqual({ kind: "match", productId: 2 });
+    expect(result).toEqual({ kind: "match", id: 2 });
   });
 
   it("is ambiguous when two candidates share the exact year", () => {
@@ -140,7 +140,7 @@ describe("matchTitle year branches", () => {
       film(1, "Heat", 2000),
       film(2, "Heat", 2000),
     ]);
-    expect(result).toEqual({ kind: "ambiguous", productIds: [1, 2] });
+    expect(result).toEqual({ kind: "ambiguous", ids: [1, 2] });
   });
 
   it("prefers a near candidate over a far one", () => {
@@ -148,7 +148,7 @@ describe("matchTitle year branches", () => {
       film(1, "Heat", 2010),
       film(2, "Heat", 2001),
     ]);
-    expect(result).toEqual({ kind: "match", productId: 2 });
+    expect(result).toEqual({ kind: "match", id: 2 });
   });
 
   it("is ambiguous with every title-equal id when two are near and none exact", () => {
@@ -157,38 +157,38 @@ describe("matchTitle year branches", () => {
       film(2, "Heat", 2001),
       film(3, "Heat", 2010),
     ]);
-    expect(result).toEqual({ kind: "ambiguous", productIds: [1, 2, 3] });
+    expect(result).toEqual({ kind: "ambiguous", ids: [1, 2, 3] });
   });
 
   it("is ambiguous for a lone candidate when the Naka year is unknown", () => {
-    const naka: NakaTitle = { title: "Heat", type: "film" };
+    const naka: Titled = { title: "Heat", type: "film" };
     expect(matchTitle(naka, [film(7, "Heat", 1995)])).toEqual({
       kind: "ambiguous",
-      productIds: [7],
+      ids: [7],
     });
   });
 
   it("an unknown-year candidate is dropped when a near one exists (documented choice)", () => {
     const result = matchTitle(heat, [film(1, "Heat"), film(2, "Heat", 2001)]);
-    expect(result).toEqual({ kind: "match", productId: 2 });
+    expect(result).toEqual({ kind: "match", id: 2 });
   });
 });
 
 describe("matchTitle title equality", () => {
   it("matches the Naka title against the candidate original title", () => {
-    const naka: NakaTitle = { title: "Le Grinch", year: 2000, type: "film" };
-    const candidate: ScCandidate = {
+    const naka: Titled = { title: "Le Grinch", year: 2000, type: "film" };
+    const candidate: Candidate = {
       ...film(1, "Something else", 2000),
       originalTitle: "Le Grinch",
     };
     expect(matchTitle(naka, [candidate])).toEqual({
       kind: "match",
-      productId: 1,
+      id: 1,
     });
   });
 
   it("matches the Naka original title against the candidate title", () => {
-    const naka: NakaTitle = {
+    const naka: Titled = {
       title: "Autre",
       originalTitle: "Heat",
       year: 2000,
@@ -196,7 +196,7 @@ describe("matchTitle title equality", () => {
     };
     expect(matchTitle(naka, [film(1, "Heat", 2000)])).toEqual({
       kind: "match",
-      productId: 1,
+      id: 1,
     });
   });
 
@@ -208,6 +208,6 @@ describe("matchTitle title equality", () => {
       film(1, "Collateral", 2000),
       film(2, "Heat", 2000),
     ]);
-    expect(result).toEqual({ kind: "match", productId: 2 });
+    expect(result).toEqual({ kind: "match", id: 2 });
   });
 });
