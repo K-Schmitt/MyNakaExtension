@@ -5,6 +5,7 @@ export type SyncInput = {
   sc: ReadonlySet<number>;
   snapshot: readonly Pair[];
   mapping: readonly Pair[];
+  settled?: readonly Pair[];
 };
 
 export type Removal = { removeFrom: "naka" | "sc"; pair: Pair };
@@ -21,12 +22,30 @@ function pairKey(pair: Pair): string {
   return `${pair.nakaId}:${pair.scId}`;
 }
 
+function sharesAnId(a: Pair, b: Pair): boolean {
+  return a.nakaId === b.nakaId || a.scId === b.scId;
+}
+
+function supersededByMapping(pair: Pair, mapping: readonly Pair[]): boolean {
+  return mapping.some(
+    (m) => pairKey(m) !== pairKey(pair) && sharesAnId(m, pair),
+  );
+}
+
+function liveSnapshot(
+  snapshot: readonly Pair[],
+  mapping: readonly Pair[],
+): Pair[] {
+  return snapshot.filter((p) => !supersededByMapping(p, mapping));
+}
+
 function knownPairs(
   mapping: readonly Pair[],
-  snapshot: readonly Pair[],
+  live: readonly Pair[],
+  settled: readonly Pair[],
 ): Pair[] {
   const unique = new Map<string, Pair>();
-  for (const pair of [...mapping, ...snapshot]) {
+  for (const pair of [...mapping, ...live, ...settled]) {
     if (!unique.has(pairKey(pair))) unique.set(pairKey(pair), pair);
   }
   return [...unique.values()];
@@ -63,17 +82,21 @@ function classifyPair(
   pair: Pair,
   input: SyncInput,
   inSnapshot: boolean,
+  settled: boolean,
   plan: SyncPlan,
 ): void {
   const inNaka = input.naka.has(pair.nakaId);
   const inSc = input.sc.has(pair.scId);
   if (inNaka === inSc) return;
   if (inNaka) {
-    if (inSnapshot) plan.confirmRemoval.push({ removeFrom: "naka", pair });
-    else plan.addToSc.push(pair);
+    if (inSnapshot) {
+      if (!settled) plan.confirmRemoval.push({ removeFrom: "naka", pair });
+    } else if (!settled) {
+      plan.addToSc.push(pair);
+    }
   } else if (inSnapshot) {
-    plan.confirmRemoval.push({ removeFrom: "sc", pair });
-  } else {
+    if (!settled) plan.confirmRemoval.push({ removeFrom: "sc", pair });
+  } else if (!settled) {
     plan.addToNaka.push(pair);
   }
 }
@@ -86,12 +109,21 @@ export function planListSync(input: SyncInput): SyncPlan {
     resolveNaka: [],
     resolveSc: [],
   };
-  const snapshotKeys = new Set(input.snapshot.map(pairKey));
-  const pairs = knownPairs(input.mapping, input.snapshot);
+  const live = liveSnapshot(input.snapshot, input.mapping);
+  const snapshotKeys = new Set(live.map(pairKey));
+  const settledKeys = new Set((input.settled ?? []).map(pairKey));
+  const pairs = knownPairs(input.mapping, live, input.settled ?? []);
   const conflicted = conflictedPairs(pairs);
   for (const pair of pairs) {
     if (conflicted.has(pair)) continue;
-    classifyPair(pair, input, snapshotKeys.has(pairKey(pair)), plan);
+    const key = pairKey(pair);
+    classifyPair(
+      pair,
+      input,
+      snapshotKeys.has(key),
+      settledKeys.has(key),
+      plan,
+    );
   }
   const bad = pairs.filter((p) => conflicted.has(p));
   plan.resolveNaka = resolvableIds(

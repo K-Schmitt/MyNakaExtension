@@ -151,7 +151,7 @@ describe("planListSync", () => {
     expect(plan).toEqual({ ...EMPTY, resolveNaka: [1], resolveSc: [10] });
   });
 
-  it("emits no removal for a stale snapshot pair conflicting with the mapping", () => {
+  it("ignores a stale snapshot pair superseded by the mapping", () => {
     const plan = planListSync(
       input({
         naka: new Set([1]),
@@ -160,7 +160,7 @@ describe("planListSync", () => {
         mapping: [{ nakaId: 1, scId: 11 }],
       }),
     );
-    expect(plan).toEqual({ ...EMPTY, resolveNaka: [1], resolveSc: [11] });
+    expect(plan).toEqual(EMPTY);
   });
 
   it("lists conflicted ids only when present in the current lists", () => {
@@ -197,16 +197,6 @@ describe("planListSync", () => {
     expect(plan.resolveNaka).toEqual([1]);
   });
 
-  it("proposes no removal once the caller drops the pair from the snapshot", () => {
-    const lists = { naka: new Set([1]), mapping: [P] };
-    expect(
-      planListSync(input({ ...lists, snapshot: [P] })).confirmRemoval,
-    ).toHaveLength(1);
-    const after = planListSync(input({ ...lists, snapshot: [] }));
-    expect(after.confirmRemoval).toEqual([]);
-    expect(after.addToSc).toEqual([P]);
-  });
-
   it("handles several pairs independently", () => {
     const a: Pair = { nakaId: 1, scId: 10 };
     const b: Pair = { nakaId: 2, scId: 20 };
@@ -231,5 +221,126 @@ describe("planListSync", () => {
     const plan = planListSync(input({ naka: new Set([1]), mapping: [P] }));
     expect(plan.resolveNaka).toEqual([]);
     expect(plan.resolveSc).toEqual([]);
+  });
+});
+
+describe("planListSync settled pairs", () => {
+  it("emits nothing for a finished film the extension unwished", () => {
+    const lists = { naka: new Set([1]), mapping: [P], snapshot: [P] };
+    expect(planListSync(input({ ...lists, settled: [P] }))).toEqual(EMPTY);
+    expect(planListSync(input(lists))).toEqual({
+      ...EMPTY,
+      confirmRemoval: [{ removeFrom: "naka", pair: P }],
+    });
+  });
+
+  it("documents the hazard settled prevents: a pair dropped from the snapshot is re-added", () => {
+    const lists = { naka: new Set([1]), mapping: [P], snapshot: [] };
+    expect(planListSync(input({ ...lists, settled: [P] }))).toEqual(EMPTY);
+    expect(planListSync(input(lists))).toEqual({ ...EMPTY, addToSc: [P] });
+  });
+
+  it("emits nothing for a settled pair only on the SensCritique side", () => {
+    const lists = { sc: new Set([10]), mapping: [P], snapshot: [P] };
+    expect(planListSync(input({ ...lists, settled: [P] }))).toEqual(EMPTY);
+    expect(planListSync(input(lists))).toEqual({
+      ...EMPTY,
+      confirmRemoval: [{ removeFrom: "sc", pair: P }],
+    });
+  });
+
+  it("emits no addToNaka for a settled pair only on the SensCritique side", () => {
+    const lists = { sc: new Set([10]), mapping: [P] };
+    expect(planListSync(input({ ...lists, settled: [P] }))).toEqual(EMPTY);
+    expect(planListSync(input(lists))).toEqual({ ...EMPTY, addToNaka: [P] });
+  });
+
+  it("emits nothing and resolves nothing for a settled pair in both lists", () => {
+    const plan = planListSync(
+      input({ naka: new Set([1]), sc: new Set([10]), settled: [P] }),
+    );
+    expect(plan).toEqual(EMPTY);
+  });
+
+  it("counts a settled pair as known even without mapping or snapshot", () => {
+    const plan = planListSync(input({ naka: new Set([1]), settled: [P] }));
+    expect(plan.resolveNaka).toEqual([]);
+    expect(plan.resolveSc).toEqual([]);
+  });
+
+  it("treats a settled pair conflicting with a mapping pair as a conflict", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1]),
+        sc: new Set([10, 11]),
+        mapping: [{ nakaId: 1, scId: 11 }],
+        settled: [P],
+      }),
+    );
+    expect(plan.addToSc).toEqual([]);
+    expect(plan.addToNaka).toEqual([]);
+    expect(plan.confirmRemoval).toEqual([]);
+    expect(plan.resolveNaka).toEqual([1]);
+    expect([...plan.resolveSc].sort()).toEqual([10, 11]);
+  });
+});
+
+describe("planListSync mapping wins over the snapshot", () => {
+  it("ignores a snapshot pair sharing its Naka id with a different mapping pair", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1]),
+        sc: new Set([11]),
+        snapshot: [P],
+        mapping: [{ nakaId: 1, scId: 11 }],
+      }),
+    );
+    expect(plan).toEqual(EMPTY);
+  });
+
+  it("ignores a snapshot pair sharing its SC id with a different mapping pair", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([2]),
+        sc: new Set([10]),
+        snapshot: [P],
+        mapping: [{ nakaId: 2, scId: 10 }],
+      }),
+    );
+    expect(plan).toEqual(EMPTY);
+  });
+
+  it("resolves the SC id of a superseded pair when it is present alone", () => {
+    const plan = planListSync(
+      input({
+        naka: new Set([1]),
+        sc: new Set([10, 11]),
+        snapshot: [P],
+        mapping: [{ nakaId: 1, scId: 11 }],
+      }),
+    );
+    expect(plan).toEqual({ ...EMPTY, resolveSc: [10] });
+  });
+
+  it("supersedes only the conflicting snapshot pairs", () => {
+    const other: Pair = { nakaId: 2, scId: 20 };
+    const plan = planListSync(
+      input({
+        naka: new Set([2]),
+        snapshot: [P, other],
+        mapping: [{ nakaId: 1, scId: 11 }],
+      }),
+    );
+    expect(plan).toEqual({
+      ...EMPTY,
+      confirmRemoval: [{ removeFrom: "naka", pair: other }],
+    });
+  });
+
+  it("keeps a pair identical in mapping and snapshot", () => {
+    const plan = planListSync(
+      input({ naka: new Set([1]), mapping: [P], snapshot: [P] }),
+    );
+    expect(plan.confirmRemoval).toEqual([{ removeFrom: "naka", pair: P }]);
   });
 });
