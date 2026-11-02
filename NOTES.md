@@ -42,6 +42,8 @@
   s'enregistre pas par script, on le relève à la main dans un navigateur normal.
 - Reste à confirmer avec une écriture réversible sur SensCritique (premier travail du Plan 2).
 - Conditions d'utilisation de Naka et de SensCritique : non lues.
+- L'extension sonde (`spike/probe-extension/`) a été supprimée après la décision ; elle reste dans
+  l'historique git au commit 386256b.
 
 ## Leçons apprises
 
