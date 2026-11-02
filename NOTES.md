@@ -32,8 +32,10 @@
 
 ## 2026-11-01 — Décision phase 0 : go
 
-- Le service worker de l'extension appelle l'API GraphQL de SensCritique avec la session du navigateur
-  (HTTP 200, JSON, test en lecture seule), y compris quand il est sollicité depuis une page Naka.
+- Le service worker de l'extension appelle l'API GraphQL de SensCritique avec `fetch` et
+  `credentials: "include"` : HTTP 200 et JSON, y compris quand il est sollicité depuis une page Naka,
+  mais sur une requête publique en lecture seule. L'envoi de la session du navigateur n'est donc
+  pas encore prouvé (l'écriture réversible du Plan 2 le prouvera).
   Un script injecté sur une page SensCritique échoue (`Failed to fetch`, appel entre sous-domaines).
   Architecture retenue : seul le service worker parle à SensCritique, les scripts lui envoient des messages.
 - Naka refuse (403) la connexion depuis un navigateur automatisé : le trafic Naka authentifié ne
