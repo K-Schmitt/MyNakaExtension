@@ -25,10 +25,25 @@
   (le défaut de MyCI est 24).
 
 ### Reporté
-- Pas de dépôt distant pour l'instant : la CI n'a donc pas encore tourné sur GitHub. Elle sera vérifiée
-  sur la première pull request.
-- Pas de `.portfolio.json` : dépôt non publié et aucun dépôt distant.
+- Dépôt privé `K-Schmitt/MyNakaExtension` créé le 2026-10-28 ; la CI n'a pas encore tourné. Elle sera
+  vérifiée sur la première pull request.
+- Pas de `.portfolio.json` : dépôt privé (la page Projets n'affiche que les dépôts publics). À revoir si
+  le dépôt devient public.
+
+## 2026-11-01 — Décision phase 0 : go
+
+- Le service worker de l'extension appelle l'API GraphQL de SensCritique avec `fetch` et
+  `credentials: "include"` : HTTP 200 et JSON, y compris quand il est sollicité depuis une page Naka,
+  mais sur une requête publique en lecture seule. L'envoi de la session du navigateur n'est donc
+  pas encore prouvé (l'écriture réversible du Plan 2 le prouvera).
+  Un script injecté sur une page SensCritique échoue (`Failed to fetch`, appel entre sous-domaines).
+  Architecture retenue : seul le service worker parle à SensCritique, les scripts lui envoient des messages.
+- Naka refuse (403) la connexion depuis un navigateur automatisé : le trafic Naka authentifié ne
+  s'enregistre pas par script, on le relève à la main dans un navigateur normal.
+- Reste à confirmer avec une écriture réversible sur SensCritique (premier travail du Plan 2).
 - Conditions d'utilisation de Naka et de SensCritique : non lues.
+- L'extension sonde (`spike/probe-extension/`) a été supprimée après la décision ; elle reste dans
+  l'historique git au commit 386256b.
 
 ## Leçons apprises
 
