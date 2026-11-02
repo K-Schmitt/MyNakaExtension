@@ -47,6 +47,21 @@ describe("isWatchComplete", () => {
     expect(isWatchComplete(unmarked(0.95), 0.95)).toBe(true);
   });
 
+  it("accepts a threshold of exactly 1", () => {
+    expect(isWatchComplete(unmarked(1), 1)).toBe(true);
+    expect(isWatchComplete(unmarked(0.99), 1)).toBe(false);
+  });
+
+  it("throws RangeError for a negative threshold", () => {
+    expect(() => isWatchComplete(unmarked(0.5), -0.1)).toThrow(RangeError);
+  });
+
+  it("validates the threshold even when marked watched", () => {
+    expect(() =>
+      isWatchComplete({ progress: 0, markedWatched: true }, 0),
+    ).toThrow(RangeError);
+  });
+
   it.each([0, 1.2, Number.NaN])("throws RangeError for threshold %s", (t) => {
     expect(() => isWatchComplete(unmarked(0.5), t)).toThrow(RangeError);
   });

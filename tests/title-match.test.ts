@@ -11,6 +11,10 @@ describe("normalizeTitle", () => {
     expect(normalizeTitle("Amélie")).toBe("amelie");
   });
 
+  it("trims and drops surrounding punctuation", () => {
+    expect(normalizeTitle("  Amélie ! ")).toBe("amelie");
+  });
+
   it("treats punctuation as a space and collapses spaces", () => {
     expect(normalizeTitle("Spider-Man  2")).toBe("spider man 2");
   });
@@ -60,6 +64,14 @@ describe("matchTitle", () => {
     expect(matchTitle(grinch, [candidate])).toEqual({
       kind: "match",
       id: 1,
+    });
+  });
+
+  it("is ambiguous for a lone candidate exactly two years off", () => {
+    const candidate = { ...grinch2000, year: 2002 };
+    expect(matchTitle(grinch, [candidate])).toEqual({
+      kind: "ambiguous",
+      ids: [1],
     });
   });
 
