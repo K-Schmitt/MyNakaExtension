@@ -1,3 +1,4 @@
+import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
 import {
   addPending,
@@ -64,24 +65,6 @@ function isSettled(state: SyncState, dir: Direction, id: number): boolean {
   return mapped || asked || unlinked;
 }
 
-function uniqueById(candidates: readonly Candidate[]): Candidate[] {
-  const seen = new Set<number>();
-  return candidates.filter((candidate) => {
-    if (seen.has(candidate.id)) return false;
-    seen.add(candidate.id);
-    return true;
-  });
-}
-
-async function findCandidates(
-  dir: Direction,
-  titled: Titled,
-): Promise<Candidate[]> {
-  const byTitle = await dir.search(titled.title);
-  if (byTitle.length > 0 || !titled.originalTitle) return uniqueById(byTitle);
-  return uniqueById(await dir.search(titled.originalTitle));
-}
-
 function mapOrAsk(
   state: SyncState,
   dir: Direction,
@@ -117,7 +100,8 @@ async function resolveOne(
     } as const;
     return { kind: "unlinked", item };
   }
-  const result = matchTitle(titled, await findCandidates(dir, titled));
+  const candidates = await findCandidates((q) => dir.search(q), titled);
+  const result = matchTitle(titled, candidates);
   if (result.kind === "match") {
     return { kind: "state", state: mapOrAsk(state, dir, id, result.id) };
   }
