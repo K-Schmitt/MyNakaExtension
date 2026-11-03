@@ -63,11 +63,14 @@ type Opts = {
   state?: Partial<SyncState>;
   failMarkDone?: number;
   nakaTitles?: Record<number, Titled>;
+  // What the Naka search returns (default: nakaTitles); describeNaka reads nakaTitles.
+  nakaCatalogue?: Record<number, Titled>;
   scTitles?: Record<number, Titled>;
 };
 
 function world(o: Opts) {
   const NAKA = o.nakaTitles ?? NAKA_TITLES;
+  const CATALOGUE = o.nakaCatalogue ?? NAKA;
   const SC = o.scTitles ?? SC_TITLES;
   const w = {
     naka: new Set(o.naka),
@@ -104,7 +107,7 @@ function world(o: Opts) {
     },
     searchNaka: async (q) => {
       w.reads.push(`searchNaka:${q}`);
-      return candidates(NAKA, q);
+      return candidates(CATALOGUE, q);
     },
     searchSc: async (q) => {
       w.reads.push(`searchSc:${q}`);
@@ -354,5 +357,140 @@ describe("episode finishes, then the sync", () => {
     expect(w.writes).toEqual([]);
     expect(w.state.mapping).toEqual([]);
     expect(w.state.pending).toEqual([asked]);
+  });
+});
+
+// Plan 3's amended answer contract: "none of these" keeps the question OPEN with no candidate, and so
+// does a question whose candidates another answer took (steps 5 and 6). The open question then stops
+// the finish (it asks again, with no write) and the other direction of the sync (G1).
+function noneOfThese(state: SyncState, side: "naka" | "sc", id: number) {
+  return {
+    ...state,
+    pending: state.pending.map((item) =>
+      item.kind === "ambiguity" && item.side === side && item.id === id
+        ? { ...item, candidateIds: [] }
+        : item,
+    ),
+  };
+}
+
+// Steps 3 to 5: the chosen pair is upserted, the questions about its own ids are resolved, and its ids
+// leave the other questions' candidates; a question left with no candidate stays open.
+function answerByContract(state: SyncState, pair: Pair): SyncState {
+  const mapped = answer(state, pair);
+  return {
+    ...mapped,
+    pending: mapped.pending.map((item) => {
+      if (item.kind !== "ambiguity") return item;
+      const taken = item.side === "naka" ? pair.scId : pair.nakaId;
+      return {
+        ...item,
+        candidateIds: item.candidateIds.filter((id) => id !== taken),
+      };
+    }),
+  };
+}
+
+describe("the owner answers 'none of these' (amended contract)", () => {
+  // Naka's catalogue entry has no release date for the describe, so the runner asks about 42.
+  const yearless = () =>
+    world({
+      naka: [FILM],
+      sc: [],
+      nakaTitles: { [FILM]: { title: "Le Film", type: "film" } },
+      nakaCatalogue: { [FILM]: FILM_TITLE },
+      scTitles: { [FILM_SC]: FILM_TITLE },
+    });
+  const asked = (side: "naka" | "sc", id: number, candidateIds: number[]) => ({
+    kind: "ambiguity",
+    side,
+    id,
+    candidateIds,
+  });
+
+  it("P1: a finish carrying the year writes nothing to the rejected product and asks again", async () => {
+    const { w, ports } = yearless();
+    await runSync(ports);
+    expect(w.state.pending).toEqual([asked("naka", FILM, [FILM_SC])]);
+    w.state = noneOfThese(w.state, "naka", FILM);
+    expect(await handleFinish(film(), ports)).toEqual({
+      kind: "needs-choice",
+      candidateIds: [],
+    });
+    expect(w.writes).toEqual([]);
+    expect(w.state.mapping).toEqual([]);
+    expect(w.state.pending).toEqual([asked("naka", FILM, [])]);
+  });
+
+  it("P1b: the explicit replay of the stored finish writes nothing either", async () => {
+    const { w, ports } = yearless();
+    await runSync(ports);
+    w.state = noneOfThese(w.state, "naka", FILM);
+    const replay = film({ source: "explicit", progress: 0.1 });
+    expect(await handleFinish(replay, ports)).toEqual({
+      kind: "needs-choice",
+      candidateIds: [],
+    });
+    expect(w.writes).toEqual([]);
+    expect(w.reads.filter((r) => r.startsWith("searchSc"))).toEqual([
+      "searchSc:Le Film",
+    ]);
+  });
+
+  it("P2: once the owner wishes the rejected product, the SensCritique pass asks instead of mapping (G1)", async () => {
+    const { w, ports } = yearless();
+    await runSync(ports);
+    w.state = noneOfThese(w.state, "naka", FILM);
+    w.sc.add(FILM_SC);
+    const r = await runSync(ports);
+    expect(w.state.mapping).toEqual([]);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([
+      asked("naka", FILM, []),
+      asked("sc", FILM_SC, [FILM]),
+    ]);
+    expect(r.added).toEqual([]);
+  });
+
+  it("P2b: later runs keep both questions open and write nothing", async () => {
+    const { w, ports } = yearless();
+    await runSync(ports);
+    w.state = noneOfThese(w.state, "naka", FILM);
+    w.sc.add(FILM_SC);
+    await runSync(ports);
+    await runSync(ports);
+    await runSync(ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.mapping).toEqual([]);
+    expect(w.state.pending).toEqual([
+      asked("naka", FILM, []),
+      asked("sc", FILM_SC, [FILM]),
+    ]);
+  });
+
+  it("step 5: a question whose only candidate another answer took stays open and stops the finish", async () => {
+    const { w, ports } = world({
+      naka: [FILM, 43],
+      sc: [],
+      nakaTitles: {
+        [FILM]: { title: "Le Film", type: "film" },
+        43: { title: "Le Film", type: "film" },
+      },
+      nakaCatalogue: {},
+      scTitles: { [FILM_SC]: FILM_TITLE },
+    });
+    await runSync(ports);
+    expect(w.state.pending).toEqual([
+      asked("naka", FILM, [FILM_SC]),
+      asked("naka", 43, [FILM_SC]),
+    ]);
+    w.state = answerByContract(w.state, { nakaId: 43, scId: FILM_SC });
+    expect(w.state.pending).toEqual([asked("naka", FILM, [])]);
+    expect(await handleFinish(film(), ports)).toEqual({
+      kind: "needs-choice",
+      candidateIds: [],
+    });
+    expect(w.writes).toEqual([]);
+    expect(w.state.mapping).toEqual([{ nakaId: 43, scId: FILM_SC }]);
   });
 });

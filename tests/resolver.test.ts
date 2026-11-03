@@ -541,6 +541,70 @@ describe("resolveScIds (mirror)", () => {
     expect(out.mapping).toEqual([p(5, 50)]);
   });
 
+  it("leaves everything but mapping, pending and unlinked untouched, and never mutates inputs", async () => {
+    const state = deepFreeze(rich());
+    const ids = deepFreeze([50, 51, 52]);
+    const pt = ports({
+      sc: { 50: film("Dune"), 51: film("Twin"), 52: film("Nothing") },
+      searchNaka: {
+        Dune: [cand(5, "Dune")],
+        Twin: [cand(61, "Twin"), cand(62, "Twin")],
+      },
+    });
+    const out = await resolveScIds(ids, state, pt);
+    expect(out).toEqual({
+      ...rich(),
+      mapping: [p(1, 11), p(2, 12), p(5, 50)],
+      pending: [
+        { kind: "removal", removeFrom: "sc", pair: p(1, 11), asked: true },
+        { kind: "ambiguity", side: "sc", id: 51, candidateIds: [61, 62] },
+      ],
+      unlinked: [
+        { side: "naka", id: 90, title: "Old", reason: "no-match" },
+        { side: "sc", id: 52, title: "Nothing", reason: "no-match" },
+      ],
+    });
+    expect(out).not.toBe(state);
+  });
+
+  it("processes duplicated input ids once", async () => {
+    const pt = ports({
+      sc: { 50: film("Dune") },
+      searchNaka: { Dune: [cand(5, "Dune")] },
+    });
+    await resolveScIds([50, 50, 50], emptyState(), pt);
+    expect(pt.log).toEqual(["describeSc:50", "searchNaka:Dune"]);
+  });
+
+  it("processes a duplicated id once even when its first attempt failed", async () => {
+    const pt = ports({ sc: { 50: "reject" } });
+    await resolveScIds([50, 50], emptyState(), pt);
+    expect(pt.log).toEqual(["describeSc:50"]);
+  });
+
+  it("isolates a rejected search: that id is untouched, the next is resolved", async () => {
+    const pt = ports({
+      sc: { 50: film("Bad"), 51: film("Good") },
+      searchNaka: { Bad: "reject", Good: [cand(6, "Good")] },
+    });
+    const out = await resolveScIds([50, 51], emptyState(), pt);
+    expect(out.mapping).toEqual([p(6, 51)]);
+    expect(out.unlinked).toEqual([]);
+    expect(out.pending).toEqual([]);
+  });
+
+  it("sees mappings made earlier in the same run (two ids matching one candidate)", async () => {
+    const pt = ports({
+      sc: { 50: film("Dune"), 51: film("Dune") },
+      searchNaka: { Dune: [cand(5, "Dune")] },
+    });
+    const out = await resolveScIds([50, 51], emptyState(), pt);
+    expect(out.mapping).toEqual([p(5, 50)]);
+    expect(out.pending).toEqual([
+      { kind: "ambiguity", side: "sc", id: 51, candidateIds: [5] },
+    ]);
+  });
+
   it("isolates failures and keeps order", async () => {
     const pt = ports({
       sc: { 50: "reject", 51: film("Good") },

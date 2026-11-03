@@ -39,6 +39,11 @@ import { UNIVERSE } from "../src/sc/sc-queries";
 // Oracle 3 (no waiver): a finish writes nothing while a Naka-side question on
 // its title is open, mapped or not, nor to a product (or an episode of a series
 // product) with an open SensCritique-side question.
+// State invariant: after every run and every finish, no mapped pair has an open
+// question on its Naka id or on its SensCritique id.
+// Answers follow Plan 3's amended contract: "none of these" keeps the question
+// open with no candidate, and the chosen ids leave the other questions'
+// candidates, a question left with none staying open.
 
 const FILMS = [1, 2, 3, 4, 5, 6];
 const SERIES = [11, 12];
@@ -217,6 +222,22 @@ async function simulate(seed: number): Promise<string[]> {
     };
   };
 
+  const checkInvariant = (after: string): void => {
+    for (const pair of state.mapping) {
+      const asked = state.pending.some(
+        (i) =>
+          i.kind === "ambiguity" &&
+          ((i.side === "naka" && i.id === pair.nakaId) ||
+            (i.side === "sc" && i.id === pair.scId)),
+      );
+      if (asked) {
+        violations.push(
+          `seed ${seed}: invariant after ${after}: mapped ${pair.nakaId}:${pair.scId} has an open question | ${log.slice(-8).join("; ")}`,
+        );
+      }
+    }
+  };
+
   // The film path reads the product state of the film exactly once, before its first save.
   const finish = async (event: FinishEvent): Promise<void> => {
     const before = saves;
@@ -264,6 +285,7 @@ async function simulate(seed: number): Promise<string[]> {
       }
     }
     checkQuestions();
+    checkInvariant(name);
   };
 
   const eventFor = (n: number): FinishEvent => {
@@ -311,7 +333,10 @@ async function simulate(seed: number): Promise<string[]> {
   ): Promise<void> => {
     const chosen =
       item.candidateIds[Math.floor(r() * item.candidateIds.length)];
-    if (chosen === undefined) return;
+    if (chosen === undefined || r() < 0.25) {
+      await noneOfThese(item);
+      return;
+    }
     const pair =
       item.side === "naka"
         ? { nakaId: item.id, scId: chosen }
@@ -320,11 +345,42 @@ async function simulate(seed: number): Promise<string[]> {
       i.kind === "ambiguity" &&
       ((i.side === "naka" && i.id === pair.nakaId) ||
         (i.side === "sc" && i.id === pair.scId));
+    const taken = (i: PendingItem): PendingItem =>
+      i.kind === "ambiguity"
+        ? {
+            ...i,
+            candidateIds: i.candidateIds.filter(
+              (id) => id !== (i.side === "naka" ? pair.scId : pair.nakaId),
+            ),
+          }
+        : i;
     const mapped = upsertMapping(state, pair);
-    state = { ...mapped, pending: mapped.pending.filter((i) => !about(i)) };
+    state = {
+      ...mapped,
+      pending: mapped.pending.filter((i) => !about(i)).map(taken),
+    };
     log.push(`choose ${pair.nakaId} -> ${pair.scId}`);
     const replay = replays.get(pair.nakaId);
     replays.delete(pair.nakaId);
+    if (replay) await finish(replay);
+  };
+
+  // "None of these": the question stays open with no candidate; the stored
+  // finish of the title is replayed, and asks again with no write.
+  const noneOfThese = async (
+    item: PendingItem & { kind: "ambiguity" },
+  ): Promise<void> => {
+    state = {
+      ...state,
+      pending: state.pending.map((i) =>
+        i.kind === "ambiguity" && i.side === item.side && i.id === item.id
+          ? { ...i, candidateIds: [] }
+          : i,
+      ),
+    };
+    log.push(`none of these ${item.side} ${item.id}`);
+    const replay = item.side === "naka" ? replays.get(item.id) : undefined;
+    replays.delete(item.id);
     if (replay) await finish(replay);
   };
 
@@ -347,6 +403,7 @@ async function simulate(seed: number): Promise<string[]> {
       } catch {
         log.push("run rejected");
       }
+      checkInvariant("a run");
     }
   }
   return violations;
