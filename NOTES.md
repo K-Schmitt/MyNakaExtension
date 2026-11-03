@@ -25,8 +25,8 @@
   (le défaut de MyCI est 24).
 
 ### Reporté
-- Dépôt privé `K-Schmitt/MyNakaExtension` créé le 2026-10-28 ; la CI n'a pas encore tourné. Elle sera
-  vérifiée sur la première pull request.
+- Dépôt privé `K-Schmitt/MyNakaExtension` créé le 2026-10-28. CI (MyCI `node-ci`) verte sur la
+  pull request #1 et sur `main` le 2026-11-02.
 - Pas de `.portfolio.json` : dépôt privé (la page Projets n'affiche que les dépôts publics). À revoir si
   le dépôt devient public.
 
@@ -44,6 +44,21 @@
 - Conditions d'utilisation de Naka et de SensCritique : non lues.
 - L'extension sonde (`spike/probe-extension/`) a été supprimée après la décision ; elle reste dans
   l'historique git au commit 386256b.
+
+## 2026-11-03 — Phase A : l'écriture SensCritique passe par le jeton de la page
+
+- Les écritures sur SensCritique exigent un en-tête `authorization` : la valeur du cookie `SC_AUTH`,
+  lue par le service worker dans la page d'accueil, envoyée brute (sans `Bearer`) à l'API,
+  `credentials: "omit"`. Prouvé par un ajout puis retrait réversible du film *Batman* (1966).
+- Décision du propriétaire : l'extension utilise ce jeton (option A), uniquement vers l'API de
+  SensCritique, en mémoire, sans jamais le stocker, l'afficher ni le journaliser. Une revue de sécurité
+  est obligatoire pour tout code qui le touche.
+- Si SensCritique change son authentification, les écritures s'arrêtent ; les lectures publiques
+  continuent. Erreur dédiée à prévoir : « session expirée, reconnectez-vous sur SensCritique ».
+- La sonde de phase A a affiché une fois la valeur du jeton (clé de cache GraphQL) ; elle est corrigée.
+- Sondes supprimées après usage (hors dépôt : `~/.local/share/mynakaextension-spike/`).
+- Inconnu : la limite de recherche de Naka est de 30 requêtes, mais la durée de la fenêtre n'est pas
+  annoncée (par défaut : une recherche toutes les 2 secondes).
 
 ## Leçons apprises
 
