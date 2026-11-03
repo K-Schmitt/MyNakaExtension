@@ -98,10 +98,12 @@ function nextSnapshot(
 
 function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
   const same = (a: Pair, b: Pair): boolean => pairKey(a) === pairKey(b);
-  const candidates = [...state.retryLast, ...outcome.failed].filter(
-    (pair) =>
-      !outcome.added.some((done) => same(done, pair)) &&
-      state.mapping.some((mapped) => same(mapped, pair)),
+  const settledNow = [...outcome.added, ...outcome.failed];
+  const waiting = state.retryLast.filter(
+    (pair) => !settledNow.some((done) => same(done, pair)),
+  );
+  const candidates = [...waiting, ...outcome.failed].filter((pair) =>
+    state.mapping.some((mapped) => same(mapped, pair)),
   );
   const unique = new Map(candidates.map((pair) => [pairKey(pair), pair]));
   return { ...state, retryLast: [...unique.values()] };

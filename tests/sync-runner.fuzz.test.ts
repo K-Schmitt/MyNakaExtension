@@ -7,6 +7,7 @@ import {
   resolvePending,
   type SyncState,
   settlePair,
+  upsertMapping,
 } from "../src/core/state";
 import { runSync } from "../src/core/sync-runner";
 
@@ -16,7 +17,11 @@ import { runSync } from "../src/core/sync-runner";
 // runs. Oracle: the runner never writes a title back to a side after the
 // owner removed it there, once a completed run had seen the pair in both lists.
 
-const TITLES = 6;
+// 14 titles so the write cap of 10 binds. Remap answers (upsertMapping, as
+// Plan 3 will do) move a title to another SensCritique id while its removal is
+// still pending; answering that removal afterwards lifts the protection (the
+// pair is gone from the mapping, a Plan 3 carry-forward).
+const TITLES = 14;
 const STEPS = 60;
 const SEEDS = 1200;
 
@@ -32,8 +37,8 @@ function rng(seed: number): () => number {
   };
 }
 
-const idOf = (n: number, side: Side): number =>
-  side === "naka" ? n : n + 1000;
+const titleOf = (side: Side, id: number): number =>
+  side === "naka" ? id : id % 1000;
 
 async function simulate(seed: number): Promise<string[]> {
   const r = rng(seed);
@@ -51,9 +56,18 @@ async function simulate(seed: number): Promise<string[]> {
   const log: string[] = [];
   const violations: string[] = [];
 
-  const remove = (n: number, side: Side, who: string): void => {
-    const both = lists.naka.has(n) && lists.sc.has(n + 1000);
-    if (!lists[side].delete(idOf(n, side))) return;
+  const scOf = (n: number): number =>
+    state.mapping.find((m) => m.nakaId === n)?.scId ?? n + 1000;
+  const idOf = (n: number, side: Side): number =>
+    side === "naka" ? n : scOf(n);
+  const remove = (
+    n: number,
+    side: Side,
+    who: string,
+    id = idOf(n, side),
+  ): void => {
+    const both = lists.naka.has(n) && lists.sc.has(scOf(n));
+    if (!lists[side].delete(id)) return;
     if (both && seenBoth.has(n)) protectedFrom.set(n, side);
     seenBoth.delete(n);
     log.push(`${who} remove ${side} ${n}`);
@@ -64,22 +78,37 @@ async function simulate(seed: number): Promise<string[]> {
     protectedFrom.delete(n);
     log.push(`${who} add ${side} ${n}`);
   };
+  const evicted = (pair: Pair): boolean =>
+    !state.mapping.some(
+      (m) => m.nakaId === pair.nakaId && m.scId === pair.scId,
+    );
   const answer = (item: PendingItem & { kind: "removal" }): void => {
     const b = r();
+    const n = item.pair.nakaId;
     if (b < 0.25) {
       state = resolvePending(settlePair(state, item.pair), item);
-      log.push(`keep ${item.pair.nakaId}`);
+      log.push(`keep ${n}`);
     } else if (b < 0.5) {
-      remove(item.pair.nakaId, item.removeFrom, "plan3");
+      const id = item.removeFrom === "naka" ? item.pair.nakaId : item.pair.scId;
+      remove(n, item.removeFrom, "plan3", id);
       state = resolvePending(state, item);
-      log.push(`answer remove ${item.removeFrom} ${item.pair.nakaId}`);
+      log.push(`answer remove ${item.removeFrom} ${n}`);
     } else if (b < 0.75) {
       state = resolvePending(state, item);
-      log.push(`answer remove (no effect) ${item.pair.nakaId}`);
+      log.push(`answer remove (no effect) ${n}`);
     } else {
       state = markAsked(state, item.pair);
-      log.push(`asked ${item.pair.nakaId}`);
+      log.push(`asked ${n}`);
+      return;
     }
+    if (evicted(item.pair)) protectedFrom.delete(n);
+  };
+  const remap = (item: PendingItem & { kind: "removal" }): void => {
+    if (evicted(item.pair)) return;
+    const n = item.pair.nakaId;
+    state = upsertMapping(state, { nakaId: n, scId: n + 2000 });
+    if (r() < 0.5) lists.sc.add(n + 2000);
+    log.push(`remap ${n}`);
   };
 
   const oneRun = async (): Promise<void> => {
@@ -90,7 +119,7 @@ async function simulate(seed: number): Promise<string[]> {
     let lastNaka: number[] = [];
     let lastSc: number[] = [];
     const write = async (side: Side, id: number): Promise<void> => {
-      const n = side === "naka" ? id : id - 1000;
+      const n = titleOf(side, id);
       if (protectedFrom.get(n) === side) {
         violations.push(
           `seed ${seed}: write ${side} ${n} | ${log.slice(-10).join("; ")}`,
@@ -126,7 +155,7 @@ async function simulate(seed: number): Promise<string[]> {
         lastSc = list;
         if (scReads === 1) {
           for (const k of firstNakaRead) {
-            if (list.includes(k + 1000)) seenBoth.add(k);
+            if (list.includes(scOf(k))) seenBoth.add(k);
           }
         }
         return list;
@@ -140,7 +169,7 @@ async function simulate(seed: number): Promise<string[]> {
     });
     // The completed run also saw, through its re-reads, titles the owner added mid-run.
     for (let k = 1; k <= TITLES; k++) {
-      if (lastNaka.includes(k) && lastSc.includes(k + 1000)) seenBoth.add(k);
+      if (lastNaka.includes(k) && lastSc.includes(scOf(k))) seenBoth.add(k);
     }
   };
 
@@ -151,12 +180,15 @@ async function simulate(seed: number): Promise<string[]> {
     if (a < 0.3) {
       if (lists[side].has(idOf(n, side))) remove(n, side, "owner");
       else add(n, side, "owner");
-    } else if (a < 0.5) {
+    } else if (a < 0.58) {
       const items = state.pending.filter(
         (i): i is PendingItem & { kind: "removal" } => i.kind === "removal",
       );
       const item = items[Math.floor(r() * items.length)];
-      if (item) answer(item);
+      if (item) {
+        if (a < 0.5) answer(item);
+        else remap(item);
+      }
     } else {
       await oneRun();
     }
@@ -171,5 +203,52 @@ describe("sync runner fuzz: never write back a title the owner removed", () => {
       violations.push(...(await simulate(seed)));
     }
     expect(violations.slice(0, 3)).toEqual([]);
-  });
+  }, 20_000);
+});
+
+// Liveness: pairs that keep failing (poison) must not starve the pairs that
+// failed only transiently. No owner edits here; SensCritique starts empty and
+// every title is a known Naka-only pair.
+async function starved(seed: number): Promise<number[]> {
+  const r = rng(seed);
+  const count = 8;
+  const poison = new Set<number>();
+  while (poison.size < 2) poison.add(1 + Math.floor(r() * count));
+  const sc = new Set<number>();
+  let state: SyncState = {
+    ...emptyState(),
+    mapping: Array.from({ length: count }, (_, i) => p(i + 1)),
+  };
+  const ports = {
+    load: async () => state,
+    save: async (s: SyncState) => {
+      state = s;
+    },
+    nakaIds: async () => Array.from({ length: count }, (_, i) => i + 1),
+    scWishlistIds: async () => [...sc],
+    addToSc: async (id: number) => {
+      if (poison.has(id - 1000) || r() < 0.3) throw new Error("fail");
+      sc.add(id);
+    },
+    addToNaka: async () => {},
+    describeNaka: async () => undefined,
+    describeSc: async () => undefined,
+    searchSc: async () => [],
+    searchNaka: async () => [],
+  };
+  for (let run = 0; run < 40; run++) await runSync(ports);
+  return Array.from({ length: count }, (_, i) => i + 1).filter(
+    (n) => !poison.has(n) && !sc.has(n + 1000),
+  );
+}
+
+describe("sync runner fuzz: failing pairs do not starve the others", () => {
+  it("writes every transiently failing pair within 40 runs", async () => {
+    const stuck: string[] = [];
+    for (let seed = 1; seed <= 300; seed++) {
+      const left = await starved(seed);
+      if (left.length > 0) stuck.push(`seed ${seed}: ${left.join(",")}`);
+    }
+    expect(stuck.slice(0, 3)).toEqual([]);
+  }, 20_000);
 });

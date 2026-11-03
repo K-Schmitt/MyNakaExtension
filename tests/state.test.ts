@@ -39,6 +39,7 @@ function rich(): SyncState {
     ],
     handled: ["movie:1"],
     unlinked: [{ side: "sc", id: 9, title: "X", reason: "no-match" }],
+    retryLast: [p(4, 40), p(1, 10)],
   };
 }
 
@@ -372,19 +373,28 @@ describe("field preservation on a fully populated state", () => {
   });
 });
 
+const updaters: [string, (s: SyncState) => SyncState][] = [
+  ["upsertMapping", (s) => upsertMapping(s, p(1, 99))],
+  ["upsertMapping new", (s) => upsertMapping(s, p(8, 88))],
+  ["settlePair", (s) => settlePair(s, p(4, 40))],
+  ["unsettlePair", (s) => unsettlePair(s, p(3, 30))],
+  ["setSnapshot", (s) => setSnapshot(s, [p(5, 50), p(5, 50)])],
+  ["addPending", (s) => addPending(s, ambiguity("sc", 77))],
+  ["resolvePending", (s) => resolvePending(s, ambiguity("naka", 5))],
+  ["markAsked", (s) => markAsked(s, p(1, 10))],
+  ["markHandled", (s) => markHandled(s, "movie:2")],
+  ["setUnlinked", (s) => setUnlinked(s, [])],
+];
+
+describe("retryLast", () => {
+  for (const [name, run] of updaters) {
+    it(`${name} keeps retryLast unchanged and in order`, () => {
+      expect(run(deepFreeze(rich())).retryLast).toEqual([p(4, 40), p(1, 10)]);
+    });
+  }
+});
+
 describe("immutability", () => {
-  const updaters: [string, (s: SyncState) => SyncState][] = [
-    ["upsertMapping", (s) => upsertMapping(s, p(1, 99))],
-    ["upsertMapping new", (s) => upsertMapping(s, p(8, 88))],
-    ["settlePair", (s) => settlePair(s, p(4, 40))],
-    ["unsettlePair", (s) => unsettlePair(s, p(3, 30))],
-    ["setSnapshot", (s) => setSnapshot(s, [p(5, 50), p(5, 50)])],
-    ["addPending", (s) => addPending(s, ambiguity("sc", 77))],
-    ["resolvePending", (s) => resolvePending(s, ambiguity("naka", 5))],
-    ["markAsked", (s) => markAsked(s, p(1, 10))],
-    ["markHandled", (s) => markHandled(s, "movie:2")],
-    ["setUnlinked", (s) => setUnlinked(s, [])],
-  ];
   for (const [name, run] of updaters) {
     it(`${name} does not mutate its input`, () => {
       const input = rich();

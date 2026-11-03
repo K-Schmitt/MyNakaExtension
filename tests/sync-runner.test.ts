@@ -6,7 +6,9 @@ import {
   type PendingItem,
   resolvePending,
   type SyncState,
+  settlePair,
   type UnlinkedItem,
+  upsertMapping,
 } from "../src/core/state";
 import type { Candidate, Titled } from "../src/core/title-match";
 
@@ -61,6 +63,7 @@ type Opts = {
   noEffectNaka?: boolean;
   afterNaka?: (naka: Set<number>) => void;
   unknownNaka?: number[];
+  scTitle?: Record<number, number>;
   nakaReadFails?: number[];
   scReadFails?: number[];
 };
@@ -114,7 +117,7 @@ function world(o: Opts = {}) {
     },
     describeSc: async (id) => {
       w.describes.push(`sc:${id}`);
-      return film(id - 1000);
+      return film(o.scTitle?.[id] ?? id - 1000);
     },
     searchSc: async (q) => [cand(numberOf(q), numberOf(q) + 1000)],
     searchNaka: async (q) => [cand(numberOf(q), numberOf(q))],
@@ -254,6 +257,53 @@ describe("removals and D1", () => {
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
     expect(r3).toEqual(report({ pendingRemovals: 1 }));
     expect(r4).toEqual(report({ pendingRemovals: 1 }));
+  });
+
+  it("a remap while the removal is pending writes nothing (D1 as a write guard)", async () => {
+    // SC 1777 is a second product titled "Film 1": the resolver raises an
+    // ambiguity (Naka 1 is held by P); the owner answers it in Plan 3.
+    const w = world({
+      sc: [1001, 1777],
+      scTitle: { 1777: 1 },
+      state: withMapping([p(1)], { snapshot: [p(1)] }),
+    });
+    const r1 = await runSync(w.ports);
+    expect(r1).toEqual(report({ pendingRemovals: 1 }));
+    const ambiguity = w.state.pending.find((i) => i.kind === "ambiguity");
+    if (!ambiguity) throw new Error("expected an ambiguity");
+    w.state = resolvePending(
+      upsertMapping(w.state, { nakaId: 1, scId: 1777 }),
+      ambiguity,
+    );
+    const r2 = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(r2).toEqual(report({ pendingRemovals: 1 }));
+    expect(w.state.pending).toEqual([
+      { kind: "removal", removeFrom: "sc", pair: p(1), asked: false },
+      { kind: "ambiguity", side: "sc", id: 1001, candidateIds: [1] },
+    ]);
+  });
+
+  it("a settled pair evicted by an ambiguity answer still blocks its Naka id (S4)", async () => {
+    const w = world({
+      naka: [1],
+      sc: [1777],
+      scTitle: { 1777: 1 },
+      state: withMapping([p(1)], { snapshot: [p(1)] }),
+    });
+    const r1 = await runSync(w.ports);
+    expect(r1).toEqual(report({ pendingRemovals: 1 }));
+    const removal = w.state.pending.find((i) => i.kind === "removal");
+    const ambiguity = w.state.pending.find((i) => i.kind === "ambiguity");
+    if (!removal || !ambiguity) throw new Error("expected both questions");
+    const kept = resolvePending(settlePair(w.state, p(1)), removal);
+    w.state = resolvePending(
+      upsertMapping(kept, { nakaId: 1, scId: 1777 }),
+      ambiguity,
+    );
+    const r2 = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(r2).toEqual(report());
   });
 
   it("does not queue a removal for a settled pair", async () => {
@@ -420,10 +470,10 @@ describe("the resolution cap is not wasted (R3)", () => {
     expect(r).toEqual(report({ added: [p(7)] }));
   });
 
-  // The mapped rule cannot be reached on the Naka side with a reachable state
-  // (upsertMapping forbids two pairs sharing an id, so the planner never lists
-  // a mapped Naka id). It is reachable on the SensCritique side: the Naka pass
-  // has just mapped most of the SC ids the first plan listed.
+  // The mapped rule is reachable on both sides. On the SensCritique side the
+  // Naka pass has just mapped most of the ids the first plan listed (this
+  // test). On the Naka side a settled pair evicted from the mapping by an
+  // ambiguity answer still shares its Naka id with the new pair (S4 below).
   it("filters the SC ids against the state after the Naka pass (probe J/K)", async () => {
     const w = world({ naka: range(1, 21), sc: range(1001, 1021) });
     const r1 = await runSync(w.ports);
@@ -765,6 +815,38 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
     expect(r3).toEqual(report({ failed: [p(1), p(2)] }));
   });
 
+  it("failing pairs rotate to the back so they cannot starve the demoted group (probe S3)", async () => {
+    const failSc = [1001, 1002];
+    const w = world({
+      naka: range(1, 5),
+      failSc,
+      state: withMapping(pairs(1, 5)),
+    });
+    const order = () => w.state.retryLast.map((x) => x.nakaId);
+    const log: { writes: string[]; retry: number[]; deferred: Pair[] }[] = [];
+    for (let run = 1; run <= 4; run++) {
+      failSc.length = 0;
+      failSc.push(1001, 1002, ...(run === 2 ? [1003, 1004] : []));
+      w.writes.length = 0;
+      const r = await runSync(w.ports);
+      log.push({ writes: [...w.writes], retry: order(), deferred: r.deferred });
+    }
+    expect(log.map((l) => l.writes)).toEqual([
+      ["addToSc:1001", "addToSc:1002"],
+      ["addToSc:1003", "addToSc:1004"],
+      ["addToSc:1005", "addToSc:1001", "addToSc:1002"],
+      ["addToSc:1003", "addToSc:1004", "addToSc:1001", "addToSc:1002"],
+    ]);
+    expect(log.map((l) => l.retry)).toEqual([
+      [1, 2],
+      [1, 2, 3, 4],
+      [3, 4, 1, 2],
+      [1, 2],
+    ]);
+    expect(log[1]?.deferred).toEqual([p(5), p(1), p(2)]);
+    expect(log[2]?.deferred).toEqual([p(3), p(4)]);
+  });
+
   it("a demoted pair deferred by the cap stays in retryLast", async () => {
     const w = world({
       naka: range(1, 11),
@@ -792,14 +874,16 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
       naka: [1],
       state: withMapping([p(1)], retry(p(9), p(1))),
     });
-    await runSync(w.ports);
+    const r = await runSync(w.ports);
+    expect(r).toEqual(report({ added: [p(1)] }));
     expect(w.saved[0]?.retryLast).toEqual([]);
     const v = world({
       naka: [1],
       failSc: [1001],
       state: withMapping([p(1)], retry(p(9))),
     });
-    await runSync(v.ports);
+    const rv = await runSync(v.ports);
+    expect(rv).toEqual(report({ failed: [p(1)] }));
     expect(v.saved[0]?.retryLast).toEqual([p(1)]);
   });
 
@@ -809,8 +893,9 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
       sc: [1011],
       state: withMapping([p(1), p(2), p(11)], retry(p(1))),
     });
-    await runSync(w.ports);
+    const r = await runSync(w.ports);
     expect(w.writes).toEqual(["addToSc:1002", "addToSc:1001", "addToNaka:11"]);
+    expect(r).toEqual(report({ added: [p(2), p(1), p(11)] }));
   });
 
   it("deduplicates retryLast when a demoted pair fails again", async () => {
@@ -819,7 +904,15 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
       failSc: [1001],
       state: withMapping([p(1)], retry(p(1))),
     });
-    await runSync(w.ports);
+    const r = await runSync(w.ports);
+    expect(r).toEqual(report({ failed: [p(1)] }));
+    expect(w.saved[0]?.retryLast).toEqual([p(1)]);
+  });
+
+  it("deduplicates a retryLast that arrives with a duplicate", async () => {
+    const w = world({ state: withMapping([p(1)], retry(p(1), p(1))) });
+    const r = await runSync(w.ports);
+    expect(r).toEqual(report());
     expect(w.saved[0]?.retryLast).toEqual([p(1)]);
   });
 

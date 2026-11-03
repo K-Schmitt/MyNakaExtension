@@ -26,9 +26,13 @@ function failedLast(
   pairs: readonly Pair[],
   retryLast: readonly Pair[],
 ): Pair[] {
-  const isRetry = (pair: Pair): boolean =>
-    retryLast.some((r) => samePair(r, pair));
-  return [...pairs.filter((pair) => !isRetry(pair)), ...pairs.filter(isRetry)];
+  const fresh = pairs.filter(
+    (pair) => !retryLast.some((r) => samePair(r, pair)),
+  );
+  const demoted = retryLast.flatMap((r) =>
+    pairs.filter((pair) => samePair(r, pair)),
+  );
+  return [...fresh, ...demoted];
 }
 
 export function selectWrites(
