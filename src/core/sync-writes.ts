@@ -29,7 +29,10 @@ function failedLast(
   const fresh = pairs.filter(
     (pair) => !retryLast.some((r) => samePair(r, pair)),
   );
-  const demoted = retryLast.flatMap((r) =>
+  const queue = retryLast.filter(
+    (r, i) => retryLast.findIndex((other) => samePair(other, r)) === i,
+  );
+  const demoted = queue.flatMap((r) =>
     pairs.filter((pair) => samePair(r, pair)),
   );
   return [...fresh, ...demoted];

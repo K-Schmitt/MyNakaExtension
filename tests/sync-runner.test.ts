@@ -284,6 +284,41 @@ describe("removals and D1", () => {
     ]);
   });
 
+  it("a conflicted snapshot pair is not re-added once the conflict clears (probe N)", async () => {
+    const q = { nakaId: 1, scId: 1777 };
+    const w = world({
+      sc: [1001, 1777],
+      scTitle: { 1777: 1 },
+      state: withMapping([p(1)], { snapshot: [p(1)] }),
+    });
+    const r1 = await runSync(w.ports);
+    const ambiguity = w.state.pending.find(
+      (i) => i.kind === "ambiguity" && i.id === 1777,
+    );
+    if (!ambiguity) throw new Error("expected an ambiguity");
+    w.state = resolvePending(upsertMapping(w.state, q), ambiguity);
+    w.naka.add(1);
+    const r2 = await runSync(w.ports);
+    expect(w.state.snapshot).toEqual([q, p(1)]);
+    w.sc.delete(1777);
+    const r3 = await runSync(w.ports);
+    const removal = w.state.pending.find(
+      (i) => i.kind === "removal" && i.pair.scId === 1001,
+    );
+    if (!removal) throw new Error("expected the first removal");
+    w.sc.delete(1001);
+    w.state = resolvePending(w.state, removal);
+    const r4 = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending.filter((i) => i.kind === "removal")).toEqual([
+      { kind: "removal", removeFrom: "naka", pair: q, asked: false },
+    ]);
+    expect(r1).toEqual(report({ pendingRemovals: 1 }));
+    expect(r2).toEqual(report({ pendingRemovals: 1 }));
+    expect(r3).toEqual(report({ pendingRemovals: 1 }));
+    expect(r4).toEqual(report({ pendingRemovals: 1 }));
+  });
+
   it("a settled pair evicted by an ambiguity answer still blocks its Naka id (S4)", async () => {
     const w = world({
       naka: [1],
@@ -755,6 +790,53 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
   });
 
+  it("a pair the planner skips stays in the snapshot while it is on at least one side (U1)", async () => {
+    const w = world({
+      naka: [1],
+      sc: [1002],
+      state: withMapping([p(1), p(2)], {
+        snapshot: [p(1), p(2)],
+        settled: [p(1), p(2)],
+      }),
+    });
+    const r = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(r).toEqual(report());
+    expect(w.saved[0]?.snapshot).toEqual([p(1), p(2)]);
+  });
+
+  it("a snapshot pair that is on neither side leaves the snapshot", async () => {
+    const w = world({ state: withMapping([p(1)], { snapshot: [p(1)] }) });
+    const r = await runSync(w.ports);
+    expect(r).toEqual(report());
+    expect(w.saved[0]?.snapshot).toEqual([]);
+  });
+
+  it("a snapshot pair that is no longer mapped leaves the snapshot", async () => {
+    const w = world({
+      naka: [1],
+      sc: [1001],
+      state: withMapping([], { snapshot: [p(1)] }),
+    });
+    await runSync(w.ports);
+    expect(w.saved[0]?.snapshot).toEqual([]);
+  });
+
+  it("a snapshot pair superseded by a remap leaves the snapshot, by either id", async () => {
+    const q1 = { nakaId: 1, scId: 1777 };
+    const q2 = { nakaId: 3, scId: 1002 };
+    const w = world({
+      naka: [1, 3],
+      sc: [1001, 1002],
+      scTitle: { 1001: 1 },
+      state: withMapping([q1, q2], { snapshot: [p(1), p(2)] }),
+    });
+    const r = await runSync(w.ports);
+    expect(w.writes).toEqual(["addToSc:1777"]);
+    expect(r).toEqual(report({ added: [q1] }));
+    expect(w.saved[0]?.snapshot).toEqual([q1, q2]);
+  });
+
   it("a re-read keeps an id the owner added mid-run: a later removal becomes a question (probe M)", async () => {
     const w = world({
       sc: range(1001, 1011),
@@ -907,6 +989,17 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
     const r = await runSync(w.ports);
     expect(r).toEqual(report({ failed: [p(1)] }));
     expect(w.saved[0]?.retryLast).toEqual([p(1)]);
+  });
+
+  it("a planned pair listed twice in retryLast is written once (probe DUP)", async () => {
+    const w = world({
+      naka: [1],
+      state: withMapping([p(1)], retry(p(1), p(1))),
+    });
+    const r = await runSync(w.ports);
+    expect(w.writes).toEqual(["addToSc:1001"]);
+    expect(r).toEqual(report({ added: [p(1)] }));
+    expect(w.saved[0]?.retryLast).toEqual([]);
   });
 
   it("deduplicates a retryLast that arrives with a duplicate", async () => {

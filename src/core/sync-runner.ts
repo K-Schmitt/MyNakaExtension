@@ -83,17 +83,29 @@ async function effectiveList(
   }
 }
 
+// A snapshot pair the planner skipped (conflicted, settled) and that is still
+// mapped and on one side must stay known: if it dropped out, it would be
+// treated as an addition once the skip ends.
 function nextSnapshot(
   state: SyncState,
-  naka: number[],
-  sc: number[],
+  loaded: SyncState,
+  lists: { naka: number[]; sc: number[] },
 ): SyncState {
-  const inNaka = new Set(naka);
-  const inSc = new Set(sc);
+  const inNaka = new Set(lists.naka);
+  const inSc = new Set(lists.sc);
   const both = state.mapping.filter(
     (pair) => inNaka.has(pair.nakaId) && inSc.has(pair.scId),
   );
-  return setSnapshot(state, [...both, ...pendingRemovalPairs(state)]);
+  const carried = loaded.snapshot.filter(
+    (pair) =>
+      state.mapping.some((m) => pairKey(m) === pairKey(pair)) &&
+      (inNaka.has(pair.nakaId) || inSc.has(pair.scId)),
+  );
+  return setSnapshot(state, [
+    ...both,
+    ...pendingRemovalPairs(state),
+    ...carried,
+  ]);
 }
 
 function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
@@ -132,7 +144,7 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     outcome.written.sc,
   );
   const state = nextRetryLast(
-    nextSnapshot(queued, finalNaka, finalSc),
+    nextSnapshot(queued, loaded, { naka: finalNaka, sc: finalSc }),
     outcome,
   );
   await ports.save(state);
