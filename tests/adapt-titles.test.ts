@@ -5,6 +5,9 @@ import {
   scToCandidate,
   scToTitled,
 } from "../src/core/adapt-titles";
+import { resolveNakaIds } from "../src/core/resolver";
+import { emptyState } from "../src/core/state";
+import type { Candidate } from "../src/core/title-match";
 import type { NakaItem } from "../src/naka/naka-items";
 import type { ScWishItem } from "../src/sc/wishlist-page";
 
@@ -113,20 +116,68 @@ describe("scToTitled", () => {
     );
   });
 
-  it("falls back to the url prefix for other universes", () => {
-    expect(
-      scToTitled(sc({ universe: 32, url: "/serie/dreamland/48034937" }))?.type,
-    ).toBe("serie");
-    expect(scToTitled(sc({ universe: 5, url: "/serie/x/1" }))?.type).toBe(
-      "serie",
-    );
-    expect(scToTitled(sc({ universe: 32, url: "/film/x/123" }))?.type).toBe(
-      "film",
-    );
+  it.each([
+    [5, "/serie/x/1"],
+    [5, "/serie/widow_s_bay/99153120/S1"],
+    [32, "/serie/dreamland/48034937"],
+    [32, "/film/x/123"],
+    [3, "/film/x/1"],
+    [0, "/serie/x/1"],
+  ])(
+    "never makes a candidate of the numeric universe %j, whatever the url %j",
+    (universe, url) => {
+      const item = sc({ universe, url });
+      expect(scToTitled(item)).toBeUndefined();
+      expect(scToCandidate(item)).toBeUndefined();
+    },
+  );
+
+  it("P4: an episode product is never a series candidate", () => {
+    const episode = sc({
+      productId: 133353723,
+      title: "Widow's Bay",
+      url: "/serie/widow_s_bay/99153120/S1/E1",
+      year: 2026,
+      universe: 32,
+    });
+    expect(scToCandidate(episode)).toBeUndefined();
+  });
+
+  it("P4: a Naka series is never mapped to an episode product", async () => {
+    const products = [
+      sc({
+        productId: 133353723,
+        title: "Widow's Bay",
+        url: "/serie/widow_s_bay/99153120/S1/E1",
+        year: 2026,
+        universe: 32,
+      }),
+    ];
+    const state = await resolveNakaIds([77], emptyState(), {
+      describeNaka: async () => ({
+        title: "Widow's Bay",
+        year: 2026,
+        type: "serie",
+      }),
+      searchSc: async () =>
+        products.flatMap((item): Candidate[] => {
+          const candidate = scToCandidate(item);
+          return candidate ? [candidate] : [];
+        }),
+      describeSc: async () => undefined,
+      searchNaka: async () => [],
+    });
+    expect(state.mapping).toEqual([]);
+  });
+
+  it("falls back to the url prefix only when the universe is not a number", () => {
     expect(scToTitled(sc({ universe: "", url: "/serie/x/1" }))?.type).toBe(
       "serie",
     );
     expect(scToTitled(sc({ universe: "1", url: "/film/x/1" }))?.type).toBe(
+      "film",
+    );
+    expect(scToTitled(sc({ universe: "4", url: "/film/x/1" }))?.type).toBe(
       "film",
     );
   });

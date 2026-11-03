@@ -33,9 +33,16 @@ function urlType(url: string): MediaType | undefined {
   return undefined;
 }
 
+function universeType(universe: number): MediaType | undefined {
+  if (universe === UNIVERSE.serie) return "serie";
+  if (universe === UNIVERSE.film) return "film";
+  return undefined;
+}
+
+// A numeric universe decides alone: a season (5) or an episode (32) has a /serie/ url but is never a
+// series candidate. The url prefix is read only when the universe is not a number.
 function scType(item: ScWishItem): MediaType | undefined {
-  if (item.universe === UNIVERSE.serie) return "serie";
-  if (item.universe === UNIVERSE.film) return "film";
+  if (typeof item.universe === "number") return universeType(item.universe);
   return urlType(item.url);
 }
 
@@ -66,7 +73,7 @@ export function nakaToCandidate(item: NakaItem): Candidate {
   return { ...nakaToTitled(item), id: item.contentId };
 }
 
-// undefined when the universe and the url name neither a film nor a series.
+// undefined when the universe (or, without a numeric universe, the url) names neither a film nor a series.
 export function scToTitled(item: ScWishItem): Titled | undefined {
   const type = scType(item);
   if (type === undefined) return undefined;
