@@ -39,11 +39,14 @@ function universeType(universe: number): MediaType | undefined {
   return undefined;
 }
 
-// A numeric universe decides alone: a season (5) or an episode (32) has a /serie/ url but is never a
-// series candidate. The url prefix is read only when the universe is not a number.
+// A universe SensCritique gives decides alone: only 1 (film) and 4 (serie) make a candidate, so a season
+// (5), an episode (32) or a value that is not a number ("32") gives none, whatever its /serie/ url. The url
+// prefix is read only when the universe is absent.
 function scType(item: ScWishItem): MediaType | undefined {
-  if (typeof item.universe === "number") return universeType(item.universe);
-  return urlType(item.url);
+  if (item.universe === undefined) return urlType(item.url);
+  return typeof item.universe === "number"
+    ? universeType(item.universe)
+    : undefined;
 }
 
 function build(
@@ -73,7 +76,7 @@ export function nakaToCandidate(item: NakaItem): Candidate {
   return { ...nakaToTitled(item), id: item.contentId };
 }
 
-// undefined when the universe (or, without a numeric universe, the url) names neither a film nor a series.
+// undefined when the universe (or, without a universe, the url) names neither a film nor a series.
 export function scToTitled(item: ScWishItem): Titled | undefined {
   const type = scType(item);
   if (type === undefined) return undefined;

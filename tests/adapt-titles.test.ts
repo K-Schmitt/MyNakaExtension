@@ -170,16 +170,25 @@ describe("scToTitled", () => {
     expect(state.mapping).toEqual([]);
   });
 
-  it("falls back to the url prefix only when the universe is not a number", () => {
-    expect(scToTitled(sc({ universe: "", url: "/serie/x/1" }))?.type).toBe(
-      "serie",
-    );
-    expect(scToTitled(sc({ universe: "1", url: "/film/x/1" }))?.type).toBe(
-      "film",
-    );
-    expect(scToTitled(sc({ universe: "4", url: "/film/x/1" }))?.type).toBe(
-      "film",
-    );
+  it.each([
+    ["32", "/serie/widow_s_bay/99153120/S1/E1"],
+    ["4", "/serie/x/1"],
+    ["1", "/film/x/1"],
+    ["", "/serie/x/1"],
+  ])(
+    "never makes a candidate of the present non-numeric universe %j, whatever the url %j",
+    (universe, url) => {
+      const item = sc({ universe, url });
+      expect(scToTitled(item)).toBeUndefined();
+      expect(scToCandidate(item)).toBeUndefined();
+    },
+  );
+
+  it("falls back to the url prefix only when the universe is absent", () => {
+    const { universe: _absent, ...bare } = sc();
+    expect(scToTitled({ ...bare, url: "/serie/x/1" })?.type).toBe("serie");
+    expect(scToTitled({ ...bare, url: "/film/x/1" })?.type).toBe("film");
+    expect(scToTitled({ ...bare, url: "/jeuvideo/x/1" })).toBeUndefined();
   });
 
   it.each([

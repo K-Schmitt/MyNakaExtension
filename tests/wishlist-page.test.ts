@@ -294,10 +294,29 @@ describe("parseWishlistPage items", () => {
     expect(onlyItem({ universe: "4" })?.universe).toBe("4");
   });
 
-  it("keeps the item with an empty universe when it is missing or odd", () => {
-    expect(onlyItem({ universe: null })?.universe).toBe("");
-    expect(onlyItem({ universe: undefined })?.universe).toBe("");
+  it("omits the universe when it is missing or null", () => {
+    for (const universe of [null, undefined]) {
+      const item = onlyItem({ universe });
+      expect(item && "universe" in item).toBe(false);
+    }
+    const { universe: _absent, ...rest } = product();
+    const { items } = parseWishlistPage(response([rest], 1));
+    expect(items[0] && "universe" in items[0]).toBe(false);
+  });
+
+  it("keeps an odd universe as present: an empty string", () => {
     expect(onlyItem({ universe: true })?.universe).toBe("");
+    expect(onlyItem({ universe: {} })?.universe).toBe("");
+  });
+
+  it("only a product without a universe falls back to its url for its type", () => {
+    const typeOf = (fields: Fields) => {
+      const item = onlyItem(fields);
+      return item && scToTitled(item)?.type;
+    };
+    expect(typeOf({ universe: null, url: "/film/x/1" })).toBe("film");
+    expect(typeOf({ universe: "32", url: "/serie/x/1/S1/E1" })).toBeUndefined();
+    expect(typeOf({ universe: true, url: "/serie/x/1" })).toBeUndefined();
   });
 });
 

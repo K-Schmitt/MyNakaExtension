@@ -9,7 +9,8 @@ export type ScWishItem = {
   originalTitle?: string;
   url: string;
   year?: number;
-  universe: number | string;
+  /** Absent when SensCritique gives none (missing or null); "" for a value neither number nor string. */
+  universe?: number | string;
 };
 
 type WishlistPage = { items: ScWishItem[]; total: number };
@@ -61,7 +62,8 @@ function yearOf(fields: Fields): number | undefined {
   );
 }
 
-function universeOf(value: unknown): number | string {
+function universeOf(value: unknown): number | string | undefined {
+  if (value === undefined || value === null) return undefined;
   return typeof value === "number" || typeof value === "string" ? value : "";
 }
 
@@ -74,12 +76,9 @@ function toItem(value: unknown): ScWishItem | undefined {
   const { id, title, url, originalTitle } = value;
   if (!isProductId(id)) return undefined;
   if (typeof title !== "string" || typeof url !== "string") return undefined;
-  const item: ScWishItem = {
-    productId: id,
-    title,
-    url,
-    universe: universeOf(value.universe),
-  };
+  const item: ScWishItem = { productId: id, title, url };
+  const universe = universeOf(value.universe);
+  if (universe !== undefined) item.universe = universe;
   if (typeof originalTitle === "string" && originalTitle !== "") {
     item.originalTitle = originalTitle;
   }
