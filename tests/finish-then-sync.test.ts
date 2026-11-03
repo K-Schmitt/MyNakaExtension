@@ -8,6 +8,7 @@ import type { Pair } from "../src/core/list-diff";
 import { emptyState, type SyncState } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { UNIVERSE } from "../src/sc/sc-queries";
 
 // One in-memory world shared by the finish handler and the REAL sync runner.
 // On SensCritique, "wished" is membership of the wishlist itself: unwish removes
@@ -30,6 +31,12 @@ const NAKA: Record<number, Titled> = {
 const SC: Record<number, Titled> = {
   [FILM_SC]: FILM_TITLE,
   [SERIES_SC]: SERIES_TITLE,
+};
+
+// The film and the series are 1042 and 1007; their episodes are 10071..10073.
+const universeOf = (id: number): number => {
+  if (id === FILM_SC) return UNIVERSE.film;
+  return id === SERIES_SC ? UNIVERSE.serie : UNIVERSE.episode;
 };
 
 function candidates(titles: Record<number, Titled>, q: string): Candidate[] {
@@ -89,6 +96,7 @@ function world(o: Opts) {
     productState: async (id) => ({
       isDone: w.done.has(id),
       isWished: w.sc.has(id),
+      universe: universeOf(id),
     }),
     unwish: async (id) => {
       w.writes.push(`unwish:${id}`);

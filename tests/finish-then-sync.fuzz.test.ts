@@ -15,6 +15,7 @@ import {
 } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { UNIVERSE } from "../src/sc/sc-queries";
 
 // Model-based fuzz of the finish handler and the REAL runSync on one world. The
 // owner edits both lists, writes, reads and saves fail on both handlers, and the
@@ -43,6 +44,10 @@ const scOf = (n: number): number => n + 1000;
 const isFilm = (n: number): boolean => FILMS.includes(n);
 const isFilmSc = (id: number): boolean =>
   id === HOMONYM || FILMS.some((n) => scOf(n) === id);
+const universeOf = (id: number): number => {
+  if (isFilmSc(id)) return UNIVERSE.film;
+  return SERIES.some((n) => scOf(n) === id) ? UNIVERSE.serie : UNIVERSE.episode;
+};
 const titleOf = (n: number): Titled =>
   isFilm(n)
     ? { title: `Film ${n}`, year: 2000 + n, type: "film" }
@@ -125,7 +130,11 @@ async function simulate(seed: number): Promise<string[]> {
     searchSc: async (q) => scCandidates(q),
     productState: async (id) => {
       flaky(0.05, "productState");
-      return { isDone: done.has(id), isWished: lists.sc.has(id) };
+      return {
+        isDone: done.has(id),
+        isWished: lists.sc.has(id),
+        universe: universeOf(id),
+      };
     },
     unwish: async (id) => {
       if (!isFilmSc(id)) violations.push(`seed ${seed}: unwish ${id}`);

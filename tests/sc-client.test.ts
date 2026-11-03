@@ -78,7 +78,7 @@ const EVERYTHING: Respond = (call) => {
   if (operationOf(call) === "UserCollection") return wishPage([], 0);
   if (operationOf(call) === "ProductCurrentUserInfos") {
     const id = Number(variablesOf(call).id);
-    return stateReply({ id, currentUserInfos: userInfos(id) });
+    return stateReply({ id, universe: 1, currentUserInfos: userInfos(id) });
   }
   return OK;
 };
@@ -1165,19 +1165,26 @@ describe("productState", () => {
   });
 
   it.each([
-    [false, false],
-    [true, false],
-    [false, true],
-    [true, true],
-  ])("returns isDone %s and isWished %s", async (isDone, isWished) => {
-    const infos = { isDone, isWished, productId: 7 };
-    const { client } = setup(LOGGED_IN, () =>
-      stateReply({ id: 7, currentUserInfos: infos }),
-    );
-    expect(await client.productState(7)).toStrictEqual({ isDone, isWished });
-  });
+    [false, false, 1],
+    [true, false, 4],
+    [false, true, 32],
+    [true, true, 5],
+  ])(
+    "returns isDone %s, isWished %s and the universe %s",
+    async (isDone, isWished, universe) => {
+      const infos = { isDone, isWished, productId: 7 };
+      const { client } = setup(LOGGED_IN, () =>
+        stateReply({ id: 7, universe, currentUserInfos: infos }),
+      );
+      expect(await client.productState(7)).toStrictEqual({
+        isDone,
+        isWished,
+        universe,
+      });
+    },
+  );
 
-  it("returns only the two flags, whatever else the answer holds", async () => {
+  it("returns only the two flags and the universe, whatever else the answer holds", async () => {
     const infos = userInfos(5, {
       ...PERSONAL,
       isDone: true,
@@ -1186,17 +1193,25 @@ describe("productState", () => {
       review: { url: LEAK },
     });
     const { client } = setup(LOGGED_IN, () =>
-      stateReply({ id: 5, title: LEAK, currentUserInfos: infos }),
+      stateReply({ id: 5, universe: 1, title: LEAK, currentUserInfos: infos }),
     );
     const state = await client.productState(5);
-    expect(state).toStrictEqual({ isDone: true, isWished: false });
-    expect(Object.keys(state).sort()).toEqual(["isDone", "isWished"]);
+    expect(state).toStrictEqual({ isDone: true, isWished: false, universe: 1 });
+    expect(Object.keys(state).sort()).toEqual([
+      "isDone",
+      "isWished",
+      "universe",
+    ]);
     expect(JSON.stringify(state)).not.toContain("LEAK");
     expect(JSON.stringify(state)).not.toContain(TOKEN);
   });
 
+  const product5 = (extra: Record<string, unknown>): Reply =>
+    stateReply({ id: 5, universe: 1, ...extra });
   const withInfos = (infos: unknown): Reply =>
-    stateReply({ id: 5, currentUserInfos: infos });
+    product5({ currentUserInfos: infos });
+  const withUniverse = (universe: unknown): Reply =>
+    product5({ universe, currentUserInfos: userInfos(5, PERSONAL) });
   const flags = (extra: Record<string, unknown>): Reply =>
     withInfos(userInfos(5, { ...PERSONAL, ...extra }));
   const without = (key: string): Reply => {
@@ -1209,7 +1224,7 @@ describe("productState", () => {
     ["a null product", stateReply(null)],
     ["a product that is a list", stateReply([LEAK, TOKEN])],
     ["a product that is a string", stateReply(`${TOKEN} ${LEAK}`)],
-    ["no currentUserInfos", stateReply({ id: 5, title: LEAK })],
+    ["no currentUserInfos", product5({ title: LEAK })],
     ["a null currentUserInfos", withInfos(null)],
     ["a currentUserInfos that is a list", withInfos([true, true])],
     ["a currentUserInfos that is a string", withInfos(`${TOKEN} ${LEAK}`)],
@@ -1223,15 +1238,27 @@ describe("productState", () => {
     ["no productId", without("productId")],
     ["a foreign productId", withInfos(userInfos(6, PERSONAL))],
     ["a productId as a string", flags({ productId: "5" })],
-    ["no product id", stateReply({ currentUserInfos: userInfos(5, PERSONAL) })],
+    [
+      "no product id",
+      stateReply({ universe: 1, currentUserInfos: userInfos(5, PERSONAL) }),
+    ],
     [
       "a foreign product id",
-      stateReply({ id: 6, currentUserInfos: userInfos(5, PERSONAL) }),
+      product5({ id: 6, currentUserInfos: userInfos(5, PERSONAL) }),
     ],
     [
       "a product id as a string",
-      stateReply({ id: "5", currentUserInfos: userInfos(5, PERSONAL) }),
+      product5({ id: "5", currentUserInfos: userInfos(5, PERSONAL) }),
     ],
+    [
+      "no universe",
+      stateReply({ id: 5, currentUserInfos: userInfos(5, PERSONAL) }),
+    ],
+    ["a null universe", withUniverse(null)],
+    ["a universe as a string", withUniverse("1")],
+    ["a universe of 1.5", withUniverse(1.5)],
+    ["a universe of 2 ** 53", withUniverse(2 ** 53)],
+    ["a universe that is a boolean", withUniverse(true)],
   ];
 
   it.each(MALFORMED)(

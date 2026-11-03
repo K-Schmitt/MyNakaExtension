@@ -7,6 +7,7 @@ import {
 import type { Pair } from "../src/core/list-diff";
 import { emptyState, type SyncState } from "../src/core/state";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
 
 const TODAY = "2026-11-03";
@@ -38,6 +39,12 @@ const SEASONS: Record<string, Season> = {
     episodes: [1, 2, 3, 4, 5].map((e) => ep(1, e, 5000 + e)),
   },
   [`${SERIES_SC}:2`]: { episodes: [ep(2, 1, 6001)] },
+};
+
+// Episodes are 5000 and up, the two series products are 1007 and 2007, everything else is a film.
+const universeOf = (id: number): number => {
+  if (id >= 5000) return UNIVERSE.episode;
+  return id === SERIES_SC || id === 2007 ? UNIVERSE.serie : UNIVERSE.film;
 };
 
 const SEARCH: Record<string, Candidate[]> = {
@@ -128,7 +135,8 @@ function world(o: Opts = {}) {
     productState: async (id) => {
       w.calls.push(`productState:${id}`);
       failing("productState");
-      return o.flags?.[id] ?? { isDone: false, isWished: true };
+      const flags = o.flags?.[id] ?? { isDone: false, isWished: true };
+      return { ...flags, universe: universeOf(id) };
     },
     unwish: async (id) => {
       w.calls.push(`unwish:${id}`);
