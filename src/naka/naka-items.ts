@@ -51,8 +51,17 @@ export function toPlaylistIds(json: unknown): number[] {
   if (!ids.every(isPositiveId)) {
     throw new NakaUnavailableError("Naka playlist: unexpected response");
   }
-  if (typeof json.limit === "number" && ids.length >= json.limit) {
+  if (mayBeTruncated(json, ids.length)) {
     throw new NakaUnavailableError("Naka playlist: list may be truncated");
   }
   return [...new Set(ids as number[])];
+}
+
+// The length is the RAW one, before the dedupe. A page limit is required: without it nothing proves the list is whole.
+function mayBeTruncated(json: Record<string, unknown>, length: number) {
+  const { limit, total, hasMore } = json;
+  if (!isPositiveId(limit) || length >= limit) return true;
+  if (typeof total === "number" && total !== length) return true;
+  if (hasMore === true) return true;
+  return Object.keys(json).some((key) => key.startsWith("next"));
 }

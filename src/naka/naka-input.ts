@@ -19,5 +19,10 @@ export function checkQuery(value: string): string {
   if (trimmed.length < 1 || trimmed.length > MAX_QUERY) {
     throw new RangeError("query must be 1 to 200 characters");
   }
+  try {
+    encodeURIComponent(trimmed);
+  } catch {
+    throw new RangeError("query must be well-formed text");
+  }
   return trimmed;
 }

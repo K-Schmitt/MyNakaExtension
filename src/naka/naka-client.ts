@@ -90,8 +90,19 @@ async function contentById(
     }
     throw error;
   }
-  const json = parseJson(text, "content");
-  return toItem(isRecord(json) && isRecord(json.data) ? json.data : json);
+  const item = toItem(unwrap(parseJson(text, "content")));
+  if (item !== undefined && item.contentId !== contentId) {
+    throw new NakaUnavailableError("Naka content: unexpected item");
+  }
+  return item;
+}
+
+// The entry is the bare object, or the `data` object of a wrapper that has no `id` of its own.
+function unwrap(json: unknown): unknown {
+  if (isRecord(json) && !("id" in json)) {
+    return json.data;
+  }
+  return json;
 }
 
 export function createNakaClient(deps: NakaDeps): NakaClient {

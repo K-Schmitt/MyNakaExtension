@@ -82,7 +82,9 @@ function only(calls: Call[]): Call {
 
 describe("requests on the wire", () => {
   it("GETs the playlist ids with the exact headers and options", async () => {
-    const { client, calls } = setup(() => json({ contentIds: [3675, 1982] }));
+    const { client, calls } = setup(() =>
+      json({ contentIds: [3675, 1982], limit: 500 }),
+    );
     expect(await client.playlistIds()).toEqual([3675, 1982]);
     const call = only(calls);
     expect(call.url).toBe(`${BASE}/playlist/ids`);
@@ -222,7 +224,9 @@ describe("search", () => {
         ],
       }),
     );
-    for (const item of await client.search("x")) {
+    const items = await client.search("x");
+    expect(items).toHaveLength(5);
+    for (const item of items) {
       expect(Object.keys(item).sort()).toEqual([
         "contentId",
         "mediaType",
@@ -285,7 +289,9 @@ describe("search", () => {
 
 describe("playlistIds fails closed", () => {
   it("removes duplicates and keeps order", async () => {
-    const { client } = setup(() => json({ contentIds: [5, 3, 5, 9, 3] }));
+    const { client } = setup(() =>
+      json({ contentIds: [5, 3, 5, 9, 3], limit: 500 }),
+    );
     expect(await client.playlistIds()).toEqual([5, 3, 9]);
   });
 
@@ -308,20 +314,72 @@ describe("playlistIds fails closed", () => {
     expect(await ok.client.playlistIds()).toHaveLength(499);
   });
 
-  it("ignores a limit that is not a number", async () => {
-    const { client } = setup(() => json({ contentIds: [1], limit: "1" }));
-    expect(await client.playlistIds()).toEqual([1]);
+  it("accepts the real shape: 11 ids and limit 500", async () => {
+    const ids = Array.from({ length: 11 }, (_, i) => 100 + i);
+    const { client } = setup(() => json({ contentIds: ids, limit: 500 }));
+    expect(await client.playlistIds()).toEqual(ids);
+  });
+
+  const range = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+  it.each([
+    ["600 ids with no limit", { contentIds: range(600) }],
+    ["a missing limit", { contentIds: [1] }],
+    ["a string limit", { contentIds: [1], limit: "500" }],
+    ["a null limit", { contentIds: [1], limit: null }],
+    ["a renamed limit", { contentIds: [1], max: 500 }],
+    ["a zero limit", { contentIds: [1], limit: 0 }],
+    ["a negative limit", { contentIds: [1], limit: -5 }],
+    ["a float limit", { contentIds: [1], limit: 500.5 }],
+    ["an unsafe limit", { contentIds: [1], limit: 2 ** 53 }],
+    ["a total that differs", { contentIds: range(50), limit: 500, total: 120 }],
+    [
+      "a total smaller than the ids",
+      { contentIds: [1, 2], limit: 500, total: 1 },
+    ],
+    ["hasMore true", { contentIds: [1], limit: 500, hasMore: true }],
+    ["a nextCursor", { contentIds: [1], limit: 500, nextCursor: "x" }],
+    ["a nextPage", { contentIds: [1], limit: 500, nextPage: 2 }],
+    [
+      "500 entries with one duplicate at the limit",
+      { contentIds: [...range(499), 1], limit: 500 },
+    ],
+  ])("fails closed on %s", async (_name, body) => {
+    const { client } = setup(() => json(body));
+    const error = await failure(client.playlistIds());
+    expect(error).toBeInstanceOf(NakaUnavailableError);
+    expect(error.message).toContain("truncated");
+  });
+
+  it("accepts a matching total, hasMore false and unrelated keys", async () => {
+    const { client } = setup(() =>
+      json({
+        contentIds: [4, 5],
+        limit: 500,
+        total: 2,
+        hasMore: false,
+        next: undefined,
+        other: "x",
+      }),
+    );
+    expect(await client.playlistIds()).toEqual([4, 5]);
+  });
+
+  it("ignores a total that is not a number", async () => {
+    const { client } = setup(() =>
+      json({ contentIds: [4, 5], limit: 500, total: null }),
+    );
+    expect(await client.playlistIds()).toEqual([4, 5]);
   });
 
   it.each([
     ["a missing contentIds", { limit: 500 }],
     ["contentIds that is not an array", { contentIds: "1,2" }],
-    ["a float id", { contentIds: [1, 2.5] }],
-    ["a string id", { contentIds: [1, "2"] }],
-    ["a zero id", { contentIds: [0] }],
-    ["a negative id", { contentIds: [-1] }],
-    ["an unsafe id", { contentIds: [2 ** 53] }],
-    ["a null id", { contentIds: [null] }],
+    ["a float id", { contentIds: [1, 2.5], limit: 500 }],
+    ["a string id", { contentIds: [1, "2"], limit: 500 }],
+    ["a zero id", { contentIds: [0], limit: 500 }],
+    ["a negative id", { contentIds: [-1], limit: 500 }],
+    ["an unsafe id", { contentIds: [2 ** 53], limit: 500 }],
+    ["a null id", { contentIds: [null], limit: 500 }],
     ["a bare array", [1, 2]],
     ["null", null],
     ["a string", "x"],
@@ -356,6 +414,27 @@ describe("contentById", () => {
   it("maps the object wrapped in data", async () => {
     const { client } = setup(() => json({ data: entry(9) }));
     expect((await client.contentById(9))?.contentId).toBe(9);
+  });
+
+  it("rejects an item whose id is not the requested one", async () => {
+    for (const body of [entry(42), { data: entry(42) }]) {
+      const { client } = setup(() => json(body));
+      const error = await failure(client.contentById(9));
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expect((error as NakaUnavailableError).status).toBe(0);
+      expect(error.message).toBe("Naka content: unexpected item");
+    }
+    const same = setup(() => json(entry(9)));
+    expect((await same.client.contentById(9))?.contentId).toBe(9);
+  });
+
+  it("uses data only when there is no top-level id", async () => {
+    const { client } = setup(() =>
+      json({ ...entry(9), data: entry(42, { title: "Autre" }) }),
+    );
+    expect((await client.contentById(9))?.title).toBe("Titre 9");
+    const odd = setup(() => json({ ...entry(9), data: "x" }));
+    expect((await odd.client.contentById(9))?.contentId).toBe(9);
   });
 
   it("returns undefined on 404 only", async () => {
@@ -445,7 +524,7 @@ describe("errors", () => {
 
   it("rejects a body over 2,000,000 characters and accepts 2,000,000", async () => {
     const pad = (n: number) => {
-      const head = '{"contentIds":[1],"pad":"';
+      const head = '{"contentIds":[1],"limit":500,"pad":"';
       const tail = '"}';
       return head + "x".repeat(n - head.length - tail.length) + tail;
     };
@@ -535,6 +614,8 @@ describe("input guards", () => {
     ["empty", ""],
     ["blank", "   "],
     ["201 characters", "a".repeat(201)],
+    ["a lone high surrogate", "a\uD800b"],
+    ["a lone low surrogate", "\uDC00"],
     ["a number", 5],
     ["undefined", undefined],
   ])("rejects a %s query", async (_name, value) => {
@@ -561,7 +642,7 @@ describe("input guards", () => {
 });
 
 describe("token secrecy", () => {
-  function scan(client: NakaClient, calls: Call[]) {
+  function scan(client: NakaClient) {
     const run = async () => {
       let errors = 0;
       const attempts: (() => Promise<unknown>)[] = [
@@ -581,7 +662,7 @@ describe("token secrecy", () => {
       }
       return errors;
     };
-    return { run, calls };
+    return { run };
   }
 
   function expectClean(error: unknown) {
@@ -619,7 +700,7 @@ describe("token secrecy", () => {
     let totalErrors = 0;
     for (const reply of replies) {
       const { client, calls } = setup(() => reply);
-      totalErrors += await scan(client, calls).run();
+      totalErrors += await scan(client).run();
       totalCalls += calls.length;
       for (const call of calls) {
         expect(call.url).not.toContain(TOKEN);
@@ -644,7 +725,41 @@ describe("token secrecy", () => {
     const { client } = setup(() => {
       throw new Error(`socket ${TOKEN} ${LEAK}`);
     });
-    const errors = await scan(client, []).run();
+    const errors = await scan(client).run();
     expect(errors).toBe(5);
+  });
+
+  const thrown: [string, () => never][] = [
+    [
+      "an Error holding the token everywhere",
+      () => {
+        const e = new Error(`boom ${TOKEN}`, { cause: TOKEN });
+        Object.assign(e, { detail: TOKEN });
+        throw e;
+      },
+    ],
+    [
+      "a string holding the token",
+      () => {
+        throw `${TOKEN} ${LEAK}`;
+      },
+    ],
+  ];
+
+  it.each(thrown)("scrubs token() throwing %s", async (_name, boom) => {
+    const { client, calls } = setup(() => OK, boom);
+    const attempts: (() => Promise<unknown>)[] = [
+      () => client.playlistIds(),
+      () => client.addToPlaylist(5),
+      () => client.removeFromPlaylist(5),
+      () => client.search("batman"),
+      () => client.contentById(5),
+    ];
+    for (const attempt of attempts) {
+      const error = await failure(attempt());
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expectClean(error);
+    }
+    expect(calls).toHaveLength(0);
   });
 });
