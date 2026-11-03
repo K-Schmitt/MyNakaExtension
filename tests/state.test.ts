@@ -40,6 +40,12 @@ function rich(): SyncState {
     handled: ["movie:1"],
     unlinked: [{ side: "sc", id: 9, title: "X", reason: "no-match" }],
     retryLast: [p(4, 40), p(1, 10)],
+    run: 7,
+    presence: {
+      naka: [{ id: 5, from: 2, to: 7 }],
+      sc: [{ id: 9, from: 1, to: 3 }],
+    },
+    threshold: 0.8,
   };
 }
 
@@ -65,6 +71,8 @@ describe("emptyState", () => {
       handled: [],
       unlinked: [],
       retryLast: [],
+      run: 0,
+      presence: { naka: [], sc: [] },
       threshold: 0.9,
     });
   });
@@ -390,6 +398,17 @@ describe("retryLast", () => {
   for (const [name, run] of updaters) {
     it(`${name} keeps retryLast unchanged and in order`, () => {
       expect(run(deepFreeze(rich())).retryLast).toEqual([p(4, 40), p(1, 10)]);
+    });
+  }
+});
+
+describe("run, presence and threshold", () => {
+  for (const [name, run] of updaters) {
+    it(`${name} keeps the run counter, the presence and the threshold unchanged`, () => {
+      const out = run(deepFreeze(rich()));
+      expect(out.run).toBe(7);
+      expect(out.presence).toEqual(rich().presence);
+      expect(out.threshold).toBe(0.8);
     });
   }
 });

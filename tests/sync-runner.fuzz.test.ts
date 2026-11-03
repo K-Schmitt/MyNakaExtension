@@ -119,6 +119,8 @@ async function simulate(seed: number): Promise<string[]> {
     if (evicted(item.pair)) return;
     const n = item.pair.nakaId;
     state = upsertMapping(state, { nakaId: n, scId: n + 2000 });
+    // The new pair has not been seen in both lists yet.
+    seenBoth.delete(n);
     if (r() < 0.5) lists.sc.add(n + 2000);
     log.push(`remap ${n}`);
   };

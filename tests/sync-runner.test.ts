@@ -409,11 +409,11 @@ describe("fail closed (D2)", () => {
     await expect(runSync(w.ports)).rejects.toThrow("save");
   });
 
-  it("an empty state with empty lists writes nothing and saves emptyState()", async () => {
+  it("an empty state with empty lists writes nothing and saves emptyState() with one run counted", async () => {
     const w = world();
     const r = await runSync(w.ports);
     expect(w.writes).toEqual([]);
-    expect(w.saved).toEqual([emptyState()]);
+    expect(w.saved).toEqual([{ ...emptyState(), run: 1 }]);
     expect(r).toEqual(report());
   });
 });

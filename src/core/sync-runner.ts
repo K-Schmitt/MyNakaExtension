@@ -1,4 +1,5 @@
 import { type Pair, planListSync, type Removal } from "./list-diff";
+import { nextPresence, type Presence, withPairsSeenTogether } from "./presence";
 import type { ResolverPorts } from "./resolver";
 import { addPending, type SyncState, setSnapshot } from "./state";
 import {
@@ -49,11 +50,20 @@ function effectiveSettled(state: SyncState): Pair[] {
   return [...unique.values()];
 }
 
-function planFor(state: SyncState, naka: number[], sc: number[]) {
+// The stored snapshot plus the mapped pairs a completed run saw together (presence as loaded).
+function knownSnapshot(state: SyncState, presence: Presence): Pair[] {
+  return withPairsSeenTogether(state.snapshot, state.mapping, presence);
+}
+
+function planFor(
+  state: SyncState,
+  presence: Presence,
+  lists: { naka: number[]; sc: number[] },
+) {
   return planListSync({
-    naka: new Set(naka),
-    sc: new Set(sc),
-    snapshot: state.snapshot,
+    naka: new Set(lists.naka),
+    sc: new Set(lists.sc),
+    snapshot: knownSnapshot(state, presence),
     mapping: state.mapping,
     settled: effectiveSettled(state),
   });
@@ -83,12 +93,12 @@ async function effectiveList(
   }
 }
 
-// A snapshot pair the planner skipped (conflicted, settled) and that is still
-// mapped and on one side must stay known: if it dropped out, it would be
-// treated as an addition once the skip ends.
+// A known pair (snapshotted, or seen together) the planner skipped (conflicted,
+// settled) and that is still mapped and on one side must stay known: if it
+// dropped out, it would be treated as an addition once the skip ends.
 function nextSnapshot(
   state: SyncState,
-  loaded: SyncState,
+  known: readonly Pair[],
   lists: { naka: number[]; sc: number[] },
 ): SyncState {
   const inNaka = new Set(lists.naka);
@@ -96,7 +106,7 @@ function nextSnapshot(
   const both = state.mapping.filter(
     (pair) => inNaka.has(pair.nakaId) && inSc.has(pair.scId),
   );
-  const carried = loaded.snapshot.filter(
+  const carried = known.filter(
     (pair) =>
       state.mapping.some((m) => pairKey(m) === pairKey(pair)) &&
       (inNaka.has(pair.nakaId) || inSc.has(pair.scId)),
@@ -106,6 +116,16 @@ function nextSnapshot(
     ...pendingRemovalPairs(state),
     ...carried,
   ]);
+}
+
+// The run is complete: its final lists extend the presence intervals.
+function completeRun(
+  state: SyncState,
+  lists: { naka: number[]; sc: number[] },
+): SyncState {
+  const run = state.run + 1;
+  const presence = nextPresence(state.presence, run, lists, state.mapping);
+  return { ...state, run, presence };
 }
 
 function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
@@ -123,29 +143,34 @@ function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
 
 export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   const loaded = await ports.load();
-  const naka = await ports.nakaIds();
-  const sc = await ports.scWishlistIds();
-  const first = planFor(loaded, naka, sc);
+  const lists = {
+    naka: await ports.nakaIds(),
+    sc: await ports.scWishlistIds(),
+  };
+  const first = planFor(loaded, loaded.presence, lists);
   const resolved = await resolveUnlinked(loaded, first, ports);
-  const plan = planFor(resolved, naka, sc);
+  const plan = planFor(resolved, loaded.presence, lists);
   const outcome = await executeWrites(
     selectWrites(plan, resolved.retryLast),
     ports,
   );
   const queued = queueRemovals(resolved, plan.confirmRemoval);
-  const finalNaka = await effectiveList(
-    () => ports.nakaIds(),
-    naka,
-    outcome.written.naka,
-  );
-  const finalSc = await effectiveList(
-    () => ports.scWishlistIds(),
-    sc,
-    outcome.written.sc,
-  );
-  const state = nextRetryLast(
-    nextSnapshot(queued, loaded, { naka: finalNaka, sc: finalSc }),
-    outcome,
+  const final = {
+    naka: await effectiveList(
+      () => ports.nakaIds(),
+      lists.naka,
+      outcome.written.naka,
+    ),
+    sc: await effectiveList(
+      () => ports.scWishlistIds(),
+      lists.sc,
+      outcome.written.sc,
+    ),
+  };
+  const known = knownSnapshot(resolved, loaded.presence);
+  const state = completeRun(
+    nextRetryLast(nextSnapshot(queued, known, final), outcome),
+    final,
   );
   await ports.save(state);
   return {

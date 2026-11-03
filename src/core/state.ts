@@ -1,4 +1,5 @@
 import type { Pair } from "./list-diff";
+import type { Presence } from "./presence";
 import { DEFAULT_THRESHOLD } from "./watch-trigger";
 
 type Side = "naka" | "sc";
@@ -23,6 +24,10 @@ export type SyncState = {
   handled: string[];
   unlinked: UnlinkedItem[];
   retryLast: Pair[];
+  /** Completed sync runs, counted from 0. */
+  run: number;
+  /** Per side, the latest contiguous interval of completed runs whose final list held each id. */
+  presence: Presence;
   threshold: number;
 };
 
@@ -62,6 +67,8 @@ export function emptyState(): SyncState {
     handled: [],
     unlinked: [],
     retryLast: [],
+    run: 0,
+    presence: { naka: [], sc: [] },
     threshold: DEFAULT_THRESHOLD,
   };
 }
