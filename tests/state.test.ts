@@ -293,6 +293,84 @@ describe("setUnlinked", () => {
   });
 });
 
+describe("field preservation on a fully populated state", () => {
+  const frozen = (): SyncState => deepFreeze(rich());
+
+  it("upsertMapping changes only mapping", () => {
+    expect(upsertMapping(frozen(), p(1, 11))).toEqual({
+      ...rich(),
+      mapping: [p(2, 20), p(1, 11)],
+    });
+  });
+  it("settlePair changes only settled", () => {
+    expect(settlePair(frozen(), p(4, 40))).toEqual({
+      ...rich(),
+      settled: [p(3, 30), p(4, 40)],
+    });
+  });
+  it("settlePair of a present pair changes nothing", () => {
+    expect(settlePair(frozen(), p(3, 30))).toEqual(rich());
+  });
+  it("unsettlePair changes only settled", () => {
+    expect(unsettlePair(frozen(), p(3, 30))).toEqual({
+      ...rich(),
+      settled: [],
+    });
+  });
+  it("unsettlePair of an absent pair changes nothing", () => {
+    expect(unsettlePair(frozen(), p(9, 9))).toEqual(rich());
+  });
+  it("setSnapshot changes only snapshot", () => {
+    expect(setSnapshot(frozen(), [p(6, 60), p(6, 60)])).toEqual({
+      ...rich(),
+      snapshot: [p(6, 60)],
+    });
+  });
+  it("addPending changes only pending", () => {
+    const item = ambiguity("sc", 77);
+    expect(addPending(frozen(), item)).toEqual({
+      ...rich(),
+      pending: [...rich().pending, item],
+    });
+  });
+  it("addPending of a present item changes nothing", () => {
+    expect(addPending(frozen(), ambiguity("naka", 5))).toEqual(rich());
+  });
+  it("resolvePending changes only pending", () => {
+    expect(resolvePending(frozen(), ambiguity("naka", 5))).toEqual({
+      ...rich(),
+      pending: [removal("sc", p(1, 10))],
+    });
+  });
+  it("resolvePending of an absent item changes nothing", () => {
+    expect(resolvePending(frozen(), ambiguity("sc", 99))).toEqual(rich());
+  });
+  it("markAsked changes only pending", () => {
+    expect(markAsked(frozen(), p(1, 10))).toEqual({
+      ...rich(),
+      pending: [removal("sc", p(1, 10), true), ambiguity("naka", 5, [7, 8])],
+    });
+  });
+  it("markHandled changes only handled", () => {
+    expect(markHandled(frozen(), "movie:2")).toEqual({
+      ...rich(),
+      handled: ["movie:1", "movie:2"],
+    });
+  });
+  it("markHandled of a present key changes nothing", () => {
+    expect(markHandled(frozen(), "movie:1")).toEqual(rich());
+  });
+  it("setUnlinked changes only unlinked", () => {
+    const items: UnlinkedItem[] = [
+      { side: "naka", id: 4, title: "Z", reason: "not-in-catalogue" },
+    ];
+    expect(setUnlinked(frozen(), items)).toEqual({
+      ...rich(),
+      unlinked: items,
+    });
+  });
+});
+
 describe("immutability", () => {
   const updaters: [string, (s: SyncState) => SyncState][] = [
     ["upsertMapping", (s) => upsertMapping(s, p(1, 99))],
