@@ -1,7 +1,7 @@
 // Finds the SensCritique product of a finished Naka title: the stored mapping first, else a search
 // shared with the resolver (candidate-search.ts), then matchTitle (same type only).
 // A question already put to the owner about the title (checked first, even before the mapping), or
-// about the product a search finds, is never decided here: the owner's pending choice wins.
+// about the product the mapping or a search gives, is never decided here: the owner's pending choice wins.
 
 import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
@@ -12,7 +12,7 @@ export type ScMatch =
   | { kind: "pair"; pair: Pair; isNew: boolean }
   /** The owner must choose: a new Naka-side question is to be saved. */
   | { kind: "needs-choice"; candidateIds: number[] }
-  /** The owner was already asked about this title: nothing changes. */
+  /** The owner was already asked about this title or its mapped product: nothing changes. */
   | { kind: "asked"; candidateIds: number[] }
   | { kind: "not-found" };
 
@@ -39,6 +39,15 @@ function openQuestion(
   return undefined;
 }
 
+// An SC-side question lists NAKA ids: the owner is asked about the product itself, and the stored
+// question stays as it is.
+function mappedMatch(state: SyncState, pair: Pair): ScMatch {
+  if (openQuestion(state, "sc", pair.scId)) {
+    return { kind: "asked", candidateIds: [pair.scId] };
+  }
+  return { kind: "pair", pair, isNew: false };
+}
+
 export async function matchOnSc(
   state: SyncState,
   nakaId: number,
@@ -48,7 +57,7 @@ export async function matchOnSc(
   const asked = openQuestion(state, "naka", nakaId);
   if (asked) return { kind: "asked", candidateIds: [...asked.candidateIds] };
   const mapped = state.mapping.find((pair) => pair.nakaId === nakaId);
-  if (mapped) return { kind: "pair", pair: mapped, isNew: false };
+  if (mapped) return mappedMatch(state, mapped);
   const candidates = await findCandidates((q) => ports.searchSc(q), titled);
   const result = matchTitle(titled, candidates);
   if (result.kind === "none") return { kind: "not-found" };

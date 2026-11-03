@@ -272,15 +272,23 @@ describe("an open question about the same title wins over a fresh match", () => 
     expect(writesOf(w.calls)).toEqual([]);
   });
 
-  it("a mapped title with an SC-side question on its product is finished: that rule needs a search match", async () => {
-    const w = world({
-      state: {
-        mapping: [FILM_PAIR],
-        pending: [question("sc", FILM_SC, [FILM, 43])],
-      },
-    });
-    expect((await handleFinish(film(), w.ports)).kind).toBe("done");
-  });
+  it.each([
+    ["film", film(), FILM_PAIR],
+    ["series", episode(1, 2), SERIES_PAIR],
+  ] as const)(
+    "a mapped %s with an SC-side question on its product asks about the product: no write, nothing saved",
+    async (_name, event, pair) => {
+      const open = question("sc", pair.scId, [pair.nakaId, 43]);
+      const w = world({ state: { mapping: [pair], pending: [open] } });
+      expect(await handleFinish(event, w.ports)).toEqual({
+        kind: "needs-choice",
+        candidateIds: [pair.scId],
+      });
+      expect(w.calls).toEqual(["load"]);
+      expect(w.state.pending).toEqual([open]);
+      expect(w.state.mapping).toEqual([pair]);
+    },
+  );
 
   it.each([
     ["a question on another Naka title", question("naka", 43, [FILM_SC])],
