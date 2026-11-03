@@ -104,6 +104,7 @@ function world(o: Opts = {}) {
       w.writes.push(`addToSc:${scId}`);
       if (o.failSc?.includes(scId)) throw new Error("sc write");
       if (!o.noEffectSc) w.sc.add(scId);
+      return "added";
     },
     addToNaka: async (nakaId) => {
       w.writes.push(`addToNaka:${nakaId}`);
@@ -135,6 +136,7 @@ const report = (r: Partial<SyncReport> = {}): SyncReport => ({
   added: [],
   deferred: [],
   failed: [],
+  alreadyDone: [],
   pendingRemovals: 0,
   unresolved: 0,
   ...r,

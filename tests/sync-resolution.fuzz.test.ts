@@ -160,7 +160,10 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
       },
       nakaIds: read("naka"),
       scWishlistIds: read("sc"),
-      addToSc: (id) => write("sc", id),
+      addToSc: async (id) => {
+        await write("sc", id);
+        return "added";
+      },
       addToNaka: (id) => write("naka", id),
       describeNaka: async (id) => {
         flaky(0.05, "describe");

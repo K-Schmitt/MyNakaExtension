@@ -174,7 +174,10 @@ async function simulate(seed: number): Promise<string[]> {
         }
         return list;
       },
-      addToSc: (id) => write("sc", id),
+      addToSc: async (id) => {
+        await write("sc", id);
+        return "added";
+      },
       addToNaka: (id) => write("naka", id),
       describeNaka: async () => undefined,
       describeSc: async () => undefined,
@@ -264,6 +267,7 @@ async function starved(seed: number): Promise<number[]> {
     addToSc: async (id: number) => {
       if (fails(id - 1000)) throw new Error("fail");
       sc.add(id);
+      return "added" as const;
     },
     addToNaka: async (id: number) => {
       if (fails(id)) throw new Error("fail");

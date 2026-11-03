@@ -147,7 +147,10 @@ async function simulate(seed: number): Promise<string[]> {
       }
       log.push(`run addToSc ${id}`);
       flaky(0.2, "addToSc");
+      // Plan 3 reads the product state first and never wishes a product already done.
+      if (done.has(id)) return "already-done";
       lists.sc.add(id);
+      return "added";
     },
     addToNaka: async (id) => {
       log.push(`run addToNaka ${id}`);

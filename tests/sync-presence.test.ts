@@ -74,6 +74,7 @@ function world(o: Opts) {
     addToSc: async (id) => {
       w.writes.push(`addToSc:${id}`);
       w.sc.add(id);
+      return "added";
     },
     addToNaka: async (id) => {
       w.writes.push(`addToNaka:${id}`);
@@ -91,6 +92,7 @@ const report = (r: Partial<SyncReport> = {}): SyncReport => ({
   added: [],
   deferred: [],
   failed: [],
+  alreadyDone: [],
   pendingRemovals: 0,
   unresolved: 0,
   ...r,

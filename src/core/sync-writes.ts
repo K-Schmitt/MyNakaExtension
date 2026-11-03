@@ -9,15 +9,20 @@ type Write = { side: Side; pair: Pair };
 
 export type WritePorts = {
   addToNaka(nakaId: number): Promise<void>;
-  addToSc(scId: number): Promise<void>;
+  /** "already-done": the owner already saw the product on SensCritique, so it was not wished. */
+  addToSc(scId: number): Promise<"added" | "already-done">;
 };
 
 export type WriteOutcome = {
   added: Pair[];
   deferred: Pair[];
   failed: Pair[];
+  /** Pairs whose SensCritique product is already done: attempted, not written. */
+  alreadyDone: Pair[];
   written: { naka: number[]; sc: number[] };
 };
+
+type Result = "added" | "already-done" | "failed";
 
 const samePair = (a: Pair, b: Pair): boolean =>
   a.nakaId === b.nakaId && a.scId === b.scId;
@@ -57,14 +62,38 @@ function writtenId(write: Write): number {
   return write.side === "sc" ? write.pair.scId : write.pair.nakaId;
 }
 
-async function attempt(write: Write, ports: WritePorts): Promise<boolean> {
+// Any answer of addToSc other than the two known ones fails closed, as a failed write.
+async function attempt(write: Write, ports: WritePorts): Promise<Result> {
   try {
-    if (write.side === "sc") await ports.addToSc(write.pair.scId);
-    else await ports.addToNaka(write.pair.nakaId);
-    return true;
+    if (write.side === "naka") {
+      await ports.addToNaka(write.pair.nakaId);
+      return "added";
+    }
+    const result: unknown = await ports.addToSc(write.pair.scId);
+    return result === "added" || result === "already-done" ? result : "failed";
   } catch {
-    return false;
+    return "failed";
   }
+}
+
+function record(
+  outcome: WriteOutcome,
+  streak: Record<Side, number>,
+  write: Write,
+  result: Result,
+): void {
+  if (result === "failed") {
+    outcome.failed.push(write.pair);
+    streak[write.side] += 1;
+    return;
+  }
+  streak[write.side] = 0;
+  if (result === "already-done") {
+    outcome.alreadyDone.push(write.pair);
+    return;
+  }
+  outcome.added.push(write.pair);
+  outcome.written[write.side].push(writtenId(write));
 }
 
 export async function executeWrites(
@@ -75,6 +104,7 @@ export async function executeWrites(
     added: [],
     deferred: [],
     failed: [],
+    alreadyDone: [],
     written: { naka: [], sc: [] },
   };
   const streak = { naka: 0, sc: 0 };
@@ -88,14 +118,7 @@ export async function executeWrites(
       continue;
     }
     attempts += 1;
-    if (await attempt(write, ports)) {
-      outcome.added.push(write.pair);
-      streak[write.side] = 0;
-      outcome.written[write.side].push(writtenId(write));
-    } else {
-      outcome.failed.push(write.pair);
-      streak[write.side] += 1;
-    }
+    record(outcome, streak, write, await attempt(write, ports));
   }
   return outcome;
 }

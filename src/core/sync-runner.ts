@@ -1,7 +1,7 @@
 import { type Pair, planListSync, type Removal } from "./list-diff";
 import { nextPresence, type Presence, withPairsSeenTogether } from "./presence";
 import type { ResolverPorts } from "./resolver";
-import { addPending, type SyncState, setSnapshot } from "./state";
+import { addPending, type SyncState, setSnapshot, settlePair } from "./state";
 import {
   countWaiting,
   MAX_RESOLVE_PER_RUN,
@@ -29,6 +29,8 @@ export type SyncReport = {
   added: Pair[];
   deferred: Pair[];
   failed: Pair[];
+  /** Products already done on SensCritique: not wished, their pairs settled. */
+  alreadyDone: Pair[];
   pendingRemovals: number;
   /** Ids still waiting for a search, counted per side (a title unmapped on both sides counts 2). */
   unresolved: number;
@@ -128,9 +130,19 @@ function completeRun(
   return { ...state, run, presence };
 }
 
+// What the owner did on SensCritique is never rewritten: a pair whose product is already done there is
+// settled, so it never acts again.
+function settleAlreadyDone(state: SyncState, outcome: WriteOutcome): SyncState {
+  return outcome.alreadyDone.reduce(settlePair, state);
+}
+
 function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
   const same = (a: Pair, b: Pair): boolean => pairKey(a) === pairKey(b);
-  const settledNow = [...outcome.added, ...outcome.failed];
+  const settledNow = [
+    ...outcome.added,
+    ...outcome.failed,
+    ...outcome.alreadyDone,
+  ];
   const waiting = state.retryLast.filter(
     (pair) => !settledNow.some((done) => same(done, pair)),
   );
@@ -154,7 +166,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     selectWrites(plan, resolved.retryLast),
     ports,
   );
-  const queued = queueRemovals(resolved, plan.confirmRemoval);
+  const queued = settleAlreadyDone(
+    queueRemovals(resolved, plan.confirmRemoval),
+    outcome,
+  );
   const final = {
     naka: await effectiveList(
       () => ports.nakaIds(),
@@ -177,6 +192,7 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     added: outcome.added,
     deferred: outcome.deferred,
     failed: outcome.failed,
+    alreadyDone: outcome.alreadyDone,
     pendingRemovals: state.pending.filter(
       (item) => item.kind === "removal" && !item.asked,
     ).length,
