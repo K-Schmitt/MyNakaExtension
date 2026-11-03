@@ -654,11 +654,104 @@ describe("readWishlist", () => {
 
   it("gives up after 500 pages when the server never stops advertising more", async () => {
     const { client, calls } = setup(LOGGED_IN, (call) =>
-      wishPage([product(Number(variablesOf(call).offset))], 1_000_000_000),
+      wishPage([product(Number(variablesOf(call).offset) + 1)], 1_000_000_000),
     );
     const error = await failure(client.readWishlist("movie"));
     expect(error).toBeInstanceOf(ScUnavailableError);
     expect(calls).toHaveLength(500);
+  });
+});
+
+// A short or filtered read looks like the owner removed titles: it must reject, never return less.
+describe("a wishlist read that comes back short or malformed", () => {
+  const DROPPED = "SensCritique UserCollection: unreadable entry";
+  const SHORT =
+    "SensCritique UserCollection: item count differs from the total";
+
+  async function rejection(respond: Respond): Promise<Error> {
+    const { client } = setup(LOGGED_IN, respond);
+    const error = await failure(client.readWishlist("movie"));
+    expect(error).toBeInstanceOf(ScUnavailableError);
+    expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+    return error;
+  }
+
+  it("rejects a short last page: 19 items read for a total of 20 (probe P5)", async () => {
+    const first = Array.from({ length: 18 }, (_v, i) => product(i + 1));
+    const error = await rejection((call) =>
+      Number(variablesOf(call).offset) === 0
+        ? wishPage(first, 20)
+        : wishPage([product(19)], 20),
+    );
+    expect(error.message).toBe(SHORT);
+  });
+
+  it("rejects a single page shorter than its total", async () => {
+    const error = await rejection(() => wishPage([product(1)], 2));
+    expect(error.message).toBe(SHORT);
+  });
+
+  it("rejects a page holding more items than the total, however large", async () => {
+    const ids = Array.from({ length: 20_000 }, (_v, i) => i + 1);
+    const error = await rejection(() => wishPage(ids.map(product), 18));
+    expect(error.message).toBe(SHORT);
+  });
+
+  it("rejects an entry the parser drops: a null url (probe P5)", async () => {
+    const page = [product(1), { ...product(2), url: null }, product(3)];
+    const error = await rejection(() => wishPage(page, 3));
+    expect(error.message).toBe(DROPPED);
+  });
+
+  it("rejects a dropped entry even when the count left matches the total", async () => {
+    const page = [product(1), { ...product(2), url: null }, product(3)];
+    const error = await rejection(() => wishPage(page, 2));
+    expect(error.message).toBe(DROPPED);
+  });
+
+  it.each([
+    ["a missing title", { ...product(2), title: undefined }],
+    ["a missing id", { ...product(2), id: undefined }],
+    ["a null entry", null],
+    ["a string entry", "x"],
+  ])("rejects a dropped entry: %s", async (_n, entry) => {
+    const error = await rejection(() =>
+      wishPage([product(1), entry, product(3)], 3),
+    );
+    expect(error.message).toBe(DROPPED);
+  });
+
+  it.each([
+    ["a fractional id (probe P5)", 1.5],
+    ["a negative id (probe P5)", -3],
+    ["a zero id", 0],
+    ["an unsafe id", 2 ** 53],
+    ["a string id", "7"],
+  ])("rejects %s", async (_n, id) => {
+    const error = await rejection(() =>
+      wishPage([product(1), { ...product(2), id }], 2),
+    );
+    expect(error.message).toBe(DROPPED);
+  });
+
+  it("rejects a dropped entry on a later page", async () => {
+    const full = wishlistOf(40);
+    const { client, calls } = setup(LOGGED_IN, (call, index) =>
+      index === 1
+        ? wishPage(
+            [...Array.from({ length: 17 }, (_v, i) => product(2000 + i)), null],
+            40,
+          )
+        : full(call, index),
+    );
+    const error = await failure(client.readWishlist("movie"));
+    expect(error.message).toBe(DROPPED);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("still reads a whole list whose pages add up to the total", async () => {
+    const { client } = setup(LOGGED_IN, wishlistOf(37));
+    expect(await client.readWishlist("movie")).toHaveLength(37);
   });
 });
 
@@ -1112,10 +1205,10 @@ describe("a wishlist that changes during the read", () => {
     expect(calls).toHaveLength(3);
   });
 
-  it("reads a very large page", async () => {
-    const ids = Array.from({ length: 20_000 }, (_v, i) => i + 1);
-    const { client } = setup(LOGGED_IN, () => wishPage(ids.map(product), 18));
-    expect(await client.readWishlist("movie")).toHaveLength(20_000);
+  it("reads the largest list the page cap allows: 9000 items in 500 pages", async () => {
+    const { client, calls } = setup(LOGGED_IN, wishlistOf(9000));
+    expect(await client.readWishlist("movie")).toHaveLength(9000);
+    expect(calls).toHaveLength(500);
   });
 });
 

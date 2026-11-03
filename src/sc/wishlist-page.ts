@@ -1,7 +1,7 @@
 // Parses one page of the response of SensCritique's `UserCollection` GraphQL query (the wishlist).
 // Pure: no network. An unreadable page gives an empty result, never a throw.
-// An item is dropped only when it lacks a numeric id, a string title or a string url:
-// dropping anything else would make the sync believe the owner removed the entry.
+// An item is dropped only when it lacks a positive safe integer id, a string title or a string url;
+// the reader (sc-wishlist.ts) rejects a page with a dropped item, so a dropped item never shortens a list.
 
 export type ScWishItem = {
   productId: number;
@@ -33,14 +33,18 @@ function collectionOf(json: unknown): Fields | undefined {
   return isRecord(collection) ? collection : undefined;
 }
 
+function inYearRange(year: number): number | undefined {
+  return year >= MIN_YEAR && year <= MAX_YEAR ? year : undefined;
+}
+
 function yearFromDate(value: unknown): number | undefined {
   if (typeof value !== "string" || !YEAR_PREFIX.test(value)) return undefined;
-  return Number(value.slice(0, 4));
+  return inYearRange(Number(value.slice(0, 4)));
 }
 
 function yearFromNumber(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isInteger(value)) return undefined;
-  return value >= MIN_YEAR && value <= MAX_YEAR ? value : undefined;
+  return inYearRange(value);
 }
 
 function yearFromDisplayed(value: unknown): number | undefined {
@@ -61,10 +65,14 @@ function universeOf(value: unknown): number | string {
   return typeof value === "number" || typeof value === "string" ? value : "";
 }
 
+function isProductId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
 function toItem(value: unknown): ScWishItem | undefined {
   if (!isRecord(value)) return undefined;
   const { id, title, url, originalTitle } = value;
-  if (typeof id !== "number") return undefined;
+  if (!isProductId(id)) return undefined;
   if (typeof title !== "string" || typeof url !== "string") return undefined;
   const item: ScWishItem = {
     productId: id,

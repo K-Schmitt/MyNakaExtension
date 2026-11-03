@@ -48,18 +48,21 @@ function wishlistStep({ universe, username }: WishRead, offset: number): Step {
   };
 }
 
-// An unreadable page is not an empty one: the parser alone cannot tell them apart.
-function isReadablePage({ data }: Envelope): boolean {
-  if (!isRecord(data.user) || !isRecord(data.user.collection)) return false;
+// The number of entries the page holds, or undefined for an unreadable page: an unreadable page is not
+// an empty one, and the parser alone cannot tell them apart.
+function entryCount({ data }: Envelope): number | undefined {
+  if (!isRecord(data.user) || !isRecord(data.user.collection)) return undefined;
   const { products, total } = data.user.collection;
-  return (
+  const readable =
     Array.isArray(products) &&
     typeof total === "number" &&
     Number.isInteger(total) &&
-    total >= 0
-  );
+    total >= 0;
+  return readable ? products.length : undefined;
 }
 
+// Every entry of the page must become an item: a dropped entry (no positive id, title or url) would
+// shorten the list.
 async function readPage(
   deps: ScDeps,
   read: WishRead,
@@ -70,17 +73,33 @@ async function readPage(
     wishlistStep(read, offset),
     read.token,
   );
-  if (!isReadablePage(envelope)) {
+  const entries = entryCount(envelope);
+  if (entries === undefined) {
     throw new ScUnavailableError(
       "SensCritique UserCollection: unreadable page",
     );
   }
-  return parseWishlistPage(envelope);
+  const page = parseWishlistPage(envelope);
+  if (page.items.length !== entries) {
+    throw new ScUnavailableError(
+      "SensCritique UserCollection: unreadable entry",
+    );
+  }
+  return page;
+}
+
+function checkComplete(items: readonly ScWishItem[], total: number): void {
+  if (items.length !== total) {
+    throw new ScUnavailableError(
+      "SensCritique UserCollection: item count differs from the total",
+    );
+  }
 }
 
 // A public profile can be read without a token, so the token is sent only when there is one.
 // The total of the first page fixes the plan; a later page that disagrees means the list changed
-// during the read, which fails closed (the next run retries).
+// during the read, and a read whose items do not add up to that total is short or padded: both fail
+// closed (the next run retries).
 export async function readWishlist(
   deps: ScDeps,
   universe: WishUniverse,
@@ -110,7 +129,10 @@ export async function readWishlist(
       );
     }
     for (const item of got.items) items.push(item);
-    if (next === undefined) return items;
+    if (next === undefined) {
+      checkComplete(items, total);
+      return items;
+    }
     offset = next;
   }
   throw new ScUnavailableError("SensCritique UserCollection: too many pages");

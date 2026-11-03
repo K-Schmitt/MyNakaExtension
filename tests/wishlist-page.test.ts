@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { scToTitled } from "../src/core/adapt-titles";
 import { nextOffset, parseWishlistPage } from "../src/sc/wishlist-page";
 
 type Fields = Record<string, unknown>;
@@ -145,6 +146,35 @@ describe("parseWishlistPage year", () => {
   it("rejects a displayedYear of another type", () => {
     expect(onlyItem({ displayedYear: true })?.year).toBeUndefined();
   });
+
+  it.each(["dateRelease", "originalRun", "displayedYear"])(
+    "bounds a year taken from the %s date to 1800..2100",
+    (field) => {
+      for (const date of [
+        "0000-01-01",
+        "1799-12-31",
+        "2101-01-01",
+        "9999-12-31",
+      ]) {
+        const item = onlyItem({ [field]: date });
+        expect(item && "year" in item).toBe(false);
+      }
+      expect(onlyItem({ [field]: "1800-01-01" })?.year).toBe(1800);
+      expect(onlyItem({ [field]: "2100-12-31" })?.year).toBe(2100);
+    },
+  );
+
+  it("skips an out-of-range dateRelease and uses the next source", () => {
+    expect(
+      onlyItem({ dateRelease: "0000-01-01", originalRun: "1999-05-01" })?.year,
+    ).toBe(1999);
+  });
+
+  it("an out-of-range date year never reaches the matcher", () => {
+    const item = onlyItem({ dateRelease: "9999-01-01" });
+    const titled = item && scToTitled(item);
+    expect(titled).toEqual({ title: "Titre Synthetique", type: "serie" });
+  });
 });
 
 describe("parseWishlistPage items", () => {
@@ -205,6 +235,20 @@ describe("parseWishlistPage items", () => {
       response([product({ id: "1001" }), product({ id: 7 })], 2),
     );
     expect(parsed.items.map((i) => i.productId)).toEqual([7]);
+  });
+
+  it.each([1.5, -3, 0, 2 ** 53, Number.NaN, Number.POSITIVE_INFINITY])(
+    "skips a product whose id %s is not a positive safe integer",
+    (id) => {
+      const parsed = parseWishlistPage(
+        response([product({ id }), product({ id: 7 })], 2),
+      );
+      expect(parsed.items.map((i) => i.productId)).toEqual([7]);
+    },
+  );
+
+  it("keeps the smallest id, 1", () => {
+    expect(onlyItem({ id: 1 })?.productId).toBe(1);
   });
 
   it("skips a product without a string title", () => {
@@ -341,6 +385,11 @@ describe("nextOffset", () => {
 
   it("returns undefined for a negative offset", () => {
     expect(nextOffset(-18, 36, 40)).toBeUndefined();
+    expect(nextOffset(-1, 18, 40)).toBeUndefined();
+  });
+
+  it("accepts a limit of 1", () => {
+    expect(nextOffset(0, 1, 40)).toBe(1);
   });
 
   it("returns undefined for a non-integer argument", () => {
