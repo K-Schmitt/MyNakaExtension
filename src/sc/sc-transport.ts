@@ -14,6 +14,7 @@ export type Fetch = (
     headers: Record<string, string>;
     body?: string;
     credentials: "include" | "omit";
+    redirect?: "error" | "follow" | "manual";
   },
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
@@ -27,6 +28,7 @@ export type Step = {
 export type Envelope = { data: Record<string, unknown> };
 
 const APOLLO = "https://apollo.senscritique.com/";
+const MAX_BODY = 2_000_000;
 
 export const JSON_TYPE = "application/json";
 
@@ -60,10 +62,18 @@ export async function send(
 ): Promise<string> {
   try {
     const response = await fetch(url, init);
-    if (response.status === 200) return await response.text();
-    throw new ScUnavailableError(
-      `SensCritique ${label}: HTTP ${response.status}`,
-    );
+    if (response.status !== 200) {
+      throw new ScUnavailableError(
+        `SensCritique ${label}: HTTP ${response.status}`,
+      );
+    }
+    const text = await response.text();
+    if (text.length > MAX_BODY) {
+      throw new ScUnavailableError(
+        `SensCritique ${label}: HTTP ${response.status}, response too large`,
+      );
+    }
+    return text;
   } catch (error) {
     if (error instanceof ScUnavailableError) throw error;
     throw new ScUnavailableError(`SensCritique ${label}: request failed`);
@@ -123,6 +133,7 @@ export async function post(
         query: GQL[operationName],
       }),
       credentials: "omit",
+      redirect: "error",
     },
     operationName,
   );

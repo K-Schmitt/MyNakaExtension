@@ -64,7 +64,7 @@ async function readPage(
   deps: ScDeps,
   read: WishRead,
   offset: number,
-): Promise<{ items: ScWishItem[]; next: number | undefined }> {
+): Promise<{ items: ScWishItem[]; total: number }> {
   const envelope = await post(
     deps.fetch,
     wishlistStep(read, offset),
@@ -75,17 +75,12 @@ async function readPage(
       "SensCritique UserCollection: unreadable page",
     );
   }
-  const { items, total } = parseWishlistPage(envelope);
-  const next = nextOffset(offset, PAGE_SIZE, total);
-  if (items.length === 0 && next !== undefined) {
-    throw new ScUnavailableError(
-      "SensCritique UserCollection: incomplete read",
-    );
-  }
-  return { items, next };
+  return parseWishlistPage(envelope);
 }
 
 // A public profile can be read without a token, so the token is sent only when there is one.
+// The total of the first page fixes the plan; a later page that disagrees means the list changed
+// during the read, which fails closed (the next run retries).
 export async function readWishlist(
   deps: ScDeps,
   universe: WishUniverse,
@@ -99,11 +94,24 @@ export async function readWishlist(
   };
   const items: ScWishItem[] = [];
   let offset = 0;
+  let total: number | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const got = await readPage(deps, read, offset);
-    items.push(...got.items);
-    if (got.next === undefined) return items;
-    offset = got.next;
+    total ??= got.total;
+    if (got.total !== total) {
+      throw new ScUnavailableError(
+        "SensCritique UserCollection: list changed during the read",
+      );
+    }
+    const next = nextOffset(offset, PAGE_SIZE, total);
+    if (got.items.length === 0 && next !== undefined) {
+      throw new ScUnavailableError(
+        "SensCritique UserCollection: incomplete read",
+      );
+    }
+    for (const item of got.items) items.push(item);
+    if (next === undefined) return items;
+    offset = next;
   }
   throw new ScUnavailableError("SensCritique UserCollection: too many pages");
 }

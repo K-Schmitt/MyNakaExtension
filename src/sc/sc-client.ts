@@ -13,7 +13,6 @@ import {
 } from "./sc-input";
 import type { GQL } from "./sc-queries";
 import {
-  JSON_TYPE,
   post,
   readSession,
   type ScDeps,
@@ -88,7 +87,7 @@ async function rate(deps: ScDeps, productId: number, rating: number) {
   ]);
 }
 
-// The season page is public: seasonInfo never reads the session.
+// The season page is public: no session, no cookie, no header; a slug change may redirect.
 async function seasonInfo(
   deps: ScDeps,
   seriesProductId: number,
@@ -101,8 +100,9 @@ async function seasonInfo(
     seasonUrl(seriesProductId, season),
     {
       method: "GET",
-      headers: { "content-type": JSON_TYPE },
-      credentials: "include",
+      headers: {},
+      credentials: "omit",
+      redirect: "follow",
     },
     "season page",
   );

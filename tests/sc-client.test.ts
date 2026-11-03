@@ -646,16 +646,16 @@ describe("readWishlist", () => {
 });
 
 describe("seasonInfo", () => {
-  it("GETs the season page with the cookies and no token", async () => {
+  it("GETs the public season page with no cookie, no header and no token", async () => {
     const { client, calls } = setup(LOGGED_IN);
     await client.seasonInfo(99153120, 1);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe(SEASON_URL);
-    expect(calls[0]?.init.method).toBe("GET");
-    expect(calls[0]?.init.credentials).toBe("include");
-    expect(calls[0]?.init.body).toBeUndefined();
-    expect(calls[0]?.init.headers).toStrictEqual({
-      "content-type": "application/json",
+    expect(calls[0]?.init).toStrictEqual({
+      method: "GET",
+      headers: {},
+      credentials: "omit",
+      redirect: "follow",
     });
   });
 
@@ -972,4 +972,131 @@ describe("runtime guards on ids, season and date", () => {
       expect(variablesOf(calls[1] as Call).date).toBe(date);
     },
   );
+});
+
+const BIG_LIMIT = 2_000_000;
+
+function padded(text: string, length: number): string {
+  return text + " ".repeat(length - text.length);
+}
+
+describe("transport options", () => {
+  it("every Apollo request pins its options exactly", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.markDone(5, "2026-11-02");
+    await client.readWishlist("movie");
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      expect(call.init).toStrictEqual({
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: TOKEN,
+        },
+        body: expect.any(String),
+        credentials: "omit",
+        redirect: "error",
+      });
+    }
+  });
+
+  it("the season request has no body and follows redirects", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.seasonInfo(99153120, 1);
+    expect(Object.keys(calls[0]?.init ?? {}).sort()).toEqual([
+      "credentials",
+      "headers",
+      "method",
+      "redirect",
+    ]);
+    expect(calls[0]?.init.redirect).toBe("follow");
+    expect(calls[0]?.init.credentials).toBe("omit");
+  });
+});
+
+describe("response size cap", () => {
+  const json = (length: number) => padded(JSON.stringify({ data: {} }), length);
+
+  it("accepts a GraphQL body of exactly 2 000 000 characters", async () => {
+    const { client } = setup(LOGGED_IN, () => raw(200, json(BIG_LIMIT)));
+    await client.wish(5);
+  });
+
+  it("rejects a GraphQL body one character over, without echoing it", async () => {
+    const body = padded(LEAK, BIG_LIMIT + 1);
+    const { client } = setup(LOGGED_IN, () => raw(200, body));
+    const error = await failure(client.wish(5));
+    expect(error).toBeInstanceOf(ScUnavailableError);
+    expect(error.message).toContain("ProductWish");
+    expect(error.message).toContain("200");
+    expect(error.message).not.toContain("LEAK");
+  });
+
+  it("accepts a season page of exactly 2 000 000 characters", async () => {
+    const { client } = setup(LOGGED_IN, () =>
+      raw(200, padded(seasonHtml, BIG_LIMIT)),
+    );
+    expect((await client.seasonInfo(99153120, 1)).episodes).toHaveLength(10);
+  });
+
+  it("rejects a season page one character over", async () => {
+    const { client } = setup(LOGGED_IN, () =>
+      raw(200, padded(seasonHtml, BIG_LIMIT + 1)),
+    );
+    const error = await failure(client.seasonInfo(99153120, 1));
+    expect(error).toBeInstanceOf(ScUnavailableError);
+    expect(error.message).toContain("season page");
+  });
+});
+
+describe("a wishlist that changes during the read", () => {
+  function changing(totalOf: (index: number) => number): Respond {
+    return (call, index) => {
+      const offset = Number(variablesOf(call).offset);
+      const total = totalOf(index);
+      const ids = [];
+      for (let i = offset; i < Math.min(offset + 18, 40); i += 1) {
+        ids.push(1000 + i);
+      }
+      return wishPage(ids.map(product), total);
+    };
+  }
+
+  it.each([
+    ["grows", 41],
+    ["shrinks", 39],
+    ["is cut short", 20],
+  ])("rejects when the total %s on a later page", async (_n, later) => {
+    const { client, calls } = setup(
+      LOGGED_IN,
+      changing((index) => (index === 0 ? 40 : later)),
+    );
+    const error = await failure(client.readWishlist("movie"));
+    expect(error).toBeInstanceOf(ScUnavailableError);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("rejects when only the last page disagrees", async () => {
+    const { client, calls } = setup(
+      LOGGED_IN,
+      changing((index) => (index === 2 ? 38 : 40)),
+    );
+    await failure(client.readWishlist("movie"));
+    expect(calls).toHaveLength(3);
+  });
+
+  it("plans the pages from the first total only", async () => {
+    const { client, calls } = setup(
+      LOGGED_IN,
+      changing(() => 40),
+    );
+    expect(await client.readWishlist("movie")).toHaveLength(40);
+    expect(calls).toHaveLength(3);
+  });
+
+  it("reads a very large page", async () => {
+    const ids = Array.from({ length: 20_000 }, (_v, i) => i + 1);
+    const { client } = setup(LOGGED_IN, () => wishPage(ids.map(product), 18));
+    expect(await client.readWishlist("movie")).toHaveLength(20_000);
+  });
 });

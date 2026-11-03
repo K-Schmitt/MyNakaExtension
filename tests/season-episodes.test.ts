@@ -469,3 +469,67 @@ describe("seasonUrl", () => {
     );
   });
 });
+
+describe("locating the __NEXT_DATA__ tag", () => {
+  const state = { "Product:1": product(1, `${BASE}/S1`) };
+  const data = JSON.stringify({
+    props: { pageProps: { __APOLLO_STATE__: state } },
+  });
+
+  it.each([
+    ["a space", " "],
+    ["a tab", "\t"],
+    ["a newline", "\n"],
+  ])("accepts the id after %s", (_n, gap) => {
+    const html = `<script${gap}id="__NEXT_DATA__">${data}</script>`;
+    expect(parseSeasonProductId(html, SERIES, 1)).toBe(1);
+  });
+
+  it.each([
+    ["data-id", `<script data-id="__NEXT_DATA__">${data}</script>`],
+    ["x-id", `<script x-id="__NEXT_DATA__">${data}</script>`],
+    ["a longer id value", `<script id="x__NEXT_DATA__">${data}</script>`],
+    ["no script tag", `<div id="__NEXT_DATA__">${data}</script>`],
+  ])("does not take %s for the tag", (_n, html) => {
+    expect(parseSeasonProductId(html, SERIES, 1)).toBeUndefined();
+    expect(parseSeasonEpisodes(html, SERIES, 1)).toEqual([]);
+  });
+
+  it("needs the id inside the script tag, not after it", () => {
+    const html = `<script>${data}</script> id="__NEXT_DATA__">`;
+    expect(parseSeasonProductId(html, SERIES, 1)).toBeUndefined();
+  });
+
+  it("stops at the first </script> after the tag", () => {
+    const html = `<script id="__NEXT_DATA__">${data}</script><script>{"x":1}</script>`;
+    expect(parseSeasonProductId(html, SERIES, 1)).toBe(1);
+  });
+
+  it("finds the tag even when '>' appears in a later attribute value", () => {
+    const html = `<script id="__NEXT_DATA__" type="application/json">${data}</script>`;
+    expect(parseSeasonProductId(html, SERIES, 1)).toBe(1);
+  });
+
+  it("returns nothing when the tag never ends or the script never closes", () => {
+    expect(
+      parseSeasonProductId('<script id="__NEXT_DATA__"', SERIES, 1),
+    ).toBeUndefined();
+    expect(
+      parseSeasonProductId(`<script id="__NEXT_DATA__">${data} `, SERIES, 1),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    ["1 MB of '<script ' with no '>'", "<script ".repeat(131_072)],
+    [
+      "1 MB of unterminated tagged scripts",
+      '<script id="__NEXT_DATA__" '.repeat(36_000),
+    ],
+    ["1 MB of ids with no script", ' id="__NEXT_DATA__"'.repeat(55_000)],
+  ])("stays linear on %s", (_n, html) => {
+    const started = performance.now();
+    expect(parseSeasonProductId(html, SERIES, 1)).toBeUndefined();
+    expect(parseSeasonEpisodes(html, SERIES, 1)).toEqual([]);
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+});
