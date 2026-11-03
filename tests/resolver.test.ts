@@ -551,3 +551,83 @@ describe("resolveScIds (mirror)", () => {
     ]);
   });
 });
+
+// A match whose counterpart the owner is still asked about, on the counterpart's own side, is never
+// mapped: the question goes to the owner, as for the swap guard (G1).
+describe("a match whose counterpart has an open question on its own side", () => {
+  type Ambiguity = Extract<SyncState["pending"][number], { kind: "ambiguity" }>;
+  const question = (
+    side: "naka" | "sc",
+    id: number,
+    candidateIds: number[],
+  ): Ambiguity => ({ kind: "ambiguity", side, id, candidateIds });
+  const withPending = (...pending: Ambiguity[]): SyncState => ({
+    ...emptyState(),
+    pending,
+  });
+  const nakaPorts = () =>
+    ports({
+      naka: { 5: film("Dune") },
+      searchSc: { Dune: [cand(50, "Dune")] },
+    });
+  const scPorts = () =>
+    ports({
+      sc: { 50: film("Dune") },
+      searchNaka: { Dune: [cand(5, "Dune")] },
+    });
+
+  it("Naka direction: 5 matches 50 while SensCritique's question on 50 is open, so 5 is asked about 50", async () => {
+    const open = question("sc", 50, [5, 6]);
+    const state = deepFreeze(withPending(open));
+    const out = await resolveNakaIds([5], state, nakaPorts());
+    expect(out.mapping).toEqual([]);
+    expect(out.pending).toEqual([open, question("naka", 5, [50])]);
+  });
+
+  it("SC direction: 50 matches 5 while Naka's question on 5 is open, so 50 is asked about 5", async () => {
+    const open = question("naka", 5, [50, 51]);
+    const state = deepFreeze(withPending(open));
+    const out = await resolveScIds([50], state, scPorts());
+    expect(out.mapping).toEqual([]);
+    expect(out.pending).toEqual([open, question("sc", 50, [5])]);
+  });
+
+  it.each([
+    ["no question", []],
+    [
+      "a Naka-side question numbered like the product",
+      [question("naka", 50, [1])],
+    ],
+    [
+      "a SensCritique-side question on another product",
+      [question("sc", 51, [5])],
+    ],
+  ] as [string, Ambiguity[]][])(
+    "Naka direction with %s still maps",
+    async (_name, pending) => {
+      const out = await resolveNakaIds(
+        [5],
+        withPending(...pending),
+        nakaPorts(),
+      );
+      expect(out.mapping).toEqual([p(5, 50)]);
+      expect(out.pending).toEqual(pending);
+    },
+  );
+
+  it.each([
+    ["no question", []],
+    [
+      "a SensCritique-side question numbered like the title",
+      [question("sc", 5, [1])],
+    ],
+    ["a Naka-side question on another title", [question("naka", 6, [50])]],
+  ] as [string, Ambiguity[]][])(
+    "SC direction with %s still maps",
+    async (_name, pending) => {
+      const out = await resolveScIds([50], withPending(...pending), scPorts());
+      expect(out.mapping).toEqual([p(5, 50)]);
+      expect(out.pending).toEqual(pending);
+    },
+  );
+});

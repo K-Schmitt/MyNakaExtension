@@ -53,18 +53,26 @@ function scDirection(ports: ResolverPorts): Direction {
   };
 }
 
+const otherSide = (side: Side): Side => (side === "naka" ? "sc" : "naka");
+
+function isAsked(state: SyncState, side: Side, id: number): boolean {
+  return state.pending.some(
+    (item) => item.kind === "ambiguity" && item.side === side && item.id === id,
+  );
+}
+
 function isSettled(state: SyncState, dir: Direction, id: number): boolean {
   const mapped = state.mapping.some((pair) => dir.own(pair) === id);
-  const asked = state.pending.some(
-    (item) =>
-      item.kind === "ambiguity" && item.side === dir.side && item.id === id,
-  );
+  const asked = isAsked(state, dir.side, id);
   const unlinked = state.unlinked.some(
     (item) => item.side === dir.side && item.id === id,
   );
   return mapped || asked || unlinked;
 }
 
+// The owner decides, and the mapping is unchanged, when the match is held by another title (the swap
+// guard) or when the owner is still asked about the match on its own side: a question left open by
+// one direction of the sync is never decided by the other.
 function mapOrAsk(
   state: SyncState,
   dir: Direction,
@@ -74,7 +82,8 @@ function mapOrAsk(
   const heldByAnother = state.mapping.some(
     (pair) => dir.other(pair) === otherId,
   );
-  if (heldByAnother) {
+  const askedAboutOther = isAsked(state, otherSide(dir.side), otherId);
+  if (heldByAnother || askedAboutOther) {
     return addPending(state, {
       kind: "ambiguity",
       side: dir.side,
