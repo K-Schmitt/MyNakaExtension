@@ -505,7 +505,7 @@ describe("locating the __NEXT_DATA__ tag", () => {
     expect(parseSeasonProductId(html, SERIES, 1)).toBe(1);
   });
 
-  it("finds the tag even when '>' appears in a later attribute value", () => {
+  it("finds the tag when another attribute follows the id", () => {
     const html = `<script id="__NEXT_DATA__" type="application/json">${data}</script>`;
     expect(parseSeasonProductId(html, SERIES, 1)).toBe(1);
   });

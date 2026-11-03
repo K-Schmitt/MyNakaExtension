@@ -1,8 +1,9 @@
 // Client for SensCritique: GraphQL calls on apollo.senscritique.com and the season page on www.senscritique.com.
 //
-// getSession() is called once per public call, never at construction and never cached. The auth token lives
-// in a local variable of that call and goes only to sc-transport's `post` (Apollo POSTs); it is never sent to
-// www.senscritique.com. See sc-transport.ts for the rules on the wire and in error messages.
+// getSession() is called once per public call that needs a session (seasonInfo reads none), never at
+// construction and never cached. The auth token lives in a local variable of that call and goes only to
+// sc-transport's `post` (Apollo POSTs); it is never sent to www.senscritique.com. See sc-transport.ts for the
+// rules on the wire and in error messages.
 
 import { ScUnauthenticatedError } from "./sc-errors";
 import {

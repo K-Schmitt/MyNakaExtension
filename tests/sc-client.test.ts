@@ -951,6 +951,58 @@ describe("a session that cannot be read", () => {
     );
   });
 
+  const throwingGetter = (field: "token" | "username") =>
+    Object.defineProperty({ token: TOKEN, username: "u" }, field, {
+      get() {
+        throw leakyError();
+      },
+    });
+  const READS_THAT_THROW: [string, () => unknown][] = [
+    ["a token getter that throws the token", () => throwingGetter("token")],
+    [
+      "a username getter that throws the token",
+      () => throwingGetter("username"),
+    ],
+    [
+      "a Proxy whose field reads throw the token",
+      // `then` is read while the promise resolves, inside the getSession guard: only the fields throw.
+      () =>
+        new Proxy(
+          {},
+          {
+            get(_target, key) {
+              if (key === "then") return undefined;
+              throw leakyError();
+            },
+          },
+        ),
+    ],
+  ];
+
+  describe.each(READS_THAT_THROW)("resolving %s", (_label, make) => {
+    it.each(SESSION_METHODS)(
+      "%s rejects with the fixed session error and sends nothing",
+      async (_name, run) => {
+        const { client, calls } = setupSession(async () => make());
+        const error = await failure(run(client));
+        expect(error).toBeInstanceOf(ScUnavailableError);
+        expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+        expect(error.message).toBe("SensCritique session: could not be read");
+        expect(error.cause).toBeUndefined();
+        const seen = [
+          error.message,
+          String(error),
+          error.stack ?? "",
+          JSON.stringify(error),
+          ...Object.values(error).map(String),
+        ].join("\n");
+        expect(seen).not.toContain(TOKEN);
+        expect(seen).not.toContain("LEAK");
+        expect(calls).toHaveLength(0);
+      },
+    );
+  });
+
   it.each([
     ["null", null],
     ["a number", 7],
@@ -1192,11 +1244,15 @@ describe("a wishlist that changes during the read", () => {
       LOGGED_IN,
       changing((index) => (index === 2 ? 38 : 40)),
     );
-    await failure(client.readWishlist("movie"));
+    const error = await failure(client.readWishlist("movie"));
+    expect(error).toBeInstanceOf(ScUnavailableError);
+    expect(error.message).toBe(
+      "SensCritique UserCollection: list changed during the read",
+    );
     expect(calls).toHaveLength(3);
   });
 
-  it("plans the pages from the first total only", async () => {
+  it("reads three pages for a total that stays at 40", async () => {
     const { client, calls } = setup(
       LOGGED_IN,
       changing(() => 40),
