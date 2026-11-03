@@ -1,15 +1,22 @@
 // Finds the SensCritique product of a finished Naka title: the stored mapping first, else a search.
 // The search follows the resolver: the title, then the original title only when the title found no
 // candidate, candidates deduplicated by id (first wins), then matchTitle (same type only).
+// A question already put to the owner about the title, or about the product a search finds, is never
+// decided here: the owner's pending choice wins over a fresh match.
 
 import type { Pair } from "./list-diff";
-import type { SyncState } from "./state";
+import type { PendingItem, SyncState } from "./state";
 import { type Candidate, matchTitle, type Titled } from "./title-match";
 
 export type ScMatch =
   | { kind: "pair"; pair: Pair; isNew: boolean }
+  /** The owner must choose: a new Naka-side question is to be saved. */
   | { kind: "needs-choice"; candidateIds: number[] }
+  /** The owner was already asked about this title: nothing changes. */
+  | { kind: "asked"; candidateIds: number[] }
   | { kind: "not-found" };
+
+type Side = "naka" | "sc";
 
 type Search = { searchSc(q: string): Promise<Candidate[]> };
 
@@ -37,6 +44,19 @@ function isHeld(state: SyncState, scId: number): boolean {
   return state.mapping.some((pair) => pair.scId === scId);
 }
 
+function openQuestion(
+  state: SyncState,
+  side: Side,
+  id: number,
+): Extract<PendingItem, { kind: "ambiguity" }> | undefined {
+  for (const item of state.pending) {
+    if (item.kind === "ambiguity" && item.side === side && item.id === id) {
+      return item;
+    }
+  }
+  return undefined;
+}
+
 export async function matchOnSc(
   state: SyncState,
   nakaId: number,
@@ -45,12 +65,14 @@ export async function matchOnSc(
 ): Promise<ScMatch> {
   const mapped = state.mapping.find((pair) => pair.nakaId === nakaId);
   if (mapped) return { kind: "pair", pair: mapped, isNew: false };
+  const asked = openQuestion(state, "naka", nakaId);
+  if (asked) return { kind: "asked", candidateIds: [...asked.candidateIds] };
   const result = matchTitle(titled, await findCandidates(ports, titled));
   if (result.kind === "none") return { kind: "not-found" };
   if (result.kind === "ambiguous") {
     return { kind: "needs-choice", candidateIds: result.ids };
   }
-  if (isHeld(state, result.id)) {
+  if (isHeld(state, result.id) || openQuestion(state, "sc", result.id)) {
     return { kind: "needs-choice", candidateIds: [result.id] };
   }
   return { kind: "pair", pair: { nakaId, scId: result.id }, isNew: true };

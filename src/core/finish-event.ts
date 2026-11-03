@@ -41,6 +41,32 @@ function isPositiveId(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 1;
 }
 
+// A progress above 1 (a percentage passed by mistake) would complete a viewing after seconds.
+function isProgress(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function isYear(value: unknown): boolean {
+  return (
+    Number.isSafeInteger(value) &&
+    (value as number) >= 1800 &&
+    (value as number) <= 3000
+  );
+}
+
+function checkTitled(titled: Titled): void {
+  if (typeof titled.title !== "string" || titled.title.trim() === "") {
+    reject("title must not be empty");
+  }
+  const { originalTitle, year } = titled;
+  if (originalTitle !== undefined && typeof originalTitle !== "string") {
+    reject("originalTitle must be a string");
+  }
+  if (year !== undefined && !isYear(year)) {
+    reject("year must be a whole number from 1800 to 3000");
+  }
+}
+
 function checkCommon(event: FinishEvent): Checked {
   if (!isObject(event) || !isObject(event.naka) || !isObject(event.titled)) {
     reject("malformed event");
@@ -50,12 +76,10 @@ function checkCommon(event: FinishEvent): Checked {
   if (!isPositiveId(naka.contentId)) {
     reject("contentId must be a positive safe integer");
   }
-  if (!(Number.isFinite(progress) && progress >= 0)) {
-    reject("progress must be a finite number >= 0");
+  if (!isProgress(progress)) {
+    reject("progress must be a finite number from 0 to 1");
   }
-  if (typeof titled.title !== "string" || titled.title.trim() === "") {
-    reject("title must not be empty");
-  }
+  checkTitled(titled);
   return { source, progress, contentId: naka.contentId, titled };
 }
 

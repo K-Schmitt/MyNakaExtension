@@ -22,12 +22,18 @@ import { UNIVERSE } from "../src/sc/sc-queries";
 // Plan-3 answers arrive between steps: removals (keep, remove, no effect,
 // asked) and the owner's choice for the one ambiguous film, followed by the
 // explicit replay of its stored finish.
+// Some titles are described WITHOUT a year by one side, so the runner leaves a
+// question open on them (Naka side for 3 and 12, SensCritique side for 1004 and
+// 1011) while the finish events, which carry the year, would match them alone.
 // Oracle 1: once a film's finish returned done, or rejected after one of its
-// saves succeeded, or once the handler's own unwish of the film succeeded, no
-// later run calls addToSc with that film's SensCritique id. (The unwish trigger
-// does not depend on when the handler saves: it also catches a handler that
-// writes before it saves anything, the plan's original rule.)
+// saves succeeded, or once the handler's own unwish or markDone of the film
+// succeeded, no later run calls addToSc with that film's SensCritique id. (The
+// write triggers do not depend on when the handler saves: they also catch a
+// handler that writes before it saves anything.)
 // Oracle 2: unwish is only ever called with a film's SensCritique id.
+// Oracle 3: a finish of an UNMAPPED title writes nothing while a Naka-side
+// question on that title is open, nor to a product (or an episode of a series
+// product) with an open SensCritique-side question.
 
 const FILMS = [1, 2, 3, 4, 5, 6];
 const SERIES = [11, 12];
@@ -54,6 +60,20 @@ const titleOf = (n: number): Titled =>
     : { title: `Serie ${n}`, year: 2010 + n, type: "serie" };
 const titleNumber = (q: string): number | undefined =>
   TITLES.find((n) => titleOf(n).title === q);
+const NO_YEAR_ON_NAKA = [3, 12];
+const NO_YEAR_ON_SC = [scOf(4), scOf(11)];
+const yearless = (titled: Titled, drop: boolean): Titled =>
+  drop ? { title: titled.title, type: titled.type } : titled;
+const nakaView = (id: number): Titled =>
+  yearless(titleOf(id), NO_YEAR_ON_NAKA.includes(id));
+const scView = (id: number): Titled =>
+  yearless(
+    titleOf(id === HOMONYM ? AMBIGUOUS : id - 1000),
+    NO_YEAR_ON_SC.includes(id),
+  );
+// Episode products are 5000 + series product * 10 + episode (1..3).
+const ownerOf = (productId: number): number =>
+  productId >= 5000 ? Math.floor((productId - 5001) / 10) : productId;
 
 function scCandidates(q: string): Candidate[] {
   const n = titleNumber(q);
@@ -124,8 +144,8 @@ async function simulate(seed: number): Promise<string[]> {
       flaky(0.2, "addToNaka");
       lists.naka.add(id);
     },
-    describeNaka: async (id) => titleOf(id),
-    describeSc: async (id) => titleOf(id === HOMONYM ? AMBIGUOUS : id - 1000),
+    describeNaka: async (id) => nakaView(id),
+    describeSc: async (id) => scView(id),
     searchNaka: async (q) => nakaCandidates(q),
     searchSc: async (q) => scCandidates(q),
     productState: async (id) => {
@@ -147,6 +167,7 @@ async function simulate(seed: number): Promise<string[]> {
       log.push(`finish markDone ${id}`);
       flaky(0.25, "markDone");
       done.add(id);
+      if (isFilmSc(id)) guarded.set(id, "its markDone");
     },
     seasonInfo: async (id, season) => ({
       seasonProductId: 4000 + id,
@@ -171,18 +192,50 @@ async function simulate(seed: number): Promise<string[]> {
     }
   };
 
+  // The questions a finish must not decide behind the owner's back (oracle 3).
+  const openQuestions = (n: number) => {
+    const unmapped = !state.mapping.some((m) => m.nakaId === n);
+    const asked = (side: Side) =>
+      state.pending.flatMap((i) =>
+        i.kind === "ambiguity" && i.side === side ? [i.id] : [],
+      );
+    return {
+      onTitle: unmapped && asked("naka").includes(n),
+      onProducts: new Set(unmapped ? asked("sc") : []),
+    };
+  };
+
   // The film path reads the product state of the film exactly once, before its first save.
   const finish = async (event: FinishEvent): Promise<void> => {
     const before = saves;
     let filmSc: number | undefined;
+    const open = openQuestions(event.naka.contentId);
+    const written: number[] = [];
     const tracked: FinishPorts = {
       ...ports,
       productState: (id) => {
         if (event.naka.mediaType === "movie") filmSc = id;
         return ports.productState(id);
       },
+      unwish: (id) => {
+        written.push(id);
+        return ports.unwish(id);
+      },
+      markDone: (id, date) => {
+        written.push(id);
+        return ports.markDone(id, date);
+      },
     };
     const name = `finish ${event.naka.contentId} ${event.source}`;
+    const checkQuestions = (): void => {
+      for (const id of written) {
+        if (open.onTitle || open.onProducts.has(ownerOf(id))) {
+          violations.push(
+            `seed ${seed}: ${name} wrote ${id} while a question was open | ${log.slice(-8).join("; ")}`,
+          );
+        }
+      }
+    };
     try {
       const outcome = await handleFinish(event, tracked);
       log.push(`${name} ${outcome.kind}`);
@@ -198,6 +251,7 @@ async function simulate(seed: number): Promise<string[]> {
         guarded.set(filmSc, `${name} rejected after a save`);
       }
     }
+    checkQuestions();
   };
 
   const eventFor = (n: number): FinishEvent => {

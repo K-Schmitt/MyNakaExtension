@@ -4,8 +4,11 @@
 // sync can re-wish the film whatever fails or crashes after the save (a settled pair never acts).
 // Episode: the series pair is never settled and the series is never unwished; one save, after the write.
 // A product already done on SensCritique is never rewritten (its date stays) and offers no rating.
+// A product of the wrong kind (a series under a film event, a film listed as an episode) is never
+// written: the handler rejects before any save or write.
 
 import type { ProductState } from "../sc/sc-product-state";
+import { UNIVERSE } from "../sc/sc-queries";
 import { findEpisode, type ScEpisode } from "../sc/season-episodes";
 import {
   type CheckedEvent,
@@ -85,7 +88,10 @@ async function finishFilm(
   { state, key, pair }: Found,
   ports: FinishPorts,
 ): Promise<FinishOutcome> {
-  const { isDone, isWished } = await ports.productState(pair.scId);
+  const { isDone, isWished, universe } = await ports.productState(pair.scId);
+  if (universe !== UNIVERSE.film) {
+    throw new Error("finish: the SensCritique product is not a film");
+  }
   const state1 = settlePair(state, pair);
   await ports.save(state1);
   if (isWished) await ports.unwish(pair.scId);
@@ -119,7 +125,10 @@ async function finishEpisode(
   const info = await ports.seasonInfo(pair.scId, season);
   const found = findEpisode(info.episodes, season, episode);
   if (!found) return { kind: "not-found" };
-  const { isDone } = await ports.productState(found.productId);
+  const { isDone, universe } = await ports.productState(found.productId);
+  if (universe !== UNIVERSE.episode) {
+    throw new Error("finish: the SensCritique product is not an episode");
+  }
   if (!isDone) await ports.markDone(found.productId, ports.today());
   await ports.save(markHandled(state, key));
   const targets = episodeTargets(
@@ -145,6 +154,9 @@ export async function handleFinish(
   }
   const match = await matchOnSc(state, event.contentId, event.titled, ports);
   if (match.kind === "not-found") return { kind: "not-found" };
+  if (match.kind === "asked") {
+    return { kind: "needs-choice", candidateIds: match.candidateIds };
+  }
   if (match.kind === "needs-choice") {
     return askOwner(state, event.contentId, match.candidateIds, ports);
   }

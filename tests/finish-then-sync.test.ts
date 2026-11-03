@@ -24,19 +24,19 @@ const SERIES_PAIR: Pair = { nakaId: SERIES, scId: SERIES_SC };
 const FILM_TITLE: Titled = { title: "Le Film", year: 2001, type: "film" };
 const SERIES_TITLE: Titled = { title: "La Série", year: 2010, type: "serie" };
 
-const NAKA: Record<number, Titled> = {
+const NAKA_TITLES: Record<number, Titled> = {
   [FILM]: FILM_TITLE,
   [SERIES]: SERIES_TITLE,
 };
-const SC: Record<number, Titled> = {
+const SC_TITLES: Record<number, Titled> = {
   [FILM_SC]: FILM_TITLE,
   [SERIES_SC]: SERIES_TITLE,
 };
 
-// The film and the series are 1042 and 1007; their episodes are 10071..10073.
+// The film is 1042, the series 1007 (and its homonym 2007); episodes are 10071 and up.
 const universeOf = (id: number): number => {
   if (id === FILM_SC) return UNIVERSE.film;
-  return id === SERIES_SC ? UNIVERSE.serie : UNIVERSE.episode;
+  return id === SERIES_SC || id === 2007 ? UNIVERSE.serie : UNIVERSE.episode;
 };
 
 function candidates(titles: Record<number, Titled>, q: string): Candidate[] {
@@ -50,9 +50,13 @@ type Opts = {
   sc: number[];
   state?: Partial<SyncState>;
   failMarkDone?: number;
+  nakaTitles?: Record<number, Titled>;
+  scTitles?: Record<number, Titled>;
 };
 
 function world(o: Opts) {
+  const NAKA = o.nakaTitles ?? NAKA_TITLES;
+  const SC = o.scTitles ?? SC_TITLES;
   const w = {
     naka: new Set(o.naka),
     sc: new Set(o.sc),
@@ -268,5 +272,33 @@ describe("episode finishes, then the sync", () => {
     expect(w.state.pending).toEqual([]);
     expect(w.state.settled).toEqual([]);
     expect(w.state.snapshot).toEqual([SERIES_PAIR]);
+  });
+
+  it("V1: a question the runner left open on the series is not decided by an episode finish", async () => {
+    const { w, ports } = world({
+      naka: [SERIES],
+      sc: [],
+      nakaTitles: { [SERIES]: { title: "La Série", type: "serie" } },
+      scTitles: {
+        [SERIES_SC]: SERIES_TITLE,
+        2007: { title: "La Série", year: 1990, type: "serie" },
+      },
+    });
+    await runSync(ports);
+    const asked = {
+      kind: "ambiguity",
+      side: "naka",
+      id: SERIES,
+      candidateIds: [SERIES_SC, 2007],
+    };
+    expect(w.state.pending).toEqual([asked]);
+    expect(await handleFinish(episode(1), ports)).toEqual({
+      kind: "needs-choice",
+      candidateIds: [SERIES_SC, 2007],
+    });
+    await runSync(ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.mapping).toEqual([]);
+    expect(w.state.pending).toEqual([asked]);
   });
 });
