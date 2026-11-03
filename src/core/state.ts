@@ -22,6 +22,7 @@ export type SyncState = {
   pending: PendingItem[];
   handled: string[];
   unlinked: UnlinkedItem[];
+  retryLast: Pair[];
   threshold: number;
 };
 
@@ -60,6 +61,7 @@ export function emptyState(): SyncState {
     pending: [],
     handled: [],
     unlinked: [],
+    retryLast: [],
     threshold: DEFAULT_THRESHOLD,
   };
 }

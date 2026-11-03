@@ -63,6 +63,7 @@ describe("emptyState", () => {
       pending: [],
       handled: [],
       unlinked: [],
+      retryLast: [],
       threshold: 0.9,
     });
   });

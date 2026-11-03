@@ -10,6 +10,7 @@ import {
   executeWrites,
   MAX_WRITES_PER_RUN,
   selectWrites,
+  type WriteOutcome,
   type WritePorts,
 } from "./sync-writes";
 
@@ -28,6 +29,7 @@ export type SyncReport = {
   deferred: Pair[];
   failed: Pair[];
   pendingRemovals: number;
+  /** Ids still waiting for a search, counted per side (a title unmapped on both sides counts 2). */
   unresolved: number;
 };
 
@@ -75,8 +77,7 @@ async function effectiveList(
 ): Promise<number[]> {
   if (written.length === 0) return original;
   try {
-    const confirmed = (await read()).filter((id) => written.includes(id));
-    return [...original, ...confirmed];
+    return [...original, ...(await read())];
   } catch {
     return original;
   }
@@ -95,6 +96,17 @@ function nextSnapshot(
   return setSnapshot(state, [...both, ...pendingRemovalPairs(state)]);
 }
 
+function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
+  const same = (a: Pair, b: Pair): boolean => pairKey(a) === pairKey(b);
+  const candidates = [...state.retryLast, ...outcome.failed].filter(
+    (pair) =>
+      !outcome.added.some((done) => same(done, pair)) &&
+      state.mapping.some((mapped) => same(mapped, pair)),
+  );
+  const unique = new Map(candidates.map((pair) => [pairKey(pair), pair]));
+  return { ...state, retryLast: [...unique.values()] };
+}
+
 export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   const loaded = await ports.load();
   const naka = await ports.nakaIds();
@@ -102,7 +114,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   const first = planFor(loaded, naka, sc);
   const resolved = await resolveUnlinked(loaded, first, ports);
   const plan = planFor(resolved, naka, sc);
-  const outcome = await executeWrites(selectWrites(plan), ports);
+  const outcome = await executeWrites(
+    selectWrites(plan, resolved.retryLast),
+    ports,
+  );
   const queued = queueRemovals(resolved, plan.confirmRemoval);
   const finalNaka = await effectiveList(
     () => ports.nakaIds(),
@@ -114,7 +129,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     sc,
     outcome.written.sc,
   );
-  const state = nextSnapshot(queued, finalNaka, finalSc);
+  const state = nextRetryLast(
+    nextSnapshot(queued, finalNaka, finalSc),
+    outcome,
+  );
   await ports.save(state);
   return {
     added: outcome.added,

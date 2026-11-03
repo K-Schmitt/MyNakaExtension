@@ -420,20 +420,24 @@ describe("the resolution cap is not wasted (R3)", () => {
     expect(r).toEqual(report({ added: [p(7)] }));
   });
 
-  it("skips already mapped (conflicted) ids ahead of the cap", async () => {
-    const conflicted = range(101, 119);
-    const mapping = conflicted.flatMap((n) => [
-      { nakaId: n, scId: n + 1000 },
-      { nakaId: n, scId: n + 2000 },
+  // The mapped rule cannot be reached on the Naka side with a reachable state
+  // (upsertMapping forbids two pairs sharing an id, so the planner never lists
+  // a mapped Naka id). It is reachable on the SensCritique side: the Naka pass
+  // has just mapped most of the SC ids the first plan listed.
+  it("filters the SC ids against the state after the Naka pass (probe J/K)", async () => {
+    const w = world({ naka: range(1, 21), sc: range(1001, 1021) });
+    const r1 = await runSync(w.ports);
+    expect(w.describes.filter((d) => d.startsWith("sc:"))).toEqual(["sc:1021"]);
+    expect(vi.mocked(resolveScIds).mock.calls[0]?.[0]).toEqual([1021]);
+    expect(w.saved[0]?.mapping).toEqual(pairs(1, 21));
+    expect(r1).toEqual(report());
+    w.sc.delete(1021);
+    const r2 = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([
+      { kind: "removal", removeFrom: "naka", pair: p(21), asked: false },
     ]);
-    const w = world({
-      naka: [7, 8, ...conflicted],
-      state: withMapping(mapping),
-    });
-    const r = await runSync(w.ports);
-    expect(nakaArg()).toEqual([7, 8]);
-    expect(w.writes).toEqual(["addToSc:1007", "addToSc:1008"]);
-    expect(r).toEqual(report({ added: [p(7), p(8)] }));
+    expect(r2).toEqual(report({ pendingRemovals: 1 }));
   });
 
   it("filters by side, not by bare id", async () => {
@@ -701,16 +705,132 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
   });
 
-  it("a re-read only confirms ids that were written, not ones the owner added mid-run", async () => {
+  it("a re-read keeps an id the owner added mid-run: a later removal becomes a question (probe M)", async () => {
+    const w = world({
+      sc: range(1001, 1011),
+      afterNaka: (naka) => naka.add(11),
+      state: withMapping(pairs(1, 11)),
+    });
+    const r1 = await runSync(w.ports);
+    expect(r1).toEqual(report({ added: pairs(1, 10), deferred: [p(11)] }));
+    expect(w.saved[0]?.snapshot).toEqual(pairs(1, 11));
+    w.sc.delete(1011);
+    w.writes.length = 0;
+    const r2 = await runSync(w.ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([
+      { kind: "removal", removeFrom: "naka", pair: p(11), asked: false },
+    ]);
+    expect(r2).toEqual(report({ pendingRemovals: 1 }));
+  });
+
+  it("a write without effect stays out of the snapshot even after a re-read", async () => {
     const w = world({
       sc: [1001, 1002],
-      afterNaka: (naka) => naka.add(2),
-      state: withMapping([p(1), p(2)], { settled: [p(2)] }),
+      noEffectNaka: true,
+      state: withMapping([p(1), p(2)]),
     });
     const r = await runSync(w.ports);
-    expect(w.writes).toEqual(["addToNaka:1"]);
-    expect(r).toEqual(report({ added: [p(1)] }));
-    expect(w.saved[0]?.snapshot).toEqual([p(1)]);
+    expect(r).toEqual(report({ added: [p(1), p(2)] }));
+    expect(w.saved[0]?.snapshot).toEqual([]);
+  });
+});
+
+describe("a failed pair goes last until it succeeds (S3)", () => {
+  const retry = (...ps: Pair[]) => ({ retryLast: ps });
+
+  it("does not starve the side over runs (probe I)", async () => {
+    const w = world({
+      naka: range(1, 5),
+      failSc: [1001, 1002],
+      state: withMapping(pairs(1, 5)),
+    });
+    const r1 = await runSync(w.ports);
+    expect(r1).toEqual(report({ failed: [p(1), p(2)], deferred: pairs(3, 5) }));
+    expect(w.saved[0]?.retryLast).toEqual([p(1), p(2)]);
+    w.writes.length = 0;
+    const r2 = await runSync(w.ports);
+    expect(w.writes).toEqual([
+      "addToSc:1003",
+      "addToSc:1004",
+      "addToSc:1005",
+      "addToSc:1001",
+      "addToSc:1002",
+    ]);
+    expect(r2).toEqual(report({ added: pairs(3, 5), failed: [p(1), p(2)] }));
+    expect(w.saved[1]?.retryLast).toEqual([p(1), p(2)]);
+    w.writes.length = 0;
+    const r3 = await runSync(w.ports);
+    expect(w.writes).toEqual(["addToSc:1001", "addToSc:1002"]);
+    expect(r3).toEqual(report({ failed: [p(1), p(2)] }));
+  });
+
+  it("a demoted pair deferred by the cap stays in retryLast", async () => {
+    const w = world({
+      naka: range(1, 11),
+      state: withMapping(pairs(1, 11), retry(p(1))),
+    });
+    const r = await runSync(w.ports);
+    expect(w.writes).toEqual(range(2, 11).map((n) => `addToSc:${n + 1000}`));
+    expect(r).toEqual(report({ added: pairs(2, 11), deferred: [p(1)] }));
+    expect(w.saved[0]?.retryLast).toEqual([p(1)]);
+  });
+
+  it("a demoted pair that succeeds leaves retryLast", async () => {
+    const w = world({
+      naka: [1, 2],
+      state: withMapping(pairs(1, 2), retry(p(1))),
+    });
+    const r = await runSync(w.ports);
+    expect(w.writes).toEqual(["addToSc:1002", "addToSc:1001"]);
+    expect(r).toEqual(report({ added: [p(2), p(1)] }));
+    expect(w.saved[0]?.retryLast).toEqual([]);
+  });
+
+  it("a pair that left the mapping leaves retryLast", async () => {
+    const w = world({
+      naka: [1],
+      state: withMapping([p(1)], retry(p(9), p(1))),
+    });
+    await runSync(w.ports);
+    expect(w.saved[0]?.retryLast).toEqual([]);
+    const v = world({
+      naka: [1],
+      failSc: [1001],
+      state: withMapping([p(1)], retry(p(9))),
+    });
+    await runSync(v.ports);
+    expect(v.saved[0]?.retryLast).toEqual([p(1)]);
+  });
+
+  it("the partition is per side: SC side first, then Naka", async () => {
+    const w = world({
+      naka: [1, 2],
+      sc: [1011],
+      state: withMapping([p(1), p(2), p(11)], retry(p(1))),
+    });
+    await runSync(w.ports);
+    expect(w.writes).toEqual(["addToSc:1002", "addToSc:1001", "addToNaka:11"]);
+  });
+
+  it("deduplicates retryLast when a demoted pair fails again", async () => {
+    const w = world({
+      naka: [1],
+      failSc: [1001],
+      state: withMapping([p(1)], retry(p(1))),
+    });
+    await runSync(w.ports);
+    expect(w.saved[0]?.retryLast).toEqual([p(1)]);
+  });
+
+  it("does not mutate a deep-frozen retryLast", async () => {
+    const w = world({
+      naka: [1, 2],
+      failSc: [1001],
+      state: deepFreeze(withMapping(pairs(1, 2), retry(p(1)))),
+    });
+    const r = await runSync(w.ports);
+    expect(r).toEqual(report({ added: [p(2)], failed: [p(1)] }));
   });
 });
 

@@ -19,9 +19,27 @@ export type WriteOutcome = {
   written: { naka: number[]; sc: number[] };
 };
 
-export function selectWrites(plan: SyncPlan): Write[] {
-  const toSc = plan.addToSc.map((pair) => ({ side: "sc" as const, pair }));
-  const toNaka = plan.addToNaka.map((pair) => ({
+const samePair = (a: Pair, b: Pair): boolean =>
+  a.nakaId === b.nakaId && a.scId === b.scId;
+
+function failedLast(
+  pairs: readonly Pair[],
+  retryLast: readonly Pair[],
+): Pair[] {
+  const isRetry = (pair: Pair): boolean =>
+    retryLast.some((r) => samePair(r, pair));
+  return [...pairs.filter((pair) => !isRetry(pair)), ...pairs.filter(isRetry)];
+}
+
+export function selectWrites(
+  plan: SyncPlan,
+  retryLast: readonly Pair[],
+): Write[] {
+  const toSc = failedLast(plan.addToSc, retryLast).map((pair) => ({
+    side: "sc" as const,
+    pair,
+  }));
+  const toNaka = failedLast(plan.addToNaka, retryLast).map((pair) => ({
     side: "naka" as const,
     pair,
   }));

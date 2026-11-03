@@ -40,11 +40,11 @@ export async function resolveUnlinked(
   ports: ResolverPorts,
 ): Promise<SyncState> {
   const naka = waitingIds(state, "naka", plan.resolveNaka);
-  const sc = waitingIds(state, "sc", plan.resolveSc);
   const withNaka = await resolveNakaIds(
     naka.slice(0, MAX_RESOLVE_PER_RUN),
     state,
     ports,
   );
+  const sc = waitingIds(withNaka, "sc", plan.resolveSc);
   return resolveScIds(sc.slice(0, MAX_RESOLVE_PER_RUN), withNaka, ports);
 }

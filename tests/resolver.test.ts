@@ -74,6 +74,7 @@ function rich(): SyncState {
     ],
     handled: ["k"],
     unlinked: [{ side: "naka", id: 90, title: "Old", reason: "no-match" }],
+    retryLast: [p(2, 12)],
     threshold: 7,
   };
 }
@@ -430,6 +431,7 @@ describe("resolveNakaIds", () => {
         { side: "naka", id: 90, title: "Old", reason: "no-match" },
         { side: "naka", id: 7, title: "Nothing", reason: "no-match" },
       ],
+      retryLast: [p(2, 12)],
       threshold: 7,
     });
     expect(out).not.toBe(state);
