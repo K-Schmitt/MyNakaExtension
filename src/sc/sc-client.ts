@@ -11,6 +11,7 @@ import {
   checkRating,
   checkSeason,
 } from "./sc-input";
+import { type ProductState, readProductState } from "./sc-product-state";
 import type { GQL } from "./sc-queries";
 import {
   post,
@@ -30,6 +31,7 @@ import {
 import type { ScWishItem } from "./wishlist-page";
 
 export { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
+export type { ProductState } from "./sc-product-state";
 export type { Fetch, ScDeps, ScSession } from "./sc-transport";
 
 export type ScClient = {
@@ -38,6 +40,7 @@ export type ScClient = {
   markDone(productId: number, isoDate: string): Promise<void>;
   unmarkDone(productId: number): Promise<void>;
   rate(productId: number, rating: number): Promise<void>;
+  productState(productId: number): Promise<ProductState>;
   readWishlist(universe: WishUniverse): Promise<ScWishItem[]>;
   seasonInfo(
     seriesProductId: number,
@@ -87,6 +90,18 @@ async function rate(deps: ScDeps, productId: number, rating: number) {
   ]);
 }
 
+// A read of the owner's own state on a product: it needs the token, under the same rules as a write.
+async function productState(deps: ScDeps, productId: number) {
+  checkProductId(productId);
+  const token = requireToken(await readSession(deps));
+  const envelope = await post(
+    deps.fetch,
+    { operationName: "ProductCurrentUserInfos", variables: { id: productId } },
+    token,
+  );
+  return readProductState(envelope, productId);
+}
+
 // The season page is public: no session, no cookie, no header; a slug change may redirect.
 async function seasonInfo(
   deps: ScDeps,
@@ -119,6 +134,7 @@ export function createScClient(deps: ScDeps): ScClient {
     markDone: (productId, isoDate) => markDone(deps, productId, isoDate),
     unmarkDone: (productId) => oneStep(deps, "ProductUndone", productId),
     rate: (productId, rating) => rate(deps, productId, rating),
+    productState: (productId) => productState(deps, productId),
     readWishlist: (universe) => readWishlist(deps, universe),
     seasonInfo: (seriesProductId, season) =>
       seasonInfo(deps, seriesProductId, season),

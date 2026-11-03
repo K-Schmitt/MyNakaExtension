@@ -62,9 +62,24 @@ function wishlistOf(total: number): Respond {
   };
 }
 
+function userInfos(
+  id: number,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { isDone: false, isWished: true, productId: id, ...extra };
+}
+
+function stateReply(product: unknown): Reply {
+  return gql({ product });
+}
+
 const EVERYTHING: Respond = (call) => {
   if (call.init.method === "GET") return raw(200, seasonHtml);
   if (operationOf(call) === "UserCollection") return wishPage([], 0);
+  if (operationOf(call) === "ProductCurrentUserInfos") {
+    const id = Number(variablesOf(call).id);
+    return stateReply({ id, currentUserInfos: userInfos(id) });
+  }
   return OK;
 };
 
@@ -116,11 +131,13 @@ const METHODS: [string, (client: ScClient) => Promise<unknown>][] = [
   ["markDone", (c) => c.markDone(5, "2026-11-02")],
   ["unmarkDone", (c) => c.unmarkDone(5)],
   ["rate", (c) => c.rate(5, 8)],
+  ["productState", (c) => c.productState(5)],
   ["readWishlist", (c) => c.readWishlist("tvShow")],
   ["seasonInfo", (c) => c.seasonInfo(99153120, 1)],
 ];
-const WRITES = METHODS.slice(0, 5);
-const SESSION_METHODS = METHODS.slice(0, 6);
+// The five writes and productState: every call that needs the token.
+const TOKEN_METHODS = METHODS.slice(0, 6);
+const SESSION_METHODS = METHODS.slice(0, 7);
 
 describe("writes", () => {
   it("wish sends one ProductWish POST", async () => {
@@ -288,9 +305,9 @@ describe("authentication", () => {
   });
 
   it.each([{}, { username: "u" }, { token: "" }])(
-    "writes reject with ScUnauthenticatedError and no fetch without a token (%j)",
+    "writes and productState reject with ScUnauthenticatedError and no fetch without a token (%j)",
     async (session) => {
-      for (const [, run] of WRITES) {
+      for (const [, run] of TOKEN_METHODS) {
         const { client, calls, getSession } = setup(session);
         const error = await failure(run(client));
         expect(error).toBeInstanceOf(ScUnauthenticatedError);
@@ -856,7 +873,7 @@ describe("a session that cannot be read", () => {
 
   it("a token that is not a string counts as no token", async () => {
     const value = { token: 42, username: "u" };
-    for (const [, run] of WRITES) {
+    for (const [, run] of TOKEN_METHODS) {
       const { client, calls } = setupSession(async () => value);
       expect(await failure(run(client))).toBeInstanceOf(ScUnauthenticatedError);
       expect(calls).toHaveLength(0);
@@ -897,6 +914,7 @@ describe("runtime guards on ids, season and date", () => {
     ["unmarkDone", (c, id) => c.unmarkDone(id)],
     ["rate", (c, id) => c.rate(id, 8)],
     ["markDone", (c, id) => c.markDone(id, "2026-11-02")],
+    ["productState", (c, id) => c.productState(id)],
     ["seasonInfo (series id)", (c, id) => c.seasonInfo(id, 1)],
   ];
 
@@ -1099,4 +1117,159 @@ describe("a wishlist that changes during the read", () => {
     const { client } = setup(LOGGED_IN, () => wishPage(ids.map(product), 18));
     expect(await client.readWishlist("movie")).toHaveLength(20_000);
   });
+});
+
+describe("productState", () => {
+  const STATE_ERROR =
+    "SensCritique ProductCurrentUserInfos: unexpected product state";
+  const PERSONAL = { rating: LEAK, dateDone: TOKEN, userId: LEAK };
+
+  function expectClean(error: Error): void {
+    const seen = [
+      error.message,
+      String(error),
+      error.stack ?? "",
+      JSON.stringify(error),
+      ...Object.values(error).map(String),
+      String(error.cause ?? ""),
+    ].join("\n");
+    expect(seen).not.toContain(TOKEN);
+    expect(seen).not.toContain("LEAK");
+    expect(error.cause).toBeUndefined();
+  }
+
+  it("sends one ProductCurrentUserInfos POST with the raw token and the id variable", async () => {
+    const { client, calls, getSession } = setup(LOGGED_IN);
+    await client.productState(5);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(APOLLO);
+    expect(calls[0]?.init).toStrictEqual({
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: TOKEN },
+      body: expect.any(String),
+      credentials: "omit",
+      redirect: "error",
+    });
+    expect(JSON.parse(calls[0]?.init.body ?? "")).toStrictEqual({
+      operationName: "ProductCurrentUserInfos",
+      variables: { id: 5 },
+      query: GQL.ProductCurrentUserInfos,
+    });
+    expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for the requested product", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.productState(41);
+    expect(variablesOf(calls[0] as Call)).toStrictEqual({ id: 41 });
+  });
+
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])("returns isDone %s and isWished %s", async (isDone, isWished) => {
+    const infos = { isDone, isWished, productId: 7 };
+    const { client } = setup(LOGGED_IN, () =>
+      stateReply({ id: 7, currentUserInfos: infos }),
+    );
+    expect(await client.productState(7)).toStrictEqual({ isDone, isWished });
+  });
+
+  it("returns only the two flags, whatever else the answer holds", async () => {
+    const infos = userInfos(5, {
+      ...PERSONAL,
+      isDone: true,
+      isWished: false,
+      id: LEAK,
+      review: { url: LEAK },
+    });
+    const { client } = setup(LOGGED_IN, () =>
+      stateReply({ id: 5, title: LEAK, currentUserInfos: infos }),
+    );
+    const state = await client.productState(5);
+    expect(state).toStrictEqual({ isDone: true, isWished: false });
+    expect(Object.keys(state).sort()).toEqual(["isDone", "isWished"]);
+    expect(JSON.stringify(state)).not.toContain("LEAK");
+    expect(JSON.stringify(state)).not.toContain(TOKEN);
+  });
+
+  const withInfos = (infos: unknown): Reply =>
+    stateReply({ id: 5, currentUserInfos: infos });
+  const flags = (extra: Record<string, unknown>): Reply =>
+    withInfos(userInfos(5, { ...PERSONAL, ...extra }));
+  const without = (key: string): Reply => {
+    const infos = userInfos(5, PERSONAL);
+    delete infos[key];
+    return withInfos(infos);
+  };
+  const MALFORMED: [string, Reply][] = [
+    ["no product", gql({ other: LEAK })],
+    ["a null product", stateReply(null)],
+    ["a product that is a list", stateReply([LEAK, TOKEN])],
+    ["a product that is a string", stateReply(`${TOKEN} ${LEAK}`)],
+    ["no currentUserInfos", stateReply({ id: 5, title: LEAK })],
+    ["a null currentUserInfos", withInfos(null)],
+    ["a currentUserInfos that is a list", withInfos([true, true])],
+    ["a currentUserInfos that is a string", withInfos(`${TOKEN} ${LEAK}`)],
+    ["no isDone", without("isDone")],
+    ["isDone as a string", flags({ isDone: "true" })],
+    ["isDone as 1", flags({ isDone: 1 })],
+    ["a null isDone", flags({ isDone: null })],
+    ["no isWished", without("isWished")],
+    ["isWished as a string", flags({ isWished: "false" })],
+    ["isWished as 0", flags({ isWished: 0 })],
+    ["no productId", without("productId")],
+    ["a foreign productId", withInfos(userInfos(6, PERSONAL))],
+    ["a productId as a string", flags({ productId: "5" })],
+    ["no product id", stateReply({ currentUserInfos: userInfos(5, PERSONAL) })],
+    [
+      "a foreign product id",
+      stateReply({ id: 6, currentUserInfos: userInfos(5, PERSONAL) }),
+    ],
+    [
+      "a product id as a string",
+      stateReply({ id: "5", currentUserInfos: userInfos(5, PERSONAL) }),
+    ],
+  ];
+
+  it.each(MALFORMED)(
+    "rejects %s with the fixed error and leaks nothing",
+    async (_name, reply) => {
+      const { client, calls } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).toBeInstanceOf(ScUnavailableError);
+      expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+      expect(error.name).toBe("ScUnavailableError");
+      expect(error.message).toBe(STATE_ERROR);
+      expectClean(error);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  it("maps a GraphQL Unauthenticated error to ScUnauthenticatedError", async () => {
+    const body = JSON.stringify({
+      errors: [{ message: `Unauthenticated ${TOKEN} ${LEAK}` }],
+    });
+    const { client } = setup(LOGGED_IN, () => raw(200, body));
+    const error = await failure(client.productState(5));
+    expect(error).toBeInstanceOf(ScUnauthenticatedError);
+    expectClean(error);
+  });
+
+  it.each([
+    ["HTTP 500", raw(500, `${TOKEN} ${LEAK}`)],
+    ["a null data", raw(200, JSON.stringify({ data: null, x: LEAK }))],
+    ["a challenge page", raw(200, `<html>${TOKEN} ${LEAK}</html>`)],
+  ])(
+    "rejects %s through the transport, naming the operation",
+    async (_n, reply) => {
+      const { client } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).toBeInstanceOf(ScUnavailableError);
+      expect(error.message).toContain("ProductCurrentUserInfos");
+      expectClean(error);
+    },
+  );
 });
