@@ -1,7 +1,7 @@
 // Finds the SensCritique product of a finished Naka title: the stored mapping first, else a search
 // shared with the resolver (candidate-search.ts), then matchTitle (same type only).
-// A question already put to the owner about the title, or about the product a search finds, is never
-// decided here: the owner's pending choice wins over a fresh match.
+// A question already put to the owner about the title (checked first, even before the mapping), or
+// about the product a search finds, is never decided here: the owner's pending choice wins.
 
 import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
@@ -45,10 +45,10 @@ export async function matchOnSc(
   titled: Titled,
   ports: Search,
 ): Promise<ScMatch> {
-  const mapped = state.mapping.find((pair) => pair.nakaId === nakaId);
-  if (mapped) return { kind: "pair", pair: mapped, isNew: false };
   const asked = openQuestion(state, "naka", nakaId);
   if (asked) return { kind: "asked", candidateIds: [...asked.candidateIds] };
+  const mapped = state.mapping.find((pair) => pair.nakaId === nakaId);
+  if (mapped) return { kind: "pair", pair: mapped, isNew: false };
   const candidates = await findCandidates((q) => ports.searchSc(q), titled);
   const result = matchTitle(titled, candidates);
   if (result.kind === "none") return { kind: "not-found" };

@@ -20,26 +20,31 @@ import { UNIVERSE } from "../src/sc/sc-queries";
 // Model-based fuzz of the finish handler and the REAL runSync on one world. The
 // owner edits both lists, writes, reads and saves fail on both handlers, and the
 // Plan-3 answers arrive between steps: removals (keep, remove, no effect,
-// asked) and the owner's choice for the one ambiguous film, followed by the
-// explicit replay of its stored finish.
+// asked) and the owner's choice on any open question, made as Plan 3's contract
+// says (one save: the chosen pair upserted, every open question about the same
+// Naka id or the same SensCritique id resolved), followed by the explicit
+// replay of the stored finish.
 // Some titles are described WITHOUT a year by one side, so the runner leaves a
 // question open on them (Naka side for 3 and 12, SensCritique side for 1004 and
 // 1011) while the finish events, which carry the year, would match them alone.
+// Film 6 has a homonym of the same year (2006). Film 5 has two products one
+// year either side (1005 in 2004, 2005 in 2006): Naka asks about 5 while each
+// product, searched on Naka, finds 5 alone, the review's probe state.
 // Oracle 1: once a film's finish returned done, or rejected after one of its
 // saves succeeded, or once the handler's own unwish or markDone of the film
 // succeeded, no later run calls addToSc with that film's SensCritique id. (The
 // write triggers do not depend on when the handler saves: they also catch a
 // handler that writes before it saves anything.)
 // Oracle 2: unwish is only ever called with a film's SensCritique id.
-// Oracle 3: a finish of an UNMAPPED title writes nothing while a Naka-side
-// question on that title is open, nor to a product (or an episode of a series
+// Oracle 3 (no waiver): a finish writes nothing while a Naka-side question on
+// its title is open, mapped or not, nor to a product (or an episode of a series
 // product) with an open SensCritique-side question.
 
 const FILMS = [1, 2, 3, 4, 5, 6];
 const SERIES = [11, 12];
 const TITLES = [...FILMS, ...SERIES];
-const AMBIGUOUS = 6;
-const HOMONYM = 2006;
+const HOMONYMS: Record<number, number> = { 5: 2005, 6: 2006 };
+const SC_YEARS: Record<number, number> = { 1005: 2004, 2005: 2006 };
 const EPISODES = 3;
 const STEPS = 40;
 const SEEDS = 1000;
@@ -49,7 +54,9 @@ type Side = "naka" | "sc";
 const scOf = (n: number): number => n + 1000;
 const isFilm = (n: number): boolean => FILMS.includes(n);
 const isFilmSc = (id: number): boolean =>
-  id === HOMONYM || FILMS.some((n) => scOf(n) === id);
+  FILMS.some((n) => scOf(n) === id || HOMONYMS[n] === id);
+const titleOfProduct = (id: number): number =>
+  id >= 2000 ? id - 2000 : id - 1000;
 const universeOf = (id: number): number => {
   if (isFilmSc(id)) return UNIVERSE.film;
   return SERIES.some((n) => scOf(n) === id) ? UNIVERSE.serie : UNIVERSE.episode;
@@ -66,11 +73,13 @@ const yearless = (titled: Titled, drop: boolean): Titled =>
   drop ? { title: titled.title, type: titled.type } : titled;
 const nakaView = (id: number): Titled =>
   yearless(titleOf(id), NO_YEAR_ON_NAKA.includes(id));
+const scTitled = (id: number): Titled => {
+  const titled = titleOf(titleOfProduct(id));
+  const year = SC_YEARS[id];
+  return year === undefined ? titled : { ...titled, year };
+};
 const scView = (id: number): Titled =>
-  yearless(
-    titleOf(id === HOMONYM ? AMBIGUOUS : id - 1000),
-    NO_YEAR_ON_SC.includes(id),
-  );
+  yearless(scTitled(id), NO_YEAR_ON_SC.includes(id));
 // Episode products are 5000 + series product * 10 + episode (1..3).
 const ownerOf = (productId: number): number =>
   productId >= 5000 ? Math.floor((productId - 5001) / 10) : productId;
@@ -78,8 +87,9 @@ const ownerOf = (productId: number): number =>
 function scCandidates(q: string): Candidate[] {
   const n = titleNumber(q);
   if (n === undefined) return [];
-  const homonym = n === AMBIGUOUS ? [{ id: HOMONYM, ...titleOf(n) }] : [];
-  return [{ id: scOf(n), ...titleOf(n) }, ...homonym];
+  const homonym = HOMONYMS[n];
+  const ids = homonym === undefined ? [scOf(n)] : [scOf(n), homonym];
+  return ids.map((id) => ({ id, ...scTitled(id) }));
 }
 
 function nakaCandidates(q: string): Candidate[] {
@@ -106,7 +116,7 @@ async function simulate(seed: number): Promise<string[]> {
   }
   let state: SyncState = {
     ...emptyState(),
-    mapping: TITLES.filter((n) => n !== AMBIGUOUS && r() < 0.5).map((n) => ({
+    mapping: TITLES.filter((n) => !(n in HOMONYMS) && r() < 0.5).map((n) => ({
       nakaId: n,
       scId: scOf(n),
     })),
@@ -192,16 +202,15 @@ async function simulate(seed: number): Promise<string[]> {
     }
   };
 
-  // The questions a finish must not decide behind the owner's back (oracle 3).
+  // The questions a finish must not decide behind the owner's back (oracle 3, no waiver).
   const openQuestions = (n: number) => {
-    const unmapped = !state.mapping.some((m) => m.nakaId === n);
     const asked = (side: Side) =>
       state.pending.flatMap((i) =>
         i.kind === "ambiguity" && i.side === side ? [i.id] : [],
       );
     return {
-      onTitle: unmapped && asked("naka").includes(n),
-      onProducts: new Set(unmapped ? asked("sc") : []),
+      onTitle: asked("naka").includes(n),
+      onProducts: new Set(asked("sc")),
     };
   };
 
@@ -292,22 +301,27 @@ async function simulate(seed: number): Promise<string[]> {
     }
   };
 
+  // Plan 3's contract: ONE save that upserts the chosen pair and resolves every
+  // open ambiguity about the same Naka id or the same SensCritique id.
   const answerAmbiguity = async (
     item: PendingItem & { kind: "ambiguity" },
   ): Promise<void> => {
-    if (item.side === "sc") {
-      state = resolvePending(state, item);
-      return;
-    }
-    const scId = item.candidateIds[Math.floor(r() * item.candidateIds.length)];
-    if (scId === undefined) return;
-    state = resolvePending(
-      upsertMapping(state, { nakaId: item.id, scId }),
-      item,
-    );
-    log.push(`choose ${item.id} -> ${scId}`);
-    const replay = replays.get(item.id);
-    replays.delete(item.id);
+    const chosen =
+      item.candidateIds[Math.floor(r() * item.candidateIds.length)];
+    if (chosen === undefined) return;
+    const pair =
+      item.side === "naka"
+        ? { nakaId: item.id, scId: chosen }
+        : { nakaId: chosen, scId: item.id };
+    const about = (i: PendingItem): boolean =>
+      i.kind === "ambiguity" &&
+      ((i.side === "naka" && i.id === pair.nakaId) ||
+        (i.side === "sc" && i.id === pair.scId));
+    const mapped = upsertMapping(state, pair);
+    state = { ...mapped, pending: mapped.pending.filter((i) => !about(i)) };
+    log.push(`choose ${pair.nakaId} -> ${pair.scId}`);
+    const replay = replays.get(pair.nakaId);
+    replays.delete(pair.nakaId);
     if (replay) await finish(replay);
   };
 

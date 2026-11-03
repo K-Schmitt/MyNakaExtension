@@ -257,11 +257,26 @@ describe("an open question about the same title wins over a fresh match", () => 
     expect(w.calls).toEqual(["load"]);
   });
 
-  it("a mapped title is finished even with an open question on it: the mapping comes first", async () => {
+  it("a mapped title with an open question on it is asked again: the question comes before the mapping", async () => {
     const w = world({
       state: {
         mapping: [FILM_PAIR],
         pending: [question("naka", FILM, [FILM_SC, 2042])],
+      },
+    });
+    expect(await handleFinish(film(), w.ports)).toEqual({
+      kind: "needs-choice",
+      candidateIds: [FILM_SC, 2042],
+    });
+    expect(w.calls).toEqual(["load"]);
+    expect(writesOf(w.calls)).toEqual([]);
+  });
+
+  it("a mapped title with an SC-side question on its product is finished: that rule needs a search match", async () => {
+    const w = world({
+      state: {
+        mapping: [FILM_PAIR],
+        pending: [question("sc", FILM_SC, [FILM, 43])],
       },
     });
     expect((await handleFinish(film(), w.ports)).kind).toBe("done");

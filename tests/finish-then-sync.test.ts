@@ -5,7 +5,7 @@ import {
   handleFinish,
 } from "../src/core/finish-handler";
 import type { Pair } from "../src/core/list-diff";
-import { emptyState, type SyncState } from "../src/core/state";
+import { emptyState, type SyncState, upsertMapping } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
 import { UNIVERSE } from "../src/sc/sc-queries";
@@ -33,11 +33,23 @@ const SC_TITLES: Record<number, Titled> = {
   [SERIES_SC]: SERIES_TITLE,
 };
 
-// The film is 1042, the series 1007 (and its homonym 2007); episodes are 10071 and up.
+// The film is 1042 (and its homonym 2042), the series 1007 (and its homonym 2007); episodes are
+// 10071 and up.
 const universeOf = (id: number): number => {
-  if (id === FILM_SC) return UNIVERSE.film;
+  if (id === FILM_SC || id === 2042) return UNIVERSE.film;
   return id === SERIES_SC || id === 2007 ? UNIVERSE.serie : UNIVERSE.episode;
 };
+
+// Plan 3's answer (contract): ONE save that upserts the chosen pair and resolves every open
+// ambiguity about the same Naka id or the same SensCritique id.
+function answer(state: SyncState, pair: Pair): SyncState {
+  const about = (item: SyncState["pending"][number]): boolean =>
+    item.kind === "ambiguity" &&
+    ((item.side === "naka" && item.id === pair.nakaId) ||
+      (item.side === "sc" && item.id === pair.scId));
+  const mapped = upsertMapping(state, pair);
+  return { ...mapped, pending: mapped.pending.filter((item) => !about(item)) };
+}
 
 function candidates(titles: Record<number, Titled>, q: string): Candidate[] {
   return Object.entries(titles)
@@ -244,6 +256,47 @@ describe("a film finish, then the sync", () => {
       expect(listWrites(w.writes)).toEqual([]);
       expect(w.sc.has(FILM_SC)).toBe(false);
       expect(w.state.pending).toEqual([]);
+    },
+  );
+});
+
+describe("the owner's open question, the finish, the answer and the replay", () => {
+  it.each([
+    ["the homonym 2042", 2042, ["markDone:2042"]],
+    ["the runner's near match 1042", FILM_SC, ["unwish:1042", "markDone:1042"]],
+  ])(
+    "the probe: the finish asks, then the owner picks %s and the replay finishes it",
+    async (_name, chosen, writes) => {
+      const { w, ports } = world({
+        naka: [FILM],
+        sc: [FILM_SC],
+        nakaTitles: { [FILM]: FILM_TITLE },
+        scTitles: {
+          [FILM_SC]: { ...FILM_TITLE, year: 2000 },
+          2042: { ...FILM_TITLE, year: 2002 },
+        },
+      });
+      await runSync(ports);
+      expect(await handleFinish(film(), ports)).toEqual({
+        kind: "needs-choice",
+        candidateIds: [FILM_SC, 2042],
+      });
+      expect(w.writes).toEqual([]);
+      await ports.save(answer(w.state, { nakaId: FILM, scId: chosen }));
+      const replay = await handleFinish(film({ source: "explicit" }), ports);
+      expect(replay).toEqual({
+        kind: "done",
+        ratingTargets: [{ label: "film", productId: chosen }],
+      });
+      await runSync(ports);
+      await runSync(ports);
+      expect(w.writes).toEqual(writes);
+      expect(w.state.mapping).toEqual([{ nakaId: FILM, scId: chosen }]);
+      expect(
+        w.state.pending.filter(
+          (item) => item.kind === "ambiguity" && item.side === "naka",
+        ),
+      ).toEqual([]);
     },
   );
 });
