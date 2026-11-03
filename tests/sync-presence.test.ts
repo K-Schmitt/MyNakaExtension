@@ -3,6 +3,7 @@ import type { Pair } from "../src/core/list-diff";
 import {
   emptyState,
   type PendingItem,
+  resolvePending,
   type SyncState,
   settlePair,
   unsettlePair,
@@ -301,7 +302,10 @@ describe("the owner's latest action wins: additions", () => {
     w.naka.delete(5);
     w.sc.delete(1005);
     expect(await runSync(ports)).toEqual(report());
-    expect(w.state.presence).toEqual({ naka: [], sc: [] });
+    expect(w.state.presence).toEqual({
+      naka: [{ id: 5, from: 1, to: 1 }],
+      sc: [{ id: 1005, from: 1, to: 1 }],
+    });
     w.naka.add(5);
     const r = await runSync(ports);
     expect(w.writes).toEqual(["addToSc:1005"]);
@@ -309,8 +313,88 @@ describe("the owner's latest action wins: additions", () => {
   });
 });
 
+describe("each id is judged by its current period (amendment 1)", () => {
+  it("C1: an absent id keeps its interval: a truthful re-pairing with a homonym it was seen with is a question", async () => {
+    // Naka 1 and Naka 2 are homonyms; SensCritique 1001 is really Naka 2's product, but the resolver
+    // maps it to Naka 1 first and asks about Naka 2.
+    const pair2 = { nakaId: 2, scId: 1001 };
+    const { w, ports } = world({
+      naka: [1, 2],
+      sc: [1001],
+      nakaTitles: { 1: film(1), 2: film(1) },
+      scTitles: { 1001: film(1) },
+    });
+    expect(await runSync(ports)).toEqual(report());
+    expect(w.state.mapping).toEqual([{ nakaId: 1, scId: 1001 }]);
+    w.sc.delete(1001);
+    expect(await runSync(ports)).toEqual(report({ pendingRemovals: 1 }));
+    const removed = w.state.pending.find((i) => i.kind === "removal");
+    if (!removed) throw new Error("expected the removal question");
+    // The owner answers "remove" (Plan 3 removes Naka 1), then "Naka 2 is 1001".
+    w.naka.delete(1);
+    w.state = answer(resolvePending(w.state, removed), pair2);
+    const r = await runSync(ports);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("naka", pair2)]);
+    expect(r).toEqual(report({ pendingRemovals: 1 }));
+  });
+
+  it("C2: a pair seen together, removed from both lists, then re-added on Naka and mapped in that run is an addition", async () => {
+    const { w, ports } = world({
+      naka: [5],
+      sc: [1005],
+      nakaTitles: { 5: film(5) },
+      scTitles: { 1005: film(5) },
+    });
+    w.offline = true;
+    expect(await runSync(ports)).toEqual(report({ unresolved: 2 }));
+    expect(await runSync(ports)).toEqual(report({ unresolved: 2 }));
+    w.naka.delete(5);
+    w.sc.delete(1005);
+    expect(await runSync(ports)).toEqual(report());
+    w.naka.add(5);
+    w.offline = false;
+    const r = await runSync(ports);
+    expect(w.writes).toEqual(["addToSc:1005"]);
+    expect(w.state.pending).toEqual([]);
+    expect(r).toEqual(report({ added: [PAIR5] }));
+  });
+});
+
+describe("the lists of the run, read before any write (amendment 1)", () => {
+  it("a pair the planner knew stays known when one of its titles is re-added mid-run", async () => {
+    const pair1 = { nakaId: 1, scId: 1001 };
+    const { w, ports } = world({
+      naka: [5],
+      sc: [1005],
+      nakaTitles: { 5: FILM5_NO_YEAR },
+      nakaCatalogue: { 5: film(5) },
+      scTitles: { 1005: film(5) },
+    });
+    expect(await runSync(ports)).toEqual(report());
+    w.naka.delete(5);
+    w.sc.delete(1005);
+    expect(await runSync(ports)).toEqual(report());
+    // The owner answers 5 -> 1005; title 1 is on SensCritique only.
+    w.state = upsertMapping(answer(w.state, PAIR5), pair1);
+    w.sc.add(1001);
+    const addToNaka = ports.addToNaka;
+    ports.addToNaka = async (id) => {
+      await addToNaka(id);
+      w.naka.add(5); // the owner re-adds film 5 during the run
+    };
+    expect(await runSync(ports)).toEqual(report({ added: [pair1] }));
+    expect(w.state.snapshot).toEqual([pair1, PAIR5]);
+    ports.addToNaka = addToNaka;
+    const r = await runSync(ports);
+    expect(w.writes).toEqual(["addToNaka:1"]);
+    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+    expect(r).toEqual(report({ pendingRemovals: 1 }));
+  });
+});
+
 describe("presence bookkeeping", () => {
-  it("an absent mapped id leaves presence; an absent unmapped id stays", async () => {
+  it("an absent id keeps its latest interval, mapped or not", async () => {
     const { w, ports } = world({
       naka: [1, 2, 7],
       sc: [1001, 1002, 1009],
@@ -346,11 +430,13 @@ describe("presence bookkeeping", () => {
     expect(w.state.run).toBe(2);
     expect(w.state.presence).toEqual({
       naka: [
+        { id: 1, from: 1, to: 1 },
         { id: 2, from: 1, to: 2 },
         { id: 7, from: 1, to: 1 },
       ],
       sc: [
         { id: 1001, from: 1, to: 2 },
+        { id: 1002, from: 1, to: 1 },
         { id: 1009, from: 1, to: 1 },
       ],
     });
@@ -437,7 +523,10 @@ describe("presence bookkeeping", () => {
     expect(r).toEqual(report({ pendingRemovals: 1 }));
     expect(w.state.presence).toEqual({
       naka: [{ id: 5, from: 1, to: 4 }],
-      sc: [{ id: 1009, from: 4, to: 4 }],
+      sc: [
+        { id: 1005, from: 2, to: 2 },
+        { id: 1009, from: 4, to: 4 },
+      ],
     });
   });
 });

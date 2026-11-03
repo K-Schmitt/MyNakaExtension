@@ -1,5 +1,5 @@
 import { type Pair, planListSync, type Removal } from "./list-diff";
-import { nextPresence, type Presence, withPairsSeenTogether } from "./presence";
+import { nextPresence, withPairsSeenTogether } from "./presence";
 import type { ResolverPorts } from "./resolver";
 import { addPending, type SyncState, setSnapshot, settlePair } from "./state";
 import {
@@ -52,20 +52,23 @@ function effectiveSettled(state: SyncState): Pair[] {
   return [...unique.values()];
 }
 
-// The stored snapshot plus the mapped pairs a completed run saw together (presence as loaded).
-function knownSnapshot(state: SyncState, presence: Presence): Pair[] {
-  return withPairsSeenTogether(state.snapshot, state.mapping, presence);
+type Lists = { naka: number[]; sc: number[] };
+
+// The stored snapshot plus the mapped pairs a completed run saw together, judged from the presence as
+// loaded and this run's lists as read before any write.
+function knownSnapshot(
+  state: SyncState,
+  loaded: SyncState,
+  lists: Lists,
+): Pair[] {
+  return withPairsSeenTogether(state.snapshot, state.mapping, loaded, lists);
 }
 
-function planFor(
-  state: SyncState,
-  presence: Presence,
-  lists: { naka: number[]; sc: number[] },
-) {
+function planFor(state: SyncState, loaded: SyncState, lists: Lists) {
   return planListSync({
     naka: new Set(lists.naka),
     sc: new Set(lists.sc),
-    snapshot: knownSnapshot(state, presence),
+    snapshot: knownSnapshot(state, loaded, lists),
     mapping: state.mapping,
     settled: effectiveSettled(state),
   });
@@ -126,7 +129,7 @@ function completeRun(
   lists: { naka: number[]; sc: number[] },
 ): SyncState {
   const run = state.run + 1;
-  const presence = nextPresence(state.presence, run, lists, state.mapping);
+  const presence = nextPresence(state.presence, run, lists);
   return { ...state, run, presence };
 }
 
@@ -159,9 +162,9 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     naka: await ports.nakaIds(),
     sc: await ports.scWishlistIds(),
   };
-  const first = planFor(loaded, loaded.presence, lists);
+  const first = planFor(loaded, loaded, lists);
   const resolved = await resolveUnlinked(loaded, first, ports);
-  const plan = planFor(resolved, loaded.presence, lists);
+  const plan = planFor(resolved, loaded, lists);
   const outcome = await executeWrites(
     selectWrites(plan, resolved.retryLast),
     ports,
@@ -182,7 +185,7 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
       outcome.written.sc,
     ),
   };
-  const known = knownSnapshot(resolved, loaded.presence);
+  const known = knownSnapshot(resolved, loaded, lists);
   const state = completeRun(
     nextRetryLast(nextSnapshot(queued, known, final), outcome),
     final,

@@ -1,21 +1,16 @@
 // Where each id was in its list, run by run. For each side, an id keeps the latest contiguous interval of
-// COMPLETED runs whose final list held it. Two ids "were together" when their intervals overlap: both were
-// in their lists at the end of the same completed run. A pair mapped only after such a run (the resolution
-// cap, a failed search or an open question delayed it) is then known to the planner as if it had been
-// snapshotted, so a later one-sided state is the owner removing one side: a question, never an addition.
-// Pure: no port, no clock.
+// COMPLETED runs whose final list held it, mapped or not. Two ids "were together" when both were in their
+// lists at the end of the same completed run, during the CURRENT period of each. A pair mapped only after
+// such a run (the resolution cap, a failed search or an open question delayed it) is then known to the
+// planner as if it had been snapshotted, so a later one-sided state is the owner removing one side: a
+// question, never an addition. Pure: no port, no clock.
 
 import type { Pair } from "./list-diff";
 
 export type PresenceEntry = { id: number; from: number; to: number };
 export type Presence = { naka: PresenceEntry[]; sc: PresenceEntry[] };
 
-type Side = keyof Presence;
-
 const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
-
-const ownId = (side: Side, pair: Pair): number =>
-  side === "naka" ? pair.nakaId : pair.scId;
 
 // An id present at the end of `run` extends an interval that reached the previous run, else starts one.
 function extend(entry: PresenceEntry, run: number): PresenceEntry {
@@ -24,38 +19,35 @@ function extend(entry: PresenceEntry, run: number): PresenceEntry {
     : { id: entry.id, from: run, to: run };
 }
 
-// An absent id keeps its interval, unless it is mapped on its own side: its pair is then covered by the
-// snapshot rules (the runner carries a pair seen together into the snapshot before the id leaves here).
+// An absent id keeps its latest interval, mapped or not: the owner may later pair it with another title
+// it was seen with.
 function nextSide(
   entries: readonly PresenceEntry[],
   run: number,
   listed: readonly number[],
-  mapped: ReadonlySet<number>,
 ): PresenceEntry[] {
   const present = new Set(listed);
   const known = new Set(entries.map((entry) => entry.id));
-  const kept = entries.flatMap((entry) => {
-    if (present.has(entry.id)) return [extend(entry, run)];
-    return mapped.has(entry.id) ? [] : [entry];
-  });
+  const kept = entries.map((entry) =>
+    present.has(entry.id) ? extend(entry, run) : entry,
+  );
   const fresh = [...present]
     .filter((id) => !known.has(id))
     .map((id) => ({ id, from: run, to: run }));
   return [...kept, ...fresh];
 }
 
-// The presence after completed run number `run`, from that run's final lists and mapping.
+type Lists = { naka: readonly number[]; sc: readonly number[] };
+
+// The presence after completed run number `run`, from that run's final lists.
 export function nextPresence(
   presence: Presence,
   run: number,
-  lists: { naka: readonly number[]; sc: readonly number[] },
-  mapping: readonly Pair[],
+  lists: Lists,
 ): Presence {
-  const mappedOn = (side: Side) =>
-    new Set(mapping.map((pair) => ownId(side, pair)));
   return {
-    naka: nextSide(presence.naka, run, lists.naka, mappedOn("naka")),
-    sc: nextSide(presence.sc, run, lists.sc, mappedOn("sc")),
+    naka: nextSide(presence.naka, run, lists.naka),
+    sc: nextSide(presence.sc, run, lists.sc),
   };
 }
 
@@ -67,25 +59,44 @@ function byId(entries: readonly PresenceEntry[]): Map<number, PresenceEntry> {
   return index;
 }
 
+// The interval an id counts with. An id present in this run's lists counts only through its current
+// period, one that was still open at the end of the last completed run; one re-added after an absence
+// has no interval yet (its stored one is a previous period). An absent id counts through its latest one.
+function counted(
+  entry: PresenceEntry | undefined,
+  present: ReadonlySet<number>,
+  lastRun: number,
+): PresenceEntry | undefined {
+  if (entry === undefined) return undefined;
+  return present.has(entry.id) && entry.to !== lastRun ? undefined : entry;
+}
+
 function overlap(a: PresenceEntry | undefined, b: PresenceEntry | undefined) {
   if (a === undefined || b === undefined) return false;
   return Math.max(a.from, b.from) <= Math.min(a.to, b.to);
 }
 
 // The snapshot the planner reads: the stored one, then every mapped pair not in it whose two ids were
-// seen together. `presence` must be the LOADED one: it covers completed runs only.
+// seen together. `loaded` is the presence and run counter as LOADED (completed runs only); `lists` are
+// this run's lists, read before any write.
 export function withPairsSeenTogether(
   snapshot: readonly Pair[],
   mapping: readonly Pair[],
-  presence: Presence,
+  loaded: { presence: Presence; run: number },
+  lists: Lists,
 ): Pair[] {
   const stored = new Set(snapshot.map(pairKey));
-  const naka = byId(presence.naka);
-  const sc = byId(presence.sc);
+  const naka = byId(loaded.presence.naka);
+  const sc = byId(loaded.presence.sc);
+  const inNaka = new Set(lists.naka);
+  const inSc = new Set(lists.sc);
   const late = mapping.filter(
     (pair) =>
       !stored.has(pairKey(pair)) &&
-      overlap(naka.get(pair.nakaId), sc.get(pair.scId)),
+      overlap(
+        counted(naka.get(pair.nakaId), inNaka, loaded.run),
+        counted(sc.get(pair.scId), inSc, loaded.run),
+      ),
   );
   return [...snapshot, ...late];
 }
