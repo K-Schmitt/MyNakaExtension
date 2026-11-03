@@ -1,6 +1,11 @@
 import { type Pair, planListSync, type Removal } from "./list-diff";
-import { type ResolverPorts, resolveNakaIds, resolveScIds } from "./resolver";
+import type { ResolverPorts } from "./resolver";
 import { addPending, type SyncState, setSnapshot } from "./state";
+import {
+  countWaiting,
+  MAX_RESOLVE_PER_RUN,
+  resolveUnlinked,
+} from "./sync-resolve";
 import {
   executeWrites,
   MAX_WRITES_PER_RUN,
@@ -8,8 +13,7 @@ import {
   type WritePorts,
 } from "./sync-writes";
 
-export { MAX_WRITES_PER_RUN };
-export const MAX_RESOLVE_PER_RUN = 20;
+export { MAX_RESOLVE_PER_RUN, MAX_WRITES_PER_RUN };
 
 export type SyncPorts = ResolverPorts &
   WritePorts & {
@@ -29,12 +33,15 @@ export type SyncReport = {
 
 const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
-function effectiveSettled(state: SyncState): Pair[] {
-  const unique = new Map<string, Pair>();
-  const pendingRemovals = state.pending.flatMap((item) =>
+function pendingRemovalPairs(state: SyncState): Pair[] {
+  return state.pending.flatMap((item) =>
     item.kind === "removal" ? [item.pair] : [],
   );
-  for (const pair of [...state.settled, ...pendingRemovals]) {
+}
+
+function effectiveSettled(state: SyncState): Pair[] {
+  const unique = new Map<string, Pair>();
+  for (const pair of [...state.settled, ...pendingRemovalPairs(state)]) {
     unique.set(pairKey(pair), pair);
   }
   return [...unique.values()];
@@ -50,19 +57,6 @@ function planFor(state: SyncState, naka: number[], sc: number[]) {
   });
 }
 
-async function resolveUnlinked(
-  state: SyncState,
-  ids: { naka: number[]; sc: number[] },
-  ports: SyncPorts,
-): Promise<SyncState> {
-  const withNaka = await resolveNakaIds(
-    ids.naka.slice(0, MAX_RESOLVE_PER_RUN),
-    state,
-    ports,
-  );
-  return resolveScIds(ids.sc.slice(0, MAX_RESOLVE_PER_RUN), withNaka, ports);
-}
-
 function queueRemovals(
   state: SyncState,
   removals: readonly Removal[],
@@ -74,14 +68,15 @@ function queueRemovals(
   );
 }
 
-async function currentList(
+async function effectiveList(
   read: () => Promise<number[]>,
   original: number[],
-  wrote: boolean,
+  written: number[],
 ): Promise<number[]> {
-  if (!wrote) return original;
+  if (written.length === 0) return original;
   try {
-    return await read();
+    const confirmed = (await read()).filter((id) => written.includes(id));
+    return [...original, ...confirmed];
   } catch {
     return original;
   }
@@ -97,7 +92,7 @@ function nextSnapshot(
   const both = state.mapping.filter(
     (pair) => inNaka.has(pair.nakaId) && inSc.has(pair.scId),
   );
-  return setSnapshot(state, both);
+  return setSnapshot(state, [...both, ...pendingRemovalPairs(state)]);
 }
 
 export async function runSync(ports: SyncPorts): Promise<SyncReport> {
@@ -105,23 +100,19 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   const naka = await ports.nakaIds();
   const sc = await ports.scWishlistIds();
   const first = planFor(loaded, naka, sc);
-  const resolved = await resolveUnlinked(
-    loaded,
-    { naka: first.resolveNaka, sc: first.resolveSc },
-    ports,
-  );
+  const resolved = await resolveUnlinked(loaded, first, ports);
   const plan = planFor(resolved, naka, sc);
   const outcome = await executeWrites(selectWrites(plan), ports);
   const queued = queueRemovals(resolved, plan.confirmRemoval);
-  const finalNaka = await currentList(
+  const finalNaka = await effectiveList(
     () => ports.nakaIds(),
     naka,
-    outcome.succeeded.has("naka"),
+    outcome.written.naka,
   );
-  const finalSc = await currentList(
+  const finalSc = await effectiveList(
     () => ports.scWishlistIds(),
     sc,
-    outcome.succeeded.has("sc"),
+    outcome.written.sc,
   );
   const state = nextSnapshot(queued, finalNaka, finalSc);
   await ports.save(state);
@@ -132,6 +123,6 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     pendingRemovals: state.pending.filter(
       (item) => item.kind === "removal" && !item.asked,
     ).length,
-    unresolved: plan.resolveNaka.length + plan.resolveSc.length,
+    unresolved: countWaiting(resolved, plan),
   };
 }

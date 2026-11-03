@@ -1,6 +1,7 @@
 import type { Pair, SyncPlan } from "./list-diff";
 
 export const MAX_WRITES_PER_RUN = 10;
+export const MAX_CONSECUTIVE_FAILURES = 2;
 
 export type Side = "naka" | "sc";
 
@@ -15,7 +16,7 @@ export type WriteOutcome = {
   added: Pair[];
   deferred: Pair[];
   failed: Pair[];
-  succeeded: Set<Side>;
+  written: { naka: number[]; sc: number[] };
 };
 
 export function selectWrites(plan: SyncPlan): Write[] {
@@ -25,6 +26,10 @@ export function selectWrites(plan: SyncPlan): Write[] {
     pair,
   }));
   return [...toSc, ...toNaka];
+}
+
+function writtenId(write: Write): number {
+  return write.side === "sc" ? write.pair.scId : write.pair.nakaId;
 }
 
 async function attempt(write: Write, ports: WritePorts): Promise<boolean> {
@@ -45,22 +50,26 @@ export async function executeWrites(
     added: [],
     deferred: [],
     failed: [],
-    succeeded: new Set(),
+    written: { naka: [], sc: [] },
   };
-  const stopped = new Set<Side>();
+  const streak = { naka: 0, sc: 0 };
   let attempts = 0;
   for (const write of writes) {
-    if (attempts >= MAX_WRITES_PER_RUN || stopped.has(write.side)) {
+    if (
+      attempts >= MAX_WRITES_PER_RUN ||
+      streak[write.side] >= MAX_CONSECUTIVE_FAILURES
+    ) {
       outcome.deferred.push(write.pair);
       continue;
     }
     attempts += 1;
     if (await attempt(write, ports)) {
       outcome.added.push(write.pair);
-      outcome.succeeded.add(write.side);
+      streak[write.side] = 0;
+      outcome.written[write.side].push(writtenId(write));
     } else {
       outcome.failed.push(write.pair);
-      stopped.add(write.side);
+      streak[write.side] += 1;
     }
   }
   return outcome;
