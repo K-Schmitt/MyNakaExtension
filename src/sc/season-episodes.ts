@@ -1,5 +1,6 @@
 // Parses the Apollo cache that SensCritique embeds in a season page (<script id="__NEXT_DATA__">).
 // Pure: no network. Any unreadable page gives an empty result, never a throw.
+// Only the requested series and season are read: the episodes are the refs listed by that season's own entry.
 
 export type ScEpisode = {
   productId: number;
@@ -8,11 +9,16 @@ export type ScEpisode = {
   title: string;
 };
 
-type ProductEntry = { id: number; url: string; title: string };
+type ApolloState = Record<string, unknown>;
+type ProductEntry = {
+  id: number;
+  url: string;
+  title: string;
+  fields: Record<string, unknown>;
+};
 
-const NEXT_DATA =
-  /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/;
-const EPISODE_URL = /\/S(\d+)\/E(\d+)$/;
+const NEXT_DATA = /<script[^>]*\bid="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/;
+const DIGITS = /^\d+$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -28,7 +34,7 @@ function readNextData(html: string): unknown {
   }
 }
 
-function apolloState(html: string): Record<string, unknown> {
+function apolloState(html: string): ApolloState {
   const root = readNextData(html);
   if (!isRecord(root)) return {};
   const props = root.props;
@@ -43,48 +49,89 @@ function toProduct(key: string, value: unknown): ProductEntry | undefined {
   if (!key.startsWith("Product:") || !isRecord(value)) return undefined;
   const { id, url, title } = value;
   if (typeof id !== "number" || typeof url !== "string") return undefined;
-  return { id, url, title: typeof title === "string" ? title : "" };
+  return {
+    id,
+    url,
+    title: typeof title === "string" ? title : "",
+    fields: value,
+  };
 }
 
-function products(html: string): ProductEntry[] {
-  const found: ProductEntry[] = [];
-  for (const [key, value] of Object.entries(apolloState(html))) {
+function seasonSuffix(seriesProductId: number, season: number): string {
+  return `/${seriesProductId}/S${season}`;
+}
+
+function findSeason(
+  state: ApolloState,
+  seriesProductId: number,
+  season: number,
+): ProductEntry | undefined {
+  const suffix = seasonSuffix(seriesProductId, season);
+  for (const [key, value] of Object.entries(state)) {
     const entry = toProduct(key, value);
-    if (entry !== undefined) found.push(entry);
+    if (entry?.url.endsWith(suffix)) return entry;
   }
-  return found;
+  return undefined;
 }
 
-function toEpisode(entry: ProductEntry): ScEpisode | undefined {
-  const match = EPISODE_URL.exec(entry.url);
-  if (match?.[1] === undefined || match[2] === undefined) return undefined;
+function refKeys(fields: Record<string, unknown>): string[] {
+  const keys: string[] = [];
+  for (const [name, value] of Object.entries(fields)) {
+    if (!name.startsWith("episodes(") || !Array.isArray(value)) continue;
+    for (const item of value) {
+      if (isRecord(item) && typeof item.__ref === "string") {
+        keys.push(item.__ref);
+      }
+    }
+  }
+  return keys;
+}
+
+function toEpisode(
+  entry: ProductEntry,
+  seriesProductId: number,
+  season: number,
+): ScEpisode | undefined {
+  const cut = entry.url.lastIndexOf("/E");
+  if (cut < 0) return undefined;
+  const number = entry.url.slice(cut + 2);
+  const head = entry.url.slice(0, cut);
+  if (!DIGITS.test(number)) return undefined;
+  if (!head.endsWith(seasonSuffix(seriesProductId, season))) return undefined;
   return {
     productId: entry.id,
-    season: Number(match[1]),
-    episode: Number(match[2]),
+    season,
+    episode: Number(number),
     title: entry.title,
   };
 }
 
-export function parseSeasonEpisodes(html: string): ScEpisode[] {
+export function parseSeasonEpisodes(
+  html: string,
+  seriesProductId: number,
+  season: number,
+): ScEpisode[] {
+  const state = apolloState(html);
+  const seasonEntry = findSeason(state, seriesProductId, season);
+  if (seasonEntry === undefined) return [];
   const byId = new Map<number, ScEpisode>();
-  for (const entry of products(html)) {
-    const episode = toEpisode(entry);
+  for (const key of refKeys(seasonEntry.fields)) {
+    const entry = toProduct(key, state[key]);
+    if (entry === undefined) continue;
+    const episode = toEpisode(entry, seriesProductId, season);
     if (episode !== undefined && !byId.has(episode.productId)) {
       byId.set(episode.productId, episode);
     }
   }
-  return [...byId.values()].sort(
-    (a, b) => a.season - b.season || a.episode - b.episode,
-  );
+  return [...byId.values()].sort((a, b) => a.episode - b.episode);
 }
 
 export function parseSeasonProductId(
   html: string,
+  seriesProductId: number,
   season: number,
 ): number | undefined {
-  const suffix = new RegExp(`/S${season}$`);
-  return products(html).find((entry) => suffix.test(entry.url))?.id;
+  return findSeason(apolloState(html), seriesProductId, season)?.id;
 }
 
 export function findEpisode(
