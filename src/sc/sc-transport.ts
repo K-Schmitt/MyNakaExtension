@@ -34,9 +34,22 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// An empty token counts as no token.
-export function tokenOf(session: ScSession): string | undefined {
-  return session.token || undefined;
+function textOf(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+// The one place that calls getSession. Whatever it rejects with (a message, a stack, a cause or a field may
+// carry the token or personal data) is dropped; a value that is not an object counts as no session, and a
+// token or username that is not a non-empty string counts as missing.
+export async function readSession(deps: ScDeps): Promise<ScSession> {
+  let raw: unknown;
+  try {
+    raw = await deps.getSession();
+  } catch {
+    throw new ScUnavailableError("SensCritique session: could not be read");
+  }
+  const fields = isRecord(raw) ? raw : {};
+  return { token: textOf(fields.token), username: textOf(fields.username) };
 }
 
 export async function send(

@@ -5,15 +5,21 @@
 // www.senscritique.com. See sc-transport.ts for the rules on the wire and in error messages.
 
 import { ScUnauthenticatedError } from "./sc-errors";
+import {
+  checkIsoDate,
+  checkProductId,
+  checkRating,
+  checkSeason,
+} from "./sc-input";
 import type { GQL } from "./sc-queries";
 import {
   JSON_TYPE,
   post,
+  readSession,
   type ScDeps,
   type ScSession,
   type Step,
   send,
-  tokenOf,
 } from "./sc-transport";
 import { readWishlist, type WishUniverse } from "./sc-wishlist";
 import {
@@ -42,28 +48,29 @@ export type ScClient = {
 
 type Operation = keyof typeof GQL;
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 function requireToken(session: ScSession): string {
-  const token = tokenOf(session);
-  if (token === undefined) throw new ScUnauthenticatedError();
-  return token;
+  if (session.token === undefined) throw new ScUnauthenticatedError();
+  return session.token;
 }
 
 // A write needs a token. The steps run in order under one session read; the first failure stops them.
 async function mutate(deps: ScDeps, steps: Step[]): Promise<void> {
-  const token = requireToken(await deps.getSession());
+  const token = requireToken(await readSession(deps));
   for (const step of steps) await post(deps.fetch, step, token);
 }
 
-function oneStep(deps: ScDeps, operationName: Operation, productId: number) {
-  return mutate(deps, [{ operationName, variables: { productId } }]);
+async function oneStep(
+  deps: ScDeps,
+  operationName: Operation,
+  productId: number,
+) {
+  checkProductId(productId);
+  await mutate(deps, [{ operationName, variables: { productId } }]);
 }
 
 async function markDone(deps: ScDeps, productId: number, isoDate: string) {
-  if (!ISO_DATE.test(isoDate)) {
-    throw new RangeError("date must look like YYYY-MM-DD");
-  }
+  checkProductId(productId);
+  checkIsoDate(isoDate);
   await mutate(deps, [
     { operationName: "ProductDone", variables: { productId } },
     {
@@ -74,21 +81,21 @@ async function markDone(deps: ScDeps, productId: number, isoDate: string) {
 }
 
 async function rate(deps: ScDeps, productId: number, rating: number) {
-  if (!Number.isInteger(rating) || rating < 1 || rating > 10) {
-    throw new RangeError("rating must be an integer from 1 to 10");
-  }
+  checkProductId(productId);
+  checkRating(rating);
   await mutate(deps, [
     { operationName: "ProductRate", variables: { productId, rating } },
   ]);
 }
 
-// The season page needs no token. The session is still read once, like for every public call.
+// The season page is public: seasonInfo never reads the session.
 async function seasonInfo(
   deps: ScDeps,
   seriesProductId: number,
   season: number,
 ) {
-  await deps.getSession();
+  checkProductId(seriesProductId);
+  checkSeason(season);
   const html = await send(
     deps.fetch,
     seasonUrl(seriesProductId, season),

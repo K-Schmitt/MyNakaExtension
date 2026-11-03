@@ -7,9 +7,9 @@ import {
   type Envelope,
   isRecord,
   post,
+  readSession,
   type ScDeps,
   type Step,
-  tokenOf,
 } from "./sc-transport";
 import {
   nextOffset,
@@ -90,12 +90,12 @@ export async function readWishlist(
   deps: ScDeps,
   universe: WishUniverse,
 ): Promise<ScWishItem[]> {
-  const session = await deps.getSession();
+  const session = await readSession(deps);
   if (!session.username) throw new ScUnauthenticatedError();
   const read = {
     universe,
     username: session.username,
-    token: tokenOf(session),
+    token: session.token,
   };
   const items: ScWishItem[] = [];
   let offset = 0;

@@ -69,6 +69,13 @@ const EVERYTHING: Respond = (call) => {
 };
 
 function setup(session: ScSession, respond: Respond = EVERYTHING) {
+  return setupSession(async () => session, respond);
+}
+
+function setupSession(
+  source: () => Promise<unknown>,
+  respond: Respond = EVERYTHING,
+) {
   const calls: Call[] = [];
   const fetch: Fetch = async (url, init) => {
     const call = { url, init };
@@ -89,7 +96,7 @@ function setup(session: ScSession, respond: Respond = EVERYTHING) {
       text: async () => body,
     };
   };
-  const getSession = vi.fn(async () => session);
+  const getSession = vi.fn(source as () => Promise<ScSession>);
   const client = createScClient({ fetch, getSession });
   return { client, calls, getSession };
 }
@@ -113,6 +120,7 @@ const METHODS: [string, (client: ScClient) => Promise<unknown>][] = [
   ["seasonInfo", (c) => c.seasonInfo(99153120, 1)],
 ];
 const WRITES = METHODS.slice(0, 5);
+const SESSION_METHODS = METHODS.slice(0, 6);
 
 describe("writes", () => {
   it("wish sends one ProductWish POST", async () => {
@@ -380,10 +388,28 @@ describe("authentication", () => {
 });
 
 describe("one session read per public call", () => {
-  it.each(METHODS)("%s reads the session exactly once", async (_name, run) => {
+  it.each(SESSION_METHODS)(
+    "%s reads the session exactly once",
+    async (_name, run) => {
+      const { client, getSession } = setup(LOGGED_IN);
+      await run(client);
+      expect(getSession).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("seasonInfo never reads the session", async () => {
     const { client, getSession } = setup(LOGGED_IN);
-    await run(client);
-    expect(getSession).toHaveBeenCalledTimes(1);
+    await client.seasonInfo(99153120, 1);
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it("seasonInfo works when the session cannot be read", async () => {
+    const { client, getSession } = setupSession(async () => {
+      throw new Error(LEAK);
+    });
+    const info = await client.seasonInfo(99153120, 1);
+    expect(info.episodes).toHaveLength(10);
+    expect(getSession).not.toHaveBeenCalled();
   });
 
   it("a three-page readWishlist reads the session once", async () => {
@@ -774,4 +800,176 @@ describe("the token stays secret", () => {
       for (const spy of spies) spy.mockRestore();
     }
   });
+});
+
+function leakyError(): Error {
+  const error = new Error(`${TOKEN} ${LEAK}`, { cause: `${TOKEN} ${LEAK}` });
+  error.stack = `${error.stack} ${TOKEN} ${LEAK}`;
+  return Object.assign(error, { body: `${TOKEN} ${LEAK}` });
+}
+
+describe("a session that cannot be read", () => {
+  const REJECTIONS: [string, () => unknown][] = [
+    ["an Error carrying secrets everywhere", leakyError],
+    ["a string carrying secrets", () => `${TOKEN} ${LEAK}`],
+  ];
+
+  describe.each(REJECTIONS)("rejecting with %s", (_label, make) => {
+    it.each(SESSION_METHODS)(
+      "%s rejects with a bare ScUnavailableError and sends nothing",
+      async (_name, run) => {
+        const { client, calls, getSession } = setupSession(async () => {
+          throw make();
+        });
+        const error = await failure(run(client));
+        expect(error).toBeInstanceOf(ScUnavailableError);
+        expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+        expect(error.message).toBe("SensCritique session: could not be read");
+        expect(error.cause).toBeUndefined();
+        const seen = [
+          error.message,
+          String(error),
+          error.stack ?? "",
+          JSON.stringify(error),
+          ...Object.values(error).map(String),
+        ].join("\n");
+        expect(seen).not.toContain(TOKEN);
+        expect(seen).not.toContain("LEAK");
+        expect(calls).toHaveLength(0);
+        expect(getSession).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
+  it.each([
+    ["null", null],
+    ["a number", 7],
+    ["a string", TOKEN],
+  ])("a resolved %s counts as no token and no username", async (_n, value) => {
+    for (const [, run] of SESSION_METHODS) {
+      const { client, calls } = setupSession(async () => value);
+      const error = await failure(run(client));
+      expect(error).toBeInstanceOf(ScUnauthenticatedError);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it("a token that is not a string counts as no token", async () => {
+    const value = { token: 42, username: "u" };
+    for (const [, run] of WRITES) {
+      const { client, calls } = setupSession(async () => value);
+      expect(await failure(run(client))).toBeInstanceOf(ScUnauthenticatedError);
+      expect(calls).toHaveLength(0);
+    }
+    const { client, calls } = setupSession(async () => value);
+    await client.readWishlist("movie");
+    expect(calls[0]?.init.headers).toStrictEqual({
+      "content-type": "application/json",
+    });
+  });
+
+  it("a username that is not a string counts as no username", async () => {
+    const value = { token: TOKEN, username: 42 };
+    const { client, calls } = setupSession(async () => value);
+    expect(await failure(client.readWishlist("movie"))).toBeInstanceOf(
+      ScUnauthenticatedError,
+    );
+    expect(calls).toHaveLength(0);
+    await client.wish(5);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("runtime guards on ids, season and date", () => {
+  const BAD_IDS: [string, unknown][] = [
+    ["0", 0],
+    ["-1", -1],
+    ["1.5", 1.5],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+    ["2 ** 53", 2 ** 53],
+    ["a path-like string", "../../account?x="],
+  ];
+  const asNumber = (value: unknown) => value as number;
+  const BY_ID: [string, (c: ScClient, id: number) => Promise<unknown>][] = [
+    ["wish", (c, id) => c.wish(id)],
+    ["unwish", (c, id) => c.unwish(id)],
+    ["unmarkDone", (c, id) => c.unmarkDone(id)],
+    ["rate", (c, id) => c.rate(id, 8)],
+    ["markDone", (c, id) => c.markDone(id, "2026-11-02")],
+    ["seasonInfo (series id)", (c, id) => c.seasonInfo(id, 1)],
+  ];
+
+  describe.each(BY_ID)("%s", (_name, run) => {
+    it.each(BAD_IDS)(
+      "rejects the id %s before anything else",
+      async (_l, bad) => {
+        const { client, calls, getSession } = setup({});
+        const error = await failure(run(client, asNumber(bad)));
+        expect(error).toBeInstanceOf(RangeError);
+        expect(calls).toHaveLength(0);
+        expect(getSession).not.toHaveBeenCalled();
+      },
+    );
+
+    it("accepts the smallest id, 1", async () => {
+      const { client, calls } = setup(LOGGED_IN);
+      await run(client, 1);
+      expect(calls.length).toBeGreaterThan(0);
+    });
+  });
+
+  it.each(BAD_IDS.filter(([label]) => label !== "0"))(
+    "seasonInfo rejects the season %s",
+    async (_l, bad) => {
+      const { client, calls } = setup(LOGGED_IN);
+      const error = await failure(client.seasonInfo(99153120, asNumber(bad)));
+      expect(error).toBeInstanceOf(RangeError);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("seasonInfo accepts season 0", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.seasonInfo(99153120, 0);
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each([
+    "2026-13-45",
+    "2026-02-30",
+    "2026-00-10",
+    "2026-04-31",
+    "2027-02-29",
+    "2026-01-00",
+    "0099-01-01",
+  ])("markDone rejects the impossible date %s", async (date) => {
+    const { client, calls, getSession } = setup(LOGGED_IN);
+    const error = await failure(client.markDone(5, date));
+    expect(error).toBeInstanceOf(RangeError);
+    expect(calls).toHaveLength(0);
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["2026-1-2", "YYYY-MM-DD"],
+    ["x2026-11-02", "YYYY-MM-DD"],
+    ["2026-11-02x", "YYYY-MM-DD"],
+    ["2026-02-30", "real calendar day"],
+    ["2026-13-45", "real calendar day"],
+  ])("markDone %s fails on the right check (%s)", async (date, part) => {
+    const { client } = setup(LOGGED_IN);
+    const error = await failure(client.markDone(5, date));
+    expect(error).toBeInstanceOf(RangeError);
+    expect(error.message).toContain(part);
+  });
+
+  it.each(["2028-02-29", "2026-12-31", "2026-01-01"])(
+    "markDone accepts the real date %s",
+    async (date) => {
+      const { client, calls } = setup(LOGGED_IN);
+      await client.markDone(5, date);
+      expect(variablesOf(calls[1] as Call).date).toBe(date);
+    },
+  );
 });
