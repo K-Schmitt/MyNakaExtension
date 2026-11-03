@@ -57,11 +57,17 @@ export function toPlaylistIds(json: unknown): number[] {
   return [...new Set(ids as number[])];
 }
 
+// A null value counts as an absent field.
+function isPresent(value: unknown): boolean {
+  return value !== undefined && value !== null;
+}
+
 // The length is the RAW one, before the dedupe. A page limit is required: without it nothing proves the list is whole.
+// A present `total` must equal the length and a present `hasMore` must be false: any other value fails closed.
 function mayBeTruncated(json: Record<string, unknown>, length: number) {
   const { limit, total, hasMore } = json;
   if (!isPositiveId(limit) || length >= limit) return true;
-  if (typeof total === "number" && total !== length) return true;
-  if (hasMore === true) return true;
+  if (isPresent(total) && total !== length) return true;
+  if (isPresent(hasMore) && hasMore !== false) return true;
   return Object.keys(json).some((key) => key.startsWith("next"));
 }

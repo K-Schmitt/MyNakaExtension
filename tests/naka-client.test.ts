@@ -364,11 +364,34 @@ describe("playlistIds fails closed", () => {
     expect(await client.playlistIds()).toEqual([4, 5]);
   });
 
-  it("ignores a total that is not a number", async () => {
+  it.each([
+    ["a null total", { total: null }],
+    ["a null hasMore", { hasMore: null }],
+    ["both null", { total: null, hasMore: null }],
+  ])("treats %s as absent", async (_name, extra) => {
     const { client } = setup(() =>
-      json({ contentIds: [4, 5], limit: 500, total: null }),
+      json({ contentIds: [4, 5], limit: 500, ...extra }),
     );
     expect(await client.playlistIds()).toEqual([4, 5]);
+  });
+
+  it.each([
+    ["a string total", { total: "120" }],
+    ["a string total equal to the count", { total: "2" }],
+    ["a boolean total", { total: true }],
+    ["an object total", { total: {} }],
+    ["a string hasMore", { hasMore: "true" }],
+    ["a string hasMore of false", { hasMore: "false" }],
+    ["a numeric hasMore", { hasMore: 1 }],
+    ["a zero hasMore", { hasMore: 0 }],
+    ["an object hasMore", { hasMore: {} }],
+  ])("fails closed on a present paging field: %s", async (_name, extra) => {
+    const { client } = setup(() =>
+      json({ contentIds: [4, 5], limit: 500, ...extra }),
+    );
+    const error = await failure(client.playlistIds());
+    expect(error).toBeInstanceOf(NakaUnavailableError);
+    expect(error.message).toBe("Naka playlist: list may be truncated");
   });
 
   it.each([
