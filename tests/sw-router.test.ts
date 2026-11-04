@@ -6,6 +6,8 @@ import { type Mode, parseSettings } from "../src/ext/settings";
 import { createStore } from "../src/ext/store";
 import { createNakaClient } from "../src/naka/naka-client";
 import type { Fetch } from "../src/sc/sc-client";
+import { localFormat } from "../src/status/status-format";
+import { toStatusView } from "../src/status/status-view";
 import { MAX_QUEUED_FINISHES } from "../src/sw/finish-queue";
 import { createJobQueue } from "../src/sw/job-queue";
 import {
@@ -1192,5 +1194,76 @@ describe("worker end to end: a finish is dated in the owner's time zone", () => 
       .map((c) => JSON.parse(c.init.body ?? "{}"))
       .find((body) => body.operationName === "SetProductDateDone");
     expect(dated?.variables).toEqual({ productId: 1003, date: "2026-11-05" });
+  });
+});
+
+// M10 and M12: the first real use, end to end through createWorker with the real clients, and the real
+// snapshot read by the page's own view model.
+describe("worker end to end: a first naka-ready in simulation", () => {
+  const NB = "\u202F";
+  const SC_WRITES = [
+    "ProductWish",
+    "ProductUnwish",
+    "ProductDone",
+    "SetProductDateDone",
+    "ProductUndone",
+    "ProductRate",
+  ];
+  const operations = (w: ReturnType<typeof worker>) =>
+    w.sc.calls
+      .filter((c) => c.url === APOLLO_HOST)
+      .map((c) => String(JSON.parse(c.init.body ?? "{}").operationName));
+
+  it("writes nothing on either site, and records a preview with sides and titles", async () => {
+    const w = worker();
+    w.send({ type: "naka-ready" }, NAKA_TAB);
+    await settle();
+    const ops = operations(w);
+    expect(ops).toContain("SearchProductExplorer");
+    for (const write of SC_WRITES) expect(ops).not.toContain(write);
+    expect(w.naka.calls.filter((c) => c.init.method !== "GET")).toEqual([]);
+    expect(w.naka.calls.map((c) => c.url)).not.toContain(
+      "https://naka.cx/api/v1/playlist",
+    );
+    const run = parseSettings(w.storage.data.get("settings")).lastRun;
+    expect(run).toMatchObject({
+      trigger: "naka-ready",
+      mode: "simulation",
+      outcome: "ok",
+    });
+    expect(run?.preview).toEqual([
+      { side: "sc", title: "Film 1" },
+      { side: "naka", title: "Film 2" },
+    ]);
+  });
+
+  it("the real status answer, read by the page's view model, gives the expected page", async () => {
+    const w = worker();
+    w.send({ type: "naka-ready" }, NAKA_TAB);
+    await settle();
+    w.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(w.answers).toHaveLength(1);
+    expect(toStatusView(w.answers[0], localFormat("UTC"))).toEqual({
+      kind: "ready",
+      headline: `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      mode: "simulation",
+      switchLabel: "Activer les écritures",
+      inProgress: false,
+      previewCount: 2,
+      lines: [
+        `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+        `Dernière synchronisation (simulation)${NB}: 04/11/2026 12:00 (ouverture de Naka)`,
+        `Prévus${NB}: 2`,
+        `Reportés (10 écritures au plus par passage)${NB}: 0`,
+        `Déjà vus sur SensCritique${NB}: 0`,
+        `Pas encore examinés${NB}: 0`,
+        "Rien en attente",
+      ],
+      preview: [
+        `Envies SensCritique${NB}: Film 1`,
+        `Ma liste Naka${NB}: Film 2`,
+      ],
+    });
   });
 });

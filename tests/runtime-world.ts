@@ -9,6 +9,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
+import { emptyState } from "../src/core/state";
 import {
   FINISH_WINDOW_MS,
   MAX_FINISHES_PER_WINDOW,
@@ -97,6 +98,10 @@ type Context = (
 ) &
   TabTrace;
 
+// The thresholds the owner may store (Ruling 10), and the spec's default (§3: 90 %) when none is stored.
+export const THRESHOLDS = [0.85, 0.9, 0.95, 0.99];
+const SPEC_DEFAULT_THRESHOLD = 0.9;
+
 // The tab with Naka's content script. Orphan tabs (opened before the install, or kept across an
 // extension reload) listen to nothing, and come first in the query's answer.
 export const LIVE_TAB = 1;
@@ -132,6 +137,8 @@ export function createWorld(seed: number) {
     current: undefined as Context | undefined,
     allowed: new Map<JobKey, number>(),
     invoked: new Map<JobKey, number>(),
+    // Every finished message a Naka tab sent, as the world built it (O13 judges from these).
+    sentFinishes: [] as FinishedMessage[],
     // How often each oracle's situation arose: a fuzz that never reaches it proves nothing.
     stats: {
       liveWrites: 0,
@@ -146,6 +153,7 @@ export function createWorld(seed: number) {
       orphanTries: 0,
       pinnedPastOrphan: 0,
       statusDuringJob: 0,
+      incompleteFinishes: 0,
     },
   };
   for (const n of TITLES) {
@@ -153,7 +161,32 @@ export function createWorld(seed: number) {
     if (r() < 0.5) w.wishlist.add(scOf(n));
     if (isFilm(n) && r() < 0.2) w.done.add(scOf(n));
   }
+  // Most owners have a stored state, with any of the thresholds; the others are a first install.
+  if (r() < 0.75) setThreshold(w, THRESHOLDS[Math.floor(r() * 4)] ?? 0.9);
   return w;
+}
+
+// The owner's threshold, written as the worker would between two jobs (Plan 4's setting).
+export function setThreshold(w: World, threshold: number): void {
+  const state = w.storage.get("state") ?? emptyState();
+  w.storage.set("state", { ...(state as object), threshold });
+  w.log.push(`threshold ${threshold}`);
+}
+
+// The threshold stored right now, read from the raw stored value, not through the code's parser.
+export function storedThreshold(w: World): number {
+  const raw = w.storage.get("state");
+  if (raw === undefined) return SPEC_DEFAULT_THRESHOLD;
+  const threshold = (raw as { threshold?: unknown }).threshold;
+  return typeof threshold === "number" ? threshold : Number.POSITIVE_INFINITY;
+}
+
+// What the world sends as a Naka tab: recorded, so that O13 judges a finish from the world's own copy.
+export function sentFinish(w: World, msg: FinishedMessage): void {
+  w.sentFinishes.push(msg);
+  const complete =
+    msg.source === "explicit" || msg.progress >= storedThreshold(w);
+  if (!complete) w.stats.incompleteFinishes += 1;
 }
 
 const ORACLES: [string, RegExp][] = [
@@ -168,6 +201,7 @@ const ORACLES: [string, RegExp][] = [
   ["O10 lost tab", /after the job lost its tab/],
   ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
   ["O12 read-only status", /a status answer wrote/],
+  ["O13 threshold rule", /incomplete viewing|never sent|outside a finish job/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -375,16 +409,17 @@ export function checkTabCall(w: World): void {
 }
 
 // Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one
-// answers, and then sends to that pinned tab only, with no new lookup.
+// answers, and then sends to that pinned tab only, with no new lookup. A lost tab is O10's.
 export function checkQuery(w: World): void {
   const ctx = w.current;
+  if (ctx?.tabLost) return;
   if (ctx?.pinned !== undefined)
     violation(w, `a tab query after the job pinned tab ${ctx.pinned}`);
 }
 
 export function checkSend(w: World, tabId: number): void {
   const ctx = w.current;
-  if (ctx === undefined) return;
+  if (ctx === undefined || ctx.tabLost) return;
   if (ctx.pinned !== undefined) {
     if (tabId !== ctx.pinned)
       violation(w, `a send to tab ${tabId}, not the pinned tab ${ctx.pinned}`);
@@ -587,6 +622,37 @@ function checkFinishWrite(w: World, what: string): void {
   checkBinding(w, what);
   if (w.current?.kind === "finish" && w.current.spent) {
     violation(w, `${what} with the hour's finishes spent`);
+  }
+  checkViewing(w, what);
+}
+
+const sameFinish = (a: FinishedMessage, b: FinishedMessage): boolean =>
+  a.source === b.source &&
+  a.progress === b.progress &&
+  a.contentId === b.contentId &&
+  a.season === b.season &&
+  a.episode === b.episode;
+
+// Oracle O13 (the owner's first rule): a SensCritique finish write comes from a finished message a Naka
+// tab sent, explicit or with a progress at least the threshold stored when the write happens. It is
+// judged from the world's own copy of the message and the raw stored threshold, never from the code.
+export function checkViewing(w: World, what: string): void {
+  const ctx = w.current;
+  if (ctx?.kind !== "finish") {
+    violation(w, `${what} outside a finish job`);
+    return;
+  }
+  const sent = w.sentFinishes.find((m) => sameFinish(m, ctx.msg));
+  if (sent === undefined) {
+    violation(w, `${what} for a finished message never sent`);
+    return;
+  }
+  const threshold = storedThreshold(w);
+  if (sent.source !== "explicit" && !(sent.progress >= threshold)) {
+    violation(
+      w,
+      `${what} from an incomplete viewing (${sent.progress} < ${threshold})`,
+    );
   }
 }
 

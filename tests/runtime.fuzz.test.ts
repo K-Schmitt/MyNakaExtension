@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { FinishedMessage } from "../src/content/playback-tracker";
 import { createRateLimiter } from "../src/core/rate-limiter";
 import { createStore } from "../src/ext/store";
 import { createJobQueue } from "../src/sw/job-queue";
@@ -17,7 +18,10 @@ import {
   SERIES,
   scFor,
   scUsernameFor,
+  sentFinish,
+  setThreshold,
   storageFor,
+  THRESHOLDS,
   TITLES,
   tabsFor,
   type World,
@@ -26,8 +30,8 @@ import {
 // Model-based fuzz of the whole worker (router, queue, jobs, ports, Plan 2's runSync and handleFinish)
 // against an in-memory world. It interleaves the five message kinds from their senders, forged messages
 // from the wrong sender or a look-alike site, worker restarts (the in-memory queue, limiters and
-// debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, account
-// switches and the owner's list edits.
+// debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, orphan
+// tabs, account switches, the owner's list edits and stored thresholds.
 // Oracles, checked at each write (tests/runtime-world.ts):
 //   O1 never two jobs at once (per worker); the status answer is no job (Ruling 20);
 //   O2 the stored state always passes parseState (and the settings parseSettings);
@@ -45,6 +49,8 @@ import {
 //   O11 a job tries the tabs it found in their query order, pins the first that answers, then sends to it
 //       only, with no new lookup (Rulings 9 and 20); orphan tabs, with no content script, come first;
 //   O12 a status answer, given at once outside the queue, never writes storage (Ruling 20);
+//   O13 the owner's first rule: every SensCritique finish write (markDone, unwish) comes from a finished
+//       message a Naka tab sent, explicit or with a progress at least the threshold stored at that moment;
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -194,6 +200,7 @@ function send(w: World, worker: Worker): void {
   if (sent.key !== undefined) {
     w.allowed.set(sent.key, (w.allowed.get(sent.key) ?? 0) + 1);
   }
+  if (sent.key === "finish") sentFinish(w, sent.msg as FinishedMessage);
   w.log.push(`msg ${JSON.stringify(sent.msg)}${sent.key ? "" : " (forged)"}`);
   worker.handle(sent.msg, sent.sender);
 }
@@ -230,6 +237,7 @@ function burst(w: World, worker: Worker): void {
       episode: 1 + Math.floor(w.r() * EPISODES),
     };
     w.allowed.set("finish", (w.allowed.get("finish") ?? 0) + 1);
+    sentFinish(w, msg as FinishedMessage);
     worker.handle(msg, NAKA_TAB);
   }
   w.log.push(`burst of ${count} finishes`);
@@ -248,6 +256,9 @@ async function step(w: World, worker: Worker): Promise<Worker> {
   } else if (a < 0.625) {
     await drain();
     switchAccount(w);
+  } else if (a < 0.645) {
+    await drain();
+    setThreshold(w, pick(w, THRESHOLDS));
   } else if (a < 0.665) {
     w.gen += 1;
     w.log.push("worker restart");
@@ -294,6 +305,7 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       orphanTries: 0,
       pinnedPastOrphan: 0,
       statusDuringJob: 0,
+      incompleteFinishes: 0,
     };
     for (let seed = 1; seed <= SEEDS; seed++) {
       const result = await simulate(seed);
@@ -308,11 +320,12 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     }
     expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 769 list writes, 4891 finish writes, 666 simulated
-    // runs with planned writes, 901 jobs stopped by the binding, 431 calls of dead workers, 475
-    // protected sides, 479 guarded films, 345 finish jobs started with the hour's budget spent, 792
-    // jobs that lost their tab, 6643 sends refused by an orphan tab, 5948 jobs that pinned the live
-    // tab after an orphan refused, 870 status answers given while a job ran).
+    // Every oracle's situation arises (measured: 801 list writes, 5220 finish writes, 737 simulated
+    // runs with planned writes, 914 jobs stopped by the binding, 237 calls of dead workers, 471
+    // protected sides, 484 guarded films, 352 finish jobs started with the hour's budget spent, 780
+    // jobs that lost their tab, 7241 sends refused by an orphan tab, 6564 jobs that pinned the live
+    // tab after an orphan refused, 819 status answers given while a job ran, 1585 finished messages
+    // sent below the stored threshold). The oracles' positive controls: tests/runtime-oracles.test.ts.
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(100);
     }
