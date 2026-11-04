@@ -103,7 +103,6 @@ const APOLLO_CALLS: [string, (c: ScClient) => Promise<unknown>][] = [
   ["ProductDone", (c) => c.markDone(5, "2026-11-04")],
   ["ProductCurrentUserInfos", (c) => c.productState(5)],
   ["UserCollection", (c) => c.readWishlist("movie")],
-  ["SearchProductExplorer", (c) => c.search("Titre", "movie")],
 ];
 
 describe("a SensCritique request its timer aborted", () => {
@@ -131,6 +130,13 @@ describe("a SensCritique request its timer aborted", () => {
       expect(s.requests).toEqual([HOME]);
     },
   );
+
+  it("on Apollo fails a search as the fixed 'SearchProductExplorer: timeout', with no home-page read", async () => {
+    const s = stalled(APOLLO);
+    const error = await s.timeOut(s.client.search("Titre", "movie"));
+    expectTimeout(error, "SearchProductExplorer");
+    expect(s.requests).toEqual([APOLLO]);
+  });
 
   it("on the season page fails as the fixed 'season page: timeout'", async () => {
     const s = stalled(SEASON);
@@ -165,9 +171,13 @@ describe("a timed-out request opens its port's breaker", () => {
     sc: countingLimiter([], "s"),
   };
 
-  it.each([APOLLO, HOME])(
-    "a sync port timed out on %s makes no further request in the job",
-    async (stuck) => {
+  // The search reads no session (Ruling 20): the home page stalls the ports that read one.
+  it.each([
+    [APOLLO, "searchSc"],
+    [HOME, "addToSc"],
+  ] as const)(
+    "a sync port timed out on %s (%s) makes no further request in the job",
+    async (stuck, port) => {
       const s = stalled(stuck);
       const { store } = memoryStore();
       const { ports } = buildSyncPorts({
@@ -177,8 +187,10 @@ describe("a timed-out request opens its port's breaker", () => {
         store,
         mode: "live",
       });
-      const first = await s.timeOut(ports.searchSc("Titre"));
-      const later = await s.timeOut(ports.searchSc("Autre"));
+      const call = (n: number): Promise<unknown> =>
+        port === "searchSc" ? ports.searchSc(`Titre ${n}`) : ports.addToSc(n);
+      const first = await s.timeOut(call(5));
+      const later = await s.timeOut(call(6));
       expect(later).toBe(first);
       expect(s.requests.filter((url) => url === stuck)).toHaveLength(1);
       expect(s.thrown).toHaveLength(1);

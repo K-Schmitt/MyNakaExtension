@@ -1,15 +1,16 @@
-// Searches SensCritique products by title. Search is public: the token is sent only when the session has
-// one, and its absence is not an error. Only the first page (16 results, by relevance) is read.
+// Searches SensCritique products by title. Search is public (spec §5, probe 3: it answers without a token,
+// with currentUserInfos null), so it reads no session and sends no authorization (Ruling 20): a sync of
+// many titles makes no home-page read for its searches. Only the first page (16 results, by relevance) is
+// read.
 
 import { checkQuery } from "../naka/naka-input";
 import { ScUnavailableError } from "./sc-errors";
 import { UNIVERSE } from "./sc-queries";
 import {
   type Envelope,
+  type Fetch,
   isRecord,
   post,
-  readSession,
-  type ScDeps,
   type Step,
 } from "./sc-transport";
 import type { WishUniverse } from "./sc-wishlist";
@@ -64,14 +65,13 @@ function parseAll(entries: unknown[]): ScWishItem[] {
 }
 
 export async function searchProducts(
-  deps: ScDeps,
+  fetch: Fetch,
   query: string,
   universe: WishUniverse,
 ): Promise<ScWishItem[]> {
   const trimmed = checkQuery(query);
   checkUniverse(universe);
-  const { token } = await readSession(deps);
-  const envelope = await post(deps.fetch, searchStep(trimmed, universe), token);
+  const envelope = await post(fetch, searchStep(trimmed, universe), undefined);
   const wanted = PRODUCT_UNIVERSE[universe];
   return parseAll(entriesOf(envelope)).filter((i) => i.universe === wanted);
 }

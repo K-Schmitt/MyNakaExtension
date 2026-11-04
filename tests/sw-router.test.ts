@@ -807,7 +807,7 @@ function stallingWorker(stuck: string, hangs: (answered: Call[]) => boolean) {
 
 describe("worker end to end: a SensCritique site that stops answering (K4)", () => {
   it.each([WWW_HOME, APOLLO_HOST])(
-    "%s hanging mid-run costs one 30 s timeout for the search port, not one per title",
+    "%s hanging mid-run costs one 30 s timeout (the search port on Apollo, the write port on the home page, which searches never read), not one per title",
     async (stuck) => {
       const w = stallingWorker(
         stuck,
@@ -954,6 +954,58 @@ describe("worker end to end: the shared limiters", () => {
     for (const gap of [...spacing(searches), ...spacing(reads)]) {
       expect(gap).toBeGreaterThanOrEqual(2000);
     }
+  });
+});
+
+// Ruling 20 (spec §5, probe 3): SearchProductExplorer answers without a token; a search reads no session.
+describe("worker end to end: searches read no session", () => {
+  const TWENTY = Array.from({ length: 20 }, (_, i) => i + 1);
+  const operation = (call: Call): string =>
+    call.url === WWW_HOME
+      ? "home"
+      : String(JSON.parse(call.init.body ?? "{}").operationName);
+
+  it("a first sync of 20 titles reads the home page for none of its 40 searches", async () => {
+    const clock: Clock = { time: Date.parse("2026-11-04T12:00:00Z") };
+    const sc = scFetch(true, clock);
+    const client = createNakaClient({
+      fetch: nakaPlaylist(TWENTY),
+      token: () => NAKA_TOKEN,
+    });
+    const r = createWorker({
+      extensionId: EXT,
+      storage: memoryArea(),
+      tabs: tabRunning(client, () => "77").tabs,
+      fetch: sc.fetch,
+      timer: { set: () => 0, clear: () => undefined },
+      now: () => clock.time,
+      sleep: async (ms) => {
+        clock.time += ms;
+      },
+    });
+    r.handle({ type: "resync" }, STATUS_PAGE, () => undefined);
+    await settle();
+    const ops = sc.calls.map(operation);
+    const searches = sc.calls.filter(
+      (c) => operation(c) === "SearchProductExplorer",
+    );
+    expect(searches).toHaveLength(40);
+    for (const search of searches) {
+      expect(search.url).toBe(APOLLO_HOST);
+      expect(search.init.headers).toStrictEqual({
+        "content-type": "application/json",
+      });
+      expect(search.init.credentials).toBe("omit");
+    }
+    // The binding, each wishlist read (one page each here) and each product state read the session;
+    // nothing else does.
+    const count = (name: string) => ops.filter((op) => op === name).length;
+    expect(count("home")).toBe(
+      1 + count("UserCollection") + count("ProductCurrentUserInfos"),
+    );
+    ops.forEach((op, i) => {
+      if (op === "home") expect(ops[i + 1]).not.toBe("SearchProductExplorer");
+    });
   });
 });
 

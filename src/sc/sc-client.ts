@@ -1,8 +1,7 @@
 // Client for SensCritique: GraphQL calls on apollo.senscritique.com and the season page on www.senscritique.com.
 //
-// getSession() is called once per public call that needs a session (seasonInfo reads none; search reads it
-// only to send a token when there is one), never at
-// construction and never cached. The auth token lives in a local variable of that call and goes only to
+// getSession() is called once per public call that needs a session (seasonInfo and search read none), never
+// at construction and never cached. The auth token lives in a local variable of that call and goes only to
 // sc-transport's `post` (Apollo POSTs); it is never sent to www.senscritique.com. See sc-transport.ts for the
 // rules on the wire and in error messages.
 
@@ -140,7 +139,7 @@ export function createScClient(deps: ScDeps): ScClient {
     rate: (productId, rating) => rate(deps, productId, rating),
     productState: (productId) => productState(deps, productId),
     readWishlist: (universe) => readWishlist(deps, universe),
-    search: (query, universe) => searchProducts(deps, query, universe),
+    search: (query, universe) => searchProducts(deps.fetch, query, universe),
     seasonInfo: (seriesProductId, season) =>
       seasonInfo(deps, seriesProductId, season),
   };

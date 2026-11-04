@@ -8,6 +8,7 @@ import {
   ScUnavailableError,
 } from "../src/sc/sc-client";
 import { GQL } from "../src/sc/sc-queries";
+import { createSessionReader } from "../src/sc/sc-session";
 import seasonHtml from "./fixtures/season-widow-s-bay-s1.html?raw";
 
 const TOKEN = "T0K3N-FAKE";
@@ -144,8 +145,8 @@ const METHODS: [string, (client: ScClient) => Promise<unknown>][] = [
 // The five writes and productState: every call that needs the token.
 const TOKEN_METHODS = METHODS.slice(0, 6);
 const SESSION_METHODS = METHODS.slice(0, 7);
-// SESSION_METHODS plus search: every call that reads the session (search needs no token).
-const SESSION_READERS = [...SESSION_METHODS, METHODS[8] as (typeof METHODS)[0]];
+// Every call that reads the session: search and seasonInfo read none.
+const SESSION_READERS = SESSION_METHODS;
 
 describe("writes", () => {
   it("wish sends one ProductWish POST", async () => {
@@ -905,7 +906,9 @@ describe("the token stays secret", () => {
         expect(call.url).toBe(APOLLO);
         expect(call.init.method).toBe("POST");
         expect(call.init.credentials).toBe("omit");
-        expect(authorization).toBe(TOKEN);
+        // The search sends no token at all (Ruling 20); every other Apollo call sends it.
+        const search = operationOf(call) === "SearchProductExplorer";
+        expect(authorization).toBe(search ? undefined : TOKEN);
       } else {
         expect(new URL(call.url).hostname).toBe("www.senscritique.com");
         expect(call.init.method).toBe("GET");
@@ -1573,13 +1576,39 @@ describe("search", () => {
     expect(variablesOf(calls[0] as Call).query).toBe("Amélie");
   });
 
-  it("sends the token when there is one", async () => {
+  // Ruling 20 (spec §5, probe 3): the search answers without a token, so it never reads the session.
+  it("sends no authorization header, even when the session has a token", async () => {
     const { client, calls } = setup(LOGGED_IN, found());
     await client.search("x", "movie");
-    expect(calls[0]?.init.headers).toStrictEqual({
-      ...SEARCH_HEADERS,
-      authorization: TOKEN,
+    expect(calls[0]?.init.headers).toStrictEqual(SEARCH_HEADERS);
+    expect(JSON.stringify(calls)).not.toContain(TOKEN);
+  });
+
+  it("makes no www request: its only request is the Apollo POST", async () => {
+    const urls: string[] = [];
+    const fetch: Fetch = async (url) => {
+      urls.push(url);
+      const page = url === APOLLO ? searchPage([]).body : "<html></html>";
+      return { ok: true, status: 200, text: async () => String(page) };
+    };
+    const client = createScClient({
+      fetch,
+      getSession: createSessionReader(fetch),
     });
+    expect(await client.search("x", "movie")).toEqual([]);
+    expect(urls).toEqual([APOLLO]);
+  });
+
+  it("never calls a session reader, even one that would fail", async () => {
+    const { client, calls, getSession } = setupSession(
+      async () => {
+        throw new Error(`reader ${TOKEN}`);
+      },
+      found(ENTRY(7, 1)),
+    );
+    expect(await client.search("x", "movie")).toHaveLength(1);
+    expect(getSession).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
   });
 
   it.each([
@@ -1596,10 +1625,10 @@ describe("search", () => {
     },
   );
 
-  it("reads the session once and makes one request", async () => {
+  it("reads no session and makes one request", async () => {
     const { client, calls, getSession } = setup(LOGGED_IN, found());
     await client.search("x", "movie");
-    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(getSession).not.toHaveBeenCalled();
     expect(calls).toHaveLength(1);
   });
 

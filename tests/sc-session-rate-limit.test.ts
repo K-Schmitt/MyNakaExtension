@@ -21,8 +21,8 @@ const SESSION_CALLS: [string, (client: ScClient) => Promise<unknown>][] = [
   ["wish", (c) => c.wish(5)],
   ["productState", (c) => c.productState(5)],
   ["readWishlist", (c) => c.readWishlist("movie")],
-  ["search", (c) => c.search("Titre", "movie")],
 ];
+const APOLLO = "https://apollo.senscritique.com/";
 
 function homeAnswering(status: number) {
   const calls: string[] = [];
@@ -82,7 +82,7 @@ describe("a home page that SensCritique rate-limits", () => {
     "a home page answering %s still cannot be read, and opens no breaker",
     async (status) => {
       const { client } = homeAnswering(status);
-      const error = await rejection(client.search("Titre", "movie"));
+      const error = await rejection(client.productState(5));
       expect(error.message).toBe("SensCritique session: could not be read");
       expect(opensBreaker(error)).toBe(false);
     },
@@ -126,6 +126,7 @@ describe("a home page that SensCritique rate-limits", () => {
     expect(strings(error).join(" ")).not.toContain(TOKEN);
   });
 
+  // The search reads no session (Ruling 20): its own 429 from Apollo opens its breaker.
   it("opens the port's breaker: its later calls in the job make no request", async () => {
     const { client, calls } = homeAnswering(429);
     const { store } = memoryStore();
@@ -144,6 +145,6 @@ describe("a home page that SensCritique rate-limits", () => {
       await rejection(ports.searchSc("Titre"));
       await rejection(ports.addToSc(5));
     }
-    expect(calls).toEqual([HOME, HOME, HOME]);
+    expect(calls).toEqual([HOME, APOLLO, HOME]);
   });
 });
