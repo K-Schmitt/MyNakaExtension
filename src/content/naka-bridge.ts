@@ -9,7 +9,7 @@ import { NakaUnavailableError } from "../naka/naka-errors";
 import { isPositiveId } from "../naka/naka-input";
 import { isRecord } from "../naka/naka-transport";
 
-const AUTH_KEY = "nakastream-auth";
+export const AUTH_KEY = "nakastream-auth";
 const NOT_FOUND = 404;
 
 const RATE_LIMITED = 429;
