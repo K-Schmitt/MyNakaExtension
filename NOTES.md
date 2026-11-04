@@ -60,6 +60,67 @@
 - Inconnu : la limite de recherche de Naka est de 30 requêtes, mais la durée de la fenêtre n'est pas
   annoncée (par défaut : une recherche toutes les 2 secondes).
 
+## 2026-11-04 — Plan 2 : clients des deux sites et logique de synchronisation
+
+Ce plan ne contient que de la logique et les deux clients. Le branchement dans l'extension, l'interface
+et le stockage viennent au Plan 3.
+
+### Décisions
+- **Client SensCritique.** Le jeton de la page est envoyé seulement en en-tête `authorization` brut
+  vers l'API GraphQL, avec `credentials: "omit"` et sans suivre de redirection. Les messages
+  d'erreur sont des textes fixes et ne contiennent jamais le jeton. La page de saison se lit sans
+  session ni en-tête. La lecture de l'état d'un titre (vu, dans les envies, type) ne renvoie que ces
+  trois valeurs : jamais la note, la date ni l'identifiant de l'utilisateur.
+- **Client Naka.** Le jeton n'est envoyé qu'en `Bearer` vers `naka.cx/api/v1`.
+- **Lectures en échec fermé.** Une liste lue de façon incomplète, tronquée, avec un doublon ou une
+  entrée illisible est refusée, et la synchronisation s'arrête pour ce passage. Une liste manquante
+  lue comme vide ferait croire à des retraits.
+- **Rapprochement des titres.** Le rapprochement se fait par titre, titre original, année et type
+  (film ou série) ; les saisons et les épisodes ne sont jamais pris pour des séries. En cas de doute,
+  l'extension pose la question au propriétaire. Tant qu'une question est ouverte, le titre n'est pas
+  relié par la synchronisation, et une fin de visionnage n'écrit rien pour lui. Recherches Naka
+  limitées (une toutes les 2 secondes), 20 titres au plus par côté et par passage.
+- **Synchronisation des listes.**
+  - La première synchronisation n'ajoute que.
+  - Au plus 10 écritures par passage.
+  - Un retrait devient une question, et une question sans réponse ne devient jamais un ajout.
+  - L'état mémorisé suit l'état réel des listes : un titre retiré pendant un passage n'est pas remis.
+  - Un titre vu des deux côtés avant d'être relié est traité comme s'il avait été relié dès le départ
+    (historique des périodes de présence).
+  - Un titre que le site refuse toujours passe en dernier, pour ne pas bloquer les autres.
+- **Film déjà vu sur SensCritique et présent dans la liste Naka.** Il n'est pas ajouté aux envies :
+  la paire est figée et signalée. C'est un choix par défaut, réversible si le propriétaire préfère
+  l'inverse.
+- **Fin de visionnage.**
+  - Elle se déclenche à 90 % ou plus, ou sur un « vu » explicite. La progression doit être entre 0 et 1.
+  - Pour un film : la paire est figée et enregistrée **avant** toute écriture, pour qu'aucune
+    synchronisation ne puisse le remettre dans les envies, même après une panne entre deux
+    écritures. Ensuite, retrait des envies s'il y est, « vu » s'il ne l'est pas déjà ; la date
+    existante n'est jamais écrasée.
+  - Pour un épisode : « vu » sur l'épisode. La série n'est jamais retirée des envies.
+  - Dans les deux cas, le type du titre est vérifié sur SensCritique avant toute écriture.
+
+### Rejeté
+- Prendre la liste relue après les écritures comme mémoire de l'état : elle effaçait les retraits
+  faits par le propriétaire pendant le passage.
+- Ne garder que la dernière période de présence d'un titre : ratait les titres reliés tard.
+- Ranger un « aucun de ceux-là » parmi les titres non reliés : une écriture pouvait atteindre le titre
+  écarté. La question reste ouverte, sans candidat.
+
+### Questions ouvertes (Plan 3)
+- Un seul verrou pour les onglets Naka et le service worker, qui chargent et enregistrent le même état.
+- Le client de recherche SensCritique, et les titres des candidats à afficher dans « lequel de ces
+  titres ? ».
+- Lier l'état au compte Naka et au compte SensCritique.
+- À vérifier sur le compte : noter une série ou une saison, ou marquer vu un épisode, retire-t-il la
+  série des envies ?
+- Alléger la requête de lecture des envies, qui demande aussi des données personnelles inutiles
+  (décision du propriétaire).
+- `unmarkDone` n'a pas encore d'usage.
+
 ## Leçons apprises
 
-(à compléter au fil du projet)
+- Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
+  pas. Une simulation de milliers d'historiques, avec une règle de sécurité dont on vérifie qu'elle
+  repère chaque correction retirée, a trouvé plusieurs remises à tort que les relectures avaient
+  laissées passer. Une règle de simulation qui recopie la règle du code ne peut pas voir ses trous.
