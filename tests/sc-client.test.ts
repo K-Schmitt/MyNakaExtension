@@ -8,6 +8,7 @@ import {
   ScUnavailableError,
 } from "../src/sc/sc-client";
 import { GQL } from "../src/sc/sc-queries";
+import { createSessionReader } from "../src/sc/sc-session";
 import seasonHtml from "./fixtures/season-widow-s-bay-s1.html?raw";
 
 const TOKEN = "T0K3N-FAKE";
@@ -62,6 +63,10 @@ function wishlistOf(total: number): Respond {
   };
 }
 
+function searchPage(items: unknown): Reply {
+  return gql({ searchProductExplorer: { total: 0, items } });
+}
+
 function userInfos(
   id: number,
   extra: Record<string, unknown> = {},
@@ -76,6 +81,7 @@ function stateReply(product: unknown): Reply {
 const EVERYTHING: Respond = (call) => {
   if (call.init.method === "GET") return raw(200, seasonHtml);
   if (operationOf(call) === "UserCollection") return wishPage([], 0);
+  if (operationOf(call) === "SearchProductExplorer") return searchPage([]);
   if (operationOf(call) === "ProductCurrentUserInfos") {
     const id = Number(variablesOf(call).id);
     return stateReply({ id, universe: 1, currentUserInfos: userInfos(id) });
@@ -134,10 +140,13 @@ const METHODS: [string, (client: ScClient) => Promise<unknown>][] = [
   ["productState", (c) => c.productState(5)],
   ["readWishlist", (c) => c.readWishlist("tvShow")],
   ["seasonInfo", (c) => c.seasonInfo(99153120, 1)],
+  ["search", (c) => c.search("Titre", "movie")],
 ];
 // The five writes and productState: every call that needs the token.
 const TOKEN_METHODS = METHODS.slice(0, 6);
 const SESSION_METHODS = METHODS.slice(0, 7);
+// Every call that reads the session: search and seasonInfo read none.
+const SESSION_READERS = SESSION_METHODS;
 
 describe("writes", () => {
   it("wish sends one ProductWish POST", async () => {
@@ -897,7 +906,9 @@ describe("the token stays secret", () => {
         expect(call.url).toBe(APOLLO);
         expect(call.init.method).toBe("POST");
         expect(call.init.credentials).toBe("omit");
-        expect(authorization).toBe(TOKEN);
+        // The search sends no token at all (Ruling 20); every other Apollo call sends it.
+        const search = operationOf(call) === "SearchProductExplorer";
+        expect(authorization).toBe(search ? undefined : TOKEN);
       } else {
         expect(new URL(call.url).hostname).toBe("www.senscritique.com");
         expect(call.init.method).toBe("GET");
@@ -949,7 +960,7 @@ describe("a session that cannot be read", () => {
   ];
 
   describe.each(REJECTIONS)("rejecting with %s", (_label, make) => {
-    it.each(SESSION_METHODS)(
+    it.each(SESSION_READERS)(
       "%s rejects with a bare ScUnavailableError and sends nothing",
       async (_name, run) => {
         const { client, calls, getSession } = setupSession(async () => {
@@ -1004,7 +1015,7 @@ describe("a session that cannot be read", () => {
   ];
 
   describe.each(READS_THAT_THROW)("resolving %s", (_label, make) => {
-    it.each(SESSION_METHODS)(
+    it.each(SESSION_READERS)(
       "%s rejects with the fixed session error and sends nothing",
       async (_name, run) => {
         const { client, calls } = setupSession(async () => make());
@@ -1398,7 +1409,7 @@ describe("productState", () => {
     ["a product that is a list", stateReply([LEAK, TOKEN])],
     ["a product that is a string", stateReply(`${TOKEN} ${LEAK}`)],
     ["no currentUserInfos", product5({ title: LEAK })],
-    ["a null currentUserInfos", withInfos(null)],
+    ["a currentUserInfos of false", withInfos(false)],
     ["a currentUserInfos that is a list", withInfos([true, true])],
     ["a currentUserInfos that is a string", withInfos(`${TOKEN} ${LEAK}`)],
     ["no isDone", without("isDone")],
@@ -1448,6 +1459,47 @@ describe("productState", () => {
     },
   );
 
+  // SensCritique answers 200 with the product and `currentUserInfos: null` for a token it does not
+  // recognize (verified 2026-11-04): the owner has to log in again.
+  it.each([
+    [
+      "the requested product",
+      product5({ title: LEAK, currentUserInfos: null }),
+    ],
+    [
+      "the requested product without a universe",
+      stateReply({ id: 5, title: LEAK, currentUserInfos: null }),
+    ],
+  ])(
+    "rejects a null currentUserInfos on %s as an unrecognized session, leaking nothing",
+    async (_name, reply) => {
+      const { client, calls } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).toBeInstanceOf(ScUnauthenticatedError);
+      expect(error.name).toBe("ScUnauthenticatedError");
+      expect(error.message).toBe(
+        "Not logged in to SensCritique: log in again on senscritique.com",
+      );
+      expectClean(error);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    ["a foreign product id", product5({ id: 6, currentUserInfos: null })],
+    ["a product id as a string", product5({ id: "5", currentUserInfos: null })],
+  ])(
+    "keeps the generic error for a null currentUserInfos on %s",
+    async (_name, reply) => {
+      const { client } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+      expect(error.name).toBe("ScUnavailableError");
+      expect(error.message).toBe(STATE_ERROR);
+      expectClean(error);
+    },
+  );
+
   it("maps a GraphQL Unauthenticated error to ScUnauthenticatedError", async () => {
     const body = JSON.stringify({
       errors: [{ message: `Unauthenticated ${TOKEN} ${LEAK}` }],
@@ -1472,4 +1524,315 @@ describe("productState", () => {
       expectClean(error);
     },
   );
+});
+
+describe("search", () => {
+  const ENTRY = (id: number, universe: unknown): Record<string, unknown> => ({
+    id,
+    title: `Titre ${id}`,
+    originalTitle: `Original ${id}`,
+    url: `/film/titre/${id}`,
+    universe,
+    dateRelease: "1999-05-12",
+  });
+  const found =
+    (...items: unknown[]) =>
+    () =>
+      searchPage(items);
+  const SEARCH_HEADERS = { "content-type": "application/json" };
+
+  it("sends one SearchProductExplorer POST with the fixed variables", async () => {
+    const { client, calls } = setup(LOGGED_IN, found());
+    await client.search("Amélie", "movie");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(APOLLO);
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.credentials).toBe("omit");
+    expect(calls[0]?.init.redirect).toBe("error");
+    expect(JSON.parse(calls[0]?.init.body ?? "")).toEqual({
+      operationName: "SearchProductExplorer",
+      variables: {
+        query: "Amélie",
+        filters: [{ identifier: "universe", termValues: ["movie"] }],
+        sortBy: "RELEVANCE",
+        limit: 16,
+        offset: 0,
+      },
+      query: GQL.SearchProductExplorer,
+    });
+  });
+
+  it("filters on tvShow for a series", async () => {
+    const { client, calls } = setup(LOGGED_IN, found());
+    await client.search("Dark", "tvShow");
+    expect(variablesOf(calls[0] as Call).filters).toEqual([
+      { identifier: "universe", termValues: ["tvShow"] },
+    ]);
+  });
+
+  it("sends the trimmed query", async () => {
+    const { client, calls } = setup(LOGGED_IN, found());
+    await client.search("  Amélie \n", "movie");
+    expect(variablesOf(calls[0] as Call).query).toBe("Amélie");
+  });
+
+  // Ruling 20 (spec §5, probe 3): the search answers without a token, so it never reads the session.
+  it("sends no authorization header, even when the session has a token", async () => {
+    const { client, calls } = setup(LOGGED_IN, found());
+    await client.search("x", "movie");
+    expect(calls[0]?.init.headers).toStrictEqual(SEARCH_HEADERS);
+    expect(JSON.stringify(calls)).not.toContain(TOKEN);
+  });
+
+  it("makes no www request: its only request is the Apollo POST", async () => {
+    const urls: string[] = [];
+    const fetch: Fetch = async (url) => {
+      urls.push(url);
+      const page = url === APOLLO ? searchPage([]).body : "<html></html>";
+      return { ok: true, status: 200, text: async () => String(page) };
+    };
+    const client = createScClient({
+      fetch,
+      getSession: createSessionReader(fetch),
+    });
+    expect(await client.search("x", "movie")).toEqual([]);
+    expect(urls).toEqual([APOLLO]);
+  });
+
+  it("never calls a session reader, even one that would fail", async () => {
+    const { client, calls, getSession } = setupSession(
+      async () => {
+        throw new Error(`reader ${TOKEN}`);
+      },
+      found(ENTRY(7, 1)),
+    );
+    expect(await client.search("x", "movie")).toHaveLength(1);
+    expect(getSession).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each([
+    ["an empty session", {}],
+    ["a username only", { username: "u" }],
+    ["an empty token", { token: "" }],
+  ])(
+    "searches without any authorization header for %s",
+    async (_n, session) => {
+      const { client, calls } = setup(session, found(ENTRY(7, 1)));
+      expect(await client.search("x", "movie")).toHaveLength(1);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.init.headers).toStrictEqual(SEARCH_HEADERS);
+    },
+  );
+
+  it("reads no session and makes one request", async () => {
+    const { client, calls, getSession } = setup(LOGGED_IN, found());
+    await client.search("x", "movie");
+    expect(getSession).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("maps an item with the wishlist parser", async () => {
+    const { client } = setup(LOGGED_IN, found(ENTRY(7, 1)));
+    expect(await client.search("x", "movie")).toEqual([
+      {
+        productId: 7,
+        title: "Titre 7",
+        originalTitle: "Original 7",
+        url: "/film/titre/7",
+        year: 1999,
+        universe: 1,
+      },
+    ]);
+  });
+
+  it("keeps the order of the answer", async () => {
+    const items = [ENTRY(9, 1), ENTRY(3, 1), ENTRY(5, 1)];
+    const { client } = setup(LOGGED_IN, found(...items));
+    const got = await client.search("x", "movie");
+    expect(got.map((item) => item.productId)).toEqual([9, 3, 5]);
+  });
+
+  it("returns an empty list for an empty answer", async () => {
+    const { client } = setup(LOGGED_IN, found());
+    expect(await client.search("x", "movie")).toEqual([]);
+  });
+
+  describe("the universe filter", () => {
+    const MIXED = [
+      ENTRY(1, 1),
+      ENTRY(2, 3),
+      ENTRY(3, 4),
+      ENTRY(4, 5),
+      ENTRY(5, 32),
+      ENTRY(6, 1),
+      ENTRY(7, 4),
+    ];
+
+    it("keeps only films for movie, even if the filter was ignored", async () => {
+      const { client } = setup(LOGGED_IN, found(...MIXED));
+      const got = await client.search("x", "movie");
+      expect(got.map((item) => item.productId)).toEqual([1, 6]);
+    });
+
+    it("keeps only series for tvShow, even if the filter was ignored", async () => {
+      const { client } = setup(LOGGED_IN, found(...MIXED));
+      const got = await client.search("x", "tvShow");
+      expect(got.map((item) => item.productId)).toEqual([3, 7]);
+    });
+
+    it.each([
+      ["a game", 3],
+      ["a season", 5],
+      ["an episode", 32],
+      ["a string universe", "1"],
+      ["a null universe", null],
+      ["no universe", undefined],
+      ["a boolean universe", true],
+    ])("drops %s", async (_n, universe) => {
+      const { client } = setup(LOGGED_IN, found(ENTRY(1, universe)));
+      expect(await client.search("x", "movie")).toEqual([]);
+    });
+
+    it("drops a series from a movie search and a film from a tvShow search", async () => {
+      const { client } = setup(LOGGED_IN, found(ENTRY(1, 4)));
+      expect(await client.search("x", "movie")).toEqual([]);
+      const other = setup(LOGGED_IN, found(ENTRY(1, 1)));
+      expect(await other.client.search("x", "tvShow")).toEqual([]);
+    });
+  });
+
+  describe("the query checks", () => {
+    const BAD: [string, unknown][] = [
+      ["an empty string", ""],
+      ["blanks only", " \t\n "],
+      ["201 characters", "a".repeat(201)],
+      ["201 characters after trimming", ` ${"a".repeat(201)} `],
+      ["a lone surrogate", "ab\uD800"],
+      ["a number", 42],
+      ["undefined", undefined],
+      ["null", null],
+      ["an object", { toString: () => "x" }],
+    ];
+
+    it.each(BAD)(
+      "rejects %s with a RangeError before any session read or fetch",
+      async (_n, query) => {
+        const { client, calls, getSession } = setup(LOGGED_IN, found());
+        const error = await failure(client.search(query as string, "movie"));
+        expect(error).toBeInstanceOf(RangeError);
+        expect(calls).toHaveLength(0);
+        expect(getSession).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ["1 character", "a", "a"],
+      ["200 characters", "a".repeat(200), "a".repeat(200)],
+      [
+        "200 characters between blanks",
+        ` ${"a".repeat(200)} `,
+        "a".repeat(200),
+      ],
+    ])("accepts %s", async (_n, query, sent) => {
+      const { client, calls } = setup(LOGGED_IN, found());
+      await client.search(query, "movie");
+      expect(variablesOf(calls[0] as Call).query).toBe(sent);
+    });
+
+    it("rejects an unknown universe before any session read or fetch", async () => {
+      const { client, calls, getSession } = setup(LOGGED_IN, found());
+      const error = await failure(client.search("x", "game" as "movie"));
+      expect(error).toBeInstanceOf(RangeError);
+      expect(calls).toHaveLength(0);
+      expect(getSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("an answer that cannot be read", () => {
+    const body = (searchProductExplorer: unknown): Reply =>
+      gql({ searchProductExplorer });
+    const UNREADABLE: [string, Reply][] = [
+      ["no searchProductExplorer", gql({ other: LEAK })],
+      ["a null searchProductExplorer", body(null)],
+      ["a searchProductExplorer that is a list", body([LEAK])],
+      ["a searchProductExplorer that is a string", body(LEAK)],
+      ["no items", body({ total: 1 })],
+      ["null items", body({ total: 1, items: null })],
+      ["items that is an object", body({ total: 1, items: { 0: LEAK } })],
+      ["items that is a string", body({ total: 1, items: LEAK })],
+    ];
+
+    it.each(UNREADABLE)(
+      "rejects %s with a clean ScUnavailableError",
+      async (_n, reply) => {
+        const { client } = setup(LOGGED_IN, () => reply);
+        const error = await failure(client.search("x", "movie"));
+        expect(error).toBeInstanceOf(ScUnavailableError);
+        expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+        expect(error.message).toContain("SearchProductExplorer");
+        expect(String(error) + (error.stack ?? "")).not.toContain(LEAK);
+        expect(String(error)).not.toContain(TOKEN);
+      },
+    );
+
+    const GOOD = ENTRY(1, 1);
+    const BAD_ITEMS: [string, unknown][] = [
+      ["a null item", null],
+      ["a string item", LEAK],
+      ["a list item", [LEAK]],
+      ["an item without id", { ...GOOD, id: undefined, title: LEAK }],
+      ["an item with id 0", { ...GOOD, id: 0, title: LEAK }],
+      ["an item with a string id", { ...GOOD, id: "2", title: LEAK }],
+      ["an item without title", { ...GOOD, id: 2, title: undefined }],
+      ["an item with a numeric title", { ...GOOD, id: 2, title: 5 }],
+      ["an item without url", { ...GOOD, id: 2, url: undefined }],
+      ["an item with a numeric url", { ...GOOD, id: 2, url: 5 }],
+      ["an unreadable item of another universe", { ...ENTRY(2, 3), id: -2 }],
+    ];
+
+    it.each(BAD_ITEMS)("rejects %s next to a good item", async (_n, item) => {
+      const { client } = setup(LOGGED_IN, found(GOOD, item));
+      const error = await failure(client.search("x", "movie"));
+      expect(error).toBeInstanceOf(ScUnavailableError);
+      expect(error.message).toBe(
+        "SensCritique SearchProductExplorer: unreadable item",
+      );
+      expect(String(error) + (error.stack ?? "")).not.toContain(LEAK);
+    });
+
+    it("rejects an unreadable item placed before the good ones", async () => {
+      const { client } = setup(LOGGED_IN, found(null, GOOD));
+      expect(await failure(client.search("x", "movie"))).toBeInstanceOf(
+        ScUnavailableError,
+      );
+    });
+  });
+
+  describe("transport failures", () => {
+    it("maps a GraphQL Unauthenticated error to ScUnauthenticatedError", async () => {
+      const text = JSON.stringify({ errors: [{ message: "Unauthenticated" }] });
+      const { client } = setup(LOGGED_IN, () => raw(200, text));
+      expect(await failure(client.search("x", "movie"))).toBeInstanceOf(
+        ScUnauthenticatedError,
+      );
+    });
+
+    it.each([
+      ["HTTP 500", raw(500, `${TOKEN} ${LEAK}`)],
+      ["a challenge page", raw(200, `<html>${TOKEN} ${LEAK}</html>`)],
+      ["a null data", raw(200, JSON.stringify({ data: null, x: LEAK }))],
+    ])(
+      "rejects %s, naming the operation and leaking nothing",
+      async (_n, reply) => {
+        const { client } = setup(LOGGED_IN, () => reply);
+        const error = await failure(client.search("x", "movie"));
+        expect(error).toBeInstanceOf(ScUnavailableError);
+        expect(error.message).toContain("SearchProductExplorer");
+        const seen = String(error) + (error.stack ?? "");
+        expect(seen).not.toContain(TOKEN);
+        expect(seen).not.toContain(LEAK);
+      },
+    );
+  });
 });

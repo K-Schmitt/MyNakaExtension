@@ -59,7 +59,11 @@ export type FinishOutcome =
 type Found = { state: SyncState; key: string; pair: Pair };
 
 // An explicit "seen" completes whatever the progress; a bad stored threshold throws for both sources.
-function isComplete(event: CheckedEvent, state: SyncState): boolean {
+// Exported for the worker's local pre-check (Ruling 18): one rule decides, before and in the handler.
+export function isComplete(
+  event: Pick<CheckedEvent, "source" | "progress">,
+  state: SyncState,
+): boolean {
   const signal = {
     progress: event.progress,
     markedWatched: event.source === "explicit",

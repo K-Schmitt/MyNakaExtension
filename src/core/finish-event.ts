@@ -107,8 +107,29 @@ export function parseEvent(event: FinishEvent): CheckedEvent {
   return reject("unknown media type");
 }
 
-export function contentKey(event: CheckedEvent): string {
+type KeyParts =
+  | { kind: "film"; contentId: number }
+  | { kind: "episode"; contentId: number; season: number; episode: number };
+
+export type ContentIds = {
+  contentId: number;
+  season?: number;
+  episode?: number;
+};
+
+// The one place a content key is written: the handled list, the finish record, the router's queue and
+// the tab's tracker all key a content with it.
+export function contentKey(event: KeyParts): string {
   return event.kind === "film"
     ? `movie:${event.contentId}`
     : `tv:${event.contentId}:S${event.season}E${event.episode}`;
+}
+
+// The key of the content some ids name: an episode when they hold both a season and an episode.
+export function contentKeyOf({ contentId, season, episode }: ContentIds) {
+  return contentKey(
+    season !== undefined && episode !== undefined
+      ? { kind: "episode", contentId, season, episode }
+      : { kind: "film", contentId },
+  );
 }
