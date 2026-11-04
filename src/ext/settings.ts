@@ -1,5 +1,6 @@
 import type { FinishOutcome } from "../core/finish-handler";
 import type { SyncReport } from "../core/sync-runner";
+import { DEFAULT_THRESHOLDS, type Thresholds } from "../core/watch-trigger";
 import {
   asInt,
   asOneOf,
@@ -14,6 +15,7 @@ import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
 import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
 import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
+import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
 
 export type Mode = "simulation" | "live";
 
@@ -43,16 +45,23 @@ export type Settings = {
   lastFinish?: FinishRecord;
   /** The hour's budget of finishes (Ruling 15). */
   finishWindow?: FinishWindow;
+  /** The end of a viewing, per kind (each on the grid of THRESHOLD_CHOICES). Absent: the defaults. */
+  thresholds?: Thresholds;
+  /** An integer 0 to 99: the progress from which the end block appears. 0 means "at any time". */
+  pauseFromPercent?: number;
 };
 
-const KEYS = [
-  "mode",
-  "binding",
-  "lastAutoRunAt",
-  "lastRun",
-  "lastFinish",
-  "finishWindow",
-];
+// A Record, so that a field added to Settings without being added here does not compile.
+const KEYS = valuesOf<keyof Settings>({
+  mode: true,
+  binding: true,
+  lastAutoRunAt: true,
+  lastRun: true,
+  lastFinish: true,
+  finishWindow: true,
+  thresholds: true,
+  pauseFromPercent: true,
+});
 const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
   "needs-choice": true,
@@ -125,6 +134,11 @@ export function parseSettings(raw: unknown): Settings {
   );
   const lastFinish = whenPresent(record.lastFinish, parseFinish);
   const finishWindow = whenPresent(record.finishWindow, parseFinishWindow);
+  const thresholds = whenPresent(record.thresholds, parseThresholds);
+  const pauseFromPercent = whenPresent(
+    record.pauseFromPercent,
+    parsePauseFromPercent,
+  );
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
     ...(binding === undefined ? {} : { binding }),
@@ -132,5 +146,16 @@ export function parseSettings(raw: unknown): Settings {
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(finishWindow === undefined ? {} : { finishWindow }),
+    ...(thresholds === undefined ? {} : { thresholds }),
+    ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
   };
+}
+
+export function thresholdsOf(s: Settings): Thresholds {
+  return s.thresholds ?? DEFAULT_THRESHOLDS;
+}
+
+// 0 means "at any time".
+export function pauseFromOf(s: Settings): number {
+  return s.pauseFromPercent ?? 0;
 }

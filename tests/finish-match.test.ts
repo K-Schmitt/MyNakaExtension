@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { handleFinish } from "../src/core/finish-handler";
 import { emptyState, type PendingItem } from "../src/core/state";
 import type { Titled } from "../src/core/title-match";
+import { DEFAULT_THRESHOLDS } from "../src/core/watch-trigger";
 import {
   cand,
   episode,
@@ -32,7 +33,7 @@ describe("matching on SensCritique", () => {
 
   it("a mapped series is not searched", async () => {
     const w = world({ state: { mapping: [SERIES_PAIR] } });
-    await handleFinish(episode(1, 2), w.ports);
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
     expect(searches(w.calls)).toEqual([]);
     expect(w.calls).toContain("seasonInfo:1007:1");
   });
@@ -44,7 +45,9 @@ describe("matching on SensCritique", () => {
         "The Title": [cand(FILM_SC, { ...BILINGUAL, title: "The Title" })],
       },
     });
-    expect((await handleFinish(bilingual, w.ports)).kind).toBe("done");
+    expect(
+      (await handleFinish(bilingual, w.ports, DEFAULT_THRESHOLDS)).kind,
+    ).toBe("done");
     expect(searches(w.calls)).toEqual([
       "searchSc:Le Titre",
       "searchSc:The Title",
@@ -58,7 +61,9 @@ describe("matching on SensCritique", () => {
         "The Title": [cand(9999, BILINGUAL)],
       },
     });
-    expect((await handleFinish(bilingual, w.ports)).kind).toBe("done");
+    expect(
+      (await handleFinish(bilingual, w.ports, DEFAULT_THRESHOLDS)).kind,
+    ).toBe("done");
     expect(searches(w.calls)).toEqual(["searchSc:Le Titre"]);
     expect(w.calls).toContain("productState:1042");
   });
@@ -70,7 +75,7 @@ describe("matching on SensCritique", () => {
         "The Title": [cand(FILM_SC, BILINGUAL)],
       },
     });
-    expect(await handleFinish(bilingual, w.ports)).toEqual({
+    expect(await handleFinish(bilingual, w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "not-found",
     });
     expect(searches(w.calls)).toEqual(["searchSc:Le Titre"]);
@@ -78,7 +83,9 @@ describe("matching on SensCritique", () => {
 
   it("searches once when there is no original title", async () => {
     const w = world({ search: { "Le Film": [] } });
-    expect(await handleFinish(film(), w.ports)).toEqual({ kind: "not-found" });
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
+      kind: "not-found",
+    });
     expect(w.calls).toEqual(["load", "searchSc:Le Film"]);
     expect(w.saved).toEqual([]);
   });
@@ -86,7 +93,9 @@ describe("matching on SensCritique", () => {
   it("a candidate listed twice is one candidate", async () => {
     const c = cand(FILM_SC, FILM_TITLE);
     const w = world({ search: { "Le Film": [c, c] } });
-    expect((await handleFinish(film(), w.ports)).kind).toBe("done");
+    expect((await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).kind).toBe(
+      "done",
+    );
   });
 
   it("an ambiguous film asks the owner, saves the question and writes nothing", async () => {
@@ -95,7 +104,7 @@ describe("matching on SensCritique", () => {
         "Le Film": [cand(FILM_SC, FILM_TITLE), cand(2042, FILM_TITLE)],
       },
     });
-    expect(await handleFinish(film(), w.ports)).toEqual({
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
@@ -121,7 +130,9 @@ describe("matching on SensCritique", () => {
         "La Série": [cand(SERIES_SC, SERIES_TITLE), cand(2007, SERIES_TITLE)],
       },
     });
-    expect(await handleFinish(episode(1, 2), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "needs-choice",
       candidateIds: [SERIES_SC, 2007],
     });
@@ -143,14 +154,17 @@ describe("matching on SensCritique", () => {
         "Le Film": [cand(FILM_SC, FILM_TITLE), cand(2042, FILM_TITLE)],
       },
     });
-    expect((await failure(handleFinish(film(), w.ports))).message).toBe(
-      "save failed",
-    );
+    expect(
+      (await failure(handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)))
+        .message,
+    ).toBe("save failed");
   });
 
   it("no candidate: not-found, nothing saved", async () => {
     const w = world({ search: { "Le Film": [] } });
-    expect(await handleFinish(film(), w.ports)).toEqual({ kind: "not-found" });
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
+      kind: "not-found",
+    });
     expect(w.saved).toEqual([]);
   });
 
@@ -162,7 +176,7 @@ describe("matching on SensCritique", () => {
     async (_name, event, nakaId, scId) => {
       const other = { nakaId: 99, scId };
       const w = world({ state: { mapping: [other] } });
-      expect(await handleFinish(event, w.ports)).toEqual({
+      expect(await handleFinish(event, w.ports, DEFAULT_THRESHOLDS)).toEqual({
         kind: "needs-choice",
         candidateIds: [scId],
       });
@@ -179,7 +193,9 @@ describe("matching on SensCritique", () => {
     const w = world({
       search: { "Le Film": [cand(FILM_SC, { ...FILM_TITLE, type: "serie" })] },
     });
-    expect(await handleFinish(film(), w.ports)).toEqual({ kind: "not-found" });
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
+      kind: "not-found",
+    });
   });
 
   it("a series never matches a film with the same title", async () => {
@@ -188,7 +204,9 @@ describe("matching on SensCritique", () => {
         "La Série": [cand(SERIES_SC, { ...SERIES_TITLE, type: "film" })],
       },
     });
-    expect(await handleFinish(episode(1, 2), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "not-found",
     });
     expect(w.calls.some((c) => c.startsWith("seasonInfo"))).toBe(false);
@@ -203,7 +221,9 @@ describe("matching on SensCritique", () => {
         ],
       },
     });
-    expect((await handleFinish(film(), w.ports)).kind).toBe("done");
+    expect((await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).kind).toBe(
+      "done",
+    );
     expect(w.calls).toContain("productState:1042");
   });
 });
@@ -219,7 +239,7 @@ describe("an open question about the same title wins over a fresh match", () => 
     const w = world({
       state: { pending: [question("naka", FILM, [FILM_SC, 2042])] },
     });
-    expect(await handleFinish(film(), w.ports)).toEqual({
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
@@ -239,7 +259,7 @@ describe("an open question about the same title wins over a fresh match", () => 
         ],
       },
     });
-    expect(await handleFinish(film(), w.ports)).toEqual({
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
@@ -250,7 +270,9 @@ describe("an open question about the same title wins over a fresh match", () => 
     const w = world({
       state: { pending: [question("naka", SERIES, [SERIES_SC, 2007])] },
     });
-    expect(await handleFinish(episode(1, 2), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "needs-choice",
       candidateIds: [SERIES_SC, 2007],
     });
@@ -264,7 +286,7 @@ describe("an open question about the same title wins over a fresh match", () => 
         pending: [question("naka", FILM, [FILM_SC, 2042])],
       },
     });
-    expect(await handleFinish(film(), w.ports)).toEqual({
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
@@ -280,7 +302,7 @@ describe("an open question about the same title wins over a fresh match", () => 
     async (_name, event, pair) => {
       const open = question("sc", pair.scId, [pair.nakaId, 43]);
       const w = world({ state: { mapping: [pair], pending: [open] } });
-      expect(await handleFinish(event, w.ports)).toEqual({
+      expect(await handleFinish(event, w.ports, DEFAULT_THRESHOLDS)).toEqual({
         kind: "needs-choice",
         candidateIds: [pair.scId],
       });
@@ -309,7 +331,9 @@ describe("an open question about the same title wins over a fresh match", () => 
     "%s does not stop the finish",
     async (_name, item) => {
       const w = world({ state: { pending: [item] } });
-      expect((await handleFinish(film(), w.ports)).kind).toBe("done");
+      expect(
+        (await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).kind,
+      ).toBe("done");
     },
   );
 
@@ -321,7 +345,7 @@ describe("an open question about the same title wins over a fresh match", () => 
     async (_name, event, nakaId, scId) => {
       const open = question("sc", scId, [nakaId, 99]);
       const w = world({ state: { pending: [open] } });
-      expect(await handleFinish(event, w.ports)).toEqual({
+      expect(await handleFinish(event, w.ports, DEFAULT_THRESHOLDS)).toEqual({
         kind: "needs-choice",
         candidateIds: [scId],
       });

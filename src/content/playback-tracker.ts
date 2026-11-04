@@ -12,10 +12,10 @@ import type { PlayerContext } from "./page-events";
 
 export type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
 
-// The worker completes at the first mark that is >= its stored threshold. Plan 4 must therefore offer
-// exactly these thresholds (0.85, 0.9, 0.95, 0.99), not a range: an off-mark value would complete at the
-// next mark up.
-export const PROGRESS_MARKS: readonly number[] = [0.85, 0.9, 0.95, 0.99];
+// The worker completes at the first mark that is >= its threshold for the kind. The marks are therefore
+// exactly the grid of the thresholds (THRESHOLD_CHOICES), not a range: an off-mark value would complete
+// at the next mark up.
+export const PROGRESS_MARKS: readonly number[] = [0.8, 0.85, 0.9, 0.95, 0.99];
 // Five minutes rule out trailers and short ads; real films and episodes are longer.
 export const DURATION_FLOOR_S = 300;
 const DURATION_TOLERANCE = 0.02;

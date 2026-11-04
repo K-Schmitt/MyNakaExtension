@@ -884,13 +884,43 @@ describe("finish job", () => {
     });
   });
 
-  it("the stored threshold decides: 0.85 is free, 0.9 completes", async () => {
-    const w = world({ state: { ...emptyState(), threshold: 0.9 } });
+  it("the stored threshold of the film decides: 0.85 is free, 0.9 completes", async () => {
+    const w = world();
     await w.jobs.finishJob(finished({ progress: 0.85 }));
     expect(writesOf(w.sk.calls)).toEqual([]);
     expect(w.settings()).toEqual({ mode: "simulation" });
     await w.jobs.finishJob(finished({ progress: 0.9 }));
     expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+    expect(w.settings().lastFinish?.outcome).toBe("done");
+  });
+
+  it("passes the stored thresholds per kind: an episode at 0.9 is free under 0.95", async () => {
+    const settings: Settings = {
+      mode: "live",
+      thresholds: { film: 0.95, episode: 0.95 },
+    };
+    const w = world({ settings });
+    await w.jobs.finishJob(
+      finished({ contentId: 7, season: 1, episode: 2, progress: 0.9 }),
+    );
+    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(w.settings()).toEqual(settings);
+  });
+
+  it("the handler reads the stored thresholds too: a film at 0.85 completes under 0.8", async () => {
+    const w = world({
+      settings: { mode: "live", thresholds: { film: 0.8, episode: 0.8 } },
+    });
+    await w.jobs.finishJob(finished({ progress: 0.85 }));
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+    expect(w.settings().lastFinish?.outcome).toBe("done");
+  });
+
+  it("an episode at 0.8 completes under the default thresholds", async () => {
+    const w = world({ settings: { mode: "live" } });
+    await w.jobs.finishJob(
+      finished({ contentId: 7, season: 1, episode: 2, progress: 0.8 }),
+    );
     expect(w.settings().lastFinish?.outcome).toBe("done");
   });
 

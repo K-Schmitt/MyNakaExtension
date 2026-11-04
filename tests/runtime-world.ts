@@ -9,7 +9,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
-import { emptyState } from "../src/core/state";
 import {
   FINISH_WINDOW_MS,
   MAX_FINISHES_PER_WINDOW,
@@ -98,9 +97,10 @@ type Context = (
 ) &
   TabTrace;
 
-// The thresholds the owner may store (Ruling 10), and the spec's default (§3: 90 %) when none is stored.
-export const THRESHOLDS = [0.85, 0.9, 0.95, 0.99];
-const SPEC_DEFAULT_THRESHOLD = 0.9;
+// The thresholds the owner may store per kind, and the spec's defaults when none is stored.
+export const THRESHOLDS = [0.8, 0.85, 0.9, 0.95, 0.99];
+export type KindThresholds = { film: number; episode: number };
+const SPEC_DEFAULT_THRESHOLDS: KindThresholds = { film: 0.9, episode: 0.8 };
 
 // The tab with Naka's content script. Orphan tabs (opened before the install, or kept across an
 // extension reload) listen to nothing, and come first in the query's answer.
@@ -161,31 +161,48 @@ export function createWorld(seed: number) {
     if (r() < 0.5) w.wishlist.add(scOf(n));
     if (isFilm(n) && r() < 0.2) w.done.add(scOf(n));
   }
-  // Most owners have a stored state, with any of the thresholds; the others are a first install.
-  if (r() < 0.75) setThreshold(w, THRESHOLDS[Math.floor(r() * 4)] ?? 0.9);
+  // Most owners have stored thresholds, any of the grid per kind; the others have the defaults.
+  if (r() < 0.75) setThresholds(w, randomThresholds(r));
   return w;
 }
 
-// The owner's threshold, written as the worker would between two jobs (Plan 4's setting).
-export function setThreshold(w: World, threshold: number): void {
-  const state = w.storage.get("state") ?? emptyState();
-  w.storage.set("state", { ...(state as object), threshold });
-  w.log.push(`threshold ${threshold}`);
+export function randomThresholds(r: () => number): KindThresholds {
+  const pick = () => THRESHOLDS[Math.floor(r() * THRESHOLDS.length)] ?? 0.9;
+  return { film: pick(), episode: pick() };
 }
 
-// The threshold stored right now, read from the raw stored value, not through the code's parser.
-export function storedThreshold(w: World): number {
-  const raw = w.storage.get("state");
-  if (raw === undefined) return SPEC_DEFAULT_THRESHOLD;
-  const threshold = (raw as { threshold?: unknown }).threshold;
-  return typeof threshold === "number" ? threshold : Number.POSITIVE_INFINITY;
+// The owner's thresholds, written into the settings as the options page would between two jobs.
+export function setThresholds(w: World, thresholds: KindThresholds): void {
+  const settings = w.storage.get("settings") ?? { mode: "simulation" };
+  w.storage.set("settings", { ...(settings as object), thresholds });
+  w.log.push(`thresholds ${thresholds.film}/${thresholds.episode}`);
+}
+
+// The thresholds stored right now, read from the raw stored value, not through the code's parser.
+export function storedThresholds(w: World): KindThresholds {
+  const raw = (
+    w.storage.get("settings") as { thresholds?: unknown } | undefined
+  )?.thresholds as Partial<KindThresholds> | undefined;
+  if (raw === undefined) return SPEC_DEFAULT_THRESHOLDS;
+  const bad = Number.POSITIVE_INFINITY;
+  return {
+    film: typeof raw.film === "number" ? raw.film : bad,
+    episode: typeof raw.episode === "number" ? raw.episode : bad,
+  };
+}
+
+// The world's own rule for the kind of a message: an episode has both a season and an episode.
+export function kindOfMessage(msg: FinishedMessage): "film" | "episode" {
+  return msg.season !== undefined && msg.episode !== undefined
+    ? "episode"
+    : "film";
 }
 
 // What the world sends as a Naka tab: recorded, so that O13 judges a finish from the world's own copy.
 export function sentFinish(w: World, msg: FinishedMessage): void {
   w.sentFinishes.push(msg);
-  const complete =
-    msg.source === "explicit" || msg.progress >= storedThreshold(w);
+  const threshold = storedThresholds(w)[kindOfMessage(msg)];
+  const complete = msg.source === "explicit" || msg.progress >= threshold;
   if (!complete) w.stats.incompleteFinishes += 1;
 }
 
@@ -634,8 +651,9 @@ const sameFinish = (a: FinishedMessage, b: FinishedMessage): boolean =>
   a.episode === b.episode;
 
 // Oracle O13 (the owner's first rule): a SensCritique finish write comes from a finished message a Naka
-// tab sent, explicit or with a progress at least the threshold stored when the write happens. It is
-// judged from the world's own copy of the message and the raw stored threshold, never from the code.
+// tab sent, explicit or with a progress at least the threshold of its kind stored when the write
+// happens. It is judged from the world's own copy of the message and the raw stored settings, never from
+// the code.
 export function checkViewing(w: World, what: string): void {
   const ctx = w.current;
   if (ctx?.kind !== "finish") {
@@ -647,7 +665,7 @@ export function checkViewing(w: World, what: string): void {
     violation(w, `${what} for a finished message never sent`);
     return;
   }
-  const threshold = storedThreshold(w);
+  const threshold = storedThresholds(w)[kindOfMessage(sent)];
   if (sent.source !== "explicit" && !(sent.progress >= threshold)) {
     violation(
       w,

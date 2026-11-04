@@ -15,7 +15,11 @@ import {
   withOneMore,
 } from "../ext/finish-window";
 import type { JobError } from "../ext/job-error";
-import type { FinishRecord, Settings } from "../ext/settings";
+import {
+  type FinishRecord,
+  type Settings,
+  thresholdsOf,
+} from "../ext/settings";
 import { checkBinding } from "./binding";
 import { buildFinishPorts, finishEventOf } from "./finish-ports";
 import { preCheck } from "./finish-precheck";
@@ -42,7 +46,8 @@ async function attempt(
       store: deps.store,
       today: deps.today,
     });
-    return { outcome: (await handleFinish(event, ports)).kind };
+    const thresholds = thresholdsOf(settings);
+    return { outcome: (await handleFinish(event, ports, thresholds)).kind };
   } catch (error) {
     return { outcome: "failed", error: toJobError(error) };
   }
@@ -90,7 +95,7 @@ export async function finishJob(
   const settings = await deps.store.loadSettings();
   const at = deps.now();
   const key = contentKeyOf(msg);
-  const check = await preCheck(deps.store, msg, key);
+  const check = await preCheck(deps.store, msg, key, thresholdsOf(settings));
   if (check === "free") return;
   if (check === "go") {
     await counted(deps, settings, msg, { at, key });

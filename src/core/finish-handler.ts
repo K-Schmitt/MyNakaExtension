@@ -27,7 +27,7 @@ import {
   upsertMapping,
 } from "./state";
 import type { Candidate } from "./title-match";
-import { isWatchComplete } from "./watch-trigger";
+import { isWatchComplete, type Thresholds } from "./watch-trigger";
 
 export type { FinishEvent } from "./finish-event";
 
@@ -58,17 +58,18 @@ export type FinishOutcome =
 
 type Found = { state: SyncState; key: string; pair: Pair };
 
-// An explicit "seen" completes whatever the progress; a bad stored threshold throws for both sources.
-// Exported for the worker's local pre-check (Ruling 18): one rule decides, before and in the handler.
+// An explicit "seen" completes whatever the progress; a bad threshold throws for both sources.
+// The threshold is the one of the event's kind. Exported for the worker's local pre-check (Ruling 18):
+// one rule decides, before and in the handler.
 export function isComplete(
-  event: Pick<CheckedEvent, "source" | "progress">,
-  state: SyncState,
+  event: Pick<CheckedEvent, "source" | "progress" | "kind">,
+  thresholds: Thresholds,
 ): boolean {
   const signal = {
     progress: event.progress,
     markedWatched: event.source === "explicit",
   };
-  return isWatchComplete(signal, state.threshold);
+  return isWatchComplete(signal, thresholds[event.kind]);
 }
 
 async function askOwner(
@@ -146,10 +147,11 @@ async function finishEpisode(
 export async function handleFinish(
   input: FinishEvent,
   ports: FinishPorts,
+  thresholds: Thresholds,
 ): Promise<FinishOutcome> {
   const event = parseEvent(input);
   const state = await ports.load();
-  if (!isComplete(event, state)) {
+  if (!isComplete(event, thresholds)) {
     return { kind: "ignored", reason: "below-threshold" };
   }
   const key = contentKey(event);

@@ -312,9 +312,9 @@ describe("router: finishes are bounded", () => {
 });
 
 // The router on the REAL jobs, with fake sites that know every content id.
-function floodWorld(threshold = 0.9) {
+function floodWorld() {
   const area = memoryArea();
-  area.data.set("state", { ...emptyState(), threshold });
+  area.data.set("state", emptyState());
   const naka = fakeNaka({
     playlistIds: async () => [],
     contentById: async (id) => ({
@@ -400,8 +400,8 @@ describe("router and jobs: a forged flood", () => {
     );
   });
 
-  it("a 0.85 mark queued behind a sync, then the 0.9 mark, under a 0.9 threshold: the finish completes", async () => {
-    const w = floodWorld(0.9);
+  it("a 0.85 mark queued behind a sync, then the 0.9 mark, under the film threshold of 0.9: the finish completes", async () => {
+    const w = floodWorld();
     w.send({ type: "resync" }, STATUS_PAGE);
     w.send(finishedFor(3, 0.85), NAKA_TAB);
     w.send(finishedFor(3, 0.9), NAKA_TAB);
