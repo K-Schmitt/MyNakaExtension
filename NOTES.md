@@ -89,8 +89,8 @@ et le stockage viennent au Plan 3.
     (historique des périodes de présence).
   - Un titre que le site refuse toujours passe en dernier, pour ne pas bloquer les autres.
 - **Film déjà vu sur SensCritique et présent dans la liste Naka.** Il n'est pas ajouté aux envies :
-  la paire est figée et signalée. C'est un choix par défaut, réversible si le propriétaire préfère
-  l'inverse.
+  la paire est figée et signalée. Choix accepté par le propriétaire le 2026-11-04, comme la question
+  posée pour un titre retiré pendant la première synchronisation.
 - **Fin de visionnage.**
   - Elle se déclenche à 90 % ou plus, ou sur un « vu » explicite. La progression doit être entre 0 et 1.
   - Pour un film : la paire est figée et enregistrée **avant** toute écriture, pour qu'aucune
@@ -112,8 +112,10 @@ et le stockage viennent au Plan 3.
 - Le client de recherche SensCritique, et les titres des candidats à afficher dans « lequel de ces
   titres ? ».
 - Lier l'état au compte Naka et au compte SensCritique.
-- À vérifier sur le compte : noter une série ou une saison, ou marquer vu un épisode, retire-t-il la
-  série des envies ?
+- Vérifié sur le compte le 2026-11-04 :
+  - marquer vu un épisode ne retire pas la série des envies ;
+  - **noter une série la retire des envies** : le Plan 4 devra la remettre, ou prévenir avant la note ;
+  - l'effet d'une note sur une saison n'est pas mesuré.
 - Alléger la requête de lecture des envies, qui demande aussi des données personnelles inutiles
   (décision du propriétaire).
 - `unmarkDone` n'a pas encore d'usage.
