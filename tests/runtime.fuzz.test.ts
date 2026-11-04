@@ -299,9 +299,9 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     }
     expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 720 list writes, 5289 finish writes, 662 simulated
-    // runs with planned writes, 794 jobs stopped by the binding, 497 calls of dead workers, 524
-    // protected sides, 451 guarded films, 711 finish jobs started with the hour's budget spent, 142
+    // Every oracle's situation arises (measured: 712 list writes, 4799 finish writes, 694 simulated
+    // runs with planned writes, 851 jobs stopped by the binding, 468 calls of dead workers, 501
+    // protected sides, 462 guarded films, 321 finish jobs started with the hour's budget spent, 133
     // jobs that lost their tab).
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(100);
