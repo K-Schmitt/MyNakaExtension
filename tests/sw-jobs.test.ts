@@ -733,7 +733,7 @@ describe("finish job", () => {
       binding: BOUND,
       finishWindow: { from: NOW, count: 1 },
     });
-    expect(w.area.ops).not.toContain("get:state");
+    expect(w.area.ops).not.toContain("set:state");
     expect(writesOf(w.sk.calls)).toEqual([]);
     expect(w.sk.calls.filter((c) => c.startsWith("search"))).toEqual([]);
   });
@@ -789,11 +789,11 @@ describe("finish job", () => {
     });
   });
 
-  it("the stored threshold decides: 0.85 is ignored, 0.9 completes", async () => {
+  it("the stored threshold decides: 0.85 is free, 0.9 completes", async () => {
     const w = world({ state: { ...emptyState(), threshold: 0.9 } });
     await w.jobs.finishJob(finished({ progress: 0.85 }));
     expect(writesOf(w.sk.calls)).toEqual([]);
-    expect(w.settings().lastFinish?.outcome).toBe("ignored");
+    expect(w.settings()).toEqual({ mode: "simulation" });
     await w.jobs.finishJob(finished({ progress: 0.9 }));
     expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
     expect(w.settings().lastFinish?.outcome).toBe("done");
@@ -810,14 +810,14 @@ describe("finish job", () => {
     });
   });
 
-  it("an ignored candidate of another key replaces the recorded finish", async () => {
+  it("a candidate of another key below the threshold leaves the recorded finish as it was", async () => {
     const w = world();
     await w.jobs.finishJob(finished({ progress: 0.9 }));
     await w.jobs.finishJob(finished({ contentId: 1, progress: 0.5 }));
     expect(w.settings().lastFinish).toEqual({
       at: NOW,
-      key: "movie:1",
-      outcome: "ignored",
+      key: "movie:3",
+      outcome: "done",
     });
   });
 
@@ -858,11 +858,13 @@ describe("finish job", () => {
       "naka-session",
     ],
   ])(
-    "%s fails the finish after the content read, before any load or write",
+    "%s fails the finish after the content read, before any write",
     async (_name, opts, error) => {
       const w = world(opts);
       await w.jobs.finishJob(finished());
-      expect(w.area.ops).not.toContain("get:state");
+      // Ruling 18: the local pre-check reads the state once; nothing reaches handleFinish.
+      expect(w.area.ops.filter((op) => op === "get:state")).toHaveLength(1);
+      expect(w.area.ops).not.toContain("set:state");
       expect(writesOf(w.sk.calls)).toEqual([]);
       expect(w.nk.calls).toEqual(["contentById:3"]);
       expect(w.settings().lastFinish).toEqual({
@@ -932,7 +934,7 @@ function jobsOn(area: ReturnType<typeof memoryArea>, tabs?: TabsPort) {
 describe("finish job: at most 30 finishes an hour", () => {
   const full = (from: number) => ({ from, count: MAX_FINISHES_PER_WINDOW });
 
-  it("over the limit: finish-limit, with no tab call, no SensCritique call and no state load", async () => {
+  it("over the limit: finish-limit, with no tab call, no SensCritique call and no state write", async () => {
     let tabCalls = 0;
     const nk = fakeNaka(catalogueNaka());
     const real = tabRunning(nk.client, () => "77").tabs;
@@ -951,7 +953,7 @@ describe("finish job: at most 30 finishes an hour", () => {
     await w.jobs.finishJob(finished());
     expect(tabCalls).toBe(0);
     expect(w.sk.calls).toEqual([]);
-    expect(w.area.ops).toEqual(["get:settings", "set:settings"]);
+    expect(w.area.ops).toEqual(["get:settings", "get:state", "set:settings"]);
     expect(w.settings()).toEqual({
       mode: "live",
       finishWindow,
@@ -973,7 +975,7 @@ describe("finish job: at most 30 finishes an hour", () => {
     expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
   });
 
-  it("every finish that passes the check counts, whatever its outcome", async () => {
+  it("every finish that passes the checks counts, whatever its outcome; one decided locally is free", async () => {
     const from = NOW - 1000;
     const w = world({
       settings: { mode: "live", finishWindow: { from, count: 27 } },
@@ -982,9 +984,14 @@ describe("finish job: at most 30 finishes an hour", () => {
     await w.jobs.finishJob(finished({ contentId: 999 }));
     await w.jobs.finishJob(finished({ progress: 0.5 }));
     await w.jobs.finishJob(finished({ contentId: 7 }));
+    expect(w.settings().finishWindow).toEqual({ from, count: 29 });
+    await w.jobs.finishJob(finished({ contentId: 1 }));
+    await w.jobs.finishJob(
+      finished({ contentId: 1, source: "explicit", progress: 1 }),
+    );
     expect(w.settings().finishWindow).toEqual({ from, count: 30 });
     await w.jobs.finishJob(finished());
-    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1001:2026-11-04"]);
     expect(w.settings().lastFinish?.error).toBe("finish-limit");
   });
 
@@ -1001,6 +1008,233 @@ describe("finish job: at most 30 finishes an hour", () => {
     expect(parseSettings(area.data.get("settings")).lastFinish).toEqual({
       at: NOW,
       key: "movie:1",
+      outcome: "failed",
+      error: "finish-limit",
+    });
+  });
+});
+
+describe("finish job: only finishes that need the network count (Ruling 18)", () => {
+  const TEN = 10;
+
+  function countingTabs() {
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    const calls: string[] = [];
+    const tabs: TabsPort = {
+      query: async (url) => {
+        calls.push("query");
+        return real.query(url);
+      },
+      send: async (tabId, msg) => {
+        calls.push("send");
+        return real.send(tabId, msg);
+      },
+    };
+    return { tabs, calls };
+  }
+
+  const withEpisodes = (count: number) =>
+    catalogueSc({
+      seasonInfo: async (id, season) => ({
+        seasonProductId: 4000 + id,
+        episodes: Array.from({ length: count }, (_, i) => ({
+          productId: 5001 + i,
+          season,
+          episode: i + 1,
+          title: `Episode ${i + 1}`,
+        })),
+      }),
+    });
+
+  // What one viewing sends: the four marks, then Naka's own "vu" at the end.
+  const viewing = (over: Partial<FinishedMessage> = {}) => [
+    ...[0.85, 0.9, 0.95, 0.99].map((progress) =>
+      finished({ ...over, progress }),
+    ),
+    finished({ ...over, source: "explicit", progress: 1 }),
+  ];
+
+  it("one viewing, four marks and its vu, costs one count and makes one write set", async () => {
+    const w = world({ state: { ...emptyState(), threshold: 0.9 } });
+    for (const msg of viewing()) await w.jobs.finishJob(msg);
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+  });
+
+  it("ten short episodes in one hour, five messages each, all complete", async () => {
+    const w = world({
+      sc: withEpisodes(TEN),
+      state: { ...emptyState(), threshold: 0.9 },
+    });
+    for (let episode = 1; episode <= TEN; episode += 1) {
+      for (const msg of viewing({ contentId: 7, season: 1, episode })) {
+        await w.jobs.finishJob(msg);
+      }
+    }
+    expect(writesOf(w.sk.calls)).toEqual(
+      Array.from({ length: TEN }, (_, i) => `markDone:${5001 + i}:2026-11-04`),
+    );
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: TEN });
+  });
+
+  it.each([
+    [
+      "an already handled key",
+      { ...emptyState(), handled: ["movie:3"] },
+      finished({ source: "explicit", progress: 1 }),
+    ],
+    [
+      "a progress below the threshold",
+      { ...emptyState(), threshold: 0.9 },
+      finished({ progress: 0.85 }),
+    ],
+  ])(
+    "a flood of 1000 messages for %s costs nothing",
+    async (_name, state, msg) => {
+      const t = countingTabs();
+      const lastFinish = { at: 5, key: "movie:1", outcome: "done" } as const;
+      const w = world({
+        tabs: t.tabs,
+        state,
+        settings: { mode: "live", lastFinish },
+      });
+      for (let i = 0; i < 1000; i += 1) await w.jobs.finishJob(msg);
+      expect(t.calls).toEqual([]);
+      expect(w.sk.calls).toEqual([]);
+      expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+      expect(w.settings()).toEqual({ mode: "live", lastFinish });
+    },
+  );
+
+  it("an unreadable state stops the finish before any count: failed, stored-state", async () => {
+    const t = countingTabs();
+    const w = world({ tabs: t.tabs });
+    w.area.data.set("state", { version: 2 });
+    await w.jobs.finishJob(finished());
+    expect(t.calls).toEqual([]);
+    expect(w.settings()).toEqual({
+      mode: "simulation",
+      lastFinish: {
+        at: NOW,
+        key: "movie:3",
+        outcome: "failed",
+        error: "stored-state",
+      },
+    });
+  });
+
+  it("the slot is reserved before any network call", async () => {
+    const t = countingTabs();
+    const w = world({ tabs: t.tabs });
+    let reservedFirst = false;
+    const query = t.tabs.query;
+    t.tabs.query = async (url) => {
+      reservedFirst =
+        parseSettings(w.area.data.get("settings")).finishWindow?.count === 1;
+      return query(url);
+    };
+    await w.jobs.finishJob(finished());
+    expect(reservedFirst).toBe(true);
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("a clock behind the window's start opens a new window (K2)", async () => {
+    const w = world({
+      settings: {
+        mode: "live",
+        finishWindow: {
+          from: NOW + FINISH_WINDOW_MS,
+          count: MAX_FINISHES_PER_WINDOW,
+        },
+      },
+    });
+    await w.jobs.finishJob(finished());
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("over the limit, 100 refusals write the settings once (K3)", async () => {
+    const w = world({
+      settings: {
+        mode: "live",
+        finishWindow: { from: NOW - 10, count: MAX_FINISHES_PER_WINDOW },
+      },
+    });
+    for (let i = 1; i <= 100; i += 1) {
+      await w.jobs.finishJob(finished({ contentId: 1000 + i }));
+    }
+    expect(w.area.ops.filter((op) => op === "set:settings")).toHaveLength(1);
+    expect(w.settings().lastFinish).toEqual({
+      at: NOW,
+      key: "movie:1001",
+      outcome: "failed",
+      error: "finish-limit",
+    });
+  });
+
+  it("over the limit, a message the state decides is still free: no refusal is recorded", async () => {
+    const finishWindow = { from: NOW - 10, count: MAX_FINISHES_PER_WINDOW };
+    const w = world({
+      settings: { mode: "live", finishWindow },
+      state: { ...emptyState(), threshold: 0.9, handled: ["movie:1"] },
+    });
+    await w.jobs.finishJob(finished({ progress: 0.5 }));
+    await w.jobs.finishJob(
+      finished({ contentId: 1, source: "explicit", progress: 1 }),
+    );
+    expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+    expect(w.settings()).toEqual({ mode: "live", finishWindow });
+  });
+
+  it("an explicit vu below the threshold is complete: the pre-check lets it through", async () => {
+    const w = world({ state: { ...emptyState(), threshold: 0.9 } });
+    await w.jobs.finishJob(finished({ source: "explicit", progress: 0.2 }));
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("another failure in the window does not silence a refusal", async () => {
+    const failed = {
+      at: NOW - 5,
+      key: "movie:9",
+      outcome: "failed",
+      error: "sc-session",
+    } as const;
+    const w = world({
+      settings: {
+        mode: "live",
+        finishWindow: { from: NOW - 10, count: MAX_FINISHES_PER_WINDOW },
+        lastFinish: failed,
+      },
+    });
+    await w.jobs.finishJob(finished());
+    expect(w.settings().lastFinish).toEqual({
+      at: NOW,
+      key: "movie:3",
+      outcome: "failed",
+      error: "finish-limit",
+    });
+  });
+
+  it("a refusal from an earlier window does not silence a new one", async () => {
+    const earlier = {
+      at: NOW - 20,
+      key: "movie:9",
+      outcome: "failed",
+      error: "finish-limit",
+    } as const;
+    const w = world({
+      settings: {
+        mode: "live",
+        finishWindow: { from: NOW - 10, count: MAX_FINISHES_PER_WINDOW },
+        lastFinish: earlier,
+      },
+    });
+    await w.jobs.finishJob(finished());
+    expect(w.settings().lastFinish).toEqual({
+      at: NOW,
+      key: "movie:3",
       outcome: "failed",
       error: "finish-limit",
     });
@@ -1067,41 +1301,68 @@ describe("a worker killed at any await", () => {
 
   function killedAt(k: number) {
     let calls = 0;
+    const names: string[] = [];
     const dies = () => {
       calls += 1;
       return calls === k;
     };
-    const guard = <T extends object>(target: T): T =>
+    const guard = <T extends object>(target: T, label: string): T =>
       new Proxy(target, {
         get(object, key) {
           const value = Reflect.get(object, key);
           if (typeof value !== "function") return value;
-          return (...args: unknown[]) =>
-            dies() ? never() : Reflect.apply(value, object, args);
+          return (...args: unknown[]) => {
+            names.push(`${label}.${String(key)}`);
+            return dies() ? never() : Reflect.apply(value, object, args);
+          };
         },
       });
     const area = memoryArea();
     const nk = fakeNaka(catalogueNaka());
     const jobs = createJobs({
-      store: createStore(guard(area)),
-      tabs: guard(tabRunning(nk.client, () => "77").tabs),
-      sc: guard(fakeSc(catalogueSc()).client),
+      store: createStore(guard(area, "area")),
+      tabs: guard(tabRunning(nk.client, () => "77").tabs, "tabs"),
+      sc: guard(fakeSc(catalogueSc()).client, "sc"),
       scUsername: () => (dies() ? never() : Promise.resolve("owner")),
       limiters: {
-        naka: guard(countingLimiter([], "naka")),
-        sc: guard(countingLimiter([], "sc")),
+        naka: guard(countingLimiter([], "naka"), "limit"),
+        sc: guard(countingLimiter([], "sc"), "limit"),
       },
       now: () => NOW,
       today: () => "2026-11-04",
       timer: { set: () => 0, clear: () => undefined },
     });
-    return { jobs, area, calls: () => calls };
+    return { jobs, area, names, calls: () => calls };
   }
 
   const savedStates = (area: ReturnType<typeof memoryArea>) =>
     area.sets.flatMap((set) =>
       "state" in set ? [JSON.stringify(set.state)] : [],
     );
+
+  it("a finish killed after it reserved its slot leaves exactly that one count", async () => {
+    const full = killedAt(0);
+    await full.jobs.finishJob(finished());
+    const reservation = full.names.indexOf("area.set") + 1;
+    expect(full.names.slice(0, reservation)).toEqual([
+      "area.get",
+      "area.get",
+      "area.set",
+    ]);
+    for (let k = 1; k <= full.calls(); k += 1) {
+      const w = killedAt(k);
+      void w.jobs.finishJob(finished());
+      await settle();
+      const settings = w.area.data.get("settings");
+      const window =
+        settings === undefined
+          ? undefined
+          : parseSettings(settings).finishWindow;
+      expect(window).toEqual(
+        k > reservation ? { from: NOW, count: 1 } : undefined,
+      );
+    }
+  });
 
   it("a sync leaves the state it found or the one it saved, and the next job starts from it", async () => {
     const full = killedAt(0);
@@ -1161,7 +1422,7 @@ describe("a worker killed at any await", () => {
       expect(parseState(w.area.data.get("state")).handled).toEqual(["movie:3"]);
       expect(
         parseSettings(w.area.data.get("settings")).lastFinish?.outcome,
-      ).toBe(handled ? "ignored" : "done");
+      ).toBe(handled ? undefined : "done");
       expect(writesOf(next.sk.calls)).toEqual(
         handled ? [] : ["markDone:1003:2026-11-04"],
       );

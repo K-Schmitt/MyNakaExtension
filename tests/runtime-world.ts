@@ -481,6 +481,7 @@ export function clockFor(w: World): () => number {
       const stored = settingsOf(w)?.finishWindow;
       ctx.spent =
         stored !== undefined &&
+        w.time >= stored.from &&
         w.time - stored.from < FINISH_WINDOW_MS &&
         stored.count >= MAX_FINISHES_PER_WINDOW;
       if (ctx.spent) w.stats.spentBudgets += 1;
@@ -518,7 +519,9 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     }
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);
-    w.current = ctx;
+    // A dead worker's queue may still start a job (it freezes at its first world call): it must not take
+    // the place of the live worker's job, or that job's writes would be credited to it.
+    if (gen === w.gen) w.current = ctx;
     try {
       return await job();
     } finally {

@@ -364,7 +364,7 @@ function floodWorld(threshold = 0.9) {
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, () => undefined);
-  return { area, sc, blocker, send };
+  return { area, sc, naka, blocker, send };
 }
 
 describe("router and jobs: a forged flood", () => {
@@ -380,9 +380,14 @@ describe("router and jobs: a forged flood", () => {
       }
       await settle();
     }
-    const loads = w.area.ops.filter((op) => op === "get:state");
-    expect(loads).toHaveLength(MAX_FINISHES_PER_WINDOW);
+    const contentReads = w.naka.calls.filter((c) =>
+      c.startsWith("contentById"),
+    );
+    expect(contentReads).toHaveLength(MAX_FINISHES_PER_WINDOW);
     expect(w.sc.calls.filter((c) => c.startsWith("markDone"))).toHaveLength(30);
+    expect(parseSettings(w.area.data.get("settings")).finishWindow?.count).toBe(
+      MAX_FINISHES_PER_WINDOW,
+    );
     expect(parseSettings(w.area.data.get("settings")).lastFinish?.error).toBe(
       "finish-limit",
     );
@@ -782,11 +787,13 @@ describe("worker end to end: the tokens stay where they belong", () => {
     });
   });
 
-  it("a logged-out SensCritique home page stops a finish after the content read, before the state is read", async () => {
+  it("a logged-out SensCritique home page stops a finish after the content read, before any state write", async () => {
     const w = worker(false);
     w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
     await settle();
-    expect(w.storage.ops).not.toContain("get:state");
+    // Ruling 18: the local pre-check reads the state once; handleFinish never runs.
+    expect(w.storage.ops.filter((op) => op === "get:state")).toHaveLength(1);
+    expect(w.storage.ops).not.toContain("set:state");
     expect(w.naka.calls.map((c) => c.url)).toEqual([
       "https://naka.cx/api/v1/browse/3",
     ]);
