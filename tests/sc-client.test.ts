@@ -1398,7 +1398,7 @@ describe("productState", () => {
     ["a product that is a list", stateReply([LEAK, TOKEN])],
     ["a product that is a string", stateReply(`${TOKEN} ${LEAK}`)],
     ["no currentUserInfos", product5({ title: LEAK })],
-    ["a null currentUserInfos", withInfos(null)],
+    ["a currentUserInfos of false", withInfos(false)],
     ["a currentUserInfos that is a list", withInfos([true, true])],
     ["a currentUserInfos that is a string", withInfos(`${TOKEN} ${LEAK}`)],
     ["no isDone", without("isDone")],
@@ -1445,6 +1445,47 @@ describe("productState", () => {
       expect(error.message).toBe(STATE_ERROR);
       expectClean(error);
       expect(calls).toHaveLength(1);
+    },
+  );
+
+  // SensCritique answers 200 with the product and `currentUserInfos: null` for a token it does not
+  // recognize (verified 2026-11-04): the owner has to log in again.
+  it.each([
+    [
+      "the requested product",
+      product5({ title: LEAK, currentUserInfos: null }),
+    ],
+    [
+      "the requested product without a universe",
+      stateReply({ id: 5, title: LEAK, currentUserInfos: null }),
+    ],
+  ])(
+    "rejects a null currentUserInfos on %s as an unrecognized session, leaking nothing",
+    async (_name, reply) => {
+      const { client, calls } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).toBeInstanceOf(ScUnauthenticatedError);
+      expect(error.name).toBe("ScUnauthenticatedError");
+      expect(error.message).toBe(
+        "Not logged in to SensCritique: log in again on senscritique.com",
+      );
+      expectClean(error);
+      expect(calls).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    ["a foreign product id", product5({ id: 6, currentUserInfos: null })],
+    ["a product id as a string", product5({ id: "5", currentUserInfos: null })],
+  ])(
+    "keeps the generic error for a null currentUserInfos on %s",
+    async (_name, reply) => {
+      const { client } = setup(LOGGED_IN, () => reply);
+      const error = await failure(client.productState(5));
+      expect(error).not.toBeInstanceOf(ScUnauthenticatedError);
+      expect(error.name).toBe("ScUnavailableError");
+      expect(error.message).toBe(STATE_ERROR);
+      expectClean(error);
     },
   );
 

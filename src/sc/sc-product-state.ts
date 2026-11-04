@@ -4,8 +4,10 @@
 // this module; the rating, the date seen, the user id and everything else in the answer are dropped
 // here. An answer that does not describe the requested product, whose flags are not booleans or whose
 // universe is not a safe integer, fails closed with one fixed message (never a piece of the answer).
+// The requested product with a null currentUserInfos is how SensCritique answers a token it does not
+// recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
-import { ScUnavailableError } from "./sc-errors";
+import { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
 import { type Envelope, isRecord } from "./sc-transport";
 
 export type ProductState = {
@@ -35,6 +37,7 @@ function userInfosOf(
   productId: number,
 ): Record<string, unknown> {
   const infos = product.currentUserInfos;
+  if (infos === null) throw new ScUnauthenticatedError();
   if (!isRecord(infos) || infos.productId !== productId) throw unexpected();
   return infos;
 }
