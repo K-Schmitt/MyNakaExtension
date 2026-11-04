@@ -132,19 +132,26 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
   return { client, calls };
 }
 
-// chrome.storage.local in memory: values are copied in and out, as structured clone does.
+// chrome.storage.local in memory: values are copied in and out, as structured clone does. Every read key
+// and every write is logged, in order.
 export function memoryArea(): StorageArea & {
   data: Map<string, unknown>;
   sets: Record<string, unknown>[];
+  ops: string[];
 } {
   const data = new Map<string, unknown>();
   const sets: Record<string, unknown>[] = [];
+  const ops: string[] = [];
   return {
     data,
     sets,
-    get: async (key) =>
-      data.has(key) ? { [key]: structuredClone(data.get(key)) } : {},
+    ops,
+    get: async (key) => {
+      ops.push(`get:${key}`);
+      return data.has(key) ? { [key]: structuredClone(data.get(key)) } : {};
+    },
     set: async (items) => {
+      ops.push(`set:${Object.keys(items).join(",")}`);
       sets.push(structuredClone(items));
       for (const [key, value] of Object.entries(items)) {
         data.set(key, structuredClone(value));
