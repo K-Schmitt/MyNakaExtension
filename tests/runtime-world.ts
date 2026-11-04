@@ -81,11 +81,25 @@ export type JobKey =
   | "mode"
   | "status";
 
+// What the world saw of a job's tabs: the tabs it last found, the ones it tried, the one it pinned.
+type TabTrace = {
+  found?: number[];
+  tried?: Set<number>;
+  pinned?: number;
+  tabLost?: boolean;
+};
+
 type Context = (
   | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number> }
   | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
   | { kind: "other" }
-) & { tabLost?: boolean };
+) &
+  TabTrace;
+
+// The tab with Naka's content script. Orphan tabs (opened before the install, or kept across an
+// extension reload) listen to nothing, and come first in the query's answer.
+export const LIVE_TAB = 1;
+const ORPHAN_TABS = [101, 102];
 
 export type World = ReturnType<typeof createWorld>;
 
@@ -104,6 +118,7 @@ export function createWorld(seed: number) {
     nakaLoggedIn: true,
     nakaToken: true,
     tabOpen: true,
+    orphans: ORPHAN_TABS.slice(0, Math.floor(r() * 3)),
     failRate: 0.03,
     storage: new Map<string, unknown>(),
     gen: 0,
@@ -127,6 +142,8 @@ export function createWorld(seed: number) {
       guards: 0,
       spentBudgets: 0,
       lostTabs: 0,
+      orphanTries: 0,
+      pinnedPastOrphan: 0,
     },
   };
   for (const n of TITLES) {
@@ -147,6 +164,7 @@ const ORACLES: [string, RegExp][] = [
   ["O7 forged message", /ran without a message/],
   ["O9 finish budget", /hour's finishes spent/],
   ["O10 lost tab", /after the job lost its tab/],
+  ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -331,18 +349,65 @@ function nakaClient(w: World): NakaClient {
   };
 }
 
-// Oracle (Ruling 17): once a send of the job failed, its tab is lost, and the job calls the tabs no more.
-function checkTabCall(w: World): void {
+// Oracle O10 (Ruling 17): once the job's pinned tab refused a send, or every tab it found did, its tab is
+// lost, and the job calls the tabs no more.
+export function checkTabCall(w: World): void {
   if (w.current?.tabLost)
     violation(w, "a tabs call after the job lost its tab");
 }
 
-function loseTab(w: World): never {
-  if (w.current !== undefined && !w.current.tabLost) {
-    w.current.tabLost = true;
-    w.stats.lostTabs += 1;
+// Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one
+// answers, and then sends to that pinned tab only, with no new lookup.
+export function checkQuery(w: World): void {
+  const ctx = w.current;
+  if (ctx?.pinned !== undefined)
+    violation(w, `a tab query after the job pinned tab ${ctx.pinned}`);
+}
+
+export function checkSend(w: World, tabId: number): void {
+  const ctx = w.current;
+  if (ctx === undefined) return;
+  if (ctx.pinned !== undefined) {
+    if (tabId !== ctx.pinned)
+      violation(w, `a send to tab ${tabId}, not the pinned tab ${ctx.pinned}`);
+    return;
   }
-  throw new Error("Could not establish connection");
+  if (ctx.found === undefined) {
+    violation(w, `a send to tab ${tabId} before any tab query`);
+    return;
+  }
+  const next = ctx.found.find((id) => !ctx.tried?.has(id));
+  if (tabId !== next) violation(w, `a try of tab ${tabId} out of query order`);
+}
+
+function loseTab(ctx: TabTrace, w: World): void {
+  if (ctx.tabLost) return;
+  ctx.tabLost = true;
+  w.stats.lostTabs += 1;
+}
+
+// A tab with no content script, or the live tab once closed: the send rejects, as Chrome's does.
+function refuse(w: World, tabId: number): never {
+  const ctx = w.current;
+  if (ORPHAN_TABS.includes(tabId)) w.stats.orphanTries += 1;
+  if (ctx !== undefined && ctx.pinned === tabId) loseTab(ctx, w);
+  if (ctx !== undefined && ctx.pinned === undefined) {
+    ctx.tried ??= new Set();
+    ctx.tried.add(tabId);
+    if (ctx.found?.every((id) => ctx.tried?.has(id))) loseTab(ctx, w);
+  }
+  throw new Error(
+    "Could not establish connection. Receiving end does not exist.",
+  );
+}
+
+function pin(w: World, ctx: TabTrace, tabId: number): void {
+  ctx.pinned = tabId;
+  if ((ctx.tried?.size ?? 0) > 0) w.stats.pinnedPastOrphan += 1;
+}
+
+function found(w: World): number[] {
+  return [...w.orphans, ...(w.tabOpen ? [LIVE_TAB] : [])];
 }
 
 export function tabsFor(w: World, gen: number): TabsPort {
@@ -350,12 +415,20 @@ export function tabsFor(w: World, gen: number): TabsPort {
     query: async () => {
       if (gen !== w.gen) return frozen(w);
       checkTabCall(w);
-      return w.tabOpen ? [{ id: 1 }] : [];
+      checkQuery(w);
+      const ids = found(w);
+      if (w.current !== undefined) {
+        w.current.found = ids;
+        w.current.tried = new Set();
+      }
+      return ids.map((id) => ({ id }));
     },
-    send: async (_tabId, msg) => {
+    send: async (tabId, msg) => {
       if (gen !== w.gen) return frozen(w);
       checkTabCall(w);
-      if (!w.tabOpen) loseTab(w);
+      checkSend(w, tabId);
+      if (tabId !== LIVE_TAB || !w.tabOpen) refuse(w, tabId);
+      const ctx = w.current;
       const account = () => (w.nakaLoggedIn ? w.nakaAccount : undefined);
       const reply = await handleNakaCall(
         wire(msg) as ToNakaTab,
@@ -363,6 +436,7 @@ export function tabsFor(w: World, gen: number): TabsPort {
         account,
       );
       if (gen !== w.gen) return frozen(w);
+      if (ctx !== undefined && ctx.pinned === undefined) pin(w, ctx, tabId);
       return wire(reply);
     },
   };

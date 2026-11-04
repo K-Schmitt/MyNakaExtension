@@ -15,17 +15,18 @@ import {
   asNothing,
   unexpected,
 } from "./naka-values";
+import {
+  pinFirstAnswering,
+  type TabExchange,
+  type TabsPort,
+} from "./pinned-tab";
+
+export type { TabsPort } from "./pinned-tab";
 
 export const NAKA_CALL_TIMEOUT_MS = 20000;
 
-const NAKA_TABS_URL = "https://naka.cx/*";
 const NOT_FOUND = 404;
 const RATE_LIMITED = 429;
-
-export type TabsPort = {
-  query(url: string): Promise<{ id: number }[]>;
-  send(tabId: number, msg: ToNakaTab): Promise<unknown>;
-};
 
 export type Timer = {
   set(fn: () => void, ms: number): unknown;
@@ -38,29 +39,6 @@ const realTimer: Timer = {
   set: (fn, ms) => setTimeout(fn, ms),
   clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
-
-async function firstTabId(tabs: TabsPort): Promise<number> {
-  let found: { id: number }[];
-  try {
-    found = await tabs.query(NAKA_TABS_URL);
-  } catch {
-    throw new NakaUnavailableError("Naka tab: unreachable");
-  }
-  const first = found[0];
-  if (first === undefined) throw new JobRejected("no-naka-tab");
-  return first.id;
-}
-
-// A send that fails means the tab is gone: closed, or its content script lost to an extension reload
-// (Ruling 17). A timeout is not a lost tab: it stays unavailable (see withTimeout).
-async function exchange(tabs: TabsPort, msg: ToNakaTab): Promise<unknown> {
-  const tabId = await firstTabId(tabs);
-  try {
-    return await tabs.send(tabId, msg);
-  } catch {
-    throw new JobRejected("no-naka-tab");
-  }
-}
 
 // The tab's answer: its value, or a throw with a fixed error. `value` is still untrusted.
 function replyValue(raw: unknown): unknown {
@@ -79,7 +57,8 @@ function replyValue(raw: unknown): unknown {
   throw new NakaUnavailableError("Naka tab: unavailable");
 }
 
-// A late answer, after the timeout, settles an already settled promise: it changes nothing.
+// A late answer, after the timeout, settles an already settled promise: it changes nothing. A timeout is
+// not a lost tab: it stays unavailable (Ruling 17).
 function withTimeout<T>(timer: Timer, work: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const handle = timer.set(
@@ -93,11 +72,11 @@ function withTimeout<T>(timer: Timer, work: () => Promise<T>): Promise<T> {
 }
 
 async function ask(
-  tabs: TabsPort,
+  exchange: TabExchange,
   timer: Timer,
   msg: ToNakaTab,
 ): Promise<unknown> {
-  return withTimeout(timer, async () => replyValue(await exchange(tabs, msg)));
+  return withTimeout(timer, async () => replyValue(await exchange(msg)));
 }
 
 function isNotFound(error: unknown): boolean {
@@ -118,11 +97,14 @@ async function contentById(read: () => Promise<unknown>, contentId: number) {
   return item.contentId === contentId ? item : unexpected();
 }
 
+// One proxy per job: its calls go to the tab it pins (see pinned-tab.ts); `onLost` hears that tab is gone.
 export function createNakaProxy(
   tabs: TabsPort,
   timer: Timer = realTimer,
+  onLost?: (error: JobRejected) => void,
 ): NakaProxy {
-  const call = (msg: ToNakaTab) => ask(tabs, timer, msg);
+  const exchange = pinFirstAnswering(tabs, onLost);
+  const call = (msg: ToNakaTab) => ask(exchange, timer, msg);
   return {
     playlistIds: async () =>
       asIdList(await call({ type: "naka-call", call: "playlistIds" })),

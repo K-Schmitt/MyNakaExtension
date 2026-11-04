@@ -202,6 +202,125 @@ describe("tab selection", () => {
   });
 });
 
+// Ruling 20: a tab with no content script (opened before the install, or after an extension reload)
+// rejects its send. A proxy is one job's: it pins the first tab that answers, for every later call.
+describe("pinning the first tab that answers", () => {
+  const DEAD = new Error(`Receiving end does not exist. ${MARKER}`);
+
+  function tabsAnswering(
+    answer: (tabId: number, msg: unknown) => unknown,
+    ids: () => number[],
+  ) {
+    const log: string[] = [];
+    const port: TabsPort = {
+      query: async () => {
+        log.push("query");
+        return ids().map((id) => ({ id }));
+      },
+      send: async (tabId, msg) => {
+        log.push(`send:${tabId}`);
+        const reply = answer(tabId, msg);
+        if (reply instanceof Error) throw reply;
+        return reply;
+      },
+    };
+    return { port, log };
+  }
+
+  it("tries the tabs in their query order and pins the first that answers", async () => {
+    const t = tabsAnswering(
+      (id) => (id === 31 ? DEAD : ok([id])),
+      () => [31, 32, 33],
+    );
+    const proxy = createNakaProxy(t.port, fakeTimer());
+    expect(await proxy.playlistIds()).toEqual([32]);
+    expect(await proxy.playlistIds()).toEqual([32]);
+    expect(t.log).toEqual(["query", "send:31", "send:32", "send:32"]);
+  });
+
+  it("pins a tab whose reply is an error code", async () => {
+    const t = tabsAnswering(
+      (id) => (id === 31 ? { ok: false, error: "unavailable" } : ok([id])),
+      () => [31, 32],
+    );
+    const proxy = createNakaProxy(t.port, fakeTimer());
+    expect(await failure(proxy.playlistIds())).toBeInstanceOf(
+      NakaUnavailableError,
+    );
+    await failure(proxy.playlistIds());
+    expect(t.log).toEqual(["query", "send:31", "send:31"]);
+  });
+
+  it("no tab answering: no-naka-tab, the loss heard once, and no later call reaches the tabs", async () => {
+    const t = tabsAnswering(
+      () => DEAD,
+      () => [31, 32],
+    );
+    const lost: unknown[] = [];
+    const proxy = createNakaProxy(t.port, fakeTimer(), (e) => lost.push(e));
+    const first = await failure(proxy.playlistIds());
+    expect(first).toBeInstanceOf(JobRejected);
+    expect((first as JobRejected).code).toBe("no-naka-tab");
+    expect(strings(first).join("|")).not.toContain(MARKER);
+    const later = await failure(proxy.account());
+    expect((later as JobRejected).code).toBe("no-naka-tab");
+    expect(t.log).toEqual(["query", "send:31", "send:32"]);
+    expect(lost).toHaveLength(1);
+    expect((lost[0] as JobRejected).code).toBe("no-naka-tab");
+  });
+
+  it("a pinned tab whose send rejects is lost: no other tab is tried", async () => {
+    let dead = false;
+    const t = tabsAnswering(
+      (id) => (dead && id === 31 ? DEAD : ok([id])),
+      () => [31, 32],
+    );
+    const lost: unknown[] = [];
+    const proxy = createNakaProxy(t.port, fakeTimer(), (e) => lost.push(e));
+    await proxy.playlistIds();
+    dead = true;
+    expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
+      "no-naka-tab",
+    );
+    await failure(proxy.playlistIds());
+    expect(t.log).toEqual(["query", "send:31", "send:31"]);
+    expect(lost).toHaveLength(1);
+  });
+
+  it("no tab found: no-naka-tab, and the next call looks again", async () => {
+    let ids: number[] = [];
+    const t = tabsAnswering(
+      (id) => ok([id]),
+      () => ids,
+    );
+    const lost: unknown[] = [];
+    const proxy = createNakaProxy(t.port, fakeTimer(), (e) => lost.push(e));
+    expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
+      "no-naka-tab",
+    );
+    ids = [41];
+    expect(await proxy.playlistIds()).toEqual([41]);
+    expect(t.log).toEqual(["query", "query", "send:41"]);
+    expect(lost).toEqual([]);
+  });
+
+  it("one 20 s timer covers the whole call, the tries included", async () => {
+    const timer = fakeTimer();
+    const port: TabsPort = {
+      query: async () => [{ id: 31 }, { id: 32 }],
+      send: (tabId) =>
+        tabId === 31 ? Promise.reject(DEAD) : new Promise(() => {}),
+    };
+    const outcome = failure(createNakaProxy(port, timer).playlistIds());
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    expect(timer.delays).toEqual([20000]);
+    timer.pending.get(0)?.();
+    const error = await outcome;
+    expect(error).toBeInstanceOf(NakaUnavailableError);
+    expect(error.message).toBe("Naka tab: no answer in time");
+  });
+});
+
 describe("timeout", () => {
   it("uses a 20 s timer and rejects when the tab never answers", async () => {
     const timer = fakeTimer();

@@ -10,7 +10,6 @@ import {
   type TabsPort,
   type Timer,
 } from "./naka-proxy";
-import { pinFirstTab } from "./pinned-tab";
 import type { SiteLimiters } from "./read-ports";
 
 export type JobDeps = {
@@ -28,12 +27,12 @@ export type JobDeps = {
   timer?: Timer;
 };
 
-// A job's own Naka proxy, pinned to the first tab it finds; `onLost` hears that the tab is gone.
+// A job's own Naka proxy, pinned to the first tab that answers; `onLost` hears that the tab is gone.
 export function jobNaka(
   deps: JobDeps,
   onLost?: (error: JobRejected) => void,
 ): NakaProxy {
-  return createNakaProxy(pinFirstTab(deps.tabs, onLost), deps.timer);
+  return createNakaProxy(deps.tabs, deps.timer, onLost);
 }
 
 export function jobAccounts(naka: NakaProxy, deps: JobDeps): AccountReaders {

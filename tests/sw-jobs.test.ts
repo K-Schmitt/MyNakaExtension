@@ -476,6 +476,7 @@ describe("sync job: automatic triggers", () => {
 });
 
 describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
+  // One Naka tab: with several, a dead one is passed over (see "one Naka tab per job").
   function closingTab(closeAfter: string | undefined) {
     const nk = fakeNaka(catalogueNaka());
     const real = tabRunning(nk.client, () => "77").tabs;
@@ -485,7 +486,7 @@ describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
     const tabs: TabsPort = {
       query: async (url) => {
         if (failed.length > 0) afterLoss.push("query");
-        return real.query(url);
+        return (await real.query(url)).slice(0, 1);
       },
       send: async (tabId, msg) => {
         if (failed.length > 0) afterLoss.push(msg);
@@ -652,6 +653,100 @@ describe("sync job: one Naka tab per job", () => {
     expect(queried).toEqual(["https://naka.cx/*"]);
     expect(new Set(sentTo)).toEqual(new Set([11]));
     expect(sentTo.length).toBeGreaterThan(2);
+  });
+
+  // A tab opened before the install, or any tab after an extension reload, has no content script.
+  function tabsWithDead(dead: number[], ids: number[]) {
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    const sent: { tabId: number; msg: unknown }[] = [];
+    let queries = 0;
+    const tabs: TabsPort = {
+      query: async () => {
+        queries += 1;
+        return ids.map((id) => ({ id }));
+      },
+      send: async (tabId, msg) => {
+        sent.push({ tabId, msg });
+        if (dead.includes(tabId)) {
+          throw new Error("Receiving end does not exist.");
+        }
+        return real.send(tabId, msg);
+      },
+    };
+    return { nk, tabs, sent, queries: () => queries };
+  }
+
+  it("a first tab without a listener is passed over: the job pins the second, for its binding check and its writes", async () => {
+    const t = tabsWithDead([10], [10, 11, 12]);
+    const w = world({ tabs: t.tabs, settings: { mode: "live" } });
+    await w.jobs.syncJob("button");
+    const run = w.settings().lastRun;
+    expect(run).toMatchObject({ mode: "live", outcome: "ok" });
+    expect(run).not.toHaveProperty("error");
+    expect(t.sent.slice(0, 2)).toEqual([
+      { tabId: 10, msg: { type: "naka-account" } },
+      { tabId: 11, msg: { type: "naka-account" } },
+    ]);
+    expect(new Set(t.sent.slice(1).map((s) => s.tabId))).toEqual(new Set([11]));
+    expect(t.sent).toContainEqual({
+      tabId: 11,
+      msg: { type: "naka-call", call: "add", contentId: 2 },
+    });
+    expect(t.nk.calls).toContain("addToPlaylist:2");
+    expect(t.queries()).toBe(1);
+  });
+
+  it("every tab without a listener: no-naka-tab, each tried once, nothing saved but the run record", async () => {
+    const t = tabsWithDead([10, 11], [10, 11]);
+    const w = world({ tabs: t.tabs });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "failed",
+      error: "no-naka-tab",
+    });
+    expect(t.sent.map((s) => s.tabId)).toEqual([10, 11]);
+    expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([
+      "set:settings",
+    ]);
+    expect(w.area.ops).not.toContain("get:state");
+  });
+
+  it("the pinned tab dying mid-run latches the job: no other tab is tried", async () => {
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    const sent: number[] = [];
+    const afterLoss: number[] = [];
+    let dies = false;
+    let lostAt: number | undefined;
+    const tabs: TabsPort = {
+      query: async () => {
+        if (lostAt !== undefined) afterLoss.push(0);
+        return [{ id: 10 }, { id: 11 }, { id: 12 }];
+      },
+      send: async (tabId, msg) => {
+        if (lostAt !== undefined) afterLoss.push(tabId);
+        sent.push(tabId);
+        if (tabId === 10) throw new Error("Receiving end does not exist.");
+        if (tabId === 11 && dies) {
+          lostAt = sent.length;
+          throw new Error("Receiving end does not exist.");
+        }
+        const reply = await real.send(tabId, msg);
+        if ("call" in msg && msg.call === "playlistIds") dies = true;
+        return reply;
+      },
+    };
+    const w = world({ tabs });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "ok",
+      error: "no-naka-tab",
+    });
+    expect(sent.slice(0, 2)).toEqual([10, 11]);
+    expect(lostAt).toBeDefined();
+    expect(afterLoss).toEqual([]);
+    expect(sent).not.toContain(12);
   });
 
   it("each job finds its tab again", async () => {

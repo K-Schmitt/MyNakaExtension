@@ -39,7 +39,10 @@ import {
 //   O7 a job runs only for a message its sender may send (forged ones are ignored);
 //   O9 no SensCritique finish write by a job that started with the hour's 30 finishes spent (the stored
 //      count itself never exceeds 30: O2);
-//   O10 once a send of a job failed (its tab lost), no later tabs call of that job (Ruling 17);
+//   O10 once the job's pinned tab refused a send, or every tab it found did (its tab lost), no later tabs
+//       call of that job (Ruling 17);
+//   O11 a job tries the tabs it found in their query order, pins the first that answers, then sends to it
+//       only, with no new lookup (Rulings 9 and 20); orphan tabs, with no content script, come first;
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -285,6 +288,8 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       guards: 0,
       spentBudgets: 0,
       lostTabs: 0,
+      orphanTries: 0,
+      pinnedPastOrphan: 0,
     };
     for (let seed = 1; seed <= SEEDS; seed++) {
       const result = await simulate(seed);
@@ -299,10 +304,11 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     }
     expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 712 list writes, 4799 finish writes, 694 simulated
-    // runs with planned writes, 851 jobs stopped by the binding, 468 calls of dead workers, 501
-    // protected sides, 462 guarded films, 321 finish jobs started with the hour's budget spent, 133
-    // jobs that lost their tab).
+    // Every oracle's situation arises (measured: 785 list writes, 5056 finish writes, 638 simulated
+    // runs with planned writes, 888 jobs stopped by the binding, 484 calls of dead workers, 465
+    // protected sides, 457 guarded films, 258 finish jobs started with the hour's budget spent, 658
+    // jobs that lost their tab, 6716 sends refused by an orphan tab, 6151 jobs that pinned the live
+    // tab after an orphan refused).
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(100);
     }
