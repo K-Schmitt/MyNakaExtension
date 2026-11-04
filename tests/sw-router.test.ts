@@ -633,6 +633,66 @@ function worker(loggedIn = true, start = "2026-11-04T12:00:00Z") {
   return { storage, sc, naka, traffic, answers, send };
 }
 
+describe("worker end to end: a SensCritique request that never answers", () => {
+  it.each([
+    "https://www.senscritique.com/",
+    "https://apollo.senscritique.com/",
+  ])(
+    "to %s is aborted at 30 s, the run fails as unavailable, and the next job runs",
+    async (stuck) => {
+      const storage = memoryArea();
+      const armed: { fn: () => void; ms: number }[] = [];
+      const timer: Timer = {
+        set: (fn, ms) => {
+          armed.push({ fn, ms });
+          return armed.length;
+        },
+        clear: () => undefined,
+      };
+      const signals: AbortSignal[] = [];
+      const answering = scFetch(true, { time: 0 }).fetch;
+      const hanging: Fetch = (url, init) =>
+        url !== stuck
+          ? answering(url, init)
+          : new Promise((_resolve, reject) => {
+              if (init.signal) signals.push(init.signal);
+              init.signal?.addEventListener("abort", () =>
+                reject(new Error("aborted")),
+              );
+            });
+      const client = createNakaClient({
+        fetch: nakaFetch({ time: 0 }).fetch,
+        token: () => NAKA_TOKEN,
+      });
+      const answers: unknown[] = [];
+      const r = createWorker({
+        extensionId: EXT,
+        storage,
+        tabs: tabRunning(client, () => "77").tabs,
+        fetch: hanging,
+        timer,
+        now: () => Date.parse("2026-11-04T12:00:00Z"),
+        sleep: async () => undefined,
+      });
+      r.handle({ type: "resync" }, STATUS_PAGE, () => undefined);
+      r.handle({ type: "status" }, STATUS_PAGE, (a) => answers.push(a));
+      await settle();
+      expect(answers).toEqual([]);
+      expect(signals).toHaveLength(1);
+      const abort = armed.filter((a) => a.ms === 30_000);
+      expect(abort.length).toBeGreaterThan(0);
+      for (const { fn } of abort) fn();
+      await settle();
+      expect(answers).toHaveLength(1);
+      expect((answers[0] as StatusSnapshot).lastRun).toMatchObject({
+        trigger: "button",
+        outcome: "failed",
+        error: "unavailable",
+      });
+    },
+  );
+});
+
 describe("worker end to end: the tokens stay where they belong", () => {
   it("a live sync writes, and neither token reaches storage, a message or an answer", async () => {
     const w = worker();

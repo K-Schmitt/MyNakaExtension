@@ -13,6 +13,7 @@ import { createJobs } from "./jobs";
 import { localDate } from "./local-date";
 import type { TabsPort, Timer } from "./naka-proxy";
 import { createRouter, type Router } from "./router";
+import { withRequestTimeout } from "./timed-fetch";
 
 // One search or content read per site every 2 s, shared by every job of this worker.
 const SEARCHES_PER_WINDOW = 1;
@@ -29,10 +30,8 @@ export type WorkerEnv = {
 };
 
 export function createWorker(env: WorkerEnv): Router {
-  const scDeps = {
-    fetch: env.fetch,
-    getSession: createSessionReader(env.fetch),
-  };
+  const fetch = withRequestTimeout(env.fetch, env.timer);
+  const scDeps = { fetch, getSession: createSessionReader(fetch) };
   const clock = { now: env.now, sleep: env.sleep };
   const limiter = () =>
     createRateLimiter(clock, SEARCHES_PER_WINDOW, SEARCH_WINDOW_MS);
