@@ -185,7 +185,8 @@ describe("tab selection", () => {
     expect(strings(error).join("|")).not.toContain(MARKER);
   });
 
-  it("maps a failing send (closed tab) to unavailable without its text", async () => {
+  // Ruling 17: a closed tab, or a content script gone after an extension reload.
+  it("maps a failing send to JobRejected(no-naka-tab), without its text", async () => {
     const port: TabsPort = {
       query: async () => [{ id: 1 }],
       send: async () => {
@@ -195,7 +196,8 @@ describe("tab selection", () => {
     const error = await failure(
       createNakaProxy(port, fakeTimer()).playlistIds(),
     );
-    expect(error).toBeInstanceOf(NakaUnavailableError);
+    expect(error).toBeInstanceOf(JobRejected);
+    expect((error as JobRejected).code).toBe("no-naka-tab");
     expect(strings(error).join("|")).not.toContain(MARKER);
   });
 });

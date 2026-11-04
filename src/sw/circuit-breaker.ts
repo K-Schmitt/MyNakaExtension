@@ -22,8 +22,10 @@ export function opensBreaker(error: unknown): boolean {
   );
 }
 
+// `onOpen` hears the error that opened the port, once (Ruling 17: the run says what stopped it).
 export function withBreaker<A extends unknown[], R>(
   call: (...args: A) => Promise<R>,
+  onOpen: (error: Error) => void = () => undefined,
 ): (...args: A) => Promise<R> {
   let opened: Error | undefined;
   return async (...args) => {
@@ -31,7 +33,10 @@ export function withBreaker<A extends unknown[], R>(
     try {
       return await call(...args);
     } catch (error) {
-      if (error instanceof Error && opensBreaker(error)) opened = error;
+      if (error instanceof Error && opensBreaker(error)) {
+        opened = error;
+        onOpen(error);
+      }
       throw error;
     }
   };

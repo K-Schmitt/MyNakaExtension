@@ -475,6 +475,161 @@ describe("sync job: automatic triggers", () => {
   });
 });
 
+describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
+  function closingTab(closeAfter: string | undefined) {
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    let closed = closeAfter === undefined;
+    const failed: unknown[] = [];
+    const afterLoss: unknown[] = [];
+    const tabs: TabsPort = {
+      query: async (url) => {
+        if (failed.length > 0) afterLoss.push("query");
+        return real.query(url);
+      },
+      send: async (tabId, msg) => {
+        if (failed.length > 0) afterLoss.push(msg);
+        if (closed) {
+          failed.push(msg);
+          throw new Error("Could not establish connection.");
+        }
+        const reply = await real.send(tabId, msg);
+        if ("call" in msg && msg.call === closeAfter) closed = true;
+        return reply;
+      },
+    };
+    return { tabs, failed, afterLoss };
+  }
+
+  it("no Naka call reaches the tab after the loss; the run saves Plan 2's counts and says no-naka-tab", async () => {
+    const t = closingTab("playlistIds");
+    const w = world({ tabs: t.tabs });
+    await w.jobs.syncJob("button");
+    expect(t.failed).toEqual([
+      { type: "naka-call", call: "contentById", contentId: 1 },
+    ]);
+    expect(t.afterLoss).toEqual([]);
+    const run = w.settings().lastRun;
+    expect(run).toMatchObject({ outcome: "ok", error: "no-naka-tab" });
+    expect(run?.report?.unresolved).toBe(2);
+    expect(() => w.state()).not.toThrow();
+    expect(w.area.ops).toContain("set:state");
+  });
+
+  it("a content script gone at the start fails the job with no-naka-tab, saving nothing", async () => {
+    const t = closingTab(undefined);
+    const w = world({ tabs: t.tabs });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "failed",
+      error: "no-naka-tab",
+    });
+    expect(w.area.ops).not.toContain("get:state");
+    expect(t.failed).toEqual([{ type: "naka-account" }]);
+    expect(t.afterLoss).toEqual([]);
+  });
+});
+
+describe("sync job: a run that a breaker stopped says so (Ruling 17)", () => {
+  it("a SensCritique session that expires after the first write gives ok with sc-session", async () => {
+    let reads = 0;
+    const w = world({
+      settings: { mode: "live" },
+      state: {
+        ...emptyState(),
+        mapping: [
+          { nakaId: 1, scId: 1001 },
+          { nakaId: 3, scId: 1003 },
+        ],
+      },
+      naka: catalogueNaka({ playlistIds: async () => [1, 3] }),
+      sc: catalogueSc({
+        readWishlist: async () => [],
+        productState: async (id) => {
+          reads += 1;
+          if (reads > 1) throw new ScUnauthenticatedError();
+          return {
+            isDone: false,
+            isWished: false,
+            universe: id === 1007 ? 4 : 1,
+          };
+        },
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(writesOf(w.sk.calls)).toEqual(["wish:1001"]);
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "ok",
+      error: "sc-session",
+    });
+  });
+
+  it("a Naka rate limit mid-run gives ok with unavailable", async () => {
+    const w = world({
+      naka: catalogueNaka({
+        search: async () => {
+          throw new NakaUnavailableError("Naka search: HTTP 429", 429);
+        },
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "ok",
+      error: "unavailable",
+    });
+  });
+
+  it("the first stop is the one recorded", async () => {
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    let closed = false;
+    const tabs: TabsPort = {
+      query: (url) => real.query(url),
+      send: async (tabId, msg) => {
+        if (closed) throw new Error("Could not establish connection.");
+        const reply = await real.send(tabId, msg);
+        if ("call" in msg && msg.call === "contentById") closed = true;
+        return reply;
+      },
+    };
+    const w = world({
+      tabs,
+      sc: catalogueSc({
+        search: async () => {
+          throw new ScUnavailableError(
+            "SensCritique SearchProductExplorer: HTTP 429",
+          );
+        },
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).toMatchObject({
+      outcome: "ok",
+      error: "unavailable",
+    });
+  });
+
+  it("a run nothing stopped has no error", async () => {
+    const w = world();
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("ok");
+    expect(w.settings().lastRun).not.toHaveProperty("error");
+  });
+
+  it("an error that opens no breaker is not recorded", async () => {
+    const w = world({
+      naka: catalogueNaka({
+        search: async () => {
+          throw new NakaUnavailableError("Naka search: HTTP 500", 500);
+        },
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("ok");
+    expect(w.settings().lastRun).not.toHaveProperty("error");
+  });
+});
+
 describe("sync job: one Naka tab per job", () => {
   it("every call of the job goes to the first tab, found once", async () => {
     const nk = fakeNaka(catalogueNaka());

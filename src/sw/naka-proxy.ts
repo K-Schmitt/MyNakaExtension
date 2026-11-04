@@ -51,12 +51,14 @@ async function firstTabId(tabs: TabsPort): Promise<number> {
   return first.id;
 }
 
+// A send that fails means the tab is gone: closed, or its content script lost to an extension reload
+// (Ruling 17). A timeout is not a lost tab: it stays unavailable (see withTimeout).
 async function exchange(tabs: TabsPort, msg: ToNakaTab): Promise<unknown> {
   const tabId = await firstTabId(tabs);
   try {
     return await tabs.send(tabId, msg);
   } catch {
-    throw new NakaUnavailableError("Naka tab: unreachable");
+    throw new JobRejected("no-naka-tab");
   }
 }
 

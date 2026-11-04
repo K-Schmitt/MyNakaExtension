@@ -81,10 +81,11 @@ export type JobKey =
   | "mode"
   | "status";
 
-type Context =
+type Context = (
   | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number> }
   | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
-  | { kind: "other" };
+  | { kind: "other" }
+) & { tabLost?: boolean };
 
 export type World = ReturnType<typeof createWorld>;
 
@@ -125,6 +126,7 @@ export function createWorld(seed: number) {
       protections: 0,
       guards: 0,
       spentBudgets: 0,
+      lostTabs: 0,
     },
   };
   for (const n of TITLES) {
@@ -144,6 +146,7 @@ const ORACLES: [string, RegExp][] = [
   ["O6 re-wish", /re-wish of/],
   ["O7 forged message", /ran without a message/],
   ["O9 finish budget", /hour's finishes spent/],
+  ["O10 lost tab", /after the job lost its tab/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -328,15 +331,31 @@ function nakaClient(w: World): NakaClient {
   };
 }
 
+// Oracle (Ruling 17): once a send of the job failed, its tab is lost, and the job calls the tabs no more.
+function checkTabCall(w: World): void {
+  if (w.current?.tabLost)
+    violation(w, "a tabs call after the job lost its tab");
+}
+
+function loseTab(w: World): never {
+  if (w.current !== undefined && !w.current.tabLost) {
+    w.current.tabLost = true;
+    w.stats.lostTabs += 1;
+  }
+  throw new Error("Could not establish connection");
+}
+
 export function tabsFor(w: World, gen: number): TabsPort {
   return {
     query: async () => {
       if (gen !== w.gen) return frozen(w);
+      checkTabCall(w);
       return w.tabOpen ? [{ id: 1 }] : [];
     },
     send: async (_tabId, msg) => {
       if (gen !== w.gen) return frozen(w);
-      if (!w.tabOpen) throw new Error("Could not establish connection");
+      checkTabCall(w);
+      if (!w.tabOpen) loseTab(w);
       const account = () => (w.nakaLoggedIn ? w.nakaAccount : undefined);
       const reply = await handleNakaCall(
         wire(msg) as ToNakaTab,

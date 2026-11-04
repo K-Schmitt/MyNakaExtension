@@ -1,9 +1,11 @@
 // One list-sync run: the binding first, then Plan 2's runSync, then the run record. Any failure is
 // recorded as a JobError code; the stored state is then the one the run saved, or the one before it.
+// A run that completed after a breaker opened or its tab was lost records "ok" with that first code.
 
 import { runSync, type SyncReport } from "../core/sync-runner";
 import type { RunRecord, Settings } from "../ext/settings";
 import { type Accounts, checkBinding } from "./binding";
+import { type FirstStop, firstStop } from "./first-stop";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import type { NakaProxy } from "./naka-proxy";
 import { type PreviewItem, previewOf } from "./preview";
@@ -23,6 +25,7 @@ async function runWithPreview(
   deps: JobDeps,
   settings: Settings,
   naka: NakaProxy,
+  stop: FirstStop,
 ): Promise<RunResult> {
   const session = buildSyncPorts({
     naka,
@@ -30,6 +33,7 @@ async function runWithPreview(
     limiters: deps.limiters,
     store: deps.store,
     mode: settings.mode,
+    onStop: stop.note,
   });
   const report = await runSync(session.ports);
   if (settings.mode === "live") return { report };
@@ -44,12 +48,15 @@ async function attempt(
   at: number,
 ): Promise<Attempt> {
   const base = { at, trigger, mode: settings.mode };
-  const naka = jobNaka(deps);
+  const stop = firstStop();
+  const naka = jobNaka(deps, stop.note);
   try {
     const readers = jobAccounts(naka, deps);
     const accounts = await checkBinding(settings.binding, readers);
-    const result = await runWithPreview(deps, settings, naka);
-    return { record: { ...base, outcome: "ok", ...result }, accounts };
+    const result = await runWithPreview(deps, settings, naka, stop);
+    const error = stop.code();
+    const ok = { ...base, outcome: "ok" as const, ...result };
+    return { record: error === undefined ? ok : { ...ok, error }, accounts };
   } catch (error) {
     return { record: { ...base, outcome: "failed", error: toJobError(error) } };
   }

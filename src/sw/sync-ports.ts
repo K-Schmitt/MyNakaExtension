@@ -26,6 +26,8 @@ export type SyncPortDeps = {
   limiters: SiteLimiters;
   store: Store;
   mode: Mode;
+  /** Hears the error that opened any port's breaker. */
+  onStop?: (error: Error) => void;
 };
 
 export type Describe = {
@@ -42,29 +44,31 @@ export type SyncSession = {
 };
 
 export function buildSyncPorts(deps: SyncPortDeps): SyncSession {
-  const { naka, sc, limiters, store } = deps;
+  const { naka, sc, limiters, store, onStop } = deps;
+  const guard = <A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
+    withBreaker(call, onStop);
   const wishlist = createWishlist(sc);
   const planned: PlannedWrite[] = [];
   const writes = writePorts(deps.mode, naka, sc, planned);
   const describe: Describe = {
     naka: remembered(
-      withBreaker((id: number) => readNakaTitle(naka, limiters.naka, id)),
+      guard((id: number) => readNakaTitle(naka, limiters.naka, id)),
     ),
     sc: async (id) => wishlist.describe(id),
   };
   const ports: SyncPorts = {
     load: () => store.loadState(),
     save: (state) => store.saveState(state),
-    nakaIds: withBreaker(() => naka.playlistIds()),
-    scWishlistIds: withBreaker(() => wishlist.ids()),
+    nakaIds: guard(() => naka.playlistIds()),
+    scWishlistIds: guard(() => wishlist.ids()),
     describeNaka: describe.naka,
     describeSc: describe.sc,
-    searchNaka: withBreaker((q: string) =>
+    searchNaka: guard((q: string) =>
       searchNakaCandidates(naka, limiters.naka, q),
     ),
-    searchSc: withBreaker((q: string) => searchScBoth(sc, limiters.sc, q)),
-    addToNaka: withBreaker((id: number) => writes.addToNaka(id)),
-    addToSc: withBreaker((id: number) => writes.addToSc(id)),
+    searchSc: guard((q: string) => searchScBoth(sc, limiters.sc, q)),
+    addToNaka: guard((id: number) => writes.addToNaka(id)),
+    addToSc: guard((id: number) => writes.addToSc(id)),
   };
   return { ports, planned, describe };
 }
