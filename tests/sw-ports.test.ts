@@ -4,6 +4,7 @@ import { emptyState } from "../src/core/state";
 import { JobRejected } from "../src/ext/job-error";
 import { NakaUnavailableError } from "../src/naka/naka-errors";
 import {
+  ScTimeoutError,
   ScUnauthenticatedError,
   ScUnavailableError,
 } from "../src/sc/sc-errors";
@@ -254,6 +255,7 @@ describe("circuit breaker: what opens it", () => {
       "a SensCritique 429",
       new ScUnavailableError("SensCritique SearchProductExplorer: HTTP 429"),
     ],
+    ["a SensCritique timeout (K4)", new ScTimeoutError("UserCollection")],
   ];
   const closed: [string, unknown][] = [
     ["no Naka tab", new JobRejected("no-naka-tab")],
@@ -263,6 +265,10 @@ describe("circuit breaker: what opens it", () => {
     [
       "a SensCritique 500",
       new ScUnavailableError("SensCritique UserCollection: HTTP 500"),
+    ],
+    [
+      "a SensCritique request that failed before its timeout",
+      new ScUnavailableError("SensCritique UserCollection: request failed"),
     ],
     ["a plain error", new Error("HTTP 429")],
     ["a RangeError", new RangeError("id must be a positive safe integer")],

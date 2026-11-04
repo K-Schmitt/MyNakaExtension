@@ -1,10 +1,15 @@
-// A port stops calling its site for the rest of a job after a rate-limit or a session error: every later
-// call rejects at once with the error that opened it. Those errors carry fixed text only (an operation
-// label and a status), so rethrowing one copies nothing of a token or a response.
+// A port stops calling its site for the rest of a job after a rate-limit, a session error or a timed-out
+// SensCritique request (K4): every later call rejects at once with the error that opened it. Those
+// errors carry fixed text only (an operation label and a status), so rethrowing one copies nothing of a
+// token or a response.
 
 import { JobRejected } from "../ext/job-error";
 import { NakaUnavailableError } from "../naka/naka-errors";
-import { ScUnauthenticatedError, ScUnavailableError } from "../sc/sc-errors";
+import {
+  ScTimeoutError,
+  ScUnauthenticatedError,
+  ScUnavailableError,
+} from "../sc/sc-errors";
 
 const RATE_LIMITED = 429;
 // sc-transport's `send` words every non-200 answer "SensCritique <label>: HTTP <status>".
@@ -16,6 +21,7 @@ export function opensBreaker(error: unknown): boolean {
     return error.status === RATE_LIMITED;
   }
   if (error instanceof ScUnauthenticatedError) return true;
+  if (error instanceof ScTimeoutError) return true;
   return (
     error instanceof ScUnavailableError &&
     error.message.includes(SC_RATE_LIMITED)

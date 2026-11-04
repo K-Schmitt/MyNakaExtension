@@ -4,7 +4,11 @@
 // APOLLO, with `credentials: "omit"`. It is never put in a URL, a body, an error message or a log.
 // Error messages carry the operation name and the HTTP status only: a response body may hold personal data.
 
-import { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
+import {
+  ScTimeoutError,
+  ScUnauthenticatedError,
+  ScUnavailableError,
+} from "./sc-errors";
 import { GQL } from "./sc-queries";
 
 export type Fetch = (
@@ -56,11 +60,12 @@ export async function readSession(deps: ScDeps): Promise<ScSession> {
   }
 }
 
-// A rate limit on the home page stays one, so that the breaker opens (M2): only the class and the
-// status are read, and the error is rebuilt from fixed text. Anything else, even an error that throws
-// while it is looked at, is the one fixed "could not be read".
+// A rate limit or a timeout on the home page stays one, so that the breaker opens (M2, K4): only the
+// class and the status are read, and the error is rebuilt from fixed text. Anything else, even an error
+// that throws while it is looked at, is the one fixed "could not be read".
 function sessionError(error: unknown): ScUnavailableError {
   try {
+    if (error instanceof ScTimeoutError) return new ScTimeoutError("session");
     if (error instanceof ScUnavailableError && error.message.includes(SC_429)) {
       return new ScUnavailableError("SensCritique session: HTTP 429");
     }
@@ -91,6 +96,7 @@ export async function send(
     }
     return text;
   } catch (error) {
+    if (error instanceof ScTimeoutError) throw new ScTimeoutError(label);
     if (error instanceof ScUnavailableError) throw error;
     throw new ScUnavailableError(`SensCritique ${label}: request failed`);
   }

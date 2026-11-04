@@ -721,6 +721,137 @@ describe("worker end to end: a SensCritique request that never answers", () => {
   );
 });
 
+const WWW_HOME = "https://www.senscritique.com/";
+const APOLLO_HOST = "https://apollo.senscritique.com/";
+
+// Films 1, 3, 4 and 5 on the Naka playlist and on no SensCritique list: a run searches SensCritique for
+// each of them.
+const PLAYLIST = [1, 3, 4, 5];
+
+function nakaPlaylist(ids: number[]): Fetch {
+  return async (url) => {
+    const path = url.replace("https://naka.cx/api/v1", "");
+    if (path === "/playlist/ids") return json({ contentIds: ids, limit: 500 });
+    if (path.startsWith("/browse/search")) return json({ data: [] });
+    const id = Number(path.replace("/browse/", ""));
+    return ids.includes(id) ? json(nakaEntry(id)) : json({}, 404);
+  };
+}
+
+const wishlistReads = (answered: Call[]) =>
+  answered.filter((c) => (c.init.body ?? "").includes('"UserCollection"'))
+    .length;
+
+// A worker whose requests to `stuck` hang, once `hangs` holds over the requests answered so far, until
+// their 30 s timer fires. `requests` logs every SensCritique request in order, `hung` the ones that hung.
+function stallingWorker(stuck: string, hangs: (answered: Call[]) => boolean) {
+  const storage = memoryArea();
+  const armed: (() => void)[] = [];
+  const timer: Timer = {
+    set: (fn, ms) => {
+      if (ms === 30_000) armed.push(fn);
+      return armed.length;
+    },
+    clear: () => undefined,
+  };
+  const answering = scFetch(true, { time: 0 });
+  const requests: string[] = [];
+  const hung: string[] = [];
+  const fetch: Fetch = (url, init) => {
+    requests.push(url);
+    if (url !== stuck || !hangs(answering.calls)) {
+      return answering.fetch(url, init);
+    }
+    hung.push(url);
+    return new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () =>
+        reject(new Error("aborted")),
+      );
+    });
+  };
+  const client = createNakaClient({
+    fetch: nakaPlaylist(PLAYLIST),
+    token: () => NAKA_TOKEN,
+  });
+  const answers: unknown[] = [];
+  const clock: Clock = { time: Date.parse("2026-11-04T12:00:00Z") };
+  const r = createWorker({
+    extensionId: EXT,
+    storage,
+    tabs: tabRunning(client, () => "77").tabs,
+    fetch,
+    timer,
+    now: () => clock.time,
+    sleep: async (ms) => {
+      clock.time += ms;
+    },
+  });
+  const send = (msg: unknown, sender: object) =>
+    r.handle(msg, sender, (answer) => answers.push(answer));
+  // Lets 30 s pass for every request armed so far, until the worker makes no new request.
+  const runOut = async () => {
+    for (let round = 0; round < 20; round += 1) {
+      await settle();
+      if (armed.length === 0) return;
+      for (const fn of armed.splice(0)) fn();
+    }
+    throw new Error("the worker kept making requests");
+  };
+  const lastRun = async () => {
+    send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    return (answers.at(-1) as StatusSnapshot).lastRun;
+  };
+  return { storage, requests, hung, send, runOut, lastRun };
+}
+
+describe("worker end to end: a SensCritique site that stops answering (K4)", () => {
+  it.each([WWW_HOME, APOLLO_HOST])(
+    "%s hanging mid-run costs one 30 s timeout for the search port, not one per title",
+    async (stuck) => {
+      const w = stallingWorker(
+        stuck,
+        (answered) => wishlistReads(answered) >= 2,
+      );
+      w.send({ type: "resync" }, STATUS_PAGE);
+      await w.runOut();
+      expect(w.hung).toEqual([stuck]);
+      expect(w.requests.at(-1)).toBe(stuck);
+      expect(await w.lastRun()).toMatchObject({
+        trigger: "button",
+        outcome: "ok",
+        error: "unavailable",
+      });
+    },
+  );
+
+  it("a home page hanging from the start fails the run at the binding check", async () => {
+    const w = stallingWorker(WWW_HOME, () => true);
+    w.send({ type: "resync" }, STATUS_PAGE);
+    await w.runOut();
+    expect(w.requests).toEqual([WWW_HOME]);
+    expect(w.hung).toEqual([WWW_HOME]);
+    expect(w.storage.ops).not.toContain("get:state");
+    expect(await w.lastRun()).toMatchObject({
+      outcome: "failed",
+      error: "unavailable",
+    });
+    expect(w.storage.data.get("settings")).not.toHaveProperty("binding");
+  });
+
+  it("a home page hanging from the start fails a finish at the binding check, before any state write", async () => {
+    const w = stallingWorker(WWW_HOME, () => true);
+    w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
+    await w.runOut();
+    expect(w.requests).toEqual([WWW_HOME]);
+    expect(w.storage.ops).not.toContain("set:state");
+    expect(w.storage.data.get("settings")).toMatchObject({
+      finishWindow: { count: 1 },
+      lastFinish: { key: "movie:3", outcome: "failed", error: "unavailable" },
+    });
+  });
+});
+
 describe("worker end to end: the tokens stay where they belong", () => {
   it("a live sync writes, and neither token reaches storage, a message or an answer", async () => {
     const w = worker();
