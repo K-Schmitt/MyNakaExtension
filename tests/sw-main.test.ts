@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // The service worker entry against a fake `chrome`: what it binds, and how (Ruling 9).
@@ -13,6 +14,8 @@ type Listener = (
 ) => boolean;
 
 const listeners: Listener[] = [];
+const clicks: ((tab: unknown) => void)[] = [];
+const opened = { count: 0, fail: false };
 const queries: unknown[] = [];
 const sends: unknown[][] = [];
 const stored = new Map<string, unknown>();
@@ -22,6 +25,13 @@ const fakeChrome = {
   runtime: {
     id: EXT,
     onMessage: { addListener: (fn: Listener) => listeners.push(fn) },
+    openOptionsPage: async () => {
+      opened.count += 1;
+      if (opened.fail) throw new Error("Could not create an options page.");
+    },
+  },
+  action: {
+    onClicked: { addListener: (fn: (tab: unknown) => void) => clicks.push(fn) },
   },
   tabs: {
     query: async (info: unknown) => {
@@ -96,5 +106,39 @@ describe("service worker entry", () => {
     expect(stored.get("settings")).toMatchObject({
       lastRun: { trigger: "naka-ready", error: "sc-session" },
     });
+  });
+});
+
+// M8: the toolbar button opens the status page, which is the extension's options page.
+describe("the toolbar button", () => {
+  it("one click opens the status page once", async () => {
+    expect(clicks).toHaveLength(1);
+    const before = opened.count;
+    clicks[0]?.({ id: 7, url: "https://naka.cx/" });
+    await settle();
+    expect(opened.count - before).toBe(1);
+  });
+
+  it("a page that cannot open becomes no unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listener);
+    opened.fail = true;
+    try {
+      clicks[0]?.({ id: 7 });
+      await settle();
+      await settle();
+      expect(unhandled).toEqual([]);
+    } finally {
+      opened.fail = false;
+      process.off("unhandledRejection", listener);
+    }
+  });
+
+  it("needs no new permission: the button has no popup, the status page is the options page", () => {
+    const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
+    expect(manifest.permissions).toEqual(["storage"]);
+    expect(manifest.action).toEqual({});
+    expect(manifest.options_page).toBe("status.html");
   });
 });

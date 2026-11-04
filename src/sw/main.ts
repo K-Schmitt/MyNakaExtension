@@ -37,3 +37,11 @@ const router = createWorker({
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) =>
   router.handle(msg, sender, sendResponse),
 );
+
+function ignore(): void {}
+
+// The toolbar button has no popup: a click opens the status page, the extension's options page. A page
+// that cannot open is no error of the worker.
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage().catch(ignore);
+});
