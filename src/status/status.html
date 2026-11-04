@@ -2,9 +2,25 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MyNakaExtension</title>
   </head>
   <body>
+    <main>
+      <h1>MyNakaExtension</h1>
+      <div id="status" aria-live="polite">
+        <p id="headline">Chargement…</p>
+        <ul id="lines"></ul>
+        <section id="preview-section" hidden>
+          <h2>Écritures prévues</h2>
+          <ul id="preview"></ul>
+        </section>
+      </div>
+      <p>
+        <button type="button" id="resync" disabled>Resynchroniser</button>
+        <button type="button" id="switch" disabled hidden></button>
+      </p>
+    </main>
     <script src="status.js"></script>
   </body>
 </html>
