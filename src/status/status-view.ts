@@ -6,10 +6,12 @@ import type { StatusFormat } from "./status-format";
 import { readSnapshot } from "./status-input";
 import {
   finishLine,
+  pendingModeLine,
   questionsLine,
   reportLine,
   runErrorLine,
   runLine,
+  runningLine,
   snapshotErrorLine,
 } from "./status-lines";
 
@@ -21,6 +23,8 @@ export type StatusView =
       headline: string;
       mode?: Mode;
       switchLabel?: string;
+      /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
+      inProgress: boolean;
       previewCount: number;
       lines: string[];
       preview: string[];
@@ -56,10 +60,23 @@ function runLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
   return lines.filter((line) => line !== undefined);
 }
 
+// What runs now and what waits, first: the stored records may be older than the job that runs.
+function activityLines(
+  snapshot: StatusSnapshot,
+  format: StatusFormat,
+): string[] {
+  const { running, pendingMode } = snapshot;
+  return [
+    running === undefined ? undefined : runningLine(running, format),
+    pendingMode === undefined ? undefined : pendingModeLine(pendingMode),
+  ].filter((line) => line !== undefined);
+}
+
 function viewLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
   const { error, lastFinish, counts } = snapshot;
   return [
     error === undefined ? undefined : snapshotErrorLine(error),
+    ...activityLines(snapshot, format),
     ...runLines(snapshot, format),
     lastFinish === undefined ? undefined : finishLine(lastFinish, format),
     counts === undefined ? undefined : questionsLine(counts),
@@ -76,6 +93,8 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
   const preview = previewTitles(snapshot);
   const base = {
     kind: "ready" as const,
+    inProgress:
+      snapshot.running !== undefined || snapshot.pendingMode !== undefined,
     previewCount: preview.length,
     lines: viewLines(snapshot, format),
     preview,

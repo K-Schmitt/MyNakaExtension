@@ -44,6 +44,10 @@ const controller = createController({
   show: render,
   setBusy,
   format: localFormat(),
+  timer: {
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  },
 });
 
 element("resync").addEventListener("click", () => void controller.resync());

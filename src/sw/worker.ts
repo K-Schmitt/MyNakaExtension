@@ -50,5 +50,6 @@ export function createWorker(env: WorkerEnv): Router {
     queue: createJobQueue(),
     jobs,
     timer: env.timer,
+    now: env.now,
   });
 }

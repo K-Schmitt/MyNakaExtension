@@ -18,6 +18,7 @@ export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
   setMode(mode: Mode): Promise<void>;
+  /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
 };
 

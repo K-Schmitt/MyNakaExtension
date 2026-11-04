@@ -10,6 +10,7 @@ import {
 } from "../ext/field-checks";
 import { ERROR_CODES, MODES, parseRunRecord } from "../ext/run-record-schema";
 import type { FinishRecord, Mode } from "../ext/settings";
+import type { Running } from "../sw/activity";
 import type { Counts, StatusSnapshot } from "../sw/status-snapshot";
 
 const OUTCOMES: readonly FinishRecord["outcome"][] = [
@@ -19,6 +20,16 @@ const OUTCOMES: readonly FinishRecord["outcome"][] = [
   "done",
   "failed",
 ];
+
+const RUNNING_KINDS: readonly Running["kind"][] = ["sync", "finish"];
+
+function parseRunning(raw: unknown): Running {
+  const record = asRecord(raw, "running");
+  return {
+    kind: asOneOf(record.kind, RUNNING_KINDS, "kind"),
+    since: asInt(record.since, 0, "since"),
+  };
+}
 
 function parseCounts(raw: unknown): Counts {
   const record = asRecord(raw, "counts");
@@ -56,12 +67,18 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
   const error = whenPresent(record.error, (v) =>
     asOneOf(v, ERROR_CODES, "error"),
   );
+  const running = whenPresent(record.running, parseRunning);
+  const pendingMode = whenPresent(record.pendingMode, (v) =>
+    asOneOf<Mode>(v, MODES, "pendingMode"),
+  );
   return {
     ...(mode === undefined ? {} : { mode }),
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(counts === undefined ? {} : { counts }),
     ...(error === undefined ? {} : { error }),
+    ...(running === undefined ? {} : { running }),
+    ...(pendingMode === undefined ? {} : { pendingMode }),
   };
 }
 

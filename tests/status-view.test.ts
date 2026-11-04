@@ -197,6 +197,41 @@ describe("toStatusView: preview", () => {
   });
 });
 
+// Ruling 20: the status is answered while a job runs; the page names it and asks again until it ends.
+describe("toStatusView: what runs now", () => {
+  it("names a running sync with the time it started, and asks to be polled", () => {
+    const view = ready({ mode: "live", running: { kind: "sync", since: AT } });
+    expect(view.lines).toContain("Synchronisation en cours depuis 14:05");
+    expect(view.inProgress).toBe(true);
+  });
+
+  it("names a running finish", () => {
+    const view = ready({
+      mode: "live",
+      running: { kind: "finish", since: AT },
+    });
+    expect(view.lines).toContain("Fin de visionnage en cours de traitement");
+    expect(view.inProgress).toBe(true);
+  });
+
+  it.each([
+    ["simulation", "simulation"],
+    ["live", "écritures actives"],
+  ] as const)("names a pending switch to %s", (pendingMode, label) => {
+    const view = ready({ mode: "live", pendingMode });
+    expect(view.lines).toContain(
+      `Changement de mode en attente\u202F: ${label}`,
+    );
+    expect(view.inProgress).toBe(true);
+  });
+
+  it("an answer with nothing running or pending is not polled", () => {
+    const view = ready({ mode: "live", counts: COUNTS });
+    expect(view.inProgress).toBe(false);
+    expect(view.lines.join(" ")).not.toContain("en cours");
+  });
+});
+
 describe("toStatusView: an untrusted answer", () => {
   const NO_ENGINE = {
     kind: "no-engine",
@@ -222,6 +257,11 @@ describe("toStatusView: an untrusted answer", () => {
       mode: "live",
       lastFinish: { at: AT, key: "k", outcome: "done", error: "unavailable" },
     },
+    { mode: "live", running: { kind: "rate", since: AT } },
+    { mode: "live", running: { kind: "sync" } },
+    { mode: "live", running: { kind: "sync", since: -1 } },
+    { mode: "live", running: "sync" },
+    { mode: "live", pendingMode: "paused" },
   ])("shows the silent-engine state for %j", (raw) => {
     expect(toStatusView(raw, UTC)).toEqual(NO_ENGINE);
   });

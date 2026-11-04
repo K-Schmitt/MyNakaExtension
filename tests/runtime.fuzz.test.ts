@@ -29,20 +29,22 @@ import {
 // debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, account
 // switches and the owner's list edits.
 // Oracles, checked at each write (tests/runtime-world.ts):
-//   O1 never two jobs at once (per worker);
+//   O1 never two jobs at once (per worker); the status answer is no job (Ruling 20);
 //   O2 the stored state always passes parseState (and the settings parseSettings);
 //   O3 no list write while the stored mode is simulation;
 //   O4 no write and no state save while the bound accounts are not the signed-in ones;
 //   O5 Plan 2's re-add: no title written back to a side the owner removed it from, once a completed run
 //      had seen it in both lists;
 //   O6 Plan 2's re-wish: no wish of a film whose finish saved, unwished or marked it done;
-//   O7 a job runs only for a message its sender may send (forged ones are ignored);
+//   O7 a job runs, and the status is answered, only for a message its sender may send (forged ones are
+//      ignored);
 //   O9 no SensCritique finish write by a job that started with the hour's 30 finishes spent (the stored
 //      count itself never exceeds 30: O2);
 //   O10 once the job's pinned tab refused a send, or every tab it found did (its tab lost), no later tabs
 //       call of that job (Ruling 17);
 //   O11 a job tries the tabs it found in their query order, pins the first that answers, then sends to it
 //       only, with no new lookup (Rulings 9 and 20); orphan tabs, with no content script, come first;
+//   O12 a status answer, given at once outside the queue, never writes storage (Ruling 20);
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -104,6 +106,7 @@ function startWorker(w: World): Worker {
     queue: createJobQueue(),
     jobs: observed(w, gen, jobs),
     timer: debounce,
+    now: () => w.time,
   });
   return {
     handle: (msg, sender) => {
@@ -290,6 +293,7 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       lostTabs: 0,
       orphanTries: 0,
       pinnedPastOrphan: 0,
+      statusDuringJob: 0,
     };
     for (let seed = 1; seed <= SEEDS; seed++) {
       const result = await simulate(seed);
@@ -304,11 +308,11 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     }
     expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 785 list writes, 5056 finish writes, 638 simulated
-    // runs with planned writes, 888 jobs stopped by the binding, 484 calls of dead workers, 465
-    // protected sides, 457 guarded films, 258 finish jobs started with the hour's budget spent, 658
-    // jobs that lost their tab, 6716 sends refused by an orphan tab, 6151 jobs that pinned the live
-    // tab after an orphan refused).
+    // Every oracle's situation arises (measured: 769 list writes, 4891 finish writes, 666 simulated
+    // runs with planned writes, 901 jobs stopped by the binding, 431 calls of dead workers, 475
+    // protected sides, 479 guarded films, 345 finish jobs started with the hour's budget spent, 792
+    // jobs that lost their tab, 6643 sends refused by an orphan tab, 5948 jobs that pinned the live
+    // tab after an orphan refused, 870 status answers given while a job ran).
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(100);
     }

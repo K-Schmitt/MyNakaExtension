@@ -18,8 +18,39 @@ const SIM = {
   },
 };
 const LIVE = { mode: "live" };
+const RUNNING = { mode: "live", running: { kind: "sync", since: 1 } };
+const PENDING = { mode: "simulation", pendingMode: "live" };
 
 type Deferred = { resolve(v: unknown): void; reject(e: unknown): void };
+
+// The page's timer: every armed callback with its delay; `fire` runs the ones still armed.
+function fakeTimer() {
+  const armed = new Map<number, { fn: () => void; ms: number }>();
+  const delays: number[] = [];
+  let next = 0;
+  return {
+    armed,
+    delays,
+    timer: {
+      set: (fn: () => void, ms: number) => {
+        next += 1;
+        armed.set(next, { fn, ms });
+        delays.push(ms);
+        return next;
+      },
+      clear: (handle: unknown) => {
+        armed.delete(handle as number);
+      },
+    },
+    fire: () => {
+      const due = [...armed.values()];
+      armed.clear();
+      for (const { fn } of due) fn();
+    },
+  };
+}
+
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 function setup(answers: unknown[], confirmAnswer = true) {
   const sent: ToWorker[] = [];
@@ -28,6 +59,7 @@ function setup(answers: unknown[], confirmAnswer = true) {
   const confirms: string[] = [];
   const pending: Deferred[] = [];
   const queue = [...answers];
+  const clock = fakeTimer();
   const controller = createController({
     send: (message) => {
       sent.push(message);
@@ -48,8 +80,9 @@ function setup(answers: unknown[], confirmAnswer = true) {
     show: (view) => shown.push(view),
     setBusy: (b) => busy.push(b),
     format: localFormat("UTC"),
+    timer: clock.timer,
   });
-  return { controller, sent, shown, busy, confirms, pending };
+  return { controller, sent, shown, busy, confirms, pending, clock };
 }
 
 describe("load", () => {
@@ -113,6 +146,7 @@ describe("resync", () => {
       show: () => {},
       setBusy: () => {},
       format: localFormat("UTC"),
+      timer: fakeTimer().timer,
     });
     await failing.resync();
     expect(t.sent.slice(base).map((m) => m.type)).toEqual(["resync", "status"]);
@@ -178,5 +212,81 @@ describe("toggleMode", () => {
     void t.controller.load();
     await t.controller.toggleMode();
     expect(t.sent.map((m) => m.type)).toEqual(["status", "status"]);
+  });
+});
+
+// Ruling 20: while a job runs or a mode change waits, the page asks again every 5 s, and only then.
+describe("polling", () => {
+  const statuses = (sent: ToWorker[]) =>
+    sent.filter((m) => m.type === "status").length;
+
+  it("asks again every 5 s while a job runs or a mode change waits, and stops after", async () => {
+    const t = setup([RUNNING, PENDING, LIVE]);
+    await t.controller.load();
+    expect(t.clock.delays).toEqual([5000]);
+    t.clock.fire();
+    await settle();
+    expect(statuses(t.sent)).toBe(2);
+    expect(t.clock.delays).toEqual([5000, 5000]);
+    t.clock.fire();
+    await settle();
+    expect(statuses(t.sent)).toBe(3);
+    expect(t.clock.armed.size).toBe(0);
+    expect(t.clock.delays).toHaveLength(2);
+  });
+
+  it("does not poll an answer with nothing running or pending", async () => {
+    const t = setup([LIVE]);
+    await t.controller.load();
+    expect(t.clock.delays).toEqual([]);
+  });
+
+  it("does not poll a silent engine", async () => {
+    const t = setup([new Error("port closed")]);
+    await t.controller.load();
+    expect(t.clock.delays).toEqual([]);
+  });
+
+  it("a poll shows no Chargement… and leaves the buttons alone", async () => {
+    const t = setup([RUNNING, LIVE]);
+    await t.controller.load();
+    t.clock.fire();
+    await settle();
+    expect(t.shown.map((v) => v.kind)).toEqual(["loading", "ready", "ready"]);
+    expect(t.busy).toEqual([true, false]);
+  });
+
+  it("a poll due during an action asks nothing; the action's own answer polls again", async () => {
+    const t = setup([RUNNING, "hang"]);
+    await t.controller.load();
+    const resync = t.controller.resync();
+    await settle();
+    t.clock.fire();
+    await settle();
+    expect(statuses(t.sent)).toBe(2);
+    t.pending[0]?.resolve(RUNNING);
+    await resync;
+    expect(t.clock.armed.size).toBe(1);
+  });
+
+  it("an older answer never replaces a newer one", async () => {
+    const t = setup([RUNNING, "hang", LIVE]);
+    await t.controller.load();
+    t.clock.fire();
+    await settle();
+    expect(t.pending).toHaveLength(1);
+    await t.controller.resync();
+    expect(t.shown.at(-1)).toMatchObject({ mode: "live", inProgress: false });
+    t.pending[0]?.resolve(RUNNING);
+    await settle();
+    expect(t.shown.at(-1)).toMatchObject({ mode: "live", inProgress: false });
+    expect(t.clock.armed.size).toBe(0);
+  });
+
+  it("only one poll is armed at a time", async () => {
+    const t = setup([RUNNING, RUNNING]);
+    await t.controller.load();
+    await t.controller.resync();
+    expect(t.clock.armed.size).toBe(1);
   });
 });

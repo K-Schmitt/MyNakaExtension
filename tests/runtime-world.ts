@@ -6,6 +6,7 @@
 // The owner switches accounts and edits the lists only while no job runs (the fuzz drains the queue
 // first), so every oracle compares a write with the world the job itself checked.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import {
@@ -144,6 +145,7 @@ export function createWorld(seed: number) {
       lostTabs: 0,
       orphanTries: 0,
       pinnedPastOrphan: 0,
+      statusDuringJob: 0,
     },
   };
   for (const n of TITLES) {
@@ -165,6 +167,7 @@ const ORACLES: [string, RegExp][] = [
   ["O9 finish budget", /hour's finishes spent/],
   ["O10 lost tab", /after the job lost its tab/],
   ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
+  ["O12 read-only status", /a status answer wrote/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -292,6 +295,20 @@ function onWrite(w: World, key: string, value: unknown): void {
   }
 }
 
+// The status answers in flight. AsyncLocalStorage follows an answer's own promise chain and no other, so
+// a storage write made inside it is the answer's, whatever job runs meanwhile (Ruling 20).
+const answering = new AsyncLocalStorage<true>();
+
+export function answerStatus<T>(read: () => Promise<T>): Promise<T> {
+  return answering.run(true, read);
+}
+
+// Oracle O12: a status answer never writes storage.
+export function checkStatusWrite(w: World, keys: string[]): void {
+  if (answering.getStore() === true)
+    violation(w, `a status answer wrote ${keys.join(",")}`);
+}
+
 export function storageFor(w: World, gen: number): StorageArea {
   return {
     get: async (key) => {
@@ -303,6 +320,7 @@ export function storageFor(w: World, gen: number): StorageArea {
     },
     set: async (items) => {
       if (gen !== w.gen) return frozen(w);
+      checkStatusWrite(w, Object.keys(items));
       if (w.r() < w.failRate) throw new Error("storage write failed");
       for (const [key, value] of Object.entries(items)) {
         onWrite(w, key, value);
@@ -580,17 +598,23 @@ export function scUsernameFor(w: World, gen: number): () => Promise<string> {
   };
 }
 
-// The jobs as the router sees them, counted, with the oracle "never two jobs at once" per worker.
+// Oracle O7: every job, and every status answer, comes from a message its sender may send.
+export function checkInvoked(w: World, key: JobKey): void {
+  w.invoked.set(key, (w.invoked.get(key) ?? 0) + 1);
+  if ((w.invoked.get(key) ?? 0) > (w.allowed.get(key) ?? 0)) {
+    violation(w, `${key} ran without a message from its sender`);
+  }
+}
+
+// The jobs as the router sees them, counted, with the oracle O1 "never two jobs at once" per worker. The
+// status answer is no job (Ruling 20): O1 does not count it, O7 and O12 judge it.
 export function observed(w: World, gen: number, jobs: Jobs): Jobs {
   const run = async <T>(
     key: JobKey,
     ctx: Context,
     job: () => Promise<T>,
   ): Promise<T> => {
-    w.invoked.set(key, (w.invoked.get(key) ?? 0) + 1);
-    if ((w.invoked.get(key) ?? 0) > (w.allowed.get(key) ?? 0)) {
-      violation(w, `${key} ran without a message from its sender`);
-    }
+    checkInvoked(w, key);
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);
     // A dead worker's queue may still start a job (it freezes at its first world call): it must not take
@@ -609,8 +633,12 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     finishJob: (msg) =>
       run("finish", { kind: "finish", msg }, () => jobs.finishJob(msg)),
     setMode: (mode) => run("mode", { kind: "other" }, () => jobs.setMode(mode)),
-    statusSnapshot: () =>
-      run("status", { kind: "other" }, () => jobs.statusSnapshot()),
+    statusSnapshot: () => {
+      checkInvoked(w, "status");
+      if (gen === w.gen && w.current !== undefined)
+        w.stats.statusDuringJob += 1;
+      return answerStatus(() => jobs.statusSnapshot());
+    },
   };
 }
 

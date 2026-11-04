@@ -1,7 +1,8 @@
 // The sentences of the status page, one function per sentence. Text only; dates go through the format.
 
 import type { JobError } from "../ext/job-error";
-import type { FinishRecord, RunRecord } from "../ext/settings";
+import type { FinishRecord, Mode, RunRecord } from "../ext/settings";
+import type { Running } from "../sw/activity";
 import type { Counts } from "../sw/status-snapshot";
 import { JOB_ERROR_LABELS } from "./job-error-labels";
 import type { StatusFormat } from "./status-format";
@@ -19,6 +20,21 @@ const FINISH_OUTCOMES: Record<FinishRecord["outcome"], string> = {
   done: "enregistrée",
   failed: "échec",
 };
+
+const MODE_LABELS: Record<Mode, string> = {
+  simulation: "simulation",
+  live: "écritures actives",
+};
+
+export function runningLine(running: Running, format: StatusFormat): string {
+  if (running.kind === "finish")
+    return "Fin de visionnage en cours de traitement";
+  return `Synchronisation en cours depuis ${format.time(running.since)}`;
+}
+
+export function pendingModeLine(mode: Mode): string {
+  return `Changement de mode en attente\u202F: ${MODE_LABELS[mode]}`;
+}
 
 export function snapshotErrorLine(error: JobError): string {
   return `Lecture de l'état impossible : ${JOB_ERROR_LABELS[error]}`;

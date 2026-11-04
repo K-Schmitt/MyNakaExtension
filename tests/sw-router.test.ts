@@ -86,19 +86,23 @@ function recordingJobs(over: Partial<Jobs> = {}) {
   return { jobs, calls, snapshot };
 }
 
+const ROUTER_NOW = Date.parse("2026-11-04T12:00:00Z");
+
 function router(over: Partial<Jobs> = {}) {
   const recorded = recordingJobs(over);
   const clock = fakeTimer();
   const answers: unknown[] = [];
+  const time = { now: ROUTER_NOW };
   const r = createRouter({
     extensionId: EXT,
     queue: createJobQueue(),
     jobs: recorded.jobs,
     timer: clock.timer,
+    now: () => time.now,
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, (answer) => answers.push(answer));
-  return { ...recorded, ...clock, answers, send };
+  return { ...recorded, ...clock, answers, send, time };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -361,6 +365,7 @@ function floodWorld(threshold = 0.9) {
     queue: createJobQueue(),
     jobs,
     timer: fakeTimer().timer,
+    now: () => Date.parse("2026-11-04T12:00:00Z"),
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, () => undefined);
@@ -442,18 +447,11 @@ describe("router: one queue", () => {
     r.send({ type: "resync" }, STATUS_PAGE);
     r.send(FINISHED, NAKA_TAB);
     r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
-    r.send({ type: "status" }, STATUS_PAGE);
     await settle();
     expect(events).toEqual(["sync start"]);
     first.open();
     await settle();
-    expect(events).toEqual([
-      "sync start",
-      "sync end",
-      "finish start",
-      "mode",
-      "status",
-    ]);
+    expect(events).toEqual(["sync start", "sync end", "finish start", "mode"]);
   });
 
   it("a debounced sync waits for the queue too", async () => {
@@ -512,6 +510,7 @@ describe("router: one queue", () => {
         queue: createJobQueue(),
         jobs: recordingJobs().jobs,
         timer: fakeTimer().timer,
+        now: () => ROUTER_NOW,
       });
       const respond = () => {
         throw new Error("The message port closed.");
@@ -523,6 +522,163 @@ describe("router: one queue", () => {
     } finally {
       process.off("unhandledRejection", listener);
     }
+  });
+});
+
+// Ruling 20: the status is answered at once, outside the queue, read-only. It says which job runs and which
+// mode a queued set-mode will apply: both live in memory, lost with the queue on a worker restart.
+describe("router: the status answer waits for no job", () => {
+  function gated() {
+    const sync = latch();
+    const finish = latch();
+    const events: string[] = [];
+    const r = router({
+      syncJob: async () => {
+        events.push("sync start");
+        await sync.opened;
+        events.push("sync end");
+      },
+      finishJob: async () => {
+        events.push("finish start");
+        await finish.opened;
+      },
+      setMode: async (mode) => {
+        events.push(`mode ${mode}`);
+      },
+    });
+    const status = async () => {
+      r.send({ type: "status" }, STATUS_PAGE);
+      await settle();
+      return r.answers.at(-1) as StatusSnapshot;
+    };
+    return { r, sync, finish, events, status };
+  }
+
+  it("a status sent during a running sync is answered before the sync ends, and holds running", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    g.r.time.now += 90_000;
+    const answer = await g.status();
+    expect(g.events).toEqual(["sync start"]);
+    expect(answer).toEqual({
+      mode: "simulation",
+      running: { kind: "sync", since: ROUTER_NOW },
+    });
+    g.sync.open();
+    await settle();
+    expect(await g.status()).toEqual({ mode: "simulation" });
+  });
+
+  it("a running finish is named as such", async () => {
+    const g = gated();
+    g.r.send(FINISHED, NAKA_TAB);
+    await settle();
+    expect((await g.status()).running).toEqual({
+      kind: "finish",
+      since: ROUTER_NOW,
+    });
+    g.finish.open();
+    await settle();
+    expect(await g.status()).not.toHaveProperty("running");
+  });
+
+  it("a set-mode queued behind a sync shows pendingMode until it is applied", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({ pendingMode: "live" });
+    g.sync.open();
+    await settle();
+    expect(g.events).toEqual(["sync start", "sync end", "mode live"]);
+    expect(await g.status()).toEqual({ mode: "simulation" });
+  });
+
+  it("two queued set-modes: the later one is pending until it is applied", async () => {
+    const gates = [latch(), latch()];
+    const events: string[] = [];
+    const r = router({
+      syncJob: async () => {
+        const gate = gates[events.filter((e) => e === "sync").length];
+        events.push("sync");
+        await gate?.opened;
+      },
+      setMode: async (mode) => {
+        events.push(`mode ${mode}`);
+      },
+    });
+    const pending = async () => {
+      r.send({ type: "status" }, STATUS_PAGE);
+      await settle();
+      return (r.answers.at(-1) as StatusSnapshot).pendingMode;
+    };
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.send({ type: "set-mode", mode: "simulation" }, STATUS_PAGE);
+    await settle();
+    expect(await pending()).toBe("simulation");
+    gates[0]?.open();
+    await settle();
+    expect(events).toEqual(["sync", "mode live", "sync"]);
+    expect(await pending()).toBe("simulation");
+    gates[1]?.open();
+    await settle();
+    expect(events).toEqual(["sync", "mode live", "sync", "mode simulation"]);
+    expect(await pending()).toBeUndefined();
+  });
+
+  it("an idle worker answers the snapshot alone", async () => {
+    const g = gated();
+    expect(await g.status()).toEqual({ mode: "simulation" });
+    expect(g.r.calls).toEqual(["status"]);
+  });
+
+  it("a job that ends while the snapshot is read is still said running: the page asks again", async () => {
+    const sync = latch();
+    const read = latch();
+    const r = router({
+      syncJob: () => sync.opened,
+      statusSnapshot: async () => {
+        await read.opened;
+        return { mode: "live" };
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    sync.open();
+    await settle();
+    read.open();
+    await settle();
+    expect(r.answers).toEqual([
+      { mode: "live", running: { kind: "sync", since: ROUTER_NOW } },
+    ]);
+  });
+
+  it("a job that starts while the snapshot is read is said running", async () => {
+    const sync = latch();
+    const read = latch();
+    const r = router({
+      syncJob: () => sync.opened,
+      statusSnapshot: async () => {
+        await read.opened;
+        return { mode: "live" };
+      },
+    });
+    r.send({ type: "status" }, STATUS_PAGE);
+    r.time.now += 1000;
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    read.open();
+    await settle();
+    expect(r.answers).toEqual([
+      {
+        mode: "live",
+        running: { kind: "sync", since: ROUTER_NOW + 1000 },
+      },
+    ]);
   });
 });
 
@@ -703,16 +859,23 @@ describe("worker end to end: a SensCritique request that never answers", () => {
         sleep: async () => undefined,
       });
       r.handle({ type: "resync" }, STATUS_PAGE, () => undefined);
+      await settle();
+      // The status does not wait for the stuck run (Ruling 20): it says a sync runs.
       r.handle({ type: "status" }, STATUS_PAGE, (a) => answers.push(a));
       await settle();
-      expect(answers).toEqual([]);
+      expect(answers).toHaveLength(1);
+      expect(answers[0]).toMatchObject({ running: { kind: "sync" } });
+      expect(answers[0]).not.toHaveProperty("lastRun");
       expect(signals).toHaveLength(1);
       const abort = armed.filter((a) => a.ms === 30_000);
       expect(abort.length).toBeGreaterThan(0);
       for (const { fn } of abort) fn();
       await settle();
-      expect(answers).toHaveLength(1);
-      expect((answers[0] as StatusSnapshot).lastRun).toMatchObject({
+      r.handle({ type: "status" }, STATUS_PAGE, (a) => answers.push(a));
+      await settle();
+      expect(answers).toHaveLength(2);
+      expect(answers[1]).not.toHaveProperty("running");
+      expect((answers[1] as StatusSnapshot).lastRun).toMatchObject({
         trigger: "button",
         outcome: "failed",
         error: "unavailable",
@@ -905,6 +1068,7 @@ describe("worker end to end: the tokens stay where they belong", () => {
     const w = worker(false);
     w.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
     w.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
     w.send({ type: "status" }, STATUS_PAGE);
     await settle();
     expect(
