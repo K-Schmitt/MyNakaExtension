@@ -40,8 +40,10 @@ export type ToNakaTab =
   | { type: "naka-call"; call: "search"; query: string }
   | { type: "naka-account" };
 
+// `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
+// It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReply =
-  | { ok: true; value: unknown }
+  | { ok: true; value?: unknown }
   | { ok: false; error: "no-token" | "unavailable" | "not-found" };
 
 export type PageEvent =
@@ -54,7 +56,12 @@ export type PageEvent =
       episode?: number;
     };
 
-export type Sender = { id?: string; url?: string; tab?: { url?: string } };
+export type Sender = {
+  id?: string;
+  url?: string;
+  frameId?: number;
+  tab?: { url?: string };
+};
 export type SenderRole = "naka-tab" | "status-page";
 
 const SOURCES = ["threshold", "explicit"] as const;
@@ -76,28 +83,23 @@ function asProgress(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0 || raw > 1) {
     return fail("progress");
   }
-  return raw;
+  return raw === 0 ? 0 : raw; // -0 becomes 0
 }
 
 function asSearchQuery(raw: unknown): string {
-  try {
-    return checkQuery(asString(raw, "query"));
-  } catch {
-    return fail("query");
-  }
+  return checkQuery(asString(raw, "query"));
 }
 
-// Optional season and episode, kept only when present.
+// Season and episode come as a pair: both present or both absent.
 function playbackContext(record: Record<string, unknown>): {
   season?: number;
   episode?: number;
 } {
   const season = whenPresent(record.season, (v) => asId(v, "season"));
   const episode = whenPresent(record.episode, (v) => asId(v, "episode"));
-  return {
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
+  if (season === undefined && episode === undefined) return {};
+  if (season === undefined || episode === undefined) return fail("episode");
+  return { season, episode };
 }
 
 function parseFinished(record: Record<string, unknown>): ToWorker {
@@ -161,14 +163,18 @@ export function parseToNakaTab(raw: unknown): ToNakaTab | undefined {
 }
 
 function parseNakaReplyRecord(record: Record<string, unknown>): NakaReply {
-  if (record.ok === true) return { ok: true, value: record.value };
+  if (record.ok === true) {
+    return record.value === undefined
+      ? { ok: true }
+      : { ok: true, value: record.value };
+  }
   if (record.ok === false) {
     return { ok: false, error: asOneOf(record.error, REPLY_ERRORS, "error") };
   }
   return fail("ok");
 }
 
-// Builds a fresh reply from the known keys only: a token, or anything else, never gets through.
+// Drops unknown TOP-LEVEL keys. `value` is passed through by reference and is untrusted: re-validate it.
 export function parseNakaReply(raw: unknown): NakaReply | undefined {
   return safely(() => parseNakaReplyRecord(asRecord(raw, "reply")));
 }
@@ -189,18 +195,49 @@ export function parsePageEvent(raw: unknown): PageEvent | undefined {
   return safely(() => parsePageEventRecord(asRecord(raw, "event")));
 }
 
+const FRAME_TOP = 0;
+
+function isNakaUrl(url: string | undefined): boolean {
+  return typeof url === "string" && url.startsWith(NAKA_ORIGIN);
+}
+
+// A Naka tab: the top frame of a page on https://naka.cx/, never an iframe.
+function isNakaTop(sender: Sender): boolean {
+  return (
+    sender.frameId === FRAME_TOP &&
+    isNakaUrl(sender.url) &&
+    isNakaUrl(sender.tab?.url)
+  );
+}
+
+// The status page, with no tab or opened in a tab that shows the same page.
+function isStatusPage(sender: Sender, extensionId: string): boolean {
+  const status = `chrome-extension://${extensionId}/status.html`;
+  if (sender.url !== status) return false;
+  return sender.tab === undefined || sender.tab.url === status;
+}
+
 // Who sent a runtime message. The worker acts only for these two roles.
 export function isTrustedSender(
   sender: Sender,
   extensionId: string,
 ): SenderRole | undefined {
   if (sender.id !== extensionId) return undefined;
-  if (sender.tab === undefined) {
-    const status = `chrome-extension://${extensionId}/status.html`;
-    return sender.url === status ? "status-page" : undefined;
-  }
-  const tabUrl = sender.tab.url;
-  return typeof tabUrl === "string" && tabUrl.startsWith(NAKA_ORIGIN)
-    ? "naka-tab"
-    : undefined;
+  if (isStatusPage(sender, extensionId)) return "status-page";
+  return isNakaTop(sender) ? "naka-tab" : undefined;
+}
+
+// One row per ToWorker type (the Record keeps the table exhaustive): the roles allowed to send it.
+const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
+  "naka-ready": ["naka-tab"],
+  "playlist-changed": ["naka-tab"],
+  finished: ["naka-tab"],
+  status: ["status-page"],
+  resync: ["status-page"],
+  "set-mode": ["status-page"],
+};
+
+// A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.
+export function allowedFor(role: SenderRole, msg: ToWorker): boolean {
+  return SENDERS[msg.type].includes(role);
 }

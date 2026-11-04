@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  allowedFor,
   isTrustedSender,
   parseNakaReply,
   parsePageEvent,
   parseToNakaTab,
   parseToWorker,
+  type SenderRole,
+  type ToWorker,
 } from "../src/ext/messages";
 
 const ID = "abcdefghijklmnopabcdefghijklmnop";
@@ -307,23 +310,33 @@ describe("parseNakaReply", () => {
     }
   });
 
-  it("never carries a token or any extra key", () => {
-    const okReply = parseNakaReply({
+  it("drops unknown top-level keys, and builds the exact reply", () => {
+    const value = { nested: [1] };
+    expect(
+      parseNakaReply({
+        ok: true,
+        value,
+        token: "T",
+        authorization: "Bearer T",
+      }),
+    ).toStrictEqual({ ok: true, value });
+    expect(
+      parseNakaReply({ ok: false, error: "no-token", token: "T", value: 1 }),
+    ).toStrictEqual({ ok: false, error: "no-token" });
+  });
+
+  it("accepts the void reply, without a value key", () => {
+    expect(parseNakaReply({ ok: true })).toStrictEqual({ ok: true });
+    expect(parseNakaReply({ ok: true, value: undefined })).toStrictEqual({
       ok: true,
-      value: 1,
-      token: "T",
-      authorization: "Bearer T",
     });
-    expect(Object.keys(okReply ?? {}).sort()).toEqual(["ok", "value"]);
-    const errReply = parseNakaReply({
-      ok: false,
-      error: "no-token",
-      token: "T",
-      value: 1,
-    });
-    expect(Object.keys(errReply ?? {}).sort()).toEqual(["error", "ok"]);
-    expect(JSON.stringify(okReply)).not.toContain('T"');
-    expect(errReply).not.toHaveProperty("token");
+  });
+
+  it("passes value through by reference, untouched", () => {
+    const value = { token: "kept: the worker re-validates it" };
+    const reply = parseNakaReply({ ok: true, value });
+    expect(reply).toMatchObject({ ok: true });
+    expect((reply as { value: unknown }).value).toBe(value);
   });
 
   it("never throws", () => {
@@ -412,22 +425,76 @@ describe("parsePageEvent", () => {
   });
 });
 
-describe("isTrustedSender", () => {
-  const tab = (url?: string) => ({ id: ID, tab: { url }, url });
+describe("finished: F5 rules", () => {
+  const base = { type: "finished", source: "explicit", contentId: 3 };
 
-  it("accepts a Naka tab of this extension", () => {
+  it("maps a progress of -0 to 0", () => {
+    const m = parseToWorker({ ...base, progress: -0 });
+    expect(m).toMatchObject({ progress: 0 });
+    expect(Object.is((m as { progress: number }).progress, 0)).toBe(true);
+  });
+
+  it("rejects 1e21 as an id", () => {
     expect(
-      isTrustedSender({ id: ID, tab: { url: "https://naka.cx/" } }, ID),
-    ).toBe("naka-tab");
+      parseToWorker({ ...base, progress: 1, contentId: 1e21 }),
+    ).toBeUndefined();
     expect(
-      isTrustedSender(
-        { id: ID, tab: { url: "https://naka.cx/watch/1?x=2" } },
-        ID,
-      ),
+      parseToNakaTab({ type: "naka-call", call: "add", contentId: 1e21 }),
+    ).toBeUndefined();
+    expect(
+      parsePageEvent({ channel: CH, kind: "watched", contentId: 1e21 }),
+    ).toBeUndefined();
+  });
+
+  it("rejects a season without an episode, and the reverse", () => {
+    expect(parseToWorker({ ...base, progress: 1, season: 1 })).toBeUndefined();
+    expect(parseToWorker({ ...base, progress: 1, episode: 1 })).toBeUndefined();
+    expect(
+      parseToWorker({ ...base, progress: 1, season: 1, episode: undefined }),
+    ).toBeUndefined();
+  });
+
+  it("accepts both or neither", () => {
+    expect(
+      parseToWorker({ ...base, progress: 1, season: 1, episode: 2 }),
+    ).toBeDefined();
+    expect(parseToWorker({ ...base, progress: 1 })).toBeDefined();
+  });
+});
+
+describe("watched page event: pair rule", () => {
+  const w = { channel: CH, kind: "watched", contentId: 4 };
+
+  it("rejects a partial season/episode pair", () => {
+    expect(parsePageEvent({ ...w, season: 1 })).toBeUndefined();
+    expect(parsePageEvent({ ...w, episode: 1 })).toBeUndefined();
+  });
+
+  it("accepts both or neither", () => {
+    expect(parsePageEvent({ ...w, season: 1, episode: 1 })).toBeDefined();
+    expect(parsePageEvent(w)).toBeDefined();
+  });
+});
+
+describe("isTrustedSender", () => {
+  const NAKA = "https://naka.cx/";
+  const STATUS = `chrome-extension://${ID}/status.html`;
+  const naka = (over: Record<string, unknown> = {}) => ({
+    id: ID,
+    frameId: 0,
+    url: `${NAKA}watch/1`,
+    tab: { url: NAKA },
+    ...over,
+  });
+
+  it("accepts the top frame of a Naka tab", () => {
+    expect(isTrustedSender(naka(), ID)).toBe("naka-tab");
+    expect(
+      isTrustedSender(naka({ tab: { url: `${NAKA}watch/1?x=2` } }), ID),
     ).toBe("naka-tab");
   });
 
-  it("rejects look-alike and insecure origins", () => {
+  it("rejects look-alike and insecure tab urls", () => {
     for (const url of [
       "https://naka.cx.evil.com/",
       "https://naka.cx",
@@ -435,74 +502,159 @@ describe("isTrustedSender", () => {
       "https://evilnaka.cx/",
       "https://www.naka.cx/",
       "https://naka.cx@evil.com/",
+      "https://naka.cx:8443/",
+      "HTTPS://NAKA.CX/",
+      "https://NAKA.cx/",
       "",
       undefined,
     ]) {
-      expect(isTrustedSender({ id: ID, tab: { url } }, ID)).toBeUndefined();
+      expect(isTrustedSender(naka({ tab: { url } }), ID)).toBeUndefined();
     }
   });
 
+  it("rejects look-alike sender urls on a Naka tab", () => {
+    for (const url of [
+      "https://evil.example/",
+      "https://naka.cx.evil.com/",
+      "https://naka.cx",
+      "http://naka.cx/",
+      "https://naka.cx:8443/",
+      "HTTPS://NAKA.CX/",
+      "",
+      undefined,
+    ]) {
+      expect(isTrustedSender(naka({ url }), ID)).toBeUndefined();
+    }
+  });
+
+  it("rejects an iframe whose tab and frame are both on naka.cx", () => {
+    expect(isTrustedSender(naka({ frameId: 3 }), ID)).toBeUndefined();
+  });
+
+  it("rejects a missing or non-zero frameId", () => {
+    expect(isTrustedSender(naka({ frameId: undefined }), ID)).toBeUndefined();
+    expect(isTrustedSender(naka({ frameId: 1 }), ID)).toBeUndefined();
+    expect(isTrustedSender(naka({ frameId: -1 }), ID)).toBeUndefined();
+  });
+
+  it("rejects a top frame whose sender.url is another origin", () => {
+    expect(
+      isTrustedSender(naka({ url: "https://evil.example/" }), ID),
+    ).toBeUndefined();
+  });
+
   it("rejects a Naka tab of another extension, or without an id", () => {
-    expect(
-      isTrustedSender({ id: "other", tab: { url: "https://naka.cx/" } }, ID),
-    ).toBeUndefined();
-    expect(
-      isTrustedSender({ tab: { url: "https://naka.cx/" } }, ID),
-    ).toBeUndefined();
+    expect(isTrustedSender(naka({ id: "other" }), ID)).toBeUndefined();
+    expect(isTrustedSender(naka({ id: undefined }), ID)).toBeUndefined();
   });
 
-  it("accepts the status page, with no tab", () => {
-    const url = `chrome-extension://${ID}/status.html`;
-    expect(isTrustedSender({ id: ID, url }, ID)).toBe("status-page");
+  it("accepts the status page with no tab", () => {
+    expect(isTrustedSender({ id: ID, url: STATUS }, ID)).toBe("status-page");
   });
 
-  it("rejects the status page of another extension or another page", () => {
+  it("accepts the status page opened in a tab", () => {
     expect(
       isTrustedSender(
-        { id: ID, url: "chrome-extension://other/status.html" },
+        { id: ID, frameId: 0, url: STATUS, tab: { url: STATUS } },
         ID,
       ),
+    ).toBe("status-page");
+  });
+
+  it("rejects the status url in a tab with another or no url", () => {
+    expect(
+      isTrustedSender({ id: ID, url: STATUS, tab: { url: NAKA } }, ID),
     ).toBeUndefined();
     expect(
-      isTrustedSender(
-        { id: ID, url: `chrome-extension://${ID}/other.html` },
-        ID,
-      ),
+      isTrustedSender({ id: ID, url: STATUS, tab: {} }, ID),
     ).toBeUndefined();
     expect(
-      isTrustedSender(
-        { id: ID, url: `chrome-extension://${ID}/status.html?x=1` },
-        ID,
-      ),
-    ).toBeUndefined();
-    expect(
-      isTrustedSender(
-        { id: ID, url: `chrome-extension://${ID}/status.htmlx` },
-        ID,
-      ),
+      isTrustedSender({ id: ID, url: STATUS, tab: { url: "" } }, ID),
     ).toBeUndefined();
   });
 
-  it("rejects the status page url when a tab is attached", () => {
-    const url = `chrome-extension://${ID}/status.html`;
-    expect(isTrustedSender({ id: ID, url, tab: { url } }, ID)).toBeUndefined();
-    expect(isTrustedSender({ id: ID, url, tab: {} }, ID)).toBeUndefined();
+  it("rejects a status url with a query or fragment, or lookalikes", () => {
+    for (const url of [
+      `${STATUS}?x`,
+      `${STATUS}#x`,
+      `${STATUS}x`,
+      `chrome-extension://${ID}/other.html`,
+      "chrome-extension://other/status.html",
+    ]) {
+      expect(isTrustedSender({ id: ID, url }, ID)).toBeUndefined();
+      expect(
+        isTrustedSender({ id: ID, url, tab: { url } }, ID),
+      ).toBeUndefined();
+    }
   });
 
-  it("rejects the status page url from another extension id", () => {
-    const url = `chrome-extension://${ID}/status.html`;
-    expect(isTrustedSender({ id: "other", url }, ID)).toBeUndefined();
-    expect(isTrustedSender({ url }, ID)).toBeUndefined();
+  it("rejects a tab whose url is the status url but sender.url is not", () => {
+    expect(
+      isTrustedSender({ id: ID, url: NAKA, tab: { url: STATUS } }, ID),
+    ).toBeUndefined();
   });
 
-  it("rejects an empty sender", () => {
+  it("rejects the status page from another extension id", () => {
+    expect(isTrustedSender({ id: "other", url: STATUS }, ID)).toBeUndefined();
+    expect(isTrustedSender({ url: STATUS }, ID)).toBeUndefined();
+  });
+
+  it("rejects an empty sender and a Naka url without a tab", () => {
     expect(isTrustedSender({}, ID)).toBeUndefined();
-    expect(isTrustedSender(tab(undefined), ID)).toBeUndefined();
+    expect(isTrustedSender({ id: ID, url: NAKA }, ID)).toBeUndefined();
+  });
+});
+
+describe("allowedFor", () => {
+  const messages: ToWorker[] = [
+    { type: "naka-ready" },
+    { type: "playlist-changed" },
+    {
+      type: "finished",
+      source: "explicit",
+      progress: 1,
+      contentId: 1,
+    },
+    { type: "status" },
+    { type: "resync" },
+    { type: "set-mode", mode: "live" },
+  ];
+  const allowed: Record<SenderRole, string[]> = {
+    "naka-tab": ["naka-ready", "playlist-changed", "finished"],
+    "status-page": ["status", "resync", "set-mode"],
+  };
+
+  it("allows each type for its role only", () => {
+    for (const role of ["naka-tab", "status-page"] as const) {
+      for (const msg of messages) {
+        expect(allowedFor(role, msg)).toBe(allowed[role].includes(msg.type));
+      }
+    }
   });
 
-  it("does not trust a Naka sender.url without a tab", () => {
+  it("refuses the privileged types from a naka.cx script", () => {
+    expect(allowedFor("naka-tab", { type: "set-mode", mode: "live" })).toBe(
+      false,
+    );
+    expect(allowedFor("naka-tab", { type: "resync" })).toBe(false);
+    expect(allowedFor("naka-tab", { type: "status" })).toBe(false);
+  });
+
+  it("refuses finished from the status page", () => {
     expect(
-      isTrustedSender({ id: ID, url: "https://naka.cx/" }, ID),
-    ).toBeUndefined();
+      allowedFor("status-page", {
+        type: "finished",
+        source: "explicit",
+        progress: 1,
+        contentId: 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("covers every ToWorker type exactly once", () => {
+    const types = messages.map((m) => m.type).sort();
+    const tabbed = Object.values(allowed).flat().sort();
+    expect(tabbed).toEqual(types);
+    expect(new Set(types).size).toBe(6);
   });
 });
