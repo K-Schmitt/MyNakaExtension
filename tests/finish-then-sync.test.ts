@@ -118,6 +118,7 @@ function world(o: Opts) {
       isDone: w.done.has(id),
       isWished: w.sc.has(id),
       universe: universeOf(id),
+      rating: null,
     }),
     unwish: async (id) => {
       w.writes.push(`unwish:${id}`);
@@ -238,7 +239,7 @@ describe("a film finish, then the sync", () => {
     );
     expect(retry).toEqual({
       kind: "done",
-      ratingTargets: [{ label: "film", productId: FILM_SC }],
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
     });
     expect(w.writes).toEqual(["unwish:1042", "markDone:1042", "markDone:1042"]);
     expect(w.state.handled).toEqual(["movie:42"]);
@@ -300,7 +301,7 @@ describe("the owner's open question, the finish, the answer and the replay", () 
       );
       expect(replay).toEqual({
         kind: "done",
-        ratingTargets: [{ label: "film", productId: chosen }],
+        ratingTargets: [{ label: "film", productId: chosen, current: null }],
       });
       await runSync(ports);
       await runSync(ports);

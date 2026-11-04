@@ -200,6 +200,7 @@ describe("sync ports: writes in live mode", () => {
         isDone: true,
         isWished: false,
         universe: 1,
+        rating: null,
       }),
     });
     const { ports } = syncWorld("live", sc);
@@ -229,6 +230,7 @@ describe("sync ports: writes in simulation", () => {
         isDone: true,
         isWished: false,
         universe: 1,
+        rating: null,
       }),
     });
     const { ports, planned } = syncWorld("simulation", sc);
@@ -425,6 +427,7 @@ describe("finish ports", () => {
         isDone: false,
         isWished: true,
         universe: 1,
+        rating: null,
       }),
       seasonInfo: async () => ({ seasonProductId: 4001, episodes: [] }),
     });
@@ -433,6 +436,7 @@ describe("finish ports", () => {
       isDone: false,
       isWished: true,
       universe: 1,
+      rating: null,
     });
     await ports.unwish(1001);
     await ports.markDone(1001, "2026-11-04");

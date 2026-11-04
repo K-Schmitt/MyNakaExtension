@@ -554,6 +554,7 @@ function scReads(
         isDone: w.done.has(id),
         isWished: w.wishlist.has(id),
         universe: universeOf(id),
+        rating: null,
       };
     },
     seasonInfo: async (series, season) => {

@@ -50,7 +50,12 @@ export function fakeSc(over: Partial<ScClient> = {}) {
     markDone: async () => undefined,
     unmarkDone: async () => undefined,
     rate: async () => undefined,
-    productState: async () => ({ isDone: false, isWished: false, universe: 1 }),
+    productState: async () => ({
+      isDone: false,
+      isWished: false,
+      universe: 1,
+      rating: null,
+    }),
     readWishlist: async () => [],
     search: async () => [],
     seasonInfo: async () => ({ episodes: [] }),

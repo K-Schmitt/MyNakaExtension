@@ -71,7 +71,13 @@ function userInfos(
   id: number,
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  return { isDone: false, isWished: true, productId: id, ...extra };
+  return {
+    isDone: false,
+    isWished: true,
+    productId: id,
+    rating: null,
+    ...extra,
+  };
 }
 
 function stateReply(product: unknown): Reply {
@@ -1306,7 +1312,7 @@ describe("a wishlist that changes during the read", () => {
 describe("productState", () => {
   const STATE_ERROR =
     "SensCritique ProductCurrentUserInfos: unexpected product state";
-  const PERSONAL = { rating: LEAK, dateDone: TOKEN, userId: LEAK };
+  const PERSONAL = { dateDone: TOKEN, userId: LEAK };
 
   function expectClean(error: Error): void {
     const seen = [
@@ -1356,7 +1362,7 @@ describe("productState", () => {
   ])(
     "returns isDone %s, isWished %s and the universe %s",
     async (isDone, isWished, universe) => {
-      const infos = { isDone, isWished, productId: 7 };
+      const infos = { isDone, isWished, productId: 7, rating: null };
       const { client } = setup(LOGGED_IN, () =>
         stateReply({ id: 7, universe, currentUserInfos: infos }),
       );
@@ -1364,15 +1370,17 @@ describe("productState", () => {
         isDone,
         isWished,
         universe,
+        rating: null,
       });
     },
   );
 
-  it("returns only the two flags and the universe, whatever else the answer holds", async () => {
+  it("returns only the flags, the universe and the owner's rating, whatever else the answer holds", async () => {
     const infos = userInfos(5, {
       ...PERSONAL,
       isDone: true,
       isWished: false,
+      rating: 6,
       id: LEAK,
       review: { url: LEAK },
     });
@@ -1380,10 +1388,16 @@ describe("productState", () => {
       stateReply({ id: 5, universe: 1, title: LEAK, currentUserInfos: infos }),
     );
     const state = await client.productState(5);
-    expect(state).toStrictEqual({ isDone: true, isWished: false, universe: 1 });
+    expect(state).toStrictEqual({
+      isDone: true,
+      isWished: false,
+      universe: 1,
+      rating: 6,
+    });
     expect(Object.keys(state).sort()).toEqual([
       "isDone",
       "isWished",
+      "rating",
       "universe",
     ]);
     expect(JSON.stringify(state)).not.toContain("LEAK");
@@ -1396,6 +1410,8 @@ describe("productState", () => {
     product5({ currentUserInfos: infos });
   const withUniverse = (universe: unknown): Reply =>
     product5({ universe, currentUserInfos: userInfos(5, PERSONAL) });
+  const withSeasons = (numberOfSeasons: unknown): Reply =>
+    product5({ numberOfSeasons, currentUserInfos: userInfos(5, PERSONAL) });
   const flags = (extra: Record<string, unknown>): Reply =>
     withInfos(userInfos(5, { ...PERSONAL, ...extra }));
   const without = (key: string): Reply => {
@@ -1419,6 +1435,18 @@ describe("productState", () => {
     ["no isWished", without("isWished")],
     ["isWished as a string", flags({ isWished: "false" })],
     ["isWished as 0", flags({ isWished: 0 })],
+    ["no rating", without("rating")],
+    ["a rating of 0", flags({ rating: 0 })],
+    ["a rating of 11", flags({ rating: 11 })],
+    ["a rating of -1", flags({ rating: -1 })],
+    ["a rating as a string", flags({ rating: "7" })],
+    ["a rating of 7.5", flags({ rating: 7.5 })],
+    ["a rating that is a boolean", flags({ rating: true })],
+    ["a numberOfSeasons of 0", withSeasons(0)],
+    ["a numberOfSeasons of -2", withSeasons(-2)],
+    ["a numberOfSeasons of 1.5", withSeasons(1.5)],
+    ["a numberOfSeasons as a string", withSeasons("3")],
+    ["a numberOfSeasons of 2 ** 53", withSeasons(2 ** 53)],
     ["no productId", without("productId")],
     ["a foreign productId", withInfos(userInfos(6, PERSONAL))],
     ["a productId as a string", flags({ productId: "5" })],
@@ -1444,6 +1472,59 @@ describe("productState", () => {
     ["a universe of 2 ** 53", withUniverse(2 ** 53)],
     ["a universe that is a boolean", withUniverse(true)],
   ];
+
+  describe("the owner's own rating and the season count", () => {
+    const read = async (product: Record<string, unknown>) => {
+      const { client } = setup(LOGGED_IN, () =>
+        stateReply({ id: 5, universe: 1, ...product }),
+      );
+      return client.productState(5);
+    };
+
+    it.each([1, 7, 10])("keeps a rating of %s", async (rating) => {
+      const state = await read({ currentUserInfos: userInfos(5, { rating }) });
+      expect(state.rating).toBe(rating);
+    });
+
+    it("keeps a null rating as null", async () => {
+      const state = await read({
+        currentUserInfos: userInfos(5, { rating: null }),
+      });
+      expect(state.rating).toBeNull();
+    });
+
+    it("reads currentUserInfos.rating, not the community average of the product", async () => {
+      const state = await read({
+        rating: 7.4,
+        currentUserInfos: userInfos(5, { rating: 6 }),
+      });
+      expect(state.rating).toBe(6);
+    });
+
+    it("a null own rating stays null whatever the community average", async () => {
+      const state = await read({
+        rating: 8,
+        currentUserInfos: userInfos(5, { rating: null }),
+      });
+      expect(state.rating).toBeNull();
+    });
+
+    it("keeps a positive integer numberOfSeasons from the product", async () => {
+      const state = await read({
+        numberOfSeasons: 4,
+        currentUserInfos: userInfos(5),
+      });
+      expect(state.numberOfSeasons).toBe(4);
+    });
+
+    it.each([
+      ["absent", {}],
+      ["null", { numberOfSeasons: null }],
+    ])("a numberOfSeasons %s leaves the key out", async (_n, extra) => {
+      const state = await read({ ...extra, currentUserInfos: userInfos(5) });
+      expect("numberOfSeasons" in state).toBe(false);
+    });
+  });
 
   it.each(MALFORMED)(
     "rejects %s with the fixed error and leaks nothing",

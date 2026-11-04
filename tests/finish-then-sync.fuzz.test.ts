@@ -173,6 +173,7 @@ async function simulate(seed: number): Promise<string[]> {
         isDone: done.has(id),
         isWished: lists.sc.has(id),
         universe: universeOf(id),
+        rating: null,
       };
     },
     unwish: async (id) => {

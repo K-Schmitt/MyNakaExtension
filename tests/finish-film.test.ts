@@ -59,7 +59,7 @@ describe("film", () => {
     const w = world();
     expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "done",
-      ratingTargets: [{ label: "film", productId: FILM_SC }],
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
     });
   });
 
@@ -85,17 +85,17 @@ describe("film", () => {
   });
 
   it.each([
-    [false, true, ["unwish:1042", "markDone:1042:2026-11-03"], true],
-    [false, false, ["markDone:1042:2026-11-03"], true],
-    [true, true, ["unwish:1042"], false],
-    [true, false, [], false],
+    [false, true, ["unwish:1042", "markDone:1042:2026-11-03"]],
+    [false, false, ["markDone:1042:2026-11-03"]],
+    [true, true, ["unwish:1042"]],
+    [true, false, []],
   ])(
-    "isDone %s, isWished %s: writes %j",
-    async (isDone, isWished, writes, rated) => {
+    "isDone %s, isWished %s: writes %j, and always returns the film target",
+    async (isDone, isWished, writes) => {
       const w = world({ flags: { [FILM_SC]: { isDone, isWished } } });
       expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
         kind: "done",
-        ratingTargets: rated ? [{ label: "film", productId: FILM_SC }] : [],
+        ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
       });
       expect(writesOf(w.calls)).toEqual(writes);
       expect(w.calls.includes("today")).toBe(!isDone);
@@ -103,6 +103,35 @@ describe("film", () => {
       expect(w.state.settled).toEqual([FILM_PAIR]);
     },
   );
+
+  it("a film already done with a rating of 6 is not rewritten and returns its target with 6", async () => {
+    const w = world({
+      flags: { [FILM_SC]: { isDone: true, isWished: false, rating: 6 } },
+    });
+    expect(await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).toEqual({
+      kind: "done",
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: 6 }],
+    });
+    expect(writesOf(w.calls)).toEqual([]);
+    expect(w.calls).not.toContain("today");
+  });
+
+  it("a film just marked done carries the rating the state reported", async () => {
+    const w = world({
+      flags: { [FILM_SC]: { isDone: false, isWished: true, rating: 9 } },
+    });
+    const outcome = await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(outcome).toEqual({
+      kind: "done",
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: 9 }],
+    });
+  });
+
+  it("a film outcome has no lastOfSeason key", async () => {
+    const w = world();
+    const outcome = await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect("lastOfSeason" in outcome).toBe(false);
+  });
 
   it("a mapped film is not searched and its mapping is kept as is", async () => {
     const w = world({ state: { mapping: [FILM_PAIR, SERIES_PAIR] } });

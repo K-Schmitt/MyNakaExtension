@@ -73,6 +73,7 @@ function catalogueSc(over: Partial<ScClient> = {}): Partial<ScClient> {
       isDone: false,
       isWished: id === 1002,
       universe: id >= 5000 ? 32 : id === 1007 ? 4 : 1,
+      rating: null,
     }),
     seasonInfo: async (id, season) => ({
       seasonProductId: 4000 + id,
@@ -186,6 +187,7 @@ describe("sync job: simulation, then live", () => {
           isDone: id === 1001,
           isWished: false,
           universe: 1,
+          rating: null,
         }),
       }),
     });
@@ -553,6 +555,7 @@ describe("sync job: a run that a breaker stopped says so (Ruling 17)", () => {
             isDone: false,
             isWished: false,
             universe: id === 1007 ? 4 : 1,
+            rating: null,
           };
         },
       }),

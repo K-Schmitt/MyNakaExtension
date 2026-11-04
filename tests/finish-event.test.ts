@@ -191,7 +191,7 @@ describe("the event is checked before any port call", () => {
     const w = world({ search: { " Le Film ": [cand(FILM_SC, FILM_TITLE)] } });
     expect(await handleFinish(event, w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "done",
-      ratingTargets: [{ label: "film", productId: FILM_SC }],
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
     });
   });
 

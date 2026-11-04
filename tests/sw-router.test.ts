@@ -743,6 +743,7 @@ function apollo(body: {
             productId: id,
             isDone: false,
             isWished: id === 1002,
+            rating: null,
           },
         },
       },
