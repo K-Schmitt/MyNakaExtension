@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { FinishedMessage } from "../src/content/playback-tracker";
+import { contentKey, contentKeyOf, parseEvent } from "../src/core/finish-event";
 import { emptyState, type SyncState } from "../src/core/state";
+import {
+  FINISH_WINDOW_MS,
+  MAX_FINISHES_PER_WINDOW,
+} from "../src/ext/finish-window";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import { parseState } from "../src/ext/state-schema";
 import { createStore } from "../src/ext/store";
@@ -530,6 +535,7 @@ describe("finish job", () => {
       key: "movie:3",
       outcome: "done",
     });
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
     expect(w.state().handled).toEqual(["movie:3"]);
   });
 
@@ -544,6 +550,7 @@ describe("finish job", () => {
     await w.jobs.finishJob(finished());
     expect(w.settings()).toEqual({
       ...before,
+      finishWindow: { from: NOW, count: 1 },
       lastFinish: { at: NOW, key: "movie:3", outcome: "done" },
     });
   });
@@ -563,23 +570,68 @@ describe("finish job", () => {
     expect(w.sk.calls.some((c) => c.includes("Film 1"))).toBe(false);
   });
 
-  it("a forged finish for a content Naka does not know gives nothing", async () => {
+  it("a forged finish for a content Naka does not know gives nothing but its count", async () => {
     const w = world({ settings: { mode: "live", binding: BOUND } });
     await w.jobs.finishJob(finished({ contentId: 999 }));
-    expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+    expect(w.settings()).toEqual({
+      mode: "live",
+      binding: BOUND,
+      finishWindow: { from: NOW, count: 1 },
+    });
     expect(w.area.ops).not.toContain("get:state");
     expect(writesOf(w.sk.calls)).toEqual([]);
     expect(w.sk.calls.filter((c) => c.startsWith("search"))).toEqual([]);
   });
 
+  it("a forged unknown id, with a live tab, leaves the last finish as it was", async () => {
+    const lastFinish = { at: 5, key: "movie:1", outcome: "done" } as const;
+    const w = world({ settings: { mode: "live", binding: BOUND, lastFinish } });
+    await w.jobs.finishJob(finished({ contentId: 999 }));
+    expect(w.nk.calls).toEqual(["contentById:999"]);
+    expect(w.settings().lastFinish).toEqual(lastFinish);
+  });
+
   it.each([
     ["a series without an episode", finished({ contentId: 7 })],
     ["a film with an episode", finished({ season: 1, episode: 1 })],
-  ])("%s gives nothing", async (_name, msg) => {
+  ])("%s gives nothing but its count", async (_name, msg) => {
     const w = world();
     await w.jobs.finishJob(msg);
-    expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+    expect(w.settings()).toEqual({
+      mode: "simulation",
+      finishWindow: { from: NOW, count: 1 },
+    });
     expect(writesOf(w.sk.calls)).toEqual([]);
+  });
+
+  it("the content is read before the binding: an unknown one records nothing, even for another account", async () => {
+    const w = world({
+      settings: { mode: "live", binding: { scUsername: "other" } },
+    });
+    await w.jobs.finishJob(finished({ contentId: 999 }));
+    expect(w.settings().lastFinish).toBeUndefined();
+    expect(w.traffic.sent).toEqual([
+      { type: "naka-call", call: "contentById", contentId: 999 },
+    ]);
+  });
+
+  it("a failure while reading the content records failed, with its code", async () => {
+    const tabs: TabsPort = {
+      query: async () => [],
+      send: async () => undefined,
+    };
+    const w = world({ tabs });
+    await w.jobs.finishJob(finished());
+    expect(w.settings()).toEqual({
+      mode: "simulation",
+      finishWindow: { from: NOW, count: 1 },
+      lastFinish: {
+        at: NOW,
+        key: "movie:3",
+        outcome: "failed",
+        error: "no-naka-tab",
+      },
+    });
   });
 
   it("the stored threshold decides: 0.85 is ignored, 0.9 completes", async () => {
@@ -634,6 +686,7 @@ describe("finish job", () => {
     [
       "a binding mismatch",
       { settings: { mode: "live", binding: { scUsername: "other" } } } as Opts,
+      "other-account",
     ],
     [
       "an expired SensCritique session",
@@ -642,22 +695,31 @@ describe("finish job", () => {
           throw new ScUnauthenticatedError();
         },
       } as Opts,
+      "sc-session",
     ],
-    ["a logged-out Naka tab", { account: () => undefined } as Opts],
-  ])("%s fails the finish before any load or write", async (_name, opts) => {
-    const w = world(opts);
-    await w.jobs.finishJob(finished());
-    expect(w.area.ops).not.toContain("get:state");
-    expect(writesOf(w.sk.calls)).toEqual([]);
-    expect(w.nk.calls).toEqual([]);
-    expect(w.settings().lastFinish).toEqual({
-      at: NOW,
-      key: "movie:3",
-      outcome: "failed",
-    });
-  });
+    [
+      "a logged-out Naka tab",
+      { account: () => undefined } as Opts,
+      "naka-session",
+    ],
+  ])(
+    "%s fails the finish after the content read, before any load or write",
+    async (_name, opts, error) => {
+      const w = world(opts);
+      await w.jobs.finishJob(finished());
+      expect(w.area.ops).not.toContain("get:state");
+      expect(writesOf(w.sk.calls)).toEqual([]);
+      expect(w.nk.calls).toEqual(["contentById:3"]);
+      expect(w.settings().lastFinish).toEqual({
+        at: NOW,
+        key: "movie:3",
+        outcome: "failed",
+        error,
+      });
+    },
+  );
 
-  it("a finish failing in the handler is recorded as failed", async () => {
+  it("a finish failing in the handler is recorded as failed, with its code", async () => {
     const w = world({
       sc: catalogueSc({
         markDone: async () => {
@@ -666,7 +728,12 @@ describe("finish job", () => {
       }),
     });
     await w.jobs.finishJob(finished());
-    expect(w.settings().lastFinish?.outcome).toBe("failed");
+    expect(w.settings().lastFinish).toEqual({
+      at: NOW,
+      key: "movie:3",
+      outcome: "failed",
+      error: "sc-session",
+    });
   });
 
   it("the content read goes through the Naka limiter", async () => {
@@ -689,6 +756,118 @@ describe("finish job", () => {
     await jobs.finishJob(finished({ contentId: 999 }));
     expect(slots).toEqual(["limit:naka"]);
   });
+});
+
+function jobsOn(area: ReturnType<typeof memoryArea>, tabs?: TabsPort) {
+  const nk = fakeNaka(catalogueNaka());
+  const sk = fakeSc(catalogueSc());
+  const jobs = createJobs({
+    store: createStore(area),
+    tabs: tabs ?? tabRunning(nk.client, () => "77").tabs,
+    sc: sk.client,
+    scUsername: async () => "owner",
+    limiters: { naka: countingLimiter([], "n"), sc: countingLimiter([], "s") },
+    now: () => NOW,
+    today: () => "2026-11-04",
+    timer: { set: () => 0, clear: () => undefined },
+  });
+  return { jobs, nk, sk };
+}
+
+describe("finish job: at most 30 finishes an hour", () => {
+  const full = (from: number) => ({ from, count: MAX_FINISHES_PER_WINDOW });
+
+  it("over the limit: finish-limit, with no tab call, no SensCritique call and no state load", async () => {
+    let tabCalls = 0;
+    const nk = fakeNaka(catalogueNaka());
+    const real = tabRunning(nk.client, () => "77").tabs;
+    const tabs: TabsPort = {
+      query: async (url) => {
+        tabCalls += 1;
+        return real.query(url);
+      },
+      send: async (tabId, msg) => {
+        tabCalls += 1;
+        return real.send(tabId, msg);
+      },
+    };
+    const finishWindow = full(NOW - FINISH_WINDOW_MS + 1);
+    const w = world({ tabs, settings: { mode: "live", finishWindow } });
+    await w.jobs.finishJob(finished());
+    expect(tabCalls).toBe(0);
+    expect(w.sk.calls).toEqual([]);
+    expect(w.area.ops).toEqual(["get:settings", "set:settings"]);
+    expect(w.settings()).toEqual({
+      mode: "live",
+      finishWindow,
+      lastFinish: {
+        at: NOW,
+        key: "movie:3",
+        outcome: "failed",
+        error: "finish-limit",
+      },
+    });
+  });
+
+  it("an hour after the window opened, the next finish runs in a new window", async () => {
+    const w = world({
+      settings: { mode: "live", finishWindow: full(NOW - FINISH_WINDOW_MS) },
+    });
+    await w.jobs.finishJob(finished());
+    expect(writesOf(w.sk.calls)).toEqual(["markDone:1003:2026-11-04"]);
+    expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("every finish that passes the check counts, whatever its outcome", async () => {
+    const from = NOW - 1000;
+    const w = world({
+      settings: { mode: "live", finishWindow: { from, count: 27 } },
+      state: { ...emptyState(), threshold: 0.9 },
+    });
+    await w.jobs.finishJob(finished({ contentId: 999 }));
+    await w.jobs.finishJob(finished({ progress: 0.5 }));
+    await w.jobs.finishJob(finished({ contentId: 7 }));
+    expect(w.settings().finishWindow).toEqual({ from, count: 30 });
+    await w.jobs.finishJob(finished());
+    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(w.settings().lastFinish?.error).toBe("finish-limit");
+  });
+
+  it("the window survives a worker restart", async () => {
+    const area = memoryArea();
+    area.data.set("settings", {
+      mode: "live",
+      finishWindow: { from: NOW - 10, count: 29 },
+    });
+    await jobsOn(area).jobs.finishJob(finished());
+    const restarted = jobsOn(area);
+    await restarted.jobs.finishJob(finished({ contentId: 1 }));
+    expect(restarted.nk.calls).toEqual([]);
+    expect(parseSettings(area.data.get("settings")).lastFinish).toEqual({
+      at: NOW,
+      key: "movie:1",
+      outcome: "failed",
+      error: "finish-limit",
+    });
+  });
+});
+
+describe("one content key", () => {
+  it.each([
+    [{ contentId: 3 }, "movie"],
+    [{ contentId: 7, season: 1, episode: 2 }, "tv"],
+  ] as const)(
+    "the key of %o is the core's content key of its event",
+    (ids, mediaType) => {
+      const event = parseEvent({
+        source: "explicit",
+        progress: 1,
+        naka: { ...ids, mediaType },
+        titled: { title: "T", type: mediaType === "tv" ? "serie" : "film" },
+      });
+      expect(contentKeyOf(ids)).toBe(contentKey(event));
+    },
+  );
 });
 
 describe("jobs on one queue", () => {

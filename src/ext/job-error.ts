@@ -4,7 +4,8 @@ export type JobError =
   | "sc-session"
   | "other-account"
   | "stored-state"
-  | "unavailable";
+  | "unavailable"
+  | "finish-limit";
 
 const MESSAGES: Record<JobError, string> = {
   "no-naka-tab": "no Naka tab",
@@ -13,6 +14,7 @@ const MESSAGES: Record<JobError, string> = {
   "other-account": "another account is bound",
   "stored-state": "stored state unreadable",
   unavailable: "service unavailable",
+  "finish-limit": "too many finishes this hour",
 };
 
 // A job refused before it ran. One fixed message per code: no value from the page or the account.

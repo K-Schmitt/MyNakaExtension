@@ -8,6 +8,7 @@ const CODES: JobError[] = [
   "other-account",
   "stored-state",
   "unavailable",
+  "finish-limit",
 ];
 
 describe("JobRejected", () => {
@@ -16,6 +17,12 @@ describe("JobRejected", () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.code).toBe(code);
     expect(error.message.length).toBeGreaterThan(0);
+  });
+
+  it("says the finish limit in fixed words", () => {
+    expect(new JobRejected("finish-limit").message).toBe(
+      "too many finishes this hour",
+    );
   });
 
   it("has one distinct message per code", () => {

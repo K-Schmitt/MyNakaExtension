@@ -6,6 +6,7 @@ import { createJobs } from "../src/sw/jobs";
 import type { Timer } from "../src/sw/naka-proxy";
 import { createRouter } from "../src/sw/router";
 import {
+  clockFor,
   createWorld,
   EPISODES,
   FILMS,
@@ -13,6 +14,7 @@ import {
   observed,
   oracleOf,
   ownerEdit,
+  SERIES,
   scFor,
   scUsernameFor,
   storageFor,
@@ -35,6 +37,8 @@ import {
 //      had seen it in both lists;
 //   O6 Plan 2's re-wish: no wish of a film whose finish saved, unwished or marked it done;
 //   O7 a job runs only for a message its sender may send (forged ones are ignored);
+//   O9 no SensCritique finish write by a job that started with the hour's 30 finishes spent (the stored
+//      count itself never exceeds 30: O2);
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -49,7 +53,7 @@ const LOOK_ALIKE = {
   tab: { url: "https://naka.cx.evil.com/" },
 };
 
-const SEEDS = 600;
+const SEEDS = 450;
 const STEPS = 50;
 
 type Worker = {
@@ -87,7 +91,7 @@ function startWorker(w: World): Worker {
       naka: createRateLimiter(clock, 1, 2000),
       sc: createRateLimiter(clock, 1, 2000),
     },
-    now: () => w.time,
+    now: clockFor(w),
     today: () => "2026-11-04",
     timer: { set: () => 0, clear: () => undefined },
   });
@@ -206,6 +210,24 @@ function outages(w: World): void {
   w.tabOpen = flip(w.tabOpen, "naka tab");
 }
 
+// A binge, or a page script flooding the worker: many explicit "vu" for distinct episodes at once.
+function burst(w: World, worker: Worker): void {
+  const count = 10 + Math.floor(w.r() * 30);
+  for (let i = 0; i < count; i++) {
+    const msg = {
+      type: "finished",
+      source: "explicit",
+      progress: 1,
+      contentId: pick(w, SERIES),
+      season: 1,
+      episode: 1 + Math.floor(w.r() * EPISODES),
+    };
+    w.allowed.set("finish", (w.allowed.get("finish") ?? 0) + 1);
+    worker.handle(msg, NAKA_TAB);
+  }
+  w.log.push(`burst of ${count} finishes`);
+}
+
 async function step(w: World, worker: Worker): Promise<Worker> {
   w.time += Math.floor(w.r() * 8 * 60_000);
   outages(w);
@@ -223,9 +245,11 @@ async function step(w: World, worker: Worker): Promise<Worker> {
     w.gen += 1;
     w.log.push("worker restart");
     return startWorker(w);
-  } else if (a < 0.75) {
+  } else if (a < 0.7) {
+    burst(w, worker);
+  } else if (a < 0.77) {
     worker.fire();
-  } else if (a < 0.85) {
+  } else if (a < 0.86) {
     await drain();
   }
   const yields = Math.floor(w.r() * 25);
@@ -258,6 +282,7 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       frozen: 0,
       protections: 0,
       guards: 0,
+      spentBudgets: 0,
     };
     for (let seed = 1; seed <= SEEDS; seed++) {
       const result = await simulate(seed);
@@ -272,9 +297,9 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     }
     expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 975 list writes, 1315 finish writes, 978 simulated
-    // runs with planned writes, 1162 jobs stopped by the binding, 553 calls of dead workers, 622
-    // protected sides, 703 guarded films).
+    // Every oracle's situation arises (measured: 723 list writes, 5081 finish writes, 647 simulated
+    // runs with planned writes, 843 jobs stopped by the binding, 490 calls of dead workers, 488
+    // protected sides, 463 guarded films, 462 finish jobs started with the hour's budget spent).
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(300);
     }

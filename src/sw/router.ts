@@ -10,6 +10,7 @@ import {
   type ToWorker,
 } from "../ext/messages";
 import { createDebounce } from "./debounce";
+import { createFinishQueue } from "./finish-queue";
 import type { JobQueue } from "./job-queue";
 import type { Jobs } from "./jobs";
 import type { Timer } from "./naka-proxy";
@@ -39,6 +40,7 @@ export function createRouter(deps: RouterDeps): Router {
   const enqueue = (job: () => Promise<void>): void => {
     queue.run(job).catch(ignore);
   };
+  const finish = createFinishQueue(enqueue, (msg) => jobs.finishJob(msg));
 
   function dispatch(msg: ToWorker, respond: Respond): boolean {
     switch (msg.type) {
@@ -52,7 +54,7 @@ export function createRouter(deps: RouterDeps): Router {
         enqueue(() => jobs.syncJob("button"));
         return false;
       case "finished":
-        enqueue(() => jobs.finishJob(msg));
+        finish(msg);
         return false;
       case "set-mode":
         enqueue(() => jobs.setMode(msg.mode));

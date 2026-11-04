@@ -22,8 +22,9 @@ const ERRORS: Record<JobError, true> = {
   "other-account": true,
   "stored-state": true,
   unavailable: true,
+  "finish-limit": true,
 };
-const ERROR_CODES = Object.keys(ERRORS) as JobError[];
+export const ERROR_CODES = Object.keys(ERRORS) as JobError[];
 const KEYS = ["at", "trigger", "mode", "outcome", "error", "report", "preview"];
 
 function parsePreviewItem(raw: unknown, path: string) {

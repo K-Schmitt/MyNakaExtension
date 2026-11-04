@@ -113,7 +113,7 @@ describe("parseSettings accepts", () => {
     });
   });
 
-  it.each(["ignored", "needs-choice", "not-found", "done", "failed"])(
+  it.each(["ignored", "needs-choice", "not-found", "done"])(
     "a finish outcome %s",
     (outcome) => {
       const lastFinish = { at: 1, key: "movie:1", outcome };
@@ -123,6 +123,32 @@ describe("parseSettings accepts", () => {
       });
     },
   );
+
+  it.each([
+    "no-naka-tab",
+    "naka-session",
+    "sc-session",
+    "other-account",
+    "stored-state",
+    "unavailable",
+    "finish-limit",
+  ])("a failed finish with its reason %s", (error) => {
+    const lastFinish = { at: 1, key: "movie:1", outcome: "failed", error };
+    expect(parseSettings({ mode: "live", lastFinish })).toEqual({
+      mode: "live",
+      lastFinish,
+    });
+  });
+
+  it.each([
+    { from: 0, count: 0 },
+    { from: 1_700_000_000_000, count: 30 },
+  ])("a finish window %o", (finishWindow) => {
+    expect(parseSettings({ mode: "live", finishWindow })).toEqual({
+      mode: "live",
+      finishWindow,
+    });
+  });
 
   it.each(["naka-ready", "playlist", "button"])("trigger %s", (trigger) => {
     const lastRun = { at: 1, trigger, mode: "live", outcome: "ok" };
@@ -139,6 +165,7 @@ describe("parseSettings accepts", () => {
     "other-account",
     "stored-state",
     "unavailable",
+    "finish-limit",
   ])("run error %s", (error) => {
     const lastRun = {
       at: 1,
@@ -376,6 +403,45 @@ const BAD_CASES: Bad[] = [
       [MARK]: 1,
     }),
   ),
+  bad(
+    "a failed finish without its reason",
+    "settings.lastFinish.error",
+    finish({ outcome: "failed" }),
+  ),
+  bad(
+    "a failed finish with an unknown reason",
+    "settings.lastFinish.error",
+    finish({ outcome: "failed", error: MARK }),
+  ),
+  bad(
+    "a finish that did not fail, with a reason",
+    "settings.lastFinish.error",
+    finish({ outcome: "done", error: "sc-session" }),
+  ),
+  bad("finishWindow null", "settings.finishWindow", {
+    mode: "live",
+    finishWindow: null,
+  }),
+  bad("finishWindow with an unknown key", "settings.finishWindow", {
+    mode: "live",
+    finishWindow: { from: 0, count: 0, [MARK]: 1 },
+  }),
+  bad("finishWindow from negative", "settings.finishWindow.from", {
+    mode: "live",
+    finishWindow: { from: -1, count: 0 },
+  }),
+  bad("finishWindow count fractional", "settings.finishWindow.count", {
+    mode: "live",
+    finishWindow: { from: 0, count: 1.5 },
+  }),
+  bad("finishWindow count above the limit", "settings.finishWindow.count", {
+    mode: "live",
+    finishWindow: { from: 0, count: 31 },
+  }),
+  bad("finishWindow count missing", "settings.finishWindow.count", {
+    mode: "live",
+    finishWindow: { from: 0 },
+  }),
 ];
 
 describe("parseSettings rejects", () => {

@@ -8,6 +8,10 @@
 
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
+import {
+  FINISH_WINDOW_MS,
+  MAX_FINISHES_PER_WINDOW,
+} from "../src/ext/finish-window";
 import type { ToNakaTab } from "../src/ext/messages";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import { parseState } from "../src/ext/state-schema";
@@ -26,7 +30,7 @@ import type { TabsPort } from "../src/sw/naka-proxy";
 export const FILMS = [1, 2, 3, 4];
 export const SERIES = [11, 12];
 export const TITLES = [...FILMS, ...SERIES];
-export const EPISODES = 2;
+export const EPISODES = 40;
 
 type Side = "naka" | "sc";
 
@@ -79,7 +83,7 @@ export type JobKey =
 
 type Context =
   | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number> }
-  | { kind: "finish"; msg: FinishedMessage }
+  | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
   | { kind: "other" };
 
 export type World = ReturnType<typeof createWorld>;
@@ -120,6 +124,7 @@ export function createWorld(seed: number) {
       frozen: 0,
       protections: 0,
       guards: 0,
+      spentBudgets: 0,
     },
   };
   for (const n of TITLES) {
@@ -138,6 +143,7 @@ const ORACLES: [string, RegExp][] = [
   ["O5 re-add", /re-add of/],
   ["O6 re-wish", /re-wish of/],
   ["O7 forged message", /ran without a message/],
+  ["O9 finish budget", /hour's finishes spent/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -421,7 +427,7 @@ export function scFor(w: World, gen: number): ScClient {
     },
     unwish: async (id) => {
       if (!mayWrite()) return frozen(w);
-      checkBinding(w, `unwish ${id}`);
+      checkFinishWrite(w, `unwish ${id}`);
       w.stats.finishWrites += 1;
       if (!isFilmProduct(id)) violation(w, `unwish of ${id}, not a film`);
       w.log.push(`finish unwish ${id}`);
@@ -431,7 +437,7 @@ export function scFor(w: World, gen: number): ScClient {
     },
     markDone: async (id) => {
       if (!mayWrite()) return frozen(w);
-      checkBinding(w, `markDone ${id}`);
+      checkFinishWrite(w, `markDone ${id}`);
       w.stats.finishWrites += 1;
       w.log.push(`finish markDone ${id}`);
       flaky(w, `markDone ${id}`);
@@ -445,6 +451,31 @@ export function scFor(w: World, gen: number): ScClient {
       violation(w, `rate ${id}`);
     },
   };
+}
+
+// The finish job reads the clock once, right after its settings: the oracle judges the hour's budget
+// there, from the stored window, as the spec words it.
+export function clockFor(w: World): () => number {
+  return () => {
+    const ctx = w.current;
+    if (ctx?.kind === "finish" && ctx.spent === undefined) {
+      const stored = settingsOf(w)?.finishWindow;
+      ctx.spent =
+        stored !== undefined &&
+        w.time - stored.from < FINISH_WINDOW_MS &&
+        stored.count >= MAX_FINISHES_PER_WINDOW;
+      if (ctx.spent) w.stats.spentBudgets += 1;
+    }
+    return w.time;
+  };
+}
+
+// Oracles of a finish write: the binding, and the hour's budget (at most 30 finishes per window).
+function checkFinishWrite(w: World, what: string): void {
+  checkBinding(w, what);
+  if (w.current?.kind === "finish" && w.current.spent) {
+    violation(w, `${what} with the hour's finishes spent`);
+  }
 }
 
 export function scUsernameFor(w: World, gen: number): () => Promise<string> {

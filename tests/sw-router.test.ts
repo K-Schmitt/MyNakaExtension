@@ -1,16 +1,25 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FinishedMessage } from "../src/content/playback-tracker";
-import type { Mode } from "../src/ext/settings";
+import { emptyState } from "../src/core/state";
+import { MAX_FINISHES_PER_WINDOW } from "../src/ext/finish-window";
+import { type Mode, parseSettings } from "../src/ext/settings";
+import { createStore } from "../src/ext/store";
 import { createNakaClient } from "../src/naka/naka-client";
 import type { Fetch } from "../src/sc/sc-client";
+import { MAX_QUEUED_FINISHES } from "../src/sw/finish-queue";
 import { createJobQueue } from "../src/sw/job-queue";
-import type { Jobs, StatusSnapshot, Trigger } from "../src/sw/jobs";
-import type { Timer } from "../src/sw/naka-proxy";
+import {
+  createJobs,
+  type Jobs,
+  type StatusSnapshot,
+  type Trigger,
+} from "../src/sw/jobs";
+import type { TabsPort, Timer } from "../src/sw/naka-proxy";
 import { createRouter } from "../src/sw/router";
 import { PLAYLIST_DEBOUNCE_MS } from "../src/sw/run-throttle";
 import { createWorker } from "../src/sw/worker";
 import { strings, tabRunning } from "./naka-bridge-fakes";
-import { memoryArea } from "./sw-fakes";
+import { countingLimiter, fakeNaka, fakeSc, memoryArea } from "./sw-fakes";
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
 const STATUS_URL = `chrome-extension://${EXT}/status.html`;
@@ -207,6 +216,192 @@ describe("router: everything else is ignored, unanswered", () => {
     expect(read).toEqual([]);
     r.send({ type: "naka-ready" }, sender);
     expect(read).toContain("id");
+  });
+});
+
+function latch() {
+  let open: () => void = () => undefined;
+  const opened = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { opened, open };
+}
+
+const finishedFor = (
+  contentId: number,
+  progress = 0.9,
+  extra: Record<string, unknown> = {},
+) => ({ type: "finished", source: "threshold", progress, contentId, ...extra });
+
+const finishes = (calls: string[]) =>
+  calls.filter((call) => call.startsWith("finish:"));
+
+describe("router: finishes are bounded", () => {
+  it("a burst of 1000 distinct ids queues at most 20 finish jobs, unanswered", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    for (let id = 1; id <= 1000; id += 1) {
+      expect(r.send(finishedFor(id), NAKA_TAB)).toBe(false);
+    }
+    blocker.open();
+    await settle();
+    expect(finishes(r.calls)).toHaveLength(MAX_QUEUED_FINISHES);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("a slot frees up when a finish job ends", async () => {
+    const r = router();
+    for (let id = 1; id <= 25; id += 1) r.send(finishedFor(id), NAKA_TAB);
+    await settle();
+    for (let id = 26; id <= 30; id += 1) r.send(finishedFor(id), NAKA_TAB);
+    await settle();
+    expect(finishes(r.calls)).toHaveLength(MAX_QUEUED_FINISHES + 5);
+  });
+
+  it("duplicates of a queued key give one job, run with the highest progress received", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.send(finishedFor(3, 0.85), NAKA_TAB);
+    r.send(finishedFor(3, 0.95), NAKA_TAB);
+    r.send(finishedFor(3, 0.95, { source: "explicit" }), NAKA_TAB);
+    r.send(finishedFor(3, 0.9), NAKA_TAB);
+    r.send(finishedFor(7, 0.9, { season: 1, episode: 1 }), NAKA_TAB);
+    r.send(finishedFor(7, 0.9, { season: 1, episode: 2 }), NAKA_TAB);
+    blocker.open();
+    await settle();
+    expect(finishes(r.calls)).toEqual([
+      `finish:${JSON.stringify(finishedFor(3, 0.95, { source: "explicit" }))}`,
+      `finish:${JSON.stringify(finishedFor(7, 0.9, { season: 1, episode: 1 }))}`,
+      `finish:${JSON.stringify(finishedFor(7, 0.9, { season: 1, episode: 2 }))}`,
+    ]);
+  });
+
+  it("a message for a key whose job is running is queued, and runs after it", async () => {
+    const running = latch();
+    const progresses: number[] = [];
+    const r = router({
+      finishJob: async (msg) => {
+        progresses.push(msg.progress);
+        if (progresses.length === 1) await running.opened;
+      },
+    });
+    r.send(finishedFor(3, 0.85), NAKA_TAB);
+    await settle();
+    expect(progresses).toEqual([0.85]);
+    r.send(finishedFor(3, 0.9), NAKA_TAB);
+    running.open();
+    await settle();
+    expect(progresses).toEqual([0.85, 0.9]);
+  });
+});
+
+// The router on the REAL jobs, with fake sites that know every content id.
+function floodWorld(threshold = 0.9) {
+  const area = memoryArea();
+  area.data.set("state", { ...emptyState(), threshold });
+  const naka = fakeNaka({
+    playlistIds: async () => [],
+    contentById: async (id) => ({
+      contentId: id,
+      tmdbId: 9000 + id,
+      mediaType: "movie",
+      title: `Film ${id}`,
+      releaseDate: "2001-01-01",
+    }),
+  });
+  const sc = fakeSc({
+    search: async (q, universe) =>
+      universe === "movie"
+        ? [
+            {
+              productId: 100000 + Number(q.slice(5)),
+              title: q,
+              url: "/film/x",
+              universe: 1,
+              year: 2001,
+            },
+          ]
+        : [],
+  });
+  const blocker = latch();
+  let first = true;
+  const real = tabRunning(naka.client, () => "77").tabs;
+  const tabs: TabsPort = {
+    query: async (url) => {
+      if (first) {
+        first = false;
+        await blocker.opened;
+      }
+      return real.query(url);
+    },
+    send: (tabId, msg) => real.send(tabId, msg),
+  };
+  const jobs = createJobs({
+    store: createStore(area),
+    tabs,
+    sc: sc.client,
+    scUsername: async () => "owner",
+    limiters: { naka: countingLimiter([], "n"), sc: countingLimiter([], "s") },
+    now: () => Date.parse("2026-11-04T12:00:00Z"),
+    today: () => "2026-11-04",
+    timer: { set: () => 0, clear: () => undefined },
+  });
+  const r = createRouter({
+    extensionId: EXT,
+    queue: createJobQueue(),
+    jobs,
+    timer: fakeTimer().timer,
+  });
+  const send = (msg: unknown, sender: object) =>
+    r.handle(msg, sender, () => undefined);
+  return { area, sc, blocker, send };
+}
+
+describe("router and jobs: a forged flood", () => {
+  it("at most 30 finishes an hour reach handleFinish", async () => {
+    const w = floodWorld();
+    w.blocker.open();
+    for (let round = 0; round < 3; round += 1) {
+      for (let id = 1; id <= 1000; id += 1) {
+        w.send(
+          finishedFor(round * 1000 + id, 1, { source: "explicit" }),
+          NAKA_TAB,
+        );
+      }
+      await settle();
+    }
+    const loads = w.area.ops.filter((op) => op === "get:state");
+    expect(loads).toHaveLength(MAX_FINISHES_PER_WINDOW);
+    expect(w.sc.calls.filter((c) => c.startsWith("markDone"))).toHaveLength(30);
+    expect(parseSettings(w.area.data.get("settings")).lastFinish?.error).toBe(
+      "finish-limit",
+    );
+  });
+
+  it("a 0.85 mark queued behind a sync, then the 0.9 mark, under a 0.9 threshold: the finish completes", async () => {
+    const w = floodWorld(0.9);
+    w.send({ type: "resync" }, STATUS_PAGE);
+    w.send(finishedFor(3, 0.85), NAKA_TAB);
+    w.send(finishedFor(3, 0.9), NAKA_TAB);
+    w.blocker.open();
+    await settle();
+    expect(w.sc.calls).toContain("markDone:100003:2026-11-04");
+    expect(parseSettings(w.area.data.get("settings")).lastFinish).toMatchObject(
+      {
+        key: "movie:3",
+        outcome: "done",
+      },
+    );
   });
 });
 
@@ -504,14 +699,19 @@ describe("worker end to end: the tokens stay where they belong", () => {
     });
   });
 
-  it("a logged-out SensCritique home page stops a finish before the state is read", async () => {
+  it("a logged-out SensCritique home page stops a finish after the content read, before the state is read", async () => {
     const w = worker(false);
     w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
     await settle();
     expect(w.storage.ops).not.toContain("get:state");
-    expect(w.naka.calls).toEqual([]);
+    expect(w.naka.calls.map((c) => c.url)).toEqual([
+      "https://naka.cx/api/v1/browse/3",
+    ]);
+    expect(w.sc.calls.map((c) => c.url)).toEqual([
+      "https://www.senscritique.com/",
+    ]);
     expect(w.storage.data.get("settings")).toMatchObject({
-      lastFinish: { key: "movie:3", outcome: "failed" },
+      lastFinish: { key: "movie:3", outcome: "failed", error: "sc-session" },
     });
   });
 });

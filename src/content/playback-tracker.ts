@@ -6,6 +6,7 @@
 // holds steady) and comes from the video source of the current context: Naka changes the URL before the
 // <video> loads the next source, so samples of the previous source are ignored.
 
+import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import type { PlayerContext } from "./page-events";
 
@@ -34,10 +35,9 @@ export type PlaybackTracker = {
   watched(ev: PageEvent): FinishedMessage | undefined;
 };
 
+// The worker keys the same content with the same function.
 function keyOf(p: Playing): string {
-  return p.season === undefined || p.episode === undefined
-    ? `movie:${p.contentId}`
-    : `tv:${p.contentId}:S${p.season}E${p.episode}`;
+  return contentKeyOf(p);
 }
 
 function idsOf(p: Playing): Playing {

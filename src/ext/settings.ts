@@ -9,9 +9,10 @@ import {
   onlyKeys,
   whenPresent,
 } from "./field-checks";
+import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
 import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
-import { MODES, parseRunRecord } from "./run-record-schema";
+import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
 
 export type Mode = "simulation" | "live";
 
@@ -29,6 +30,8 @@ export type FinishRecord = {
   at: number;
   key: string;
   outcome: FinishOutcome["kind"] | "failed";
+  /** Present if and only if the outcome is "failed" (Ruling 13). */
+  error?: JobError;
 };
 
 export type Settings = {
@@ -37,9 +40,18 @@ export type Settings = {
   lastAutoRunAt?: number;
   lastRun?: RunRecord;
   lastFinish?: FinishRecord;
+  /** The hour's budget of finishes (Ruling 15). */
+  finishWindow?: FinishWindow;
 };
 
-const KEYS = ["mode", "binding", "lastAutoRunAt", "lastRun", "lastFinish"];
+const KEYS = [
+  "mode",
+  "binding",
+  "lastAutoRunAt",
+  "lastRun",
+  "lastFinish",
+  "finishWindow",
+];
 const FINISH_KINDS: Record<FinishOutcome["kind"] | "failed", true> = {
   ignored: true,
   "needs-choice": true,
@@ -63,15 +75,38 @@ function parseBinding(raw: unknown): NonNullable<Settings["binding"]> {
     : { scUsername, nakaAccount };
 }
 
+// The reason comes with a failure, and only with one.
+function finishError(
+  raw: unknown,
+  outcome: FinishRecord["outcome"],
+  path: string,
+): JobError | undefined {
+  if (outcome === "failed") return asOneOf(raw, ERROR_CODES, path);
+  return raw === undefined ? undefined : fail(path);
+}
+
 function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
-  onlyKeys(record, ["at", "key", "outcome"], path);
+  onlyKeys(record, ["at", "key", "outcome", "error"], path);
+  const outcome = asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`);
+  const error = finishError(record.error, outcome, `${path}.error`);
   return {
     at: asInt(record.at, 0, `${path}.at`),
     key: parseContentKey(record.key, `${path}.key`),
-    outcome: asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`),
+    outcome,
+    ...(error === undefined ? {} : { error }),
   };
+}
+
+function parseFinishWindow(raw: unknown): FinishWindow {
+  const path = "settings.finishWindow";
+  const record = asRecord(raw, path);
+  onlyKeys(record, ["from", "count"], path);
+  const from = asInt(record.from, 0, `${path}.from`);
+  const count = asInt(record.count, 0, `${path}.count`);
+  if (count > MAX_FINISHES_PER_WINDOW) return fail(`${path}.count`);
+  return { from, count };
 }
 
 // The settings read from storage. An absent key (undefined) is a first install: simulation, nothing else.
@@ -87,11 +122,13 @@ export function parseSettings(raw: unknown): Settings {
     parseRunRecord(v, "settings.lastRun"),
   );
   const lastFinish = whenPresent(record.lastFinish, parseFinish);
+  const finishWindow = whenPresent(record.finishWindow, parseFinishWindow);
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
     ...(binding === undefined ? {} : { binding }),
     ...(lastAutoRunAt === undefined ? {} : { lastAutoRunAt }),
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
+    ...(finishWindow === undefined ? {} : { finishWindow }),
   };
 }
