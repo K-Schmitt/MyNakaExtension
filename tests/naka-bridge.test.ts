@@ -137,6 +137,36 @@ describe("handleNakaCall: error codes", () => {
     expect(api.calls).toHaveLength(0);
   });
 
+  it("maps HTTP 401 and 403 to session, 429 to rate-limit", async () => {
+    const expected = new Map([
+      [401, "session"],
+      [403, "session"],
+      [429, "rate-limit"],
+      [500, "unavailable"],
+      [400, "unavailable"],
+    ]);
+    for (const [status, error] of expected) {
+      const api = fakeApi(() => ({ status, body: MARKER }));
+      const reply = await handleNakaCall(msg, clientOn(api.fetch), noAccount);
+      expect(reply).toStrictEqual({ ok: false, error });
+    }
+  });
+
+  it("maps the session and rate-limit statuses from the status only", async () => {
+    for (const [status, error] of [
+      [401, "session"],
+      [403, "session"],
+      [429, "rate-limit"],
+    ] as const) {
+      const reply = await handleNakaCall(
+        msg,
+        failing(new NakaUnavailableError("any text at all", status)),
+        noAccount,
+      );
+      expect(reply).toStrictEqual({ ok: false, error });
+    }
+  });
+
   it("maps a 404 to not-found", async () => {
     const reply = await handleNakaCall(
       msg,
@@ -149,9 +179,9 @@ describe("handleNakaCall: error codes", () => {
   it("maps any other failure to unavailable", async () => {
     for (const error of [
       new NakaUnavailableError("Naka playlist: HTTP 500", 500),
-      new NakaUnavailableError("Naka playlist: HTTP 401", 401),
       new NakaUnavailableError("Naka session: could not be read"),
       new NakaUnavailableError("no token", 500),
+      new NakaUnavailableError("HTTP 429 HTTP 401", 500),
       new RangeError("contentId must be a positive safe integer"),
       "a string",
       undefined,

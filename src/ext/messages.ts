@@ -42,9 +42,16 @@ export type ToNakaTab =
 
 // `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
 // It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
+export type NakaReplyError =
+  | "no-token"
+  | "session"
+  | "rate-limit"
+  | "unavailable"
+  | "not-found";
+
 export type NakaReply =
   | { ok: true; value?: unknown }
-  | { ok: false; error: "no-token" | "unavailable" | "not-found" };
+  | { ok: false; error: NakaReplyError };
 
 export type PageEvent =
   | { channel: typeof PAGE_CHANNEL; kind: "playlist" }
@@ -67,7 +74,13 @@ export type SenderRole = "naka-tab" | "status-page";
 const SOURCES = ["threshold", "explicit"] as const;
 const MODE_VALUES: readonly Mode[] = ["simulation", "live"];
 const ID_CALLS = ["add", "remove", "contentById"] as const;
-const REPLY_ERRORS = ["no-token", "unavailable", "not-found"] as const;
+const REPLY_ERRORS: readonly NakaReplyError[] = [
+  "no-token",
+  "session",
+  "rate-limit",
+  "unavailable",
+  "not-found",
+];
 const NAKA_ORIGIN = "https://naka.cx/";
 
 // Runs a throwing parser. Any failure (a bad field, or a hostile getter) becomes undefined.

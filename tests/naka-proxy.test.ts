@@ -263,6 +263,63 @@ describe("timeout", () => {
 });
 
 describe("error replies", () => {
+  it("session becomes JobRejected(naka-session)", async () => {
+    const { proxy } = proxyAnswering(() => ({ ok: false, error: "session" }));
+    for (const run of [
+      () => proxy.playlistIds(),
+      () => proxy.addToPlaylist(1),
+      () => proxy.search("a"),
+      () => proxy.contentById(1),
+      () => proxy.account(),
+    ]) {
+      const error = await failure(run());
+      expect(error).toBeInstanceOf(JobRejected);
+      expect((error as JobRejected).code).toBe("naka-session");
+    }
+  });
+
+  it("rate-limit becomes a 429 NakaUnavailableError, contentById included", async () => {
+    const { proxy } = proxyAnswering(() => ({
+      ok: false,
+      error: "rate-limit",
+    }));
+    for (const run of [
+      () => proxy.playlistIds(),
+      () => proxy.removeFromPlaylist(1),
+      () => proxy.contentById(1),
+    ]) {
+      const error = await failure(run());
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expect((error as NakaUnavailableError).status).toBe(429);
+    }
+  });
+
+  it("carries HTTP 401, 403 and 429 through the real tab handler", async () => {
+    const expected = [
+      [401, "session"],
+      [403, "session"],
+      [429, "rate-limit"],
+    ] as const;
+    for (const [status, kind] of expected) {
+      const api = fakeApi(() => ({ status, body: MARKER }));
+      const traffic = { sent: [] as unknown[], returned: [] as unknown[] };
+      const { tabs } = tabRunning(
+        clientOn(api.fetch),
+        () => undefined,
+        traffic,
+      );
+      const error = await failure(
+        createNakaProxy(tabs, fakeTimer()).playlistIds(),
+      );
+      if (kind === "session") {
+        expect((error as JobRejected).code).toBe("naka-session");
+      } else {
+        expect((error as NakaUnavailableError).status).toBe(429);
+      }
+      expect(strings([error, traffic]).join("|")).not.toContain(MARKER);
+    }
+  });
+
   it("no-token becomes JobRejected(naka-session)", async () => {
     const { proxy } = proxyAnswering(() => ({ ok: false, error: "no-token" }));
     for (const run of [

@@ -3,7 +3,7 @@
 // function) and never reaches this file: a reply carries a value or one of three fixed error codes, never the
 // text, the cause or a field of an error.
 
-import type { NakaReply, ToNakaTab } from "../ext/messages";
+import type { NakaReply, NakaReplyError, ToNakaTab } from "../ext/messages";
 import type { NakaClient } from "../naka/naka-client";
 import { NakaUnavailableError } from "../naka/naka-errors";
 import { isPositiveId } from "../naka/naka-input";
@@ -12,7 +12,8 @@ import { isRecord } from "../naka/naka-transport";
 const AUTH_KEY = "nakastream-auth";
 const NOT_FOUND = 404;
 
-type ErrorCode = Extract<NakaReply, { ok: false }>["error"];
+const RATE_LIMITED = 429;
+const SESSION_STATUSES: readonly number[] = [401, 403];
 
 function userId(json: unknown): unknown {
   if (!isRecord(json) || !isRecord(json.state)) return undefined;
@@ -56,9 +57,11 @@ async function run(
 }
 
 // Fixed codes only: what an error says is never looked at beyond its class, its status and "no token".
-function errorCode(error: unknown): ErrorCode {
+function errorCode(error: unknown): NakaReplyError {
   if (!(error instanceof NakaUnavailableError)) return "unavailable";
   if (error.status === NOT_FOUND) return "not-found";
+  if (error.status === RATE_LIMITED) return "rate-limit";
+  if (SESSION_STATUSES.includes(error.status)) return "session";
   if (error.status === 0 && error.message === "no token") return "no-token";
   return "unavailable";
 }

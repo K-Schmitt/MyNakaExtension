@@ -20,6 +20,7 @@ export const NAKA_CALL_TIMEOUT_MS = 20000;
 
 const NAKA_TABS_URL = "https://naka.cx/*";
 const NOT_FOUND = 404;
+const RATE_LIMITED = 429;
 
 export type TabsPort = {
   query(url: string): Promise<{ id: number }[]>;
@@ -64,7 +65,12 @@ function replyValue(raw: unknown): unknown {
   const reply = parseNakaReply(raw);
   if (reply === undefined) return unexpected();
   if (reply.ok) return reply.value;
-  if (reply.error === "no-token") throw new JobRejected("naka-session");
+  if (reply.error === "no-token" || reply.error === "session") {
+    throw new JobRejected("naka-session");
+  }
+  if (reply.error === "rate-limit") {
+    throw new NakaUnavailableError("Naka tab: HTTP 429", RATE_LIMITED);
+  }
   if (reply.error === "not-found") {
     throw new NakaUnavailableError("Naka tab: HTTP 404", NOT_FOUND);
   }

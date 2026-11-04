@@ -283,8 +283,14 @@ describe("parseNakaReply", () => {
     });
   });
 
-  it("accepts the three errors", () => {
-    for (const error of ["no-token", "unavailable", "not-found"]) {
+  it("accepts the five errors", () => {
+    for (const error of [
+      "no-token",
+      "session",
+      "rate-limit",
+      "unavailable",
+      "not-found",
+    ]) {
       expect(parseNakaReply({ ok: false, error })).toEqual({
         ok: false,
         error,
