@@ -124,6 +124,31 @@ describe("parsePlayerUrl", () => {
     });
   });
 
+  it("rejects a url that repeats id, type, season or episode", () => {
+    expect(parsePlayerUrl(`${P}?id=1&id=2&type=movie`)).toBeUndefined();
+    expect(parsePlayerUrl(`${P}?id=1&type=movie&type=tv`)).toBeUndefined();
+    expect(parsePlayerUrl(`${P}?id=1&type=movie&type=movie`)).toBeUndefined();
+    expect(
+      parsePlayerUrl(`${P}?id=1&type=tv&season=1&season=2&episode=1`),
+    ).toBeUndefined();
+    expect(
+      parsePlayerUrl(`${P}?id=1&type=tv&season=1&episode=1&episode=1`),
+    ).toBeUndefined();
+    expect(
+      parsePlayerUrl(`${P}?id=1&type=movie&season=1&season=2`),
+    ).toBeUndefined();
+    expect(
+      parsePlayerUrl(`${P}?id=1&type=movie&episode=1&episode=2`),
+    ).toBeUndefined();
+  });
+
+  it("allows a repeated parameter it does not read", () => {
+    expect(parsePlayerUrl(`${P}?id=1&type=movie&title=a&title=b`)).toEqual({
+      contentId: 1,
+      mediaType: "movie",
+    });
+  });
+
   it("ignores a season on a film", () => {
     expect(parsePlayerUrl(`${P}?id=3&type=movie&season=1&episode=1`)).toEqual({
       contentId: 3,

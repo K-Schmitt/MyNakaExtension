@@ -42,7 +42,7 @@ function orAbsent(value: unknown): unknown {
   return value === null ? undefined : value;
 }
 
-function classifyWatched(body: unknown): PageEvent | undefined {
+function readWatched(body: unknown): PageEvent | undefined {
   const record = bodyRecord(body);
   if (record === undefined || record.watched !== true) return undefined;
   return parsePageEvent({
@@ -52,6 +52,15 @@ function classifyWatched(body: unknown): PageEvent | undefined {
     season: orAbsent(record.seasonNumber),
     episode: orAbsent(record.episodeNumber),
   });
+}
+
+// The body belongs to the page: a getter or a proxy on it may throw, and that is "no event".
+function classifyWatched(body: unknown): PageEvent | undefined {
+  try {
+    return readWatched(body);
+  } catch {
+    return undefined;
+  }
 }
 
 export function classifyRequest(

@@ -5,6 +5,7 @@ import { type PageEvent, parsePageEvent } from "../ext/messages";
 
 const NAKA_ORIGIN = "https://naka.cx";
 const PLAYER_PATH = "/player";
+const READ_PARAMS = ["id", "type", "season", "episode"];
 const POSITIVE_INT = /^[1-9][0-9]*$/;
 
 export type PlayerContext = {
@@ -51,11 +52,17 @@ function episodeOf(
   return { contentId, mediaType: "tv", season, episode };
 }
 
+// A parameter we read that appears twice is ambiguous: the URL is refused.
+function hasRepeatedParam(params: URLSearchParams): boolean {
+  return READ_PARAMS.some((name) => params.getAll(name).length > 1);
+}
+
 // `id` is the Naka contentId. A /content/... page carries a TMDB id and is never read here.
 export function parsePlayerUrl(href: string): PlayerContext | undefined {
   const url = parseHref(href);
   if (url === undefined || url.origin !== NAKA_ORIGIN) return undefined;
   if (url.pathname !== PLAYER_PATH) return undefined;
+  if (hasRepeatedParam(url.searchParams)) return undefined;
   const contentId = positiveInt(url.searchParams.get("id"));
   if (contentId === undefined) return undefined;
   const type = url.searchParams.get("type");

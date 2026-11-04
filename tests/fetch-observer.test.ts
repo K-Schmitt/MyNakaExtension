@@ -125,6 +125,40 @@ describe("classifyRequest watched route", () => {
     ).toBeUndefined();
   });
 
+  it("gives nothing when reading the body throws", () => {
+    const throwing = {
+      get watched(): boolean {
+        throw new Error("hostile");
+      },
+    };
+    expect(classifyRequest("PUT", WATCHED, throwing)).toBeUndefined();
+    const proxy = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("hostile");
+        },
+        getPrototypeOf() {
+          throw new Error("hostile");
+        },
+      },
+    );
+    expect(classifyRequest("PUT", WATCHED, proxy)).toBeUndefined();
+    const lateThrow = {
+      watched: true,
+      get contentId(): number {
+        throw new Error("hostile");
+      },
+    };
+    expect(classifyRequest("PUT", WATCHED, lateThrow)).toBeUndefined();
+    const arrayLike = new Proxy([], {
+      get() {
+        throw new Error("hostile");
+      },
+    });
+    expect(classifyRequest("PUT", WATCHED, arrayLike)).toBeUndefined();
+  });
+
   it("gives nothing when only one of season and episode is present", () => {
     const body = JSON.stringify({
       contentId: 7,
