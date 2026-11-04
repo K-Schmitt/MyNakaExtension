@@ -71,7 +71,7 @@ function isProductId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-function toItem(value: unknown): ScWishItem | undefined {
+export function parseWishItem(value: unknown): ScWishItem | undefined {
   if (!isRecord(value)) return undefined;
   const { id, title, url, originalTitle } = value;
   if (!isProductId(id)) return undefined;
@@ -92,7 +92,7 @@ function itemsOf(collection: Fields): ScWishItem[] {
   if (!Array.isArray(products)) return [];
   const items: ScWishItem[] = [];
   for (const product of products) {
-    const item = toItem(product);
+    const item = parseWishItem(product);
     if (item !== undefined) items.push(item);
   }
   return items;

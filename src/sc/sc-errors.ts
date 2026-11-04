@@ -9,6 +9,16 @@ export class ScUnavailableError extends Error {
   }
 }
 
+// A request the worker's 30 s timer aborted (Ruling 16). Its text names the operation and the timeout
+// only. Like a 429, it opens the port's breaker (K4): a site that stopped answering costs one timeout
+// per port, not one per call.
+export class ScTimeoutError extends ScUnavailableError {
+  constructor(label: string) {
+    super(`SensCritique ${label}: timeout`);
+    this.name = "ScTimeoutError";
+  }
+}
+
 // No token, no username, or a GraphQL "Unauthenticated" error: the owner has to log in again.
 export class ScUnauthenticatedError extends ScUnavailableError {
   constructor() {

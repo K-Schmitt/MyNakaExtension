@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["chrome"]
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }

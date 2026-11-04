@@ -2,5 +2,30 @@
   "manifest_version": 3,
   "name": "MyNakaExtension",
   "version": "0.0.1",
-  "description": "Passerelle entre Naka et SensCritique : notes, listes et fin de visionnage."
+  "description": "Passerelle entre Naka et SensCritique : notes, listes et fin de visionnage.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://naka.cx/*",
+    "https://www.senscritique.com/*",
+    "https://apollo.senscritique.com/*"
+  ],
+  "background": {
+    "service_worker": "sw.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://naka.cx/*"],
+      "js": ["naka-main.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://naka.cx/*"],
+      "js": ["naka-isolated.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "status.html",
+  "action": {}
 }
