@@ -1,0 +1,388 @@
+import { describe, expect, it } from "vitest";
+import { parseSettings, type Settings } from "../src/ext/settings";
+import { StoredStateError } from "../src/ext/stored-error";
+
+const MARK = "SECRET-MARKER";
+
+const report = {
+  added: [{ nakaId: 1, scId: 2 }],
+  deferred: [],
+  failed: [{ nakaId: 3, scId: 4 }],
+  alreadyDone: [],
+  pendingRemovals: 1,
+  unresolved: 2,
+};
+
+function full(): Settings {
+  return {
+    mode: "live",
+    binding: { scUsername: "someone", nakaAccount: "acct" },
+    lastAutoRunAt: 1_700_000_000_000,
+    lastRun: {
+      at: 1_700_000_000_500,
+      trigger: "playlist",
+      mode: "simulation",
+      outcome: "ok",
+      report,
+      preview: [
+        { side: "naka", title: "A film" },
+        { side: "sc", title: "A show" },
+      ],
+    },
+    lastFinish: { at: 1_700_000_001_000, key: "tv:7:S1E2", outcome: "done" },
+  };
+}
+
+function rejection(raw: unknown): unknown {
+  try {
+    parseSettings(raw);
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
+describe("parseSettings accepts", () => {
+  it("an absent key as simulation", () => {
+    expect(parseSettings(undefined)).toEqual({ mode: "simulation" });
+  });
+
+  it("a full value, unchanged", () => {
+    expect(parseSettings(full())).toEqual(full());
+  });
+
+  it("a minimal live value", () => {
+    expect(parseSettings({ mode: "live" })).toEqual({ mode: "live" });
+  });
+
+  it("zero values and empty strings where they are legal", () => {
+    const value = {
+      mode: "live",
+      binding: { scUsername: "u", nakaAccount: "" },
+      lastAutoRunAt: 0,
+      lastRun: {
+        at: 0,
+        trigger: "button",
+        mode: "live",
+        outcome: "ok",
+        report: {
+          added: [],
+          deferred: [],
+          failed: [],
+          alreadyDone: [],
+          pendingRemovals: 0,
+          unresolved: 0,
+        },
+        preview: [{ side: "sc", title: "" }],
+      },
+      lastFinish: { at: 0, key: "movie:0", outcome: "ignored" },
+    };
+    expect(parseSettings(value)).toEqual(value);
+  });
+
+  it("an empty preview list", () => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "ok",
+      preview: [],
+    };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+
+  it("a binding without a naka account", () => {
+    const value = { mode: "simulation", binding: { scUsername: "u" } };
+    expect(parseSettings(value)).toEqual(value);
+  });
+
+  it("a failed run with an error", () => {
+    const lastRun = {
+      at: 0,
+      trigger: "button",
+      mode: "live",
+      outcome: "failed",
+      error: "sc-session",
+    };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+
+  it.each(["ignored", "needs-choice", "not-found", "done", "failed"])(
+    "a finish outcome %s",
+    (outcome) => {
+      const lastFinish = { at: 1, key: "movie:1", outcome };
+      expect(parseSettings({ mode: "live", lastFinish })).toEqual({
+        mode: "live",
+        lastFinish,
+      });
+    },
+  );
+
+  it.each(["naka-ready", "playlist", "button"])("trigger %s", (trigger) => {
+    const lastRun = { at: 1, trigger, mode: "live", outcome: "ok" };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+
+  it.each([
+    "no-naka-tab",
+    "naka-session",
+    "sc-session",
+    "other-account",
+    "stored-state",
+    "unavailable",
+  ])("run error %s", (error) => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "failed",
+      error,
+    };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+});
+
+const run = (patch: Record<string, unknown>) => ({
+  mode: "live",
+  lastRun: {
+    at: 1,
+    trigger: "button",
+    mode: "live",
+    outcome: "ok",
+    ...patch,
+  },
+});
+
+const finish = (patch: Record<string, unknown>) => ({
+  mode: "live",
+  lastFinish: { at: 1, key: "movie:1", outcome: "done", ...patch },
+});
+
+type Bad = { name: string; raw: unknown; path: string };
+
+const bad = (name: string, path: string, raw: unknown): Bad => ({
+  name,
+  path,
+  raw,
+});
+
+const NULLED: [string, unknown][] = [
+  ["binding", { mode: "live", binding: null }],
+  ["lastAutoRunAt", { mode: "live", lastAutoRunAt: null }],
+  ["lastRun", { mode: "live", lastRun: null }],
+  ["lastFinish", { mode: "live", lastFinish: null }],
+  [
+    "binding.nakaAccount",
+    { mode: "live", binding: { scUsername: "u", nakaAccount: null } },
+  ],
+  ["lastRun.error", run({ error: null })],
+  ["lastRun.report", run({ report: null })],
+  ["lastRun.preview", run({ preview: null })],
+];
+
+const BAD_CASES: Bad[] = [
+  ...NULLED.map(([name, raw]) => bad(`${name} null`, `settings.${name}`, raw)),
+  bad("lastAutoRunAt false", "settings.lastAutoRunAt", {
+    mode: "live",
+    lastAutoRunAt: false,
+  }),
+  bad("lastRun error empty", "settings.lastRun.error", run({ error: "" })),
+  bad("not an object", "settings", MARK),
+  bad("null", "settings", null),
+  bad("an array", "settings", []),
+  bad("mode missing", "settings.mode", {}),
+  bad("mode unknown", "settings.mode", { mode: MARK }),
+  bad("an unknown key", "settings", { mode: "live", [MARK]: 1 }),
+  bad("binding not an object", "settings.binding", {
+    mode: "live",
+    binding: MARK,
+  }),
+  bad("binding without a username", "settings.binding.scUsername", {
+    mode: "live",
+    binding: {},
+  }),
+  bad("binding with an empty username", "settings.binding.scUsername", {
+    mode: "live",
+    binding: { scUsername: "" },
+  }),
+  bad("binding username not a string", "settings.binding.scUsername", {
+    mode: "live",
+    binding: { scUsername: 4 },
+  }),
+  bad("binding naka account not a string", "settings.binding.nakaAccount", {
+    mode: "live",
+    binding: { scUsername: "u", nakaAccount: 4 },
+  }),
+  bad("binding with an unknown key", "settings.binding", {
+    mode: "live",
+    binding: { scUsername: "u", [MARK]: 1 },
+  }),
+  bad("lastAutoRunAt negative", "settings.lastAutoRunAt", {
+    mode: "live",
+    lastAutoRunAt: -1,
+  }),
+  bad("lastAutoRunAt fractional", "settings.lastAutoRunAt", {
+    mode: "live",
+    lastAutoRunAt: 1.5,
+  }),
+  bad("lastAutoRunAt a string", "settings.lastAutoRunAt", {
+    mode: "live",
+    lastAutoRunAt: MARK,
+  }),
+  bad("lastRun not an object", "settings.lastRun", {
+    mode: "live",
+    lastRun: MARK,
+  }),
+  bad("lastRun at negative", "settings.lastRun.at", run({ at: -1 })),
+  bad("lastRun at missing", "settings.lastRun.at", run({ at: undefined })),
+  bad(
+    "lastRun trigger unknown",
+    "settings.lastRun.trigger",
+    run({
+      trigger: MARK,
+    }),
+  ),
+  bad("lastRun mode unknown", "settings.lastRun.mode", run({ mode: MARK })),
+  bad(
+    "lastRun outcome unknown",
+    "settings.lastRun.outcome",
+    run({
+      outcome: MARK,
+    }),
+  ),
+  bad("lastRun error unknown", "settings.lastRun.error", run({ error: MARK })),
+  bad("lastRun with an unknown key", "settings.lastRun", run({ [MARK]: 1 })),
+  bad(
+    "lastRun report not an object",
+    "settings.lastRun.report",
+    run({
+      report: MARK,
+    }),
+  ),
+  bad(
+    "report pair list not an array",
+    "settings.lastRun.report.added",
+    run({
+      report: { ...report, added: MARK },
+    }),
+  ),
+  bad(
+    "report pair id invalid",
+    "settings.lastRun.report.failed[0].scId",
+    run({ report: { ...report, failed: [{ nakaId: 1, scId: 0 }] } }),
+  ),
+  bad(
+    "report deferred missing",
+    "settings.lastRun.report.deferred",
+    run({ report: { ...report, deferred: undefined } }),
+  ),
+  bad(
+    "report alreadyDone missing",
+    "settings.lastRun.report.alreadyDone",
+    run({ report: { ...report, alreadyDone: undefined } }),
+  ),
+  bad(
+    "report pendingRemovals negative",
+    "settings.lastRun.report.pendingRemovals",
+    run({ report: { ...report, pendingRemovals: -1 } }),
+  ),
+  bad(
+    "report unresolved negative",
+    "settings.lastRun.report.unresolved",
+    run({ report: { ...report, unresolved: -1 } }),
+  ),
+  bad(
+    "report unresolved fractional",
+    "settings.lastRun.report.unresolved",
+    run({ report: { ...report, unresolved: 0.5 } }),
+  ),
+  bad(
+    "report with an unknown key",
+    "settings.lastRun.report",
+    run({ report: { ...report, [MARK]: 1 } }),
+  ),
+  bad(
+    "preview not an array",
+    "settings.lastRun.preview",
+    run({
+      preview: MARK,
+    }),
+  ),
+  bad(
+    "preview side unknown",
+    "settings.lastRun.preview[0].side",
+    run({
+      preview: [{ side: MARK, title: "t" }],
+    }),
+  ),
+  bad(
+    "preview title not a string",
+    "settings.lastRun.preview[1].title",
+    run({
+      preview: [
+        { side: "sc", title: "t" },
+        { side: "sc", title: 4 },
+      ],
+    }),
+  ),
+  bad(
+    "preview entry with an unknown key",
+    "settings.lastRun.preview[0]",
+    run({
+      preview: [{ side: "sc", title: "t", [MARK]: 1 }],
+    }),
+  ),
+  bad("lastFinish not an object", "settings.lastFinish", {
+    mode: "live",
+    lastFinish: MARK,
+  }),
+  bad(
+    "lastFinish at fractional",
+    "settings.lastFinish.at",
+    finish({
+      at: 0.5,
+    }),
+  ),
+  bad(
+    "lastFinish key invalid",
+    "settings.lastFinish.key",
+    finish({
+      key: MARK,
+    }),
+  ),
+  bad(
+    "lastFinish outcome unknown",
+    "settings.lastFinish.outcome",
+    finish({
+      outcome: MARK,
+    }),
+  ),
+  bad(
+    "lastFinish with an unknown key",
+    "settings.lastFinish",
+    finish({
+      [MARK]: 1,
+    }),
+  ),
+];
+
+describe("parseSettings rejects", () => {
+  it.each(BAD_CASES)("$name", ({ raw, path }) => {
+    const error = rejection(raw);
+    expect(error).toBeInstanceOf(StoredStateError);
+    expect((error as Error).message).toBe(`stored state: ${path}`);
+    expect((error as Error).message).not.toContain(MARK);
+  });
+});
