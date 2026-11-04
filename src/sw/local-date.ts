@@ -10,7 +10,3 @@ export function localDate(date: Date): string {
   const month = pad(date.getMonth() + 1, 2);
   return `${year}-${month}-${pad(date.getDate(), 2)}`;
 }
-
-export function today(now: () => number = Date.now): string {
-  return localDate(new Date(now()));
-}

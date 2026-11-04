@@ -1,6 +1,6 @@
 // Tab side of the Naka bridge. It runs in the Naka tab's isolated content script and answers the worker's
 // requests with the client the entry file built. The Naka token is bound inside that client (its `token`
-// function) and never reaches this file: a reply carries a value or one of three fixed error codes, never the
+// function) and never reaches this file: a reply carries a value or one of five fixed error codes, never the
 // text, the cause or a field of an error.
 
 import type { NakaReply, NakaReplyError, ToNakaTab } from "../ext/messages";

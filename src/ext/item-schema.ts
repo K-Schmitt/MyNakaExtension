@@ -8,12 +8,16 @@ import {
   asString,
   fail,
   onlyKeys,
+  valuesOf,
 } from "./field-checks";
 import { parsePair } from "./pair-schema";
 
-const SIDES = ["naka", "sc"] as const;
-const REASONS = ["no-match", "not-in-catalogue"] as const;
-const KINDS = ["removal", "ambiguity"] as const;
+const SIDES = valuesOf<UnlinkedItem["side"]>({ naka: true, sc: true });
+const REASONS = valuesOf<UnlinkedItem["reason"]>({
+  "no-match": true,
+  "not-in-catalogue": true,
+});
+const KINDS = valuesOf<PendingItem["kind"]>({ removal: true, ambiguity: true });
 
 // Movie or episode content key, as the finish handler writes it.
 const CONTENT_KEY = /^(movie:\d+|tv:\d+:S\d+E\d+)$/;

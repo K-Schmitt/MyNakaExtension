@@ -1,3 +1,5 @@
+// One job at a time, in the order they were queued. No job may await `queue.run()` itself: the job it
+// queues starts only after the awaiting job ends, which then never ends (a deadlock).
 export type JobQueue = {
   run<T>(job: () => Promise<T>): Promise<T>;
 };

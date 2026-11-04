@@ -5,17 +5,24 @@ import {
   asRecord,
   asString,
   onlyKeys,
+  valuesOf,
   whenPresent,
 } from "./field-checks";
 import type { JobError } from "./job-error";
 import { parseReport } from "./report-schema";
 import type { Mode, RunRecord } from "./settings";
 
-export const MODES: readonly Mode[] = ["simulation", "live"];
-const TRIGGERS = ["naka-ready", "playlist", "button"] as const;
-const OUTCOMES = ["ok", "failed"] as const;
-const SIDES = ["naka", "sc"] as const;
-const ERRORS: Record<JobError, true> = {
+type Side = NonNullable<RunRecord["preview"]>[number]["side"];
+
+export const MODES = valuesOf<Mode>({ simulation: true, live: true });
+const TRIGGERS = valuesOf<RunRecord["trigger"]>({
+  "naka-ready": true,
+  playlist: true,
+  button: true,
+});
+const OUTCOMES = valuesOf<RunRecord["outcome"]>({ ok: true, failed: true });
+const SIDES = valuesOf<Side>({ naka: true, sc: true });
+export const ERROR_CODES = valuesOf<JobError>({
   "no-naka-tab": true,
   "naka-session": true,
   "sc-session": true,
@@ -23,8 +30,7 @@ const ERRORS: Record<JobError, true> = {
   "stored-state": true,
   unavailable: true,
   "finish-limit": true,
-};
-export const ERROR_CODES = Object.keys(ERRORS) as JobError[];
+});
 const KEYS = ["at", "trigger", "mode", "outcome", "error", "report", "preview"];
 
 function parsePreviewItem(raw: unknown, path: string) {

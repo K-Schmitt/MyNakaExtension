@@ -7,6 +7,7 @@ import {
   asString,
   fail,
   onlyKeys,
+  valuesOf,
   whenPresent,
 } from "./field-checks";
 import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
@@ -52,14 +53,13 @@ const KEYS = [
   "lastFinish",
   "finishWindow",
 ];
-const FINISH_KINDS: Record<FinishOutcome["kind"] | "failed", true> = {
+const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
   "needs-choice": true,
   "not-found": true,
   done: true,
   failed: true,
-};
-const FINISH_OUTCOMES = Object.keys(FINISH_KINDS) as FinishRecord["outcome"][];
+});
 
 // Shared with the status page, which reads the binding from the worker's answer.
 export function parseBinding(raw: unknown): NonNullable<Settings["binding"]> {
@@ -86,7 +86,8 @@ function finishError(
   return raw === undefined ? undefined : fail(path);
 }
 
-function parseFinish(raw: unknown): FinishRecord {
+// Shared with the status page, which reads the last finish from the worker's answer.
+export function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
   onlyKeys(record, ["at", "key", "outcome", "error"], path);

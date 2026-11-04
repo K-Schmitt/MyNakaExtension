@@ -1,27 +1,20 @@
 // The worker's answer to `status`, checked before the page reads it. It comes from our own worker but is
-// treated as untrusted: a fresh object holding the known keys only, or undefined. Never throws.
+// treated as untrusted: a fresh object holding the known keys only, or undefined. Never throws. The binding
+// and the last finish go through the very parsers the stored settings do.
 
 import {
   asInt,
   asOneOf,
   asRecord,
-  asString,
+  valuesOf,
   whenPresent,
 } from "../ext/field-checks";
 import { ERROR_CODES, MODES, parseRunRecord } from "../ext/run-record-schema";
-import { type FinishRecord, type Mode, parseBinding } from "../ext/settings";
+import { type Mode, parseBinding, parseFinish } from "../ext/settings";
 import type { Running } from "../sw/activity";
 import type { Counts, StatusSnapshot } from "../sw/status-snapshot";
 
-const OUTCOMES: readonly FinishRecord["outcome"][] = [
-  "ignored",
-  "needs-choice",
-  "not-found",
-  "done",
-  "failed",
-];
-
-const RUNNING_KINDS: readonly Running["kind"][] = ["sync", "finish"];
+const RUNNING_KINDS = valuesOf<Running["kind"]>({ sync: true, finish: true });
 
 function parseRunning(raw: unknown): Running {
   const record = asRecord(raw, "running");
@@ -38,22 +31,6 @@ function parseCounts(raw: unknown): Counts {
     openQuestions: asInt(record.openQuestions, 0, "openQuestions"),
     unlinked: asInt(record.unlinked, 0, "unlinked"),
   };
-}
-
-// An error is there if and only if the finish failed, as the worker stores it.
-function parseFinish(raw: unknown): FinishRecord {
-  const record = asRecord(raw, "lastFinish");
-  const outcome = asOneOf(record.outcome, OUTCOMES, "outcome");
-  const base = {
-    at: asInt(record.at, 0, "at"),
-    key: asString(record.key, "key"),
-    outcome,
-  };
-  if (outcome !== "failed") {
-    if (record.error !== undefined) throw new Error("error");
-    return base;
-  }
-  return { ...base, error: asOneOf(record.error, ERROR_CODES, "error") };
 }
 
 function parseSnapshot(raw: unknown): StatusSnapshot {

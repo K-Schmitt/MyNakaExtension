@@ -46,6 +46,15 @@ export function asBoolean(raw: unknown, path: string): boolean {
   return raw;
 }
 
+// The values of a union, from a Record that names each of them once: when the union gains or loses a
+// member, the Record no longer compiles, so a list that validates stored or messaged values cannot fall
+// behind its type.
+export function valuesOf<T extends string>(
+  members: Record<T, true>,
+): readonly T[] {
+  return Object.keys(members) as T[];
+}
+
 export function asOneOf<T extends string>(
   raw: unknown,
   allowed: readonly T[],

@@ -94,7 +94,7 @@ describe("toStatusView: error labels", () => {
   it.each(CODES)("maps %s on a failed finish", (code) => {
     const lastFinish: FinishRecord = {
       at: AT,
-      key: "film:1",
+      key: "movie:1",
       outcome: "failed",
       error: code,
     };
@@ -209,7 +209,11 @@ describe("toStatusView: the last run, by its own mode", () => {
   });
 
   it("shows a finished viewing that did not fail", () => {
-    const lastFinish: FinishRecord = { at: AT, key: "film:1", outcome: "done" };
+    const lastFinish: FinishRecord = {
+      at: AT,
+      key: "movie:1",
+      outcome: "done",
+    };
     expect(ready({ mode: "live", lastFinish }).lines).toContain(
       `Dernière fin de visionnage${NB}: 04/11/2026 14:05, enregistrée`,
     );
@@ -423,6 +427,11 @@ describe("toStatusView: an untrusted answer", () => {
     { mode: "live", binding: { nakaAccount: "77" } },
     { mode: "live", binding: { scUsername: "o", nakaAccount: 77 } },
     { mode: "live", binding: { scUsername: "o", token: "x" } },
+    { mode: "live", lastFinish: { at: AT, key: "film:1", outcome: "done" } },
+    {
+      mode: "live",
+      lastFinish: { at: AT, key: "movie:1", outcome: "done", note: "x" },
+    },
   ])("shows the silent-engine state for %j", (raw) => {
     expect(toStatusView(raw, UTC)).toEqual(NO_ENGINE);
   });

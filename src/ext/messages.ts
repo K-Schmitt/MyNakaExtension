@@ -9,6 +9,7 @@ import {
   asRecord,
   asString,
   fail,
+  valuesOf,
   whenPresent,
 } from "./field-checks";
 import type { Mode } from "./settings";
@@ -40,8 +41,6 @@ export type ToNakaTab =
   | { type: "naka-call"; call: "search"; query: string }
   | { type: "naka-account" };
 
-// `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
-// It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReplyError =
   | "no-token"
   | "session"
@@ -49,6 +48,8 @@ export type NakaReplyError =
   | "unavailable"
   | "not-found";
 
+// `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
+// It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReply =
   | { ok: true; value?: unknown }
   | { ok: false; error: NakaReplyError };
@@ -71,16 +72,41 @@ export type Sender = {
 };
 export type SenderRole = "naka-tab" | "status-page";
 
-const SOURCES = ["threshold", "explicit"] as const;
-const MODE_VALUES: readonly Mode[] = ["simulation", "live"];
-const ID_CALLS = ["add", "remove", "contentById"] as const;
-const REPLY_ERRORS: readonly NakaReplyError[] = [
-  "no-token",
-  "session",
-  "rate-limit",
-  "unavailable",
-  "not-found",
-];
+type FinishedSource = Extract<ToWorker, { type: "finished" }>["source"];
+type NakaCall = Extract<ToNakaTab, { type: "naka-call" }>["call"];
+
+const WORKER_TYPES = valuesOf<ToWorker["type"]>({
+  "naka-ready": true,
+  "playlist-changed": true,
+  finished: true,
+  status: true,
+  resync: true,
+  "set-mode": true,
+});
+const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
+const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
+const TAB_TYPES = valuesOf<ToNakaTab["type"]>({
+  "naka-call": true,
+  "naka-account": true,
+});
+const CALLS = valuesOf<NakaCall>({
+  playlistIds: true,
+  search: true,
+  add: true,
+  remove: true,
+  contentById: true,
+});
+const REPLY_ERRORS = valuesOf<NakaReplyError>({
+  "no-token": true,
+  session: true,
+  "rate-limit": true,
+  unavailable: true,
+  "not-found": true,
+});
+const PAGE_KINDS = valuesOf<PageEvent["kind"]>({
+  playlist: true,
+  watched: true,
+});
 const NAKA_ORIGIN = "https://naka.cx/";
 
 // Runs a throwing parser. Any failure (a bad field, or a hostile getter) becomes undefined.
@@ -126,18 +152,7 @@ function parseFinished(record: Record<string, unknown>): ToWorker {
 }
 
 function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
-  const type = asOneOf(
-    record.type,
-    [
-      "naka-ready",
-      "playlist-changed",
-      "finished",
-      "status",
-      "resync",
-      "set-mode",
-    ],
-    "type",
-  );
+  const type = asOneOf(record.type, WORKER_TYPES, "type");
   if (type === "finished") return parseFinished(record);
   if (type === "set-mode") {
     return { type, mode: asOneOf(record.mode, MODE_VALUES, "mode") };
@@ -150,11 +165,7 @@ export function parseToWorker(raw: unknown): ToWorker | undefined {
 }
 
 function parseNakaCall(record: Record<string, unknown>): ToNakaTab {
-  const call = asOneOf(
-    record.call,
-    ["playlistIds", "search", ...ID_CALLS],
-    "call",
-  );
+  const call = asOneOf(record.call, CALLS, "call");
   if (call === "playlistIds") return { type: "naka-call", call };
   if (call === "search") {
     return { type: "naka-call", call, query: asSearchQuery(record.query) };
@@ -167,7 +178,7 @@ function parseNakaCall(record: Record<string, unknown>): ToNakaTab {
 }
 
 function parseToNakaTabRecord(record: Record<string, unknown>): ToNakaTab {
-  const type = asOneOf(record.type, ["naka-call", "naka-account"], "type");
+  const type = asOneOf(record.type, TAB_TYPES, "type");
   return type === "naka-account" ? { type } : parseNakaCall(record);
 }
 
@@ -194,7 +205,7 @@ export function parseNakaReply(raw: unknown): NakaReply | undefined {
 
 function parsePageEventRecord(record: Record<string, unknown>): PageEvent {
   asOneOf(record.channel, [PAGE_CHANNEL], "channel");
-  const kind = asOneOf(record.kind, ["playlist", "watched"], "kind");
+  const kind = asOneOf(record.kind, PAGE_KINDS, "kind");
   if (kind === "playlist") return { channel: PAGE_CHANNEL, kind };
   return {
     channel: PAGE_CHANNEL,

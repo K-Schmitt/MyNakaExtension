@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { localDate, today } from "../src/sw/local-date";
+import { localDate } from "../src/sw/local-date";
 
 // Each block switches the process time zone (Node re-reads TZ when it is assigned), so the file runs
 // under both zones whatever TZ the gate has. Kiritimati is UTC+14 and Adak UTC-10 in November: around
@@ -40,18 +40,11 @@ describe.each(ZONES)("the local date under TZ=%s", (zone, cases) => {
 
   it.each(cases)("%s is %s", (instant, day) => {
     expect(localDate(new Date(instant))).toBe(day);
-    expect(today(() => Date.parse(instant))).toBe(day);
   });
 });
 
 describe("the local date: format", () => {
   it("pads the month and the day", () => {
     expect(localDate(new Date(2026, 0, 5, 12))).toBe("2026-01-05");
-  });
-
-  it("today reads the clock it is given, else the real one", () => {
-    const real = today();
-    expect(real).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(real).toBe(localDate(new Date()));
   });
 });

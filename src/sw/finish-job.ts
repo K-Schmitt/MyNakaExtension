@@ -48,12 +48,6 @@ async function attempt(
   }
 }
 
-// An ignored candidate (below the threshold, or a later mark of a viewing already handled) never
-// replaces the record of the same content: the status keeps what happened to it.
-function keepsRecord(settings: Settings, key: string, done: Done) {
-  return done.outcome === "ignored" && settings.lastFinish?.key === key;
-}
-
 // One refusal per window is enough to show the limit (K3): the later ones write nothing.
 function alreadyRefused(settings: Settings, window: FinishWindow): boolean {
   const last = settings.lastFinish;
@@ -85,7 +79,7 @@ async function counted(
   const reserved: Settings = { ...settings, finishWindow: withOneMore(window) };
   await deps.store.saveSettings(reserved);
   const done = await attempt(deps, settings, msg);
-  if (done === undefined || keepsRecord(settings, key, done)) return;
+  if (done === undefined) return;
   await record(deps, reserved, { at, key, ...done });
 }
 
