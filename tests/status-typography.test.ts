@@ -68,7 +68,7 @@ const SNAPSHOTS: StatusSnapshot[] = [
   },
   {
     mode: "live",
-    lastRun: run({ mode: "live" }),
+    lastRun: run({ mode: "live", report: { ...REPORT, failed: pairs(2) } }),
     counts: { pendingRemovals: 0, openQuestions: 0, unlinked: 0 },
     running: { kind: "finish", since: AT },
     pendingMode: "simulation",
@@ -107,6 +107,7 @@ describe("French typography on the status page", () => {
     const all = [
       ...Object.values(JOB_ERROR_LABELS),
       confirmText(0),
+      confirmText(1),
       confirmText(3),
       ...texts(toStatusView(undefined, localFormat("UTC"))),
     ];

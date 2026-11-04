@@ -144,6 +144,40 @@ describe("toStatusView: the last run, by its own mode", () => {
     `Pas encore examinés${NB}: 4`,
   ];
 
+  // Ruling 21: failed writes, in either mode, right after Déjà vus, and only when there are some.
+  const FAILED = (n: number) =>
+    `Échecs (nouvel essai au prochain passage)${NB}: ${n}`;
+  const withFailures = (mode: RunRecord["mode"], n: number) =>
+    run({
+      mode,
+      report: {
+        added: pairs(2),
+        deferred: pairs(1),
+        failed: pairs(n),
+        alreadyDone: pairs(3),
+        pendingRemovals: 0,
+        unresolved: 4,
+      },
+    });
+
+  it.each(["live", "simulation"] as const)(
+    "a %s run with failed writes counts them right after Déjà vus",
+    (mode) => {
+      const lines = ready({ mode, lastRun: withFailures(mode, 2) }).lines;
+      const at = lines.indexOf(`Déjà vus sur SensCritique${NB}: 3`);
+      expect(at).toBeGreaterThan(0);
+      expect(lines[at + 1]).toBe(FAILED(2));
+      expect(lines[at + 2]).toBe(`Pas encore examinés${NB}: 4`);
+    },
+  );
+
+  it("one failed write is counted, none is not shown", () => {
+    const one = ready({ mode: "live", lastRun: withFailures("live", 1) });
+    expect(one.lines).toContain(FAILED(1));
+    const none = ready({ mode: "live", lastRun: withFailures("live", 0) });
+    expect(none.lines.join(" ")).not.toContain("Échecs");
+  });
+
   it("a live run: the date, the trigger, Ajoutés and the three other counts", () => {
     const lines = ready({ mode: "live", lastRun: run({ mode: "live" }) }).lines;
     expect(lines).toContain(
@@ -347,6 +381,19 @@ describe("the confirmation before going live", () => {
   it("with a preview: the cap, and that the next pass takes up its titles without a new preview", () => {
     expect(confirmText(3)).toBe(
       `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra les 3 titres de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+    );
+  });
+
+  // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
+  it("with one title in the preview: le titre de l'aperçu", () => {
+    expect(confirmText(1)).toBe(
+      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra le titre de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+    );
+  });
+
+  it("with two titles: les 2 titres de l'aperçu", () => {
+    expect(confirmText(2)).toContain(
+      "reprendra les 2 titres de l'aperçu, puis les suivants",
     );
   });
 

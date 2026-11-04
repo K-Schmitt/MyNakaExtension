@@ -27,11 +27,12 @@ export const MODE_LABELS: Record<Mode, string> = {
 
 const CAP = `Chaque synchronisation fera au plus ${MAX_WRITES_PER_RUN} écritures`;
 
-// `count` is the number of titles in the simulation's preview.
+// `count` is the number of titles in the simulation's preview; one agrees in the singular (Ruling 21).
 export function confirmText(count: number): string {
   const ask = "Activer les écritures\u202F?";
   if (count === 0) return `${ask} ${CAP}, sans aperçu.`;
   const next =
     "La prochaine (bouton «\u202FResynchroniser\u202F» ou prochaine ouverture de Naka)";
-  return `${ask} ${CAP}. ${next} reprendra les ${count} titres de l'aperçu, puis les suivants, sans nouvel aperçu.`;
+  const titles = count === 1 ? "le titre" : `les ${count} titres`;
+  return `${ask} ${CAP}. ${next} reprendra ${titles} de l'aperçu, puis les suivants, sans nouvel aperçu.`;
 }

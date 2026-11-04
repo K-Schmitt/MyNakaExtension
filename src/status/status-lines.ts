@@ -42,6 +42,12 @@ export function runLine(run: RunRecord, format: StatusFormat): string {
   return `Dernière synchronisation${which}\u202F: ${format.dateTime(run.at)} (${TRIGGERS[run.trigger]})`;
 }
 
+// Failed writes, in either mode, only when there are some (Ruling 21): Plan 2 retries them next run.
+function failedLines(failed: number): string[] {
+  if (failed === 0) return [];
+  return [`Échecs (nouvel essai au prochain passage)\u202F: ${failed}`];
+}
+
 // A simulated run planned its writes; a live one made them.
 export function reportLines(run: RunRecord): string[] {
   const report = run.report;
@@ -51,6 +57,7 @@ export function reportLines(run: RunRecord): string[] {
     `${written}\u202F: ${report.added.length}`,
     `Reportés (${MAX_WRITES_PER_RUN} écritures au plus par passage)\u202F: ${report.deferred.length}`,
     `Déjà vus sur SensCritique\u202F: ${report.alreadyDone.length}`,
+    ...failedLines(report.failed.length),
     `Pas encore examinés\u202F: ${report.unresolved}`,
   ];
 }
