@@ -91,11 +91,19 @@ export function tabRunning(
 export function portAnswering(
   answer: (msg: ToNakaTab) => unknown,
   tabIds: number[] = [11],
-): TabsPort & { sent: { tabId: number; msg: ToNakaTab }[] } {
+): TabsPort & {
+  sent: { tabId: number; msg: ToNakaTab }[];
+  queried: string[];
+} {
   const sent: { tabId: number; msg: ToNakaTab }[] = [];
+  const queried: string[] = [];
   return {
     sent,
-    query: async () => tabIds.map((id) => ({ id })),
+    queried,
+    query: async (url) => {
+      queried.push(url);
+      return tabIds.map((id) => ({ id }));
+    },
     send: async (tabId, msg) => {
       sent.push({ tabId, msg });
       return answer(msg);

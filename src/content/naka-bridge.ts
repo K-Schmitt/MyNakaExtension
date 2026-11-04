@@ -36,6 +36,11 @@ export function readAccount(
   }
 }
 
+// Compile-time exhaustive; at run time a call the code does not know fails closed (the reply is `unavailable`).
+function unknownCall(_msg: never): never {
+  throw new Error("unknown Naka call");
+}
+
 async function run(
   msg: ToNakaTab,
   client: NakaClient,
@@ -53,6 +58,8 @@ async function run(
       return client.addToPlaylist(msg.contentId);
     case "remove":
       return client.removeFromPlaylist(msg.contentId);
+    default:
+      return unknownCall(msg);
   }
 }
 

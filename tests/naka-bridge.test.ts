@@ -192,6 +192,14 @@ describe("handleNakaCall: error codes", () => {
     }
   });
 
+  it("fails closed on a call it does not know", async () => {
+    const unknown = { type: "naka-call", call: "wipe" } as unknown as ToNakaTab;
+    const api = fakeApi(standardApi);
+    const reply = await handleNakaCall(unknown, clientOn(api.fetch), noAccount);
+    expect(reply).toStrictEqual({ ok: false, error: "unavailable" });
+    expect(api.calls).toHaveLength(0);
+  });
+
   it("maps a throwing account reader to unavailable", async () => {
     const reply = await handleNakaCall(
       { type: "naka-account" },

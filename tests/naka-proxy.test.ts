@@ -20,6 +20,11 @@ import {
   tabRunning,
 } from "./naka-bridge-fakes";
 
+type LateTab = {
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
+};
+
 type Fake = Timer & {
   pending: Map<number, () => void>;
   delays: number[];
@@ -242,23 +247,44 @@ describe("timeout", () => {
     expect(timer.pending.size).toBe(0);
   });
 
-  it("ignores a late answer and does not leave an unhandled rejection", async () => {
-    const timer = fakeTimer();
-    let answer: (v: unknown) => void = () => {};
-    const port: TabsPort = {
-      query: async () => [{ id: 1 }],
-      send: () =>
-        new Promise((resolve) => {
-          answer = resolve;
-        }),
-    };
-    const outcome = failure(createNakaProxy(port, timer).playlistIds());
-    await Promise.resolve();
-    await Promise.resolve();
-    timer.pending.get(0)?.();
-    await outcome;
-    answer(ok([1]));
-    await Promise.resolve();
+  describe("a late settlement after the timeout", () => {
+    async function timedOut(settle: (late: LateTab) => void) {
+      const timer = fakeTimer();
+      const late: LateTab = { resolve: () => {}, reject: () => {} };
+      const port: TabsPort = {
+        query: async () => [{ id: 1 }],
+        send: () =>
+          new Promise((resolve, reject) => {
+            late.resolve = resolve;
+            late.reject = reject;
+          }),
+      };
+      const outcome = createNakaProxy(port, timer).playlistIds();
+      const settled = failure(outcome);
+      await Promise.resolve();
+      await Promise.resolve();
+      timer.pending.get(0)?.();
+      const error = await settled;
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expect(error.message).toBe("Naka tab: no answer in time");
+      settle(late);
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      // still the same settled outcome, and the timer was cleared once
+      expect(await failure(outcome)).toBe(error);
+      expect(timer.cleared).toEqual([0]);
+    }
+
+    it("ignores a late answer", async () => {
+      await timedOut((late) => late.resolve(ok([1])));
+    });
+
+    it("ignores a late rejection", async () => {
+      await timedOut((late) => late.reject(new Error(MARKER)));
+    });
+
+    it("ignores a late no-token reply", async () => {
+      await timedOut((late) => late.resolve({ ok: false, error: "no-token" }));
+    });
   });
 });
 
@@ -561,6 +587,7 @@ describe("messages sent to the tab", () => {
     await expect(proxy.contentById(-1)).rejects.toThrow(RangeError);
     await expect(proxy.search("   ")).rejects.toThrow(RangeError);
     expect(port.sent).toHaveLength(0);
+    expect(port.queried).toEqual([]);
   });
 });
 
