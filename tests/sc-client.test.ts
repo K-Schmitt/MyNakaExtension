@@ -753,6 +753,30 @@ describe("a wishlist read that comes back short or malformed", () => {
     const { client } = setup(LOGGED_IN, wishlistOf(37));
     expect(await client.readWishlist("movie")).toHaveLength(37);
   });
+
+  const DUPLICATE =
+    "SensCritique UserCollection: duplicate product in the read";
+
+  it("rejects a product listed twice across pages: the count matches, but 19 would look removed", async () => {
+    const first = Array.from({ length: 18 }, (_v, i) => product(i + 1));
+    const second = [
+      product(18),
+      ...Array.from({ length: 17 }, (_v, i) => product(i + 20)),
+    ];
+    const error = await rejection((call) =>
+      Number(variablesOf(call).offset) === 0
+        ? wishPage(first, 36)
+        : wishPage(second, 36),
+    );
+    expect(error.message).toBe(DUPLICATE);
+  });
+
+  it("rejects a product listed twice in one page", async () => {
+    const error = await rejection(() =>
+      wishPage([product(1), product(2), product(1)], 3),
+    );
+    expect(error.message).toBe(DUPLICATE);
+  });
 });
 
 describe("seasonInfo", () => {

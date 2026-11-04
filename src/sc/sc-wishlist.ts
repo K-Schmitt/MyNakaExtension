@@ -96,6 +96,23 @@ function checkComplete(items: readonly ScWishItem[], total: number): void {
   }
 }
 
+// A product listed twice in one read would hide another one while the count still matches the total.
+function appendUnique(
+  items: ScWishItem[],
+  seen: Set<number>,
+  page: readonly ScWishItem[],
+): void {
+  for (const item of page) {
+    if (seen.has(item.productId)) {
+      throw new ScUnavailableError(
+        "SensCritique UserCollection: duplicate product in the read",
+      );
+    }
+    seen.add(item.productId);
+    items.push(item);
+  }
+}
+
 // A public profile can be read without a token, so the token is sent only when there is one.
 // The total of the first page fixes the plan; a later page that disagrees means the list changed
 // during the read, and a read whose items do not add up to that total is short or padded: both fail
@@ -112,6 +129,7 @@ export async function readWishlist(
     token: session.token,
   };
   const items: ScWishItem[] = [];
+  const seen = new Set<number>();
   let offset = 0;
   let total: number | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -128,7 +146,7 @@ export async function readWishlist(
         "SensCritique UserCollection: incomplete read",
       );
     }
-    for (const item of got.items) items.push(item);
+    appendUnique(items, seen, got.items);
     if (next === undefined) {
       checkComplete(items, total);
       return items;
