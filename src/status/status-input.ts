@@ -9,7 +9,7 @@ import {
   whenPresent,
 } from "../ext/field-checks";
 import { ERROR_CODES, MODES, parseRunRecord } from "../ext/run-record-schema";
-import type { FinishRecord, Mode } from "../ext/settings";
+import { type FinishRecord, type Mode, parseBinding } from "../ext/settings";
 import type { Running } from "../sw/activity";
 import type { Counts, StatusSnapshot } from "../sw/status-snapshot";
 
@@ -59,6 +59,7 @@ function parseFinish(raw: unknown): FinishRecord {
 function parseSnapshot(raw: unknown): StatusSnapshot {
   const record = asRecord(raw, "status");
   const mode = whenPresent(record.mode, (v) => asOneOf<Mode>(v, MODES, "mode"));
+  const binding = whenPresent(record.binding, parseBinding);
   const lastRun = whenPresent(record.lastRun, (v) =>
     parseRunRecord(v, "lastRun"),
   );
@@ -73,6 +74,7 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
   );
   return {
     ...(mode === undefined ? {} : { mode }),
+    ...(binding === undefined ? {} : { binding }),
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(counts === undefined ? {} : { counts }),

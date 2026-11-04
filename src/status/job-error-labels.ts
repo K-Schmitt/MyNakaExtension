@@ -1,4 +1,5 @@
-// What the owner reads for each reason a job stopped. The Record keeps the table exhaustive.
+// What the owner reads for each reason a job stopped. The Record keeps the table exhaustive. French
+// typography: U+202F before « : ; ? ! ».
 
 import type { JobError } from "../ext/job-error";
 
@@ -10,5 +11,5 @@ export const JOB_ERROR_LABELS: Record<JobError, string> = {
   "stored-state": "État enregistré illisible",
   unavailable: "Site indisponible, nouvel essai au prochain passage",
   "finish-limit":
-    "Trop de fins de visionnage en une heure : réessayez plus tard",
+    "Trop de fins de visionnage en une heure\u202F: réessayez plus tard",
 };

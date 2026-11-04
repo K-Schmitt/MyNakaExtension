@@ -1,11 +1,15 @@
-// The sentences of the status page, one function per sentence. Text only; dates go through the format.
+// The sentences about the stored records: the last run, its counts and preview, the last finish, a read
+// error. One function per sentence; text only; dates go through the format. A run is worded by its own
+// mode, whatever the mode is now. French typography: U+202F before « : ; ? ! ».
 
+import { MAX_WRITES_PER_RUN } from "../core/sync-writes";
+import { MAX_FINISHES_PER_WINDOW } from "../ext/finish-window";
 import type { JobError } from "../ext/job-error";
-import type { FinishRecord, Mode, RunRecord } from "../ext/settings";
-import type { Running } from "../sw/activity";
-import type { Counts } from "../sw/status-snapshot";
+import type { FinishRecord, RunRecord } from "../ext/settings";
 import { JOB_ERROR_LABELS } from "./job-error-labels";
 import type { StatusFormat } from "./status-format";
+
+type PreviewItem = NonNullable<RunRecord["preview"]>[number];
 
 const TRIGGERS: Record<RunRecord["trigger"], string> = {
   "naka-ready": "ouverture de Naka",
@@ -21,55 +25,54 @@ const FINISH_OUTCOMES: Record<FinishRecord["outcome"], string> = {
   failed: "échec",
 };
 
-const MODE_LABELS: Record<Mode, string> = {
-  simulation: "simulation",
-  live: "écritures actives",
+const TARGETS: Record<PreviewItem["side"], string> = {
+  sc: "Envies SensCritique",
+  naka: "Ma liste Naka",
 };
 
-export function runningLine(running: Running, format: StatusFormat): string {
-  if (running.kind === "finish")
-    return "Fin de visionnage en cours de traitement";
-  return `Synchronisation en cours depuis ${format.time(running.since)}`;
-}
-
-export function pendingModeLine(mode: Mode): string {
-  return `Changement de mode en attente\u202F: ${MODE_LABELS[mode]}`;
-}
+const because = (error: JobError | undefined): string =>
+  error === undefined ? "" : `\u202F: ${JOB_ERROR_LABELS[error]}`;
 
 export function snapshotErrorLine(error: JobError): string {
-  return `Lecture de l'état impossible : ${JOB_ERROR_LABELS[error]}`;
-}
-
-export function questionsLine(counts: Counts): string {
-  return `Questions à traiter dans une prochaine version : ${counts.openQuestions}`;
+  return `Lecture de l'état impossible${because(error)}`;
 }
 
 export function runLine(run: RunRecord, format: StatusFormat): string {
-  return `Dernière synchronisation : ${format.dateTime(run.at)} (${TRIGGERS[run.trigger]})`;
+  const which = run.mode === "simulation" ? " (simulation)" : "";
+  return `Dernière synchronisation${which}\u202F: ${format.dateTime(run.at)} (${TRIGGERS[run.trigger]})`;
 }
 
-export function reportLine(run: RunRecord): string | undefined {
+// A simulated run planned its writes; a live one made them.
+export function reportLines(run: RunRecord): string[] {
   const report = run.report;
-  if (report === undefined) return undefined;
-  return `Ajoutés : ${report.added.length} · Reportés : ${report.deferred.length} · Échecs : ${report.failed.length} · Déjà vus : ${report.alreadyDone.length}`;
+  if (report === undefined) return [];
+  const written = run.mode === "simulation" ? "Prévus" : "Ajoutés";
+  return [
+    `${written}\u202F: ${report.added.length}`,
+    `Reportés (${MAX_WRITES_PER_RUN} écritures au plus par passage)\u202F: ${report.deferred.length}`,
+    `Déjà vus sur SensCritique\u202F: ${report.alreadyDone.length}`,
+    `Pas encore examinés\u202F: ${report.unresolved}`,
+  ];
 }
 
 export function runErrorLine(run: RunRecord): string | undefined {
   if (run.outcome === "failed") {
-    const why =
-      run.error === undefined ? "" : ` : ${JOB_ERROR_LABELS[run.error]}`;
-    return `Synchronisation échouée${why}`;
+    return `Synchronisation échouée${because(run.error)}`;
   }
   if (run.error === undefined) return undefined;
-  return `Terminée, mais arrêtée en cours : ${JOB_ERROR_LABELS[run.error]}`;
+  return `Terminée, mais arrêtée en cours${because(run.error)}`;
 }
 
 export function finishLine(finish: FinishRecord, format: StatusFormat): string {
   if (finish.error === "finish-limit") {
-    return `Limite atteinte depuis ${format.time(finish.at)}`;
+    return `Fins de visionnage\u202F: limite de ${MAX_FINISHES_PER_WINDOW} par heure atteinte le ${format.date(finish.at)} à ${format.time(finish.at)}`;
   }
   const outcome = FINISH_OUTCOMES[finish.outcome];
-  const why =
-    finish.error === undefined ? "" : ` : ${JOB_ERROR_LABELS[finish.error]}`;
-  return `Dernière fin de visionnage : ${format.dateTime(finish.at)}, ${outcome}${why}`;
+  return `Dernière fin de visionnage\u202F: ${format.dateTime(finish.at)}, ${outcome}${because(finish.error)}`;
+}
+
+// A title Naka could not give is empty in the record.
+export function previewLine(item: PreviewItem): string {
+  const title = item.title === "" ? "(titre inconnu)" : item.title;
+  return `${TARGETS[item.side]}\u202F: ${title}`;
 }

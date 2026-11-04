@@ -61,7 +61,8 @@ const FINISH_KINDS: Record<FinishOutcome["kind"] | "failed", true> = {
 };
 const FINISH_OUTCOMES = Object.keys(FINISH_KINDS) as FinishRecord["outcome"][];
 
-function parseBinding(raw: unknown): NonNullable<Settings["binding"]> {
+// Shared with the status page, which reads the binding from the worker's answer.
+export function parseBinding(raw: unknown): NonNullable<Settings["binding"]> {
   const path = "settings.binding";
   const record = asRecord(raw, path);
   onlyKeys(record, ["scUsername", "nakaAccount"], path);

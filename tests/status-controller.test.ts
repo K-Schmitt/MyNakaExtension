@@ -60,6 +60,8 @@ function setup(answers: unknown[], confirmAnswer = true) {
   const pending: Deferred[] = [];
   const queue = [...answers];
   const clock = fakeTimer();
+  // What the page did, in order: the buttons enabled or not, and where the focus went.
+  const page: string[] = [];
   const controller = createController({
     send: (message) => {
       sent.push(message);
@@ -78,11 +80,15 @@ function setup(answers: unknown[], confirmAnswer = true) {
       return confirmAnswer;
     },
     show: (view) => shown.push(view),
-    setBusy: (b) => busy.push(b),
+    setBusy: (b) => {
+      busy.push(b);
+      page.push(`busy:${b}`);
+    },
+    focus: (target) => page.push(`focus:${target}`),
     format: localFormat("UTC"),
     timer: clock.timer,
   });
-  return { controller, sent, shown, busy, confirms, pending, clock };
+  return { controller, sent, shown, busy, confirms, pending, clock, page };
 }
 
 describe("load", () => {
@@ -145,6 +151,7 @@ describe("resync", () => {
       confirm: () => true,
       show: () => {},
       setBusy: () => {},
+      focus: () => {},
       format: localFormat("UTC"),
       timer: fakeTimer().timer,
     });
@@ -166,7 +173,7 @@ describe("toggleMode", () => {
     await t.controller.load();
     await t.controller.toggleMode();
     expect(t.confirms).toHaveLength(1);
-    expect(t.confirms[0]).toContain("2 écriture(s)");
+    expect(t.confirms[0]).toContain("reprendra les 2 titres de l'aperçu");
     expect(t.sent.slice(1)).toEqual([
       { type: "set-mode", mode: "live" },
       { type: "status" },
@@ -288,5 +295,69 @@ describe("polling", () => {
     await t.controller.load();
     await t.controller.resync();
     expect(t.clock.armed.size).toBe(1);
+  });
+});
+
+// Disabling the pressed button drops its focus: once the answer is shown and the buttons are enabled
+// again, the focus goes back to it, or to the headline when that button is now hidden (Ruling 19).
+describe("focus after an action", () => {
+  it("returns to Resynchroniser once the buttons are enabled again", async () => {
+    const t = setup([SIM, SIM]);
+    await t.controller.load();
+    expect(t.page).toEqual(["busy:true", "busy:false"]);
+    await t.controller.resync();
+    expect(t.page.slice(2)).toEqual([
+      "busy:true",
+      "busy:false",
+      "focus:resync",
+    ]);
+  });
+
+  it("returns to the switch after a mode change", async () => {
+    const t = setup([LIVE, SIM]);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.page.at(-1)).toBe("focus:switch");
+  });
+
+  it("returns to the switch when the owner declines", async () => {
+    const t = setup([SIM], false);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.page.slice(2)).toEqual([
+      "busy:true",
+      "busy:false",
+      "focus:switch",
+    ]);
+  });
+
+  it("goes to the headline when the switch is hidden after the answer", async () => {
+    const t = setup([LIVE, new Error("port closed")]);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.shown.at(-1)?.kind).toBe("no-engine");
+    expect(t.page.at(-1)).toBe("focus:headline");
+  });
+
+  it("goes to the headline when the mode becomes unknown", async () => {
+    const t = setup([LIVE, { error: "stored-state" }]);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.page.at(-1)).toBe("focus:headline");
+  });
+
+  it("a page load and a poll move no focus", async () => {
+    const t = setup([RUNNING, LIVE]);
+    await t.controller.load();
+    t.clock.fire();
+    await settle();
+    expect(t.page.filter((p) => p.startsWith("focus"))).toEqual([]);
+  });
+
+  it("a click ignored while busy moves no focus", async () => {
+    const t = setup(["hang"]);
+    void t.controller.load();
+    await t.controller.resync();
+    expect(t.page).toEqual(["busy:true"]);
   });
 });

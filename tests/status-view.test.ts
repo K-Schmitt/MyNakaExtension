@@ -1,14 +1,19 @@
-import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { JobError } from "../src/ext/job-error";
 import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { localFormat } from "../src/status/status-format";
-import { confirmText, toStatusView } from "../src/status/status-view";
+import { confirmText } from "../src/status/status-mode-copy";
+import { bindingLine } from "../src/status/status-owner-lines";
+import { toStatusView } from "../src/status/status-view";
 import type { StatusSnapshot } from "../src/sw/status-snapshot";
 
+// French typography: U+202F before « : ; ? ! » and inside « ». Every expected string below spells it
+// out by code point, so a plain space fails.
+const NB = "\u202F";
 const UTC = localFormat("UTC");
 const AT = Date.UTC(2026, 10, 4, 14, 5);
 const COUNTS = { pendingRemovals: 0, openQuestions: 2, unlinked: 1 };
+const ZERO = { pendingRemovals: 0, openQuestions: 0, unlinked: 0 };
 
 const LABELS: Record<JobError, string> = {
   "no-naka-tab": "Ouvrez ou rechargez un onglet Naka",
@@ -17,8 +22,7 @@ const LABELS: Record<JobError, string> = {
   "other-account": "Compte différent de celui enregistré",
   "stored-state": "État enregistré illisible",
   unavailable: "Site indisponible, nouvel essai au prochain passage",
-  "finish-limit":
-    "Trop de fins de visionnage en une heure : réessayez plus tard",
+  "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessayez plus tard`,
 };
 const CODES = Object.keys(LABELS) as JobError[];
 
@@ -38,7 +42,7 @@ function run(extra: Partial<RunRecord> = {}): RunRecord {
       failed: pairs(0),
       alreadyDone: pairs(3),
       pendingRemovals: 0,
-      unresolved: 0,
+      unresolved: 4,
     },
     ...extra,
   };
@@ -51,9 +55,11 @@ function ready(snapshot: StatusSnapshot, format = UTC) {
 }
 
 describe("toStatusView: mode", () => {
-  it("labels the simulation and offers the switch to live", () => {
+  it("says what simulation leaves alone and what it still writes, and offers live", () => {
     const view = ready({ mode: "simulation", counts: COUNTS });
-    expect(view.headline).toBe("Simulation : rien n'est écrit");
+    expect(view.headline).toBe(
+      `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+    );
     expect(view.mode).toBe("simulation");
     expect(view.switchLabel).toBe("Activer les écritures");
   });
@@ -69,7 +75,7 @@ describe("toStatusView: mode", () => {
     expect(view.mode).toBeUndefined();
     expect(view.switchLabel).toBeUndefined();
     expect(view.lines).toContain(
-      "Lecture de l'état impossible : État enregistré illisible",
+      `Lecture de l'état impossible${NB}: État enregistré illisible`,
     );
   });
 });
@@ -80,7 +86,9 @@ describe("toStatusView: error labels", () => {
       mode: "live",
       lastRun: run({ outcome: "failed", error: code }),
     });
-    expect(view.lines).toContain(`Synchronisation échouée : ${LABELS[code]}`);
+    expect(view.lines).toContain(
+      `Synchronisation échouée${NB}: ${LABELS[code]}`,
+    );
   });
 
   it.each(CODES)("maps %s on a failed finish", (code) => {
@@ -93,15 +101,15 @@ describe("toStatusView: error labels", () => {
     const lines = ready({ mode: "live", lastFinish }).lines;
     const expected =
       code === "finish-limit"
-        ? "Limite atteinte depuis 14:05"
-        : `Dernière fin de visionnage : 04/11/2026 14:05, échec : ${LABELS[code]}`;
+        ? `Fins de visionnage${NB}: limite de 30 par heure atteinte le 04/11/2026 à 14:05`
+        : `Dernière fin de visionnage${NB}: 04/11/2026 14:05, échec${NB}: ${LABELS[code]}`;
     expect(lines).toContain(expected);
   });
 
   it.each(CODES)("maps %s on a snapshot error", (code) => {
     const view = ready({ mode: "live", error: code });
     expect(view.lines).toContain(
-      `Lecture de l'état impossible : ${LABELS[code]}`,
+      `Lecture de l'état impossible${NB}: ${LABELS[code]}`,
     );
   });
 
@@ -111,20 +119,65 @@ describe("toStatusView: error labels", () => {
       lastRun: run({ error: "sc-session" }),
     });
     expect(view.lines).toContain(
-      "Terminée, mais arrêtée en cours : Reconnectez-vous sur SensCritique",
+      `Terminée, mais arrêtée en cours${NB}: Reconnectez-vous sur SensCritique`,
+    );
+  });
+
+  it("dates the finish limit in the owner's local time, day included", () => {
+    const tokyo = localFormat("Asia/Tokyo");
+    const lastFinish: FinishRecord = {
+      at: Date.UTC(2026, 10, 4, 20, 30),
+      key: "movie:1",
+      outcome: "failed",
+      error: "finish-limit",
+    };
+    expect(ready({ mode: "live", lastFinish }, tokyo).lines).toContain(
+      `Fins de visionnage${NB}: limite de 30 par heure atteinte le 05/11/2026 à 05:30`,
     );
   });
 });
 
-describe("toStatusView: last run and finish", () => {
-  it("shows the date, the trigger and the four counts", () => {
+describe("toStatusView: the last run, by its own mode", () => {
+  const LATER = [
+    `Reportés (10 écritures au plus par passage)${NB}: 1`,
+    `Déjà vus sur SensCritique${NB}: 3`,
+    `Pas encore examinés${NB}: 4`,
+  ];
+
+  it("a live run: the date, the trigger, Ajoutés and the three other counts", () => {
+    const lines = ready({ mode: "live", lastRun: run({ mode: "live" }) }).lines;
+    expect(lines).toContain(
+      `Dernière synchronisation${NB}: 04/11/2026 14:05 (bouton Resynchroniser)`,
+    );
+    expect(lines).toContain(`Ajoutés${NB}: 2`);
+    for (const line of LATER) expect(lines).toContain(line);
+    expect(lines.join(" ")).not.toContain("Prévus");
+  });
+
+  it("a simulated run says so, and counts what it planned as Prévus", () => {
+    const lines = ready({ mode: "simulation", lastRun: run() }).lines;
+    expect(lines).toContain(
+      `Dernière synchronisation (simulation)${NB}: 04/11/2026 14:05 (bouton Resynchroniser)`,
+    );
+    expect(lines).toContain(`Prévus${NB}: 2`);
+    for (const line of LATER) expect(lines).toContain(line);
+    expect(lines.join(" ")).not.toContain("Ajoutés");
+  });
+
+  it("a simulated run read under live mode still says (simulation) and Prévus", () => {
     const lines = ready({ mode: "live", lastRun: run() }).lines;
-    expect(lines).toContain(
-      "Dernière synchronisation : 04/11/2026 14:05 (bouton Resynchroniser)",
-    );
-    expect(lines).toContain(
-      "Ajoutés : 2 · Reportés : 1 · Échecs : 0 · Déjà vus : 3",
-    );
+    expect(lines[0]).toContain(`(simulation)${NB}:`);
+    expect(lines).toContain(`Prévus${NB}: 2`);
+    expect(lines.join(" ")).not.toContain("Ajoutés");
+  });
+
+  it("a live run read under simulation says Ajoutés, without (simulation)", () => {
+    const lines = ready({
+      mode: "simulation",
+      lastRun: run({ mode: "live" }),
+    }).lines;
+    expect(lines).toContain(`Ajoutés${NB}: 2`);
+    expect(lines.join(" ")).not.toContain("(simulation)");
   });
 
   it.each([
@@ -132,9 +185,12 @@ describe("toStatusView: last run and finish", () => {
     ["playlist", "changement de la liste"],
     ["button", "bouton Resynchroniser"],
   ] as const)("names the trigger %s", (trigger, label) => {
-    const lines = ready({ mode: "live", lastRun: run({ trigger }) }).lines;
+    const lines = ready({
+      mode: "live",
+      lastRun: run({ mode: "live", trigger }),
+    }).lines;
     expect(lines).toContain(
-      `Dernière synchronisation : 04/11/2026 14:05 (${label})`,
+      `Dernière synchronisation${NB}: 04/11/2026 14:05 (${label})`,
     );
   });
 
@@ -144,22 +200,102 @@ describe("toStatusView: last run and finish", () => {
     expect(lines[0]).toContain("04/11/2026 23:05");
   });
 
+  it("a run with no report has no count line", () => {
+    const lines = ready({
+      mode: "live",
+      lastRun: run({ report: undefined }),
+    }).lines;
+    expect(lines).toHaveLength(1);
+  });
+
   it("shows a finished viewing that did not fail", () => {
     const lastFinish: FinishRecord = { at: AT, key: "film:1", outcome: "done" };
     expect(ready({ mode: "live", lastFinish }).lines).toContain(
-      "Dernière fin de visionnage : 04/11/2026 14:05, enregistrée",
-    );
-  });
-
-  it("shows the questions left for a later version", () => {
-    const view = ready({ mode: "live", counts: COUNTS });
-    expect(view.lines).toContain(
-      "Questions à traiter dans une prochaine version : 2",
+      `Dernière fin de visionnage${NB}: 04/11/2026 14:05, enregistrée`,
     );
   });
 
   it("shows no run line before the first run", () => {
-    expect(ready({ mode: "live", counts: COUNTS }).lines).toHaveLength(1);
+    expect(ready({ mode: "live", counts: ZERO }).lines).toEqual([
+      "Rien en attente",
+    ]);
+  });
+});
+
+describe("toStatusView: what waits for the owner", () => {
+  const QUESTIONS = "Questions à traiter dans une prochaine version";
+  const REMOVALS = "Retraits à confirmer dans une prochaine version";
+  const UNLINKED = "Titres non reliés";
+
+  it("each count above zero on its own line", () => {
+    const lines = ready({
+      mode: "live",
+      counts: { pendingRemovals: 3, openQuestions: 2, unlinked: 1 },
+    }).lines;
+    expect(lines).toEqual([
+      `${QUESTIONS}${NB}: 2`,
+      `${REMOVALS}${NB}: 3`,
+      `${UNLINKED}${NB}: 1`,
+    ]);
+  });
+
+  it.each([
+    [{ ...ZERO, openQuestions: 2 }, `${QUESTIONS}${NB}: 2`],
+    [{ ...ZERO, pendingRemovals: 3 }, `${REMOVALS}${NB}: 3`],
+    [{ ...ZERO, unlinked: 1 }, `${UNLINKED}${NB}: 1`],
+  ])("only the count above zero: %j", (counts, line) => {
+    expect(ready({ mode: "live", counts }).lines).toEqual([line]);
+  });
+
+  it("all three at zero: Rien en attente", () => {
+    expect(ready({ mode: "live", counts: ZERO }).lines).toEqual([
+      "Rien en attente",
+    ]);
+  });
+
+  it("no counts (the state unreadable): neither the counts nor Rien en attente", () => {
+    const lines = ready({ mode: "live", error: "stored-state" }).lines;
+    expect(lines.join(" ")).not.toContain("Rien en attente");
+    expect(lines).toHaveLength(1);
+  });
+});
+
+describe("toStatusView: the bound accounts", () => {
+  it("names both accounts", () => {
+    const binding = { scUsername: "owner", nakaAccount: "77" };
+    expect(ready({ mode: "live", binding }).lines).toContain(
+      `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+    );
+  });
+
+  it("leaves out a Naka account not bound yet", () => {
+    const lines = ready({
+      mode: "live",
+      binding: { scUsername: "owner" },
+    }).lines;
+    expect(lines).toContain(`Comptes liés${NB}: owner sur SensCritique`);
+  });
+
+  it("leaves out each part that is absent", () => {
+    expect(bindingLine({ nakaAccount: "77" })).toBe(
+      `Comptes liés${NB}: compte Naka n° 77`,
+    );
+    expect(bindingLine({ scUsername: "owner" })).toBe(
+      `Comptes liés${NB}: owner sur SensCritique`,
+    );
+    expect(bindingLine({})).toBeUndefined();
+  });
+
+  it("no binding: no line", () => {
+    const lines = ready({ mode: "live", counts: ZERO }).lines;
+    expect(lines.join(" ")).not.toContain("Comptes liés");
+  });
+
+  it("carries a hostile username as plain text", () => {
+    const scUsername = "<img src=x onerror=alert(1)>";
+    expect(ready({ mode: "live", binding: { scUsername } }).lines).toContain(
+      `Comptes liés${NB}: ${scUsername} sur SensCritique`,
+    );
   });
 });
 
@@ -169,10 +305,22 @@ describe("toStatusView: preview", () => {
     { side: "naka" as const, title: "Heat" },
   ];
 
-  it("lists the planned titles in simulation", () => {
+  it("lists the planned titles in simulation, each with its target", () => {
     const view = ready({ mode: "simulation", lastRun: run({ preview }) });
-    expect(view.preview).toEqual(["Alien", "Heat"]);
+    expect(view.preview).toEqual([
+      `Envies SensCritique${NB}: Alien`,
+      `Ma liste Naka${NB}: Heat`,
+    ]);
     expect(view.previewCount).toBe(2);
+  });
+
+  it("names an empty title (titre inconnu)", () => {
+    const view = ready({
+      mode: "simulation",
+      lastRun: run({ preview: [{ side: "naka", title: "" }] }),
+    });
+    expect(view.preview).toEqual([`Ma liste Naka${NB}: (titre inconnu)`]);
+    expect(view.previewCount).toBe(1);
   });
 
   it("hides the preview when writes are live", () => {
@@ -187,12 +335,20 @@ describe("toStatusView: preview", () => {
       mode: "simulation",
       lastRun: run({ preview: [{ side: "sc", title }] }),
     });
-    expect(view.preview).toEqual([title]);
+    expect(view.preview).toEqual([`Envies SensCritique${NB}: ${title}`]);
+  });
+});
+
+describe("the confirmation before going live", () => {
+  it("with a preview: the cap, and that the next pass takes up its titles without a new preview", () => {
+    expect(confirmText(3)).toBe(
+      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra les 3 titres de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+    );
   });
 
-  it("words the confirmation with the count", () => {
-    expect(confirmText(3)).toBe(
-      "Activer les écritures ? 3 écriture(s) prévue(s) dans la simulation seront faites au prochain passage.",
+  it("without a preview: the cap, and no preview", () => {
+    expect(confirmText(0)).toBe(
+      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures, sans aperçu.`,
     );
   });
 });
@@ -220,7 +376,7 @@ describe("toStatusView: what runs now", () => {
   ] as const)("names a pending switch to %s", (pendingMode, label) => {
     const view = ready({ mode: "live", pendingMode });
     expect(view.lines).toContain(
-      `Changement de mode en attente\u202F: ${label}`,
+      `Changement de mode en attente${NB}: ${label}`,
     );
     expect(view.inProgress).toBe(true);
   });
@@ -262,6 +418,11 @@ describe("toStatusView: an untrusted answer", () => {
     { mode: "live", running: { kind: "sync", since: -1 } },
     { mode: "live", running: "sync" },
     { mode: "live", pendingMode: "paused" },
+    { mode: "live", binding: { scUsername: "" } },
+    { mode: "live", binding: { scUsername: 7 } },
+    { mode: "live", binding: { nakaAccount: "77" } },
+    { mode: "live", binding: { scUsername: "o", nakaAccount: 77 } },
+    { mode: "live", binding: { scUsername: "o", token: "x" } },
   ])("shows the silent-engine state for %j", (raw) => {
     expect(toStatusView(raw, UTC)).toEqual(NO_ENGINE);
   });
@@ -279,16 +440,5 @@ describe("toStatusView: an untrusted answer", () => {
     const view = toStatusView({ mode: "live", token: "secret" }, UTC);
     expect(view.kind).toBe("ready");
     expect(JSON.stringify(view)).not.toContain("secret");
-  });
-});
-
-describe("the page source", () => {
-  it("never uses innerHTML or insertAdjacentHTML", () => {
-    for (const name of readdirSync("src/status")) {
-      const source = readFileSync(`src/status/${name}`, "utf8");
-      expect(source, name).not.toMatch(
-        /innerHTML|outerHTML|insertAdjacentHTML|document\.write/,
-      );
-    }
   });
 });

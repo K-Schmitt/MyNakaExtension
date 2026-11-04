@@ -2,18 +2,19 @@
 
 import type { Mode } from "../ext/settings";
 import type { StatusSnapshot } from "../sw/status-snapshot";
+import { pendingModeLine, runningLine } from "./status-activity-lines";
 import type { StatusFormat } from "./status-format";
 import { readSnapshot } from "./status-input";
 import {
   finishLine,
-  pendingModeLine,
-  questionsLine,
-  reportLine,
+  previewLine,
+  reportLines,
   runErrorLine,
   runLine,
-  runningLine,
   snapshotErrorLine,
 } from "./status-lines";
+import { MODE_TEXT } from "./status-mode-copy";
+import { bindingLine, countLines } from "./status-owner-lines";
 
 export type StatusView =
   | { kind: "loading"; message: string }
@@ -40,24 +41,19 @@ const NO_ENGINE_VIEW: StatusView = {
   message: "Le moteur ne répond pas, rouvrez cette page",
 };
 
-const MODE_TEXT: Record<Mode, { headline: string; switchLabel: string }> = {
-  simulation: {
-    headline: "Simulation : rien n'est écrit",
-    switchLabel: "Activer les écritures",
-  },
-  live: {
-    headline: "Écritures actives",
-    switchLabel: "Revenir en simulation",
-  },
-};
-
 const UNKNOWN_MODE = "Mode inconnu";
+
+const present = <T>(items: (T | undefined)[]): T[] =>
+  items.filter((item) => item !== undefined);
 
 function runLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
   const run = snapshot.lastRun;
   if (run === undefined) return [];
-  const lines = [runLine(run, format), reportLine(run), runErrorLine(run)];
-  return lines.filter((line) => line !== undefined);
+  return present([
+    runLine(run, format),
+    ...reportLines(run),
+    runErrorLine(run),
+  ]);
 }
 
 // What runs now and what waits, first: the stored records may be older than the job that runs.
@@ -66,31 +62,32 @@ function activityLines(
   format: StatusFormat,
 ): string[] {
   const { running, pendingMode } = snapshot;
-  return [
+  return present([
     running === undefined ? undefined : runningLine(running, format),
     pendingMode === undefined ? undefined : pendingModeLine(pendingMode),
-  ].filter((line) => line !== undefined);
+  ]);
 }
 
 function viewLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
-  const { error, lastFinish, counts } = snapshot;
-  return [
+  const { error, binding, lastFinish, counts } = snapshot;
+  return present([
     error === undefined ? undefined : snapshotErrorLine(error),
     ...activityLines(snapshot, format),
+    binding === undefined ? undefined : bindingLine(binding),
     ...runLines(snapshot, format),
     lastFinish === undefined ? undefined : finishLine(lastFinish, format),
-    counts === undefined ? undefined : questionsLine(counts),
-  ].filter((line) => line !== undefined);
+    ...(counts === undefined ? [] : countLines(counts)),
+  ]);
 }
 
-// The titles the next live pass would write: shown in simulation only.
-function previewTitles(snapshot: StatusSnapshot): string[] {
+// What the next live pass would write, each with its target: shown in simulation only.
+function previewLines(snapshot: StatusSnapshot): string[] {
   if (snapshot.mode !== "simulation") return [];
-  return (snapshot.lastRun?.preview ?? []).map((item) => item.title);
+  return (snapshot.lastRun?.preview ?? []).map(previewLine);
 }
 
 function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
-  const preview = previewTitles(snapshot);
+  const preview = previewLines(snapshot);
   const base = {
     kind: "ready" as const,
     inProgress:
@@ -107,8 +104,4 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
 export function toStatusView(raw: unknown, format: StatusFormat): StatusView {
   const snapshot = readSnapshot(raw);
   return snapshot === undefined ? NO_ENGINE_VIEW : readyView(snapshot, format);
-}
-
-export function confirmText(count: number): string {
-  return `Activer les écritures ? ${count} écriture(s) prévue(s) dans la simulation seront faites au prochain passage.`;
 }

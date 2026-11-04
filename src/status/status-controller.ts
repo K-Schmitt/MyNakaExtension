@@ -4,12 +4,8 @@
 import type { ToWorker } from "../ext/messages";
 import type { Mode } from "../ext/settings";
 import type { StatusFormat } from "./status-format";
-import {
-  confirmText,
-  LOADING_VIEW,
-  type StatusView,
-  toStatusView,
-} from "./status-view";
+import { confirmText } from "./status-mode-copy";
+import { LOADING_VIEW, type StatusView, toStatusView } from "./status-view";
 
 // While a job runs or a mode change waits, the page asks again this often (Ruling 20).
 export const POLL_MS = 5000;
@@ -19,11 +15,14 @@ export type PageTimer = {
   clear(handle: unknown): void;
 };
 
+export type FocusTarget = "resync" | "switch" | "headline";
+
 export type Ports = {
   send(message: ToWorker): Promise<unknown>;
   confirm(text: string): boolean;
   show(view: StatusView): void;
   setBusy(busy: boolean): void;
+  focus(target: FocusTarget): void;
   format: StatusFormat;
   timer: PageTimer;
 };
@@ -53,6 +52,12 @@ async function sendQuietly(ports: Ports, message: ToWorker): Promise<void> {
 
 const inProgress = (view: StatusView): boolean =>
   view.kind === "ready" && view.inProgress;
+
+// The pressed button, unless the view now hides it: the switch shows only with a known mode.
+function focusTarget(pressed: "resync" | "switch", view: StatusView) {
+  const shown = view.kind === "ready" && view.switchLabel !== undefined;
+  return pressed === "switch" && !shown ? "headline" : pressed;
+}
 
 export function createController(ports: Ports): Controller {
   let busy = false;
@@ -88,8 +93,12 @@ export function createController(ports: Ports): Controller {
   }
 
   // One action at a time: a click during an answer is ignored, and the buttons are disabled meanwhile. A
-  // poll due meanwhile asks nothing: the action's own answer arms the next one.
-  async function exclusive(action: () => Promise<void>): Promise<void> {
+  // poll due meanwhile asks nothing: the action's own answer arms the next one. Disabling the pressed
+  // button drops its focus, so it gets it back once the buttons are enabled again (Ruling 19).
+  async function exclusive(
+    action: () => Promise<void>,
+    pressed?: "resync" | "switch",
+  ): Promise<void> {
     if (busy) return;
     busy = true;
     ports.setBusy(true);
@@ -98,6 +107,7 @@ export function createController(ports: Ports): Controller {
     } finally {
       busy = false;
       ports.setBusy(false);
+      if (pressed !== undefined) ports.focus(focusTarget(pressed, current));
     }
   }
 
@@ -119,7 +129,7 @@ export function createController(ports: Ports): Controller {
       exclusive(async () => {
         await sendQuietly(ports, { type: "resync" });
         await reload();
-      }),
-    toggleMode: () => exclusive(toggle),
+      }, "resync"),
+    toggleMode: () => exclusive(toggle, "switch"),
   };
 }

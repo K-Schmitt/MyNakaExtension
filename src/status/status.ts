@@ -1,7 +1,7 @@
 // The status page's entry: binds the controller to the DOM, `chrome.runtime`, `window.confirm` and the clock.
 // Everything shown goes through textContent: titles are remote catalogue text.
 
-import { createController } from "./status-controller";
+import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
 import type { StatusView } from "./status-view";
 
@@ -32,6 +32,11 @@ function render(view: StatusView): void {
   toggle.textContent = ready ? (view.switchLabel ?? "") : "";
 }
 
+// The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
+function focus(target: FocusTarget): void {
+  element(target).focus();
+}
+
 function setBusy(busy: boolean): void {
   element<HTMLButtonElement>("resync").disabled = busy;
   element<HTMLButtonElement>("switch").disabled = busy;
@@ -43,6 +48,7 @@ const controller = createController({
   confirm: (text) => window.confirm(text),
   show: render,
   setBusy,
+  focus,
   format: localFormat(),
   timer: {
     set: (fn, ms) => setTimeout(fn, ms),

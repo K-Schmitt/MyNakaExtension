@@ -2,6 +2,7 @@
 
 export type StatusFormat = {
   dateTime(at: number): string;
+  date(at: number): string;
   time(at: number): string;
 };
 
@@ -23,6 +24,7 @@ export function localFormat(timeZone?: string): StatusFormat {
   });
   return {
     dateTime: (at) => `${day.format(at)} ${clock.format(at)}`,
+    date: (at) => day.format(at),
     time: (at) => clock.format(at),
   };
 }
