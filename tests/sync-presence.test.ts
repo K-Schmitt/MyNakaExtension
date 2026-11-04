@@ -281,7 +281,10 @@ describe("the owner's latest action wins: additions", () => {
     }
     expect(waiting).toEqual([1, 2, 2, 0, 0, 1, 1]);
     expect(w.state.presence).toEqual({
-      naka: [{ id: 5, from: 6, to: 7 }],
+      naka: [
+        { id: 5, from: 1, to: 3 },
+        { id: 5, from: 6, to: 7 },
+      ],
       sc: [{ id: 1005, from: 2, to: 3 }],
     });
     w.offline = false;
@@ -361,8 +364,170 @@ describe("each id is judged by its current period (amendment 1)", () => {
   });
 });
 
-describe("the lists of the run, read before any write (amendment 1)", () => {
-  it("a pair the planner knew stays known when one of its titles is re-added mid-run", async () => {
+describe("a late-mapped pair is snapshotted as if mapped all along", () => {
+  // Runs 1-2: both titles listed. Run 3: film 5 gone from Naka, 1005 still wished. Before run 4 the
+  // owner re-adds 5 AND removes 1005; run 4 maps the pair (or it was mapped from the start).
+  // `extraRuns`: runs after the gap that still cannot map it (delayed P7).
+  async function p7(mappedFromStart: boolean, extraRuns = 0) {
+    const { w, ports } = world({
+      naka: [5],
+      sc: [1005],
+      nakaTitles: { 5: film(5) },
+      scTitles: { 1005: film(5) },
+      state: mappedFromStart
+        ? { ...emptyState(), mapping: [PAIR5] }
+        : undefined,
+    });
+    w.offline = !mappedFromStart;
+    const reports = [await runSync(ports), await runSync(ports)];
+    w.naka.delete(5);
+    reports.push(await runSync(ports));
+    w.naka.add(5);
+    w.sc.delete(1005);
+    for (let run = 0; run < extraRuns; run++) {
+      reports.push(await runSync(ports));
+    }
+    w.offline = false;
+    reports.push(await runSync(ports));
+    return { w, reports };
+  }
+
+  it("delayed P7, mapped from the start: still only the run-3 question", async () => {
+    const { w, reports } = await p7(true, 1);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("sc", PAIR5)]);
+    expect(reports).toEqual([
+      report(),
+      report(),
+      report({ pendingRemovals: 1 }),
+      report({ pendingRemovals: 1 }),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  it("delayed P7, mapped late one run after the gap: a question, never a re-wish", async () => {
+    const { w, reports } = await p7(false, 1);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+    expect(reports).toEqual([
+      report({ unresolved: 2 }),
+      report({ unresolved: 2 }),
+      report({ unresolved: 1 }),
+      report({ unresolved: 1 }),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  // Fuzz seed 124's chain: both listed in runs 1-2, film 5 alone in runs 3-4, then in one gap the owner
+  // removes 5 and re-adds 1005, which stays alone for 15 runs; the pair maps at run 20.
+  async function chain(mappedFromStart: boolean) {
+    const { w, ports } = world({
+      naka: [5],
+      sc: [1005],
+      nakaTitles: { 5: film(5) },
+      scTitles: { 1005: film(5) },
+      state: mappedFromStart
+        ? { ...emptyState(), mapping: [PAIR5] }
+        : undefined,
+    });
+    w.offline = !mappedFromStart;
+    const reports: SyncReport[] = [];
+    for (let run = 1; run <= 19; run++) {
+      if (run === 3) w.sc.delete(1005);
+      if (run === 5) {
+        w.naka.delete(5);
+        w.sc.add(1005);
+      }
+      reports.push(await runSync(ports));
+    }
+    w.offline = false;
+    reports.push(await runSync(ports));
+    return { w, reports };
+  }
+
+  it("seed 124's chain, mapped from the start: never a write", async () => {
+    const { w } = await chain(true);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+  });
+
+  it("seed 124's chain, mapped late: the snapshot survived the alternation, so it asks", async () => {
+    const { w, reports } = await chain(false);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("sc", PAIR5)]);
+    expect(reports).toEqual([
+      report({ unresolved: 2 }),
+      report({ unresolved: 2 }),
+      ...Array.from({ length: 17 }, () => report({ unresolved: 1 })),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  it("the last run with both listed counts: the pair left, came back, and stayed", async () => {
+    const { w, ports } = world({
+      naka: [5],
+      sc: [1005],
+      nakaTitles: { 5: film(5) },
+      scTitles: { 1005: film(5) },
+    });
+    w.offline = true;
+    const reports = [await runSync(ports)];
+    w.naka.delete(5);
+    w.sc.delete(1005);
+    reports.push(await runSync(ports));
+    w.naka.add(5);
+    w.sc.add(1005);
+    reports.push(await runSync(ports));
+    w.sc.delete(1005);
+    reports.push(await runSync(ports), await runSync(ports));
+    w.offline = false;
+    reports.push(await runSync(ports));
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+    expect(reports).toEqual([
+      report({ unresolved: 2 }),
+      report(),
+      report({ unresolved: 2 }),
+      report({ unresolved: 1 }),
+      report({ unresolved: 1 }),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  it("P7, mapped from the start: the run-3 removal question blocks every write", async () => {
+    const { w, reports } = await p7(true);
+    expect(w.writes).toEqual([]);
+    expect(w.state.pending).toEqual([removal("sc", PAIR5)]);
+    expect(reports).toEqual([
+      report(),
+      report(),
+      report({ pendingRemovals: 1 }),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  it("P7, mapped late: the run that maps it asks, and 1005 is never wished back", async () => {
+    const { w, reports } = await p7(false);
+    expect(w.writes).toEqual([]);
+    expect(w.state.presence).toEqual({
+      naka: [
+        { id: 5, from: 1, to: 2 },
+        { id: 5, from: 4, to: 4 },
+      ],
+      sc: [{ id: 1005, from: 1, to: 3 }],
+    });
+    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+    expect(reports).toEqual([
+      report({ unresolved: 2 }),
+      report({ unresolved: 2 }),
+      report({ unresolved: 1 }),
+      report({ pendingRemovals: 1 }),
+    ]);
+  });
+
+  // The re-read put film 5 in the final lists of run 3: its new period starts there and never
+  // overlaps 1005's, which had already gone. Re-adding it is the owner's latest action: an addition.
+  it("a title re-added mid-run after leaving both lists is added on the other side next run", async () => {
     const pair1 = { nakaId: 1, scId: 1001 };
     const { w, ports } = world({
       naka: [5],
@@ -384,12 +549,12 @@ describe("the lists of the run, read before any write (amendment 1)", () => {
       w.naka.add(5); // the owner re-adds film 5 during the run
     };
     expect(await runSync(ports)).toEqual(report({ added: [pair1] }));
-    expect(w.state.snapshot).toEqual([pair1, PAIR5]);
+    expect(w.state.snapshot).toEqual([pair1]);
     ports.addToNaka = addToNaka;
     const r = await runSync(ports);
-    expect(w.writes).toEqual(["addToNaka:1"]);
-    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
-    expect(r).toEqual(report({ pendingRemovals: 1 }));
+    expect(w.writes).toEqual(["addToNaka:1", "addToSc:1005"]);
+    expect(w.state.pending).toEqual([]);
+    expect(r).toEqual(report({ added: [PAIR5] }));
   });
 });
 
@@ -525,6 +690,7 @@ describe("presence bookkeeping", () => {
       naka: [{ id: 5, from: 1, to: 4 }],
       sc: [
         { id: 1005, from: 2, to: 2 },
+        { id: 1009, from: 1, to: 1 },
         { id: 1009, from: 4, to: 4 },
       ],
     });

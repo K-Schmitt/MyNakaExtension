@@ -21,9 +21,11 @@ import type { Candidate, Titled } from "../src/core/title-match";
 // "none of these", and the owner never wishes a homonym product. Every pairing the runner acts on is
 // then a world title. (A wrong answer declares a pairing the world does not have; a write made for it
 // follows the owner's latest action, which this oracle cannot judge.)
-// Oracle (no waiver), keyed on the world's titles: the runner never writes a title's id back to a side
-// after the owner removed it there, if a completed run had seen BOTH of the title's ids in its final
-// lists during the current presence period of each (neither id has entered its list again since).
+// Oracle (no waiver), keyed on the world's titles and blind to how the runner decides: a GHOST snapshot
+// per title, kept by the mapped-pair snapshot rules as if the title had been mapped all along, from each
+// completed run's final lists: set when both ids are listed, kept while at least one is, cleared when
+// neither is. A run never writes a title's id to a side while its ghost is set: the id is absent there,
+// so the owner removed it while the pair was snapshotted, and that removal is a question.
 
 const TITLES = 30;
 const FILMS = 24;
@@ -78,16 +80,12 @@ function rng(seed: number): () => number {
   };
 }
 
-type Periods = { naka: Map<number, number>; sc: Map<number, number> };
-
 async function simulate(seed: number, answers: boolean): Promise<string[]> {
   const r = rng(seed);
   const searchFailure = answers ? 0.15 : 0.8;
   const lists = { naka: new Set<number>(), sc: new Set<number>() };
-  // Oracle bookkeeping: how many times each title's id entered its list, and the periods a completed
-  // run saw both ids in.
-  const period: Periods = { naka: new Map(), sc: new Map() };
-  const together = new Map<number, { naka: number; sc: number }>();
+  // The titles whose ghost snapshot is set after the last completed run.
+  const ghost = new Set<number>();
   const violations: string[] = [];
   const log: string[] = [];
   let state: SyncState = emptyState();
@@ -98,8 +96,6 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
     side === "naka" ? id : titleOfProduct(id);
   const enter = (side: Side, id: number): void => {
     lists[side].add(id);
-    const n = titleOn(side, id);
-    if (n !== undefined) period[side].set(n, (period[side].get(n) ?? 0) + 1);
   };
   for (let n = 1; n <= TITLES; n++) {
     if (r() < 0.5) enter("naka", n);
@@ -124,13 +120,7 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
 
   const checkWrite = (side: Side, id: number): void => {
     const n = titleOn(side, id);
-    if (n === undefined) return;
-    const seen = together.get(n);
-    if (
-      seen !== undefined &&
-      seen.naka === period.naka.get(n) &&
-      seen.sc === period.sc.get(n)
-    ) {
+    if (n !== undefined && ghost.has(n)) {
       violations.push(
         `seed ${seed}: write ${side} ${id} | ${log.slice(-12).join("; ")}`,
       );
@@ -190,24 +180,31 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
     const naka = final("naka");
     const sc = final("sc");
     for (let n = 1; n <= TITLES; n++) {
-      if (naka.has(n) && sc.has(scOf(n))) {
-        together.set(n, {
-          naka: period.naka.get(n) ?? 0,
-          sc: period.sc.get(n) ?? 0,
-        });
-      }
+      const inNaka = naka.has(n);
+      const inSc = sc.has(scOf(n));
+      if (inNaka && inSc) ghost.add(n);
+      else if (!inNaka && !inSc) ghost.delete(n);
     }
   };
 
-  const ownerEdit = (): void => {
-    const n = 1 + Math.floor(r() * TITLES);
-    const side: Side = r() < 0.5 ? "naka" : "sc";
+  const toggle = (side: Side, n: number): void => {
     const id = idOn(side, n);
     if (lists[side].delete(id)) log.push(`owner remove ${side} ${id}`);
     else {
       enter(side, id);
       log.push(`owner add ${side} ${id}`);
     }
+  };
+  // The owner often comes back to the title they last edited, and now and then changes both sides of
+  // one title between two runs (probe P7: Naka's copy back and SensCritique's removed in the same gap).
+  let lastEdited = 1;
+  const ownerEdit = (): void => {
+    const n = r() < 0.5 ? lastEdited : 1 + Math.floor(r() * TITLES);
+    lastEdited = n;
+    if (r() < 0.3) {
+      toggle("naka", n);
+      toggle("sc", n);
+    } else toggle(r() < 0.5 ? "naka" : "sc", n);
   };
 
   const answerRemoval = (item: PendingItem & { kind: "removal" }): void => {

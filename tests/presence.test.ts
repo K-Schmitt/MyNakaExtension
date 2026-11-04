@@ -9,7 +9,6 @@ import {
 const e = (id: number, from: number, to: number) => ({ id, from, to });
 const p = (nakaId: number, scId: number): Pair => ({ nakaId, scId });
 const EMPTY: Presence = { naka: [], sc: [] };
-const NO_LISTS = { naka: [], sc: [] };
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === "object") {
@@ -27,7 +26,7 @@ describe("nextPresence", () => {
     });
   });
 
-  it("extends an interval that reached the previous run", () => {
+  it("extends the interval that reached the previous run", () => {
     const before = { naka: [e(1, 2, 3)], sc: [e(10, 3, 3)] };
     expect(nextPresence(before, 4, { naka: [1], sc: [10] })).toEqual({
       naka: [e(1, 2, 4)],
@@ -35,20 +34,28 @@ describe("nextPresence", () => {
     });
   });
 
-  it("starts a new interval for an id back after a gap", () => {
+  it("starts a new interval beside the old one for an id back after a gap", () => {
     const before = { naka: [e(1, 1, 2)], sc: [e(10, 1, 1)] };
     expect(nextPresence(before, 4, { naka: [1], sc: [10] })).toEqual({
-      naka: [e(1, 4, 4)],
-      sc: [e(10, 4, 4)],
+      naka: [e(1, 1, 2), e(1, 4, 4)],
+      sc: [e(10, 1, 1), e(10, 4, 4)],
     });
   });
 
-  it("keeps the latest interval of an absent id, mapped or not", () => {
+  it("extends only the latest interval of an id with several", () => {
+    const before = { naka: [e(1, 1, 2), e(1, 4, 5)], sc: [] };
+    expect(nextPresence(before, 6, { naka: [1], sc: [] })).toEqual({
+      naka: [e(1, 1, 2), e(1, 4, 6)],
+      sc: [],
+    });
+  });
+
+  it("keeps every interval of an absent id, mapped or not", () => {
     const before = {
-      naka: [e(1, 1, 3), e(2, 1, 2)],
+      naka: [e(1, 1, 3), e(1, 5, 5), e(2, 1, 2)],
       sc: [e(10, 2, 3), e(20, 1, 1)],
     };
-    expect(nextPresence(before, 4, NO_LISTS)).toEqual(before);
+    expect(nextPresence(before, 7, { naka: [], sc: [] })).toEqual(before);
   });
 
   it("counts an id listed twice once", () => {
@@ -58,7 +65,7 @@ describe("nextPresence", () => {
     });
   });
 
-  it("keeps the stored order, then the new ids in list order", () => {
+  it("keeps the stored order, then the new intervals in list order", () => {
     const before = { naka: [e(9, 1, 1), e(3, 1, 1)], sc: [] };
     expect(nextPresence(before, 2, { naka: [5, 3, 1], sc: [] })).toEqual({
       naka: [e(9, 1, 1), e(3, 1, 2), e(5, 2, 2), e(1, 2, 2)],
@@ -69,100 +76,145 @@ describe("nextPresence", () => {
   it("does not mutate a deep-frozen presence", () => {
     const before = deepFreeze({ naka: [e(1, 1, 3)], sc: [e(10, 1, 1)] });
     const copy = structuredClone(before);
-    nextPresence(before, 4, { naka: [1, 2], sc: [] });
+    nextPresence(before, 4, { naka: [1, 2], sc: [10] });
     expect(before).toEqual(copy);
   });
 });
 
-// Absent ids (no lists given): each counts through its latest interval.
-const seenTogether = (
-  presence: Presence,
-  pair: Pair,
-  run = 99,
-  lists: { naka: number[]; sc: number[] } = NO_LISTS,
+// Would the pair (1, 10), had it been mapped all along, be in the snapshot at the end of `run`?
+const snapshotted = (
+  naka: [number, number][],
+  sc: [number, number][],
+  run: number,
 ): boolean =>
-  withPairsSeenTogether([], [pair], { presence, run }, lists).length === 1;
+  withPairsSeenTogether([], [p(1, 10)], {
+    presence: {
+      naka: naka.map(([from, to]) => e(1, from, to)),
+      sc: sc.map(([from, to]) => e(10, from, to)),
+    },
+    run,
+  }).length === 1;
 
-describe("two absent ids seen together", () => {
-  const at = (naka: [number, number], sc: [number, number]): Presence => ({
-    naka: [e(1, ...naka)],
-    sc: [e(10, ...sc)],
+describe("the snapshot a late-mapped pair would have had", () => {
+  it("both listed in the last completed run: in", () => {
+    expect(snapshotted([[1, 3]], [[3, 3]], 3)).toBe(true);
   });
 
-  it.each([
-    ["the same single run", [1, 1], [1, 1], true],
-    ["overlapping intervals", [1, 3], [3, 5], true],
-    ["one inside the other", [1, 9], [4, 5], true],
-    ["adjacent intervals", [1, 2], [3, 4], false],
-    ["adjacent the other way", [3, 4], [1, 2], false],
-    ["disjoint intervals", [1, 2], [5, 6], false],
-  ] as const)("%s: %s", (_name, naka, sc, expected) => {
-    expect(seenTogether(at([...naka], [...sc]), p(1, 10))).toBe(expected);
+  it("listed together once, one of them in every run since: in", () => {
+    expect(snapshotted([[1, 5]], [[1, 2]], 5)).toBe(true);
   });
 
-  it("needs an entry for both ids", () => {
-    expect(seenTogether({ naka: [e(1, 1, 1)], sc: [] }, p(1, 10))).toBe(false);
-    expect(seenTogether({ naka: [], sc: [e(10, 1, 1)] }, p(1, 10))).toBe(false);
+  it("never listed in the same run: out", () => {
+    expect(snapshotted([[1, 2]], [[3, 4]], 4)).toBe(false);
+    expect(snapshotted([[3, 4]], [[1, 2]], 4)).toBe(false);
   });
 
-  it("reads each id on its own side", () => {
+  it("a run with neither listed after the last time together: out (removed from both)", () => {
+    expect(snapshotted([[1, 2]], [[1, 2]], 3)).toBe(false);
+    expect(
+      snapshotted(
+        [
+          [1, 2],
+          [4, 4],
+        ],
+        [[1, 2]],
+        4,
+      ),
+    ).toBe(false);
+  });
+
+  it("a gap exactly at the run after the last time together: out", () => {
+    expect(
+      snapshotted(
+        [
+          [1, 1],
+          [3, 5],
+        ],
+        [[1, 1]],
+        5,
+      ),
+    ).toBe(false);
+  });
+
+  it("coverage that stops one run before the last completed run: out", () => {
+    expect(snapshotted([[1, 4]], [[1, 2]], 5)).toBe(false);
+  });
+
+  it("the LAST time both were listed counts: they left together, came back, and one stayed", () => {
+    expect(
+      snapshotted(
+        [
+          [1, 1],
+          [3, 5],
+        ],
+        [
+          [1, 1],
+          [3, 3],
+        ],
+        5,
+      ),
+    ).toBe(true);
+  });
+
+  it("alternating presence keeps it in (fuzz seed 124's chain)", () => {
+    expect(
+      snapshotted(
+        [[1, 4]],
+        [
+          [1, 2],
+          [5, 19],
+        ],
+        19,
+      ),
+    ).toBe(true);
+  });
+
+  it("delayed P7: Naka back one run after SensCritique left: in", () => {
+    expect(
+      snapshotted(
+        [
+          [1, 2],
+          [4, 4],
+        ],
+        [[1, 3]],
+        4,
+      ),
+    ).toBe(true);
+  });
+
+  it("needs intervals on both sides, each read on its own side", () => {
+    expect(snapshotted([[1, 3]], [], 3)).toBe(false);
+    expect(snapshotted([], [[1, 3]], 3)).toBe(false);
     const crossed = { naka: [e(10, 1, 1)], sc: [e(1, 1, 1)] };
-    expect(seenTogether(crossed, p(1, 10))).toBe(false);
-  });
-});
-
-describe("a present id counts only through its current period", () => {
-  const presence = { naka: [e(1, 1, 2)], sc: [e(10, 1, 1)] };
-
-  it("its period continues when it was in the last completed run's list", () => {
-    expect(seenTogether(presence, p(1, 10), 2, { naka: [1], sc: [] })).toBe(
-      true,
-    );
-  });
-
-  it("an id back after an absence has no interval yet: its stored one is a previous period", () => {
-    expect(seenTogether(presence, p(1, 10), 3, { naka: [1], sc: [] })).toBe(
-      false,
-    );
-  });
-
-  it("an absent id counts through its latest interval, whatever the last run", () => {
-    expect(seenTogether(presence, p(1, 10), 7)).toBe(true);
-    const scPresent = { naka: [e(1, 1, 1)], sc: [e(10, 1, 7)] };
-    expect(seenTogether(scPresent, p(1, 10), 7, { naka: [], sc: [10] })).toBe(
-      true,
-    );
-  });
-
-  it("applies on the SensCritique side too", () => {
-    const scBack = { naka: [e(1, 1, 3)], sc: [e(10, 1, 1)] };
-    expect(seenTogether(scBack, p(1, 10), 3, { naka: [1], sc: [10] })).toBe(
-      false,
-    );
+    expect(
+      withPairsSeenTogether([], [p(1, 10)], { presence: crossed, run: 1 }),
+    ).toEqual([]);
   });
 });
 
 describe("withPairsSeenTogether", () => {
   const presence = {
-    naka: [e(1, 1, 2), e(2, 1, 1), e(3, 1, 1)],
+    naka: [e(1, 1, 2), e(2, 1, 1), e(3, 1, 2)],
     sc: [e(10, 2, 2), e(20, 2, 2), e(30, 1, 1)],
   };
   const loaded = { presence, run: 2 };
 
-  it("adds the mapped pairs seen together, after the stored snapshot", () => {
+  it("adds the mapped pairs that would be in the snapshot, after the stored one", () => {
     const mapping = [p(1, 10), p(2, 20), p(3, 30)];
-    expect(
-      withPairsSeenTogether([p(7, 70)], mapping, loaded, NO_LISTS),
-    ).toEqual([p(7, 70), p(1, 10), p(3, 30)]);
+    expect(withPairsSeenTogether([p(7, 70)], mapping, loaded)).toEqual([
+      p(7, 70),
+      p(1, 10),
+      p(3, 30),
+    ]);
   });
 
   it("never adds a pair twice", () => {
-    expect(
-      withPairsSeenTogether([p(1, 10)], [p(1, 10)], loaded, NO_LISTS),
-    ).toEqual([p(1, 10)]);
+    expect(withPairsSeenTogether([p(1, 10)], [p(1, 10)], loaded)).toEqual([
+      p(1, 10),
+    ]);
   });
 
   it("adds nothing that is not mapped", () => {
-    expect(withPairsSeenTogether([], [], loaded, NO_LISTS)).toEqual([]);
+    expect(withPairsSeenTogether([], [], loaded)).toEqual([]);
   });
 });

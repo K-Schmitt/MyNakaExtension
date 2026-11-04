@@ -54,21 +54,17 @@ function effectiveSettled(state: SyncState): Pair[] {
 
 type Lists = { naka: number[]; sc: number[] };
 
-// The stored snapshot plus the mapped pairs a completed run saw together, judged from the presence as
-// loaded and this run's lists as read before any write.
-function knownSnapshot(
-  state: SyncState,
-  loaded: SyncState,
-  lists: Lists,
-): Pair[] {
-  return withPairsSeenTogether(state.snapshot, state.mapping, loaded, lists);
+// The stored snapshot plus the mapped pairs that would be in it had they been mapped all along, judged
+// from the presence as loaded.
+function knownSnapshot(state: SyncState, loaded: SyncState): Pair[] {
+  return withPairsSeenTogether(state.snapshot, state.mapping, loaded);
 }
 
 function planFor(state: SyncState, loaded: SyncState, lists: Lists) {
   return planListSync({
     naka: new Set(lists.naka),
     sc: new Set(lists.sc),
-    snapshot: knownSnapshot(state, loaded, lists),
+    snapshot: knownSnapshot(state, loaded),
     mapping: state.mapping,
     settled: effectiveSettled(state),
   });
@@ -185,7 +181,7 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
       outcome.written.sc,
     ),
   };
-  const known = knownSnapshot(resolved, loaded, lists);
+  const known = knownSnapshot(resolved, loaded);
   const state = completeRun(
     nextRetryLast(nextSnapshot(queued, known, final), outcome),
     final,
