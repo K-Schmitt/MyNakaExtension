@@ -120,9 +120,83 @@ et le stockage viennent au Plan 3.
   (décision du propriétaire).
 - `unmarkDone` n'a pas encore d'usage.
 
+## 2026-11-04 — Plan 3 : le moteur de l'extension
+
+Ce plan branche la logique du Plan 2 dans l'extension : service worker, onglet Naka, détection de fin
+de visionnage, page d'état minimale. L'interface complète vient au Plan 4.
+
+### Décisions
+- **Une seule file de jobs.**
+  - Seul le service worker écrit dans le stockage.
+  - Synchronisations, fins de visionnage et changements de mode passent un par un.
+  - La page d'état lit l'état sans attendre la file, en lecture seule, et affiche le job en cours.
+- **Simulation d'abord pour les listes.**
+  - Les ajouts aux listes sont préparés sans être faits, et l'aperçu montre chaque titre avec son
+    site.
+  - Les fins de visionnage écrivent dans les deux modes.
+  - Au plus 10 écritures par passage : l'aperçu ne montre que les 10 premières, et les suivantes
+    s'écrivent aux passages suivants sans nouvel aperçu. La confirmation avant le passage en
+    écritures actives le dit.
+- **Déclencheurs.**
+  - Une synchronisation part à l'ouverture d'un onglet Naka, après un changement de « Ma liste »
+    (5 s sans nouveau changement) ou sur le bouton « Resynchroniser ».
+  - Au moins 15 minutes séparent deux passages automatiques, échecs compris. Un changement de
+    « Ma liste » dans cet intervalle attend le déclencheur suivant.
+- **Comptes liés.**
+  - Le premier passage réussi enregistre le compte SensCritique et le compte Naka.
+  - Un autre compte sur l'un des deux sites arrête tout job avant la moindre écriture.
+- **Jetons.**
+  - Le jeton Naka n'est lu que dans le script isolé de l'onglet Naka et n'est envoyé qu'à
+    `naka.cx/api/v1`. Le script de la page ne voit que des identifiants.
+  - Le jeton SensCritique est lu depuis la page d'accueil au moment de chaque appel. Il n'est jamais
+    stocké, ni mis dans un message ou une erreur.
+  - La recherche SensCritique se fait sans session : vérifié le 2026-11-04, elle répond sans jeton.
+    Cela évite de charger la page d'accueil à chaque recherche.
+- **Onglet Naka.**
+  - Un job prend le premier onglet Naka qui répond et s'y tient : la vérification du compte et les
+    écritures vont au même onglet.
+  - Si cet onglet disparaît en cours de route, les appels Naka suivants échouent aussitôt. Le passage
+    enregistre ce qu'il a déjà fait, et le reste est réessayé au passage suivant.
+- **Coupe-circuit.**
+  - Il se déclenche sur un refus pour trop de requêtes, une session expirée ou un délai dépassé
+    (30 s par requête SensCritique, 20 s par appel Naka).
+  - Le même type d'appel s'arrête alors pour le reste du job, et la page d'état l'indique.
+- **Détection de fin.**
+  - Marques de progression à 85, 90, 95 et 99 % : le seuil réglable du Plan 4 devra être l'une
+    d'elles.
+  - Un échantillon toutes les 5 s, sur des vidéos de 5 minutes au moins dont la durée reste stable à
+    2 % près.
+  - Après un changement d'épisode, il faut une source vidéo différente, pour que la fin de l'épisode
+    précédent ne marque jamais le suivant.
+- **Plafond des fins de visionnage.**
+  - 30 par heure, une seule en attente par titre, 20 en attente au plus.
+  - Un message que l'extension tranche seule (pas assez avancé, ou déjà traité) ne compte pas.
+- **Date du « vu ».** C'est la date locale, jamais la date UTC.
+
+### Rejeté
+- Interrompre tout le passage quand l'onglet Naka se ferme : les écritures déjà faites n'auraient
+  pas été enregistrées.
+- Compter chaque message de fin de visionnage dans le plafond : un seul visionnage en envoie jusqu'à
+  cinq, et six épisodes courts par heure auraient suffi à le bloquer.
+- Faire attendre la page d'état derrière la file : la première synchronisation peut durer plusieurs
+  minutes.
+
+### Reporté au Plan 4
+- Le réglage du seuil, limité aux quatre marques.
+- La note après un visionnage. Les titres à noter ne sont pas encore conservés.
+- Remettre une série dans les envies après l'avoir notée, ou prévenir avant la note.
+- Oublier les comptes liés.
+- Réinitialiser un état enregistré illisible.
+- Répondre aux questions et aux retraits, et relier les titres non reliés.
+- Aperçu des écritures reportées.
+- Le nom du titre dans la ligne de fin de visionnage.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
   pas. Une simulation de milliers d'historiques, avec une règle de sécurité dont on vérifie qu'elle
   repère chaque correction retirée, a trouvé plusieurs remises à tort que les relectures avaient
   laissées passer. Une règle de simulation qui recopie la règle du code ne peut pas voir ses trous.
+- Un plafond contre les abus se compte sur l'action qui coûte (un appel réseau, une écriture), pas
+  sur les messages reçus. Les messages que l'on peut trancher sur place passent gratuitement :
+  sinon l'usage normal, qui répète les messages, épuise le plafond.
