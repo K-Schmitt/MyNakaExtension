@@ -1,4 +1,6 @@
+import type { RatingCard } from "../core/rating-cards";
 import { emptyState, type SyncState } from "../core/state";
+import { parseRatings } from "./rating-schema";
 import { parseSettings, type Settings } from "./settings";
 import { parseState } from "./state-schema";
 
@@ -12,8 +14,11 @@ export type Store = {
   saveState(s: SyncState): Promise<void>;
   loadSettings(): Promise<Settings>;
   saveSettings(s: Settings): Promise<void>;
+  loadRatings(): Promise<RatingCard[]>;
+  saveRatings(cards: RatingCard[]): Promise<void>;
 };
 
+const RATINGS_KEY = "ratings";
 const STATE_KEY = "state";
 const SETTINGS_KEY = "settings";
 
@@ -37,6 +42,12 @@ export function createStore(area: StorageArea): Store {
     },
     async saveSettings(s) {
       await area.set({ [SETTINGS_KEY]: s });
+    },
+    async loadRatings() {
+      return parseRatings(await read(area, RATINGS_KEY));
+    },
+    async saveRatings(cards) {
+      await area.set({ [RATINGS_KEY]: cards });
     },
   };
 }
