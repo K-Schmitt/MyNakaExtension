@@ -4,6 +4,10 @@
 // only once the response is ok, so a refused "vu" never counts. It reads the method and a string body,
 // never a header (the page's Authorization header holds the Naka token) and never a Request's body.
 // Any error of its own is swallowed: the page's fetch goes on as if nothing watched it.
+//
+// Two differences the page could notice, both accepted (M10): observing the outcome of a classified
+// request attaches a handler to the page's promise, which silences the page's `unhandledrejection` for
+// that request; and the wrapper's name, length and toString differ from the native fetch.
 
 import type { PageEvent } from "../ext/messages";
 import { classifyRequest } from "./fetch-observer";

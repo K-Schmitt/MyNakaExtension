@@ -1139,7 +1139,7 @@ describe("a worker killed at any await", () => {
     }
   });
 
-  it("a finish leaves the state it found, the settled pair, or the handled key", async () => {
+  it("a finish leaves the state it found, the settled pair, or the handled key, and the next finish completes from it", async () => {
     const full = killedAt(0);
     await full.jobs.finishJob(finished());
     const total = full.calls();
@@ -1153,6 +1153,17 @@ describe("a worker killed at any await", () => {
       const state = w.area.data.get("state");
       expect([undefined, ...states]).toContain(
         state === undefined ? undefined : JSON.stringify(state),
+      );
+      const handled =
+        state !== undefined && parseState(state).handled.length > 0;
+      const next = jobsOn(w.area);
+      await next.jobs.finishJob(finished());
+      expect(parseState(w.area.data.get("state")).handled).toEqual(["movie:3"]);
+      expect(
+        parseSettings(w.area.data.get("settings")).lastFinish?.outcome,
+      ).toBe(handled ? "ignored" : "done");
+      expect(writesOf(next.sk.calls)).toEqual(
+        handled ? [] : ["markDone:1003:2026-11-04"],
       );
     }
   });

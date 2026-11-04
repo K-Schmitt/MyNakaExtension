@@ -496,6 +496,29 @@ describe("router: one queue", () => {
     await settle();
     expect(r.answers).toEqual([]);
   });
+
+  it("a status answer channel that throws becomes no unhandled rejection (M4)", async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listener);
+    try {
+      const r = createRouter({
+        extensionId: EXT,
+        queue: createJobQueue(),
+        jobs: recordingJobs().jobs,
+        timer: fakeTimer().timer,
+      });
+      const respond = () => {
+        throw new Error("The message port closed.");
+      };
+      expect(r.handle({ type: "status" }, STATUS_PAGE, respond)).toBe(true);
+      await settle();
+      await settle();
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+  });
 });
 
 // End to end through createWorker: the real SensCritique client and session reader on a fake fetch, the

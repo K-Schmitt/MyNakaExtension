@@ -60,7 +60,11 @@ export function createRouter(deps: RouterDeps): Router {
         enqueue(() => jobs.setMode(msg.mode));
         return false;
       case "status":
-        queue.run(() => jobs.statusSnapshot()).then(respond, ignore);
+        // Chrome's responder may throw (its port already closed): that is no error of the worker.
+        queue
+          .run(() => jobs.statusSnapshot())
+          .then(respond)
+          .catch(ignore);
         return true;
     }
   }
