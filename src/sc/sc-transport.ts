@@ -31,6 +31,7 @@ export type Envelope = { data: Record<string, unknown> };
 
 const APOLLO = "https://apollo.senscritique.com/";
 const MAX_BODY = 2_000_000;
+const SC_429 = "HTTP 429";
 
 export const JSON_TYPE = "application/json";
 
@@ -50,9 +51,23 @@ export async function readSession(deps: ScDeps): Promise<ScSession> {
     const raw: unknown = await deps.getSession();
     const fields = isRecord(raw) ? raw : {};
     return { token: textOf(fields.token), username: textOf(fields.username) };
-  } catch {
-    throw new ScUnavailableError("SensCritique session: could not be read");
+  } catch (error) {
+    throw sessionError(error);
   }
+}
+
+// A rate limit on the home page stays one, so that the breaker opens (M2): only the class and the
+// status are read, and the error is rebuilt from fixed text. Anything else, even an error that throws
+// while it is looked at, is the one fixed "could not be read".
+function sessionError(error: unknown): ScUnavailableError {
+  try {
+    if (error instanceof ScUnavailableError && error.message.includes(SC_429)) {
+      return new ScUnavailableError("SensCritique session: HTTP 429");
+    }
+  } catch {
+    // Dropped: see above.
+  }
+  return new ScUnavailableError("SensCritique session: could not be read");
 }
 
 export async function send(
