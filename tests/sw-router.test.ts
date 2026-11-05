@@ -1713,7 +1713,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       inProgress: false,
       previewCount: 2,
       lines: [
-        `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+        `Comptes liés${NB}: owner sur SensCritique, compte Naka n°\u00A077`,
         `Dernière synchronisation (simulation)${NB}: 04/11/2026 12:00 (ouverture de Naka)`,
         `Prévus${NB}: 2`,
         `Reportés (10 écritures au plus par passage)${NB}: 0`,

@@ -3,9 +3,13 @@ import type { JobError } from "../src/ext/job-error";
 import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
-import { bindingLine } from "../src/status/status-owner-lines";
+import {
+  bindingLine,
+  COUNT_ORDER,
+  WAITING_LABELS,
+} from "../src/status/status-owner-lines";
 import { toStatusView } from "../src/status/status-view";
-import type { StatusSnapshot } from "../src/sw/status-snapshot";
+import type { Counts, StatusSnapshot } from "../src/sw/status-snapshot";
 
 // French typography: U+202F before « : ; ? ! » and inside « ». Every expected string below spells it
 // out by code point, so a plain space fails.
@@ -302,7 +306,7 @@ describe("toStatusView: the bound accounts", () => {
   it("names both accounts", () => {
     const binding = { scUsername: "owner", nakaAccount: "77" };
     expect(ready({ mode: "live", binding }).lines).toContain(
-      `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+      `Comptes liés${NB}: owner sur SensCritique, compte Naka n°\u00A077`,
     );
   });
 
@@ -316,7 +320,7 @@ describe("toStatusView: the bound accounts", () => {
 
   it("leaves out each part that is absent", () => {
     expect(bindingLine({ nakaAccount: "77" })).toBe(
-      `Comptes liés${NB}: compte Naka n° 77`,
+      `Comptes liés${NB}: compte Naka n°\u00A077`,
     );
     expect(bindingLine({ scUsername: "owner" })).toBe(
       `Comptes liés${NB}: owner sur SensCritique`,
@@ -496,5 +500,35 @@ describe("toStatusView: an untrusted answer", () => {
     const view = toStatusView({ mode: "live", token: "secret" }, UTC);
     expect(view.kind).toBe("ready");
     expect(JSON.stringify(view)).not.toContain("secret");
+  });
+});
+
+describe("bindingLine: no-break space after n°", () => {
+  it("holds n°, U+00A0, then the id", () => {
+    const line = bindingLine({ scUsername: "a", nakaAccount: "7" }) ?? "";
+    const tail = line.slice(line.indexOf("n°"));
+    expect(Array.from(tail, (c) => c.codePointAt(0))).toEqual([
+      0x6e, 0xb0, 0xa0, 0x37,
+    ]);
+  });
+});
+
+describe("the waiting-count labels", () => {
+  it("name every count, in the display order", () => {
+    expect([...COUNT_ORDER].sort()).toEqual(Object.keys(WAITING_LABELS).sort());
+    expect(COUNT_ORDER).toEqual([
+      "openQuestions",
+      "pendingRemovals",
+      "unlinked",
+    ]);
+  });
+
+  it("refuse a Record that misses a count (type check)", () => {
+    // @ts-expect-error unlinked is missing
+    const incomplete: Record<keyof Counts, string> = {
+      openQuestions: "a",
+      pendingRemovals: "b",
+    };
+    expect(Object.keys(incomplete)).toHaveLength(2);
   });
 });
