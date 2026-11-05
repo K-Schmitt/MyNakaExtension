@@ -2,6 +2,7 @@
 // Every message from another context is untrusted: a parser takes `unknown`, never throws, and returns a
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
+import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
   asId,
@@ -18,6 +19,7 @@ import {
   type RatingMessage,
 } from "./rating-messages";
 import type { Mode } from "./settings";
+import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
 
 export const PAGE_CHANNEL = "mynaka/1";
 
@@ -35,6 +37,11 @@ export type ToWorker =
   | { type: "status" }
   | { type: "resync" }
   | { type: "set-mode"; mode: Mode }
+  | {
+      type: "set-settings";
+      thresholds: Thresholds;
+      pauseFromPercent: number;
+    }
   | RatingMessage;
 
 export type ToNakaTab =
@@ -88,6 +95,7 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   status: true,
   resync: true,
   "set-mode": true,
+  "set-settings": true,
   "rating-card": true,
   "rating-cards": true,
   rate: true,
@@ -154,6 +162,13 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
   if (type === "finished") return parseFinished(record);
   if (type === "set-mode") {
     return { type, mode: asOneOf(record.mode, MODE_VALUES, "mode") };
+  }
+  if (type === "set-settings") {
+    return {
+      type,
+      thresholds: parseThresholds(record.thresholds),
+      pauseFromPercent: parsePauseFromPercent(record.pauseFromPercent),
+    };
   }
   if (isRatingType(type)) return parseRatingMessage(type, record);
   return { type };
@@ -258,6 +273,7 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   status: ["status-page"],
   resync: ["status-page"],
   "set-mode": ["status-page"],
+  "set-settings": ["status-page"],
   "rating-card": ["naka-tab"],
   "rating-cards": ["naka-tab"],
   rate: ["naka-tab"],

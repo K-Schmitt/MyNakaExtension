@@ -2,7 +2,7 @@
 // then whether that sender may send that type, and ignores (never answers) anything that fails a step.
 // Every job of the worker then runs on ONE queue, one at a time. `status`, the only message answered, is
 // no job (Ruling 20): it is answered at once, outside the queue, from a read-only snapshot and the
-// activity kept here. `set-mode` stays queued: a sync saves the settings it loaded. `rating-card` and
+// activity kept here. `set-mode` and `set-settings` stay queued: a sync saves the settings it loaded. `rating-card` and
 // `rating-cards` are answered the same way (read-only); `rate` and `dismiss-rating` are queued jobs.
 
 import {
@@ -88,6 +88,9 @@ export function createRouter(deps: RouterDeps): Router {
         return false;
       case "set-mode":
         enqueue(activity.queueMode(msg.mode, () => jobs.setMode(msg.mode)));
+        return false;
+      case "set-settings":
+        enqueue(() => jobs.setSettings(msg.thresholds, msg.pauseFromPercent));
         return false;
       case "status":
         answerStatus(respond);

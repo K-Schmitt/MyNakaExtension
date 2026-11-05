@@ -1560,6 +1560,59 @@ describe("a worker killed at any await", () => {
   });
 });
 
+describe("set settings", () => {
+  const THRESHOLDS = { film: 0.95, episode: 0.85 };
+
+  it("saves the thresholds and the pause setting, and keeps the rest of the settings", async () => {
+    const before: Settings = {
+      mode: "live",
+      binding: BOUND,
+      lastAutoRunAt: 5,
+      finishWindow: { from: 1, count: 2 },
+    };
+    const w = world({ settings: before });
+    await w.jobs.setSettings(THRESHOLDS, 45);
+    expect(w.settings()).toEqual({
+      ...before,
+      thresholds: THRESHOLDS,
+      pauseFromPercent: 45,
+    });
+  });
+
+  it("on a first install it saves the simulation default with the new values", async () => {
+    const w = world();
+    await w.jobs.setSettings(THRESHOLDS, 0);
+    expect(w.settings()).toEqual({
+      mode: "simulation",
+      thresholds: THRESHOLDS,
+      pauseFromPercent: 0,
+    });
+  });
+
+  it("a later finish judges with the saved thresholds", async () => {
+    const w = world();
+    await w.jobs.setSettings({ film: 0.99, episode: 0.8 }, 0);
+    await w.jobs.finishJob(finished({ progress: 0.95 }));
+    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(w.settings().lastFinish).toBeUndefined();
+  });
+
+  it("the same values write nothing", async () => {
+    const w = world({
+      settings: { mode: "live", thresholds: THRESHOLDS, pauseFromPercent: 45 },
+    });
+    await w.jobs.setSettings(THRESHOLDS, 45);
+    expect(w.area.sets).toEqual([]);
+  });
+
+  it("unreadable settings are left as they were", async () => {
+    const w = world();
+    w.area.data.set("settings", { mode: 3 });
+    await expect(w.jobs.setSettings(THRESHOLDS, 45)).resolves.toBeUndefined();
+    expect(w.area.data.get("settings")).toEqual({ mode: 3 });
+  });
+});
+
 describe("set mode", () => {
   it("saves the mode and keeps the rest of the settings", async () => {
     const before: Settings = {
@@ -1627,6 +1680,8 @@ describe("status snapshot", () => {
       lastRun: settings.lastRun,
       lastFinish: settings.lastFinish,
       counts: { pendingRemovals: 2, openQuestions: 1, unlinked: 1 },
+      thresholds: { film: 0.9, episode: 0.8 },
+      pauseFromPercent: 0,
     });
   });
 
@@ -1635,6 +1690,22 @@ describe("status snapshot", () => {
     expect(await w.jobs.statusSnapshot()).toEqual({
       mode: "simulation",
       counts: { pendingRemovals: 0, openQuestions: 0, unlinked: 0 },
+      thresholds: { film: 0.9, episode: 0.8 },
+      pauseFromPercent: 0,
+    });
+  });
+
+  it("shows the stored thresholds and pause setting", async () => {
+    const w = world({
+      settings: {
+        mode: "live",
+        thresholds: { film: 0.95, episode: 0.85 },
+        pauseFromPercent: 60,
+      },
+    });
+    expect(await w.jobs.statusSnapshot()).toMatchObject({
+      thresholds: { film: 0.95, episode: 0.85 },
+      pauseFromPercent: 60,
     });
   });
 
@@ -1649,6 +1720,8 @@ describe("status snapshot", () => {
     w.area.data.set("state", { version: 2 });
     expect(await w.jobs.statusSnapshot()).toEqual({
       mode: "live",
+      thresholds: { film: 0.9, episode: 0.8 },
+      pauseFromPercent: 0,
       error: "stored-state",
     });
   });
@@ -1666,7 +1739,14 @@ describe("status snapshot", () => {
     await w.jobs.syncJob("button");
     const snapshot = await w.jobs.statusSnapshot();
     expect(Object.keys(snapshot).sort()).toEqual(
-      ["binding", "counts", "lastRun", "mode"].sort(),
+      [
+        "binding",
+        "counts",
+        "lastRun",
+        "mode",
+        "pauseFromPercent",
+        "thresholds",
+      ].sort(),
     );
     expect(strings(snapshot).join(" ")).not.toMatch(/Error|HTTP|stack/);
   });

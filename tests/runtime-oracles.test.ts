@@ -49,6 +49,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     syncJob: async () => undefined,
     finishJob: async () => undefined,
     setMode: async () => undefined,
+    setSettings: async () => undefined,
     rate: async () => undefined,
     dismissRating: async () => undefined,
     statusSnapshot: async () => ({}),

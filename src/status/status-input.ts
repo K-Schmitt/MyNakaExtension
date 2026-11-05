@@ -11,6 +11,10 @@ import {
 } from "../ext/field-checks";
 import { ERROR_CODES, MODES, parseRunRecord } from "../ext/run-record-schema";
 import { type Mode, parseBinding, parseFinish } from "../ext/settings";
+import {
+  parsePauseFromPercent,
+  parseThresholds,
+} from "../ext/thresholds-schema";
 import type { Running } from "../sw/activity";
 import type { Counts, StatusSnapshot } from "../sw/status-snapshot";
 
@@ -49,6 +53,11 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
   const pendingMode = whenPresent(record.pendingMode, (v) =>
     asOneOf<Mode>(v, MODES, "pendingMode"),
   );
+  const thresholds = whenPresent(record.thresholds, parseThresholds);
+  const pauseFromPercent = whenPresent(
+    record.pauseFromPercent,
+    parsePauseFromPercent,
+  );
   return {
     ...(mode === undefined ? {} : { mode }),
     ...(binding === undefined ? {} : { binding }),
@@ -58,6 +67,8 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
     ...(error === undefined ? {} : { error }),
     ...(running === undefined ? {} : { running }),
     ...(pendingMode === undefined ? {} : { pendingMode }),
+    ...(thresholds === undefined ? {} : { thresholds }),
+    ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
   };
 }
 

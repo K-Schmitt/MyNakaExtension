@@ -269,6 +269,62 @@ describe("rating messages", () => {
   });
 });
 
+describe("set-settings message", () => {
+  const OK = {
+    type: "set-settings",
+    thresholds: { film: 0.95, episode: 0.8 },
+    pauseFromPercent: 40,
+  };
+
+  it("accepts the grid thresholds and a percent from 0 to 99", () => {
+    expect(parseToWorker(OK)).toEqual(OK);
+    for (const pauseFromPercent of [0, 99]) {
+      expect(parseToWorker({ ...OK, pauseFromPercent })).toEqual({
+        ...OK,
+        pauseFromPercent,
+      });
+    }
+  });
+
+  it("drops extra top-level keys", () => {
+    expect(parseToWorker({ ...OK, mode: "live", token: "x" })).toEqual(OK);
+  });
+
+  it.each([0.5, 0.9000001, 1, "0.9", null, undefined, 0.7])(
+    "rejects the off-grid film threshold %j",
+    (film) => {
+      expect(
+        parseToWorker({ ...OK, thresholds: { film, episode: 0.8 } }),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each([0.5, 1, "0.8", null, undefined])(
+    "rejects the off-grid episode threshold %j",
+    (episode) => {
+      expect(
+        parseToWorker({ ...OK, thresholds: { film: 0.9, episode } }),
+      ).toBeUndefined();
+    },
+  );
+
+  it("rejects missing, non-object and extra-key thresholds", () => {
+    expect(parseToWorker({ ...OK, thresholds: undefined })).toBeUndefined();
+    expect(parseToWorker({ ...OK, thresholds: [0.9, 0.8] })).toBeUndefined();
+    expect(
+      parseToWorker({ ...OK, thresholds: { film: 0.9, episode: 0.8, x: 1 } }),
+    ).toBeUndefined();
+    expect(parseToWorker({ ...OK, thresholds: { film: 0.9 } })).toBeUndefined();
+  });
+
+  it.each([-1, 100, 40.5, "40", null, undefined, Number.NaN, 1e9])(
+    "rejects the pauseFromPercent %j",
+    (pauseFromPercent) => {
+      expect(parseToWorker({ ...OK, pauseFromPercent })).toBeUndefined();
+    },
+  );
+});
+
 describe("parseToNakaTab", () => {
   it("accepts playlistIds", () => {
     expect(parseToNakaTab({ type: "naka-call", call: "playlistIds" })).toEqual({
@@ -734,6 +790,11 @@ describe("allowedFor", () => {
     { type: "rating-cards" },
     { type: "rate", contentId: 1, label: "film", rating: 7 },
     { type: "dismiss-rating", contentId: 1, label: "film" },
+    {
+      type: "set-settings",
+      thresholds: { film: 0.9, episode: 0.8 },
+      pauseFromPercent: 50,
+    },
   ];
   const allowed: Record<SenderRole, string[]> = {
     "naka-tab": [
@@ -745,7 +806,7 @@ describe("allowedFor", () => {
       "rate",
       "dismiss-rating",
     ],
-    "status-page": ["status", "resync", "set-mode"],
+    "status-page": ["status", "resync", "set-mode", "set-settings"],
   };
 
   it("allows each type for its role only", () => {
@@ -775,6 +836,16 @@ describe("allowedFor", () => {
     }
   });
 
+  it("refuses set-settings from a naka.cx script", () => {
+    expect(
+      allowedFor("naka-tab", {
+        type: "set-settings",
+        thresholds: { film: 0.9, episode: 0.8 },
+        pauseFromPercent: 0,
+      }),
+    ).toBe(false);
+  });
+
   it("refuses finished from the status page", () => {
     expect(
       allowedFor("status-page", {
@@ -790,6 +861,6 @@ describe("allowedFor", () => {
     const types = messages.map((m) => m.type).sort();
     const tabbed = Object.values(allowed).flat().sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(10);
+    expect(new Set(types).size).toBe(11);
   });
 });

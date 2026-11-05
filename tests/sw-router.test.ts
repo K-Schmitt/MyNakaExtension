@@ -46,7 +46,13 @@ const RATE = {
 };
 const DISMISS = { type: "dismiss-rating", contentId: 3, label: "film" };
 const CARD = { type: "rating-card", contentId: 3 };
+const SETTINGS = {
+  type: "set-settings",
+  thresholds: { film: 0.95, episode: 0.85 },
+  pauseFromPercent: 30,
+};
 const RATING_MESSAGES: [string, unknown][] = [
+  ["a set-settings", SETTINGS],
   ["a rate", RATE],
   ["a dismiss-rating", DISMISS],
   ["a rating-card", CARD],
@@ -93,6 +99,11 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     setMode: async (mode: Mode) => {
       calls.push(`mode:${mode}`);
+    },
+    setSettings: async (thresholds, pauseFromPercent) => {
+      calls.push(
+        `settings:${JSON.stringify({ thresholds, pauseFromPercent })}`,
+      );
     },
     rate: async (msg) => {
       calls.push(`rate:${JSON.stringify(msg)}`);
@@ -187,6 +198,38 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls).toEqual(["mode:live"]);
   });
 
+  it("set-settings from the status page becomes a settings job with the parsed values, unanswered", async () => {
+    const r = router();
+    expect(r.send({ ...SETTINGS, mode: "live", x: 1 }, STATUS_PAGE)).toBe(
+      false,
+    );
+    await settle();
+    expect(r.calls).toEqual([
+      `settings:${JSON.stringify({
+        thresholds: SETTINGS.thresholds,
+        pauseFromPercent: 30,
+      })}`,
+    ]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("set-settings is queued behind the running job, like set-mode", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(SETTINGS, STATUS_PAGE);
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("settings:"))).toBe(false);
+    blocker.open();
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("settings:"))).toBe(true);
+  });
+
   it("rate from the Naka tab becomes a rate job with the parsed message, unanswered", async () => {
     const r = router();
     expect(r.send({ ...RATE, productId: 99, token: "x" }, NAKA_TAB)).toBe(
@@ -268,6 +311,17 @@ describe("router: everything else is ignored, unanswered", () => {
     [
       "playlist-changed from the status page",
       { type: "playlist-changed" },
+      STATUS_PAGE,
+    ],
+    ["a set-settings from the Naka tab", SETTINGS, NAKA_TAB],
+    [
+      "a set-settings with an off-grid threshold",
+      { ...SETTINGS, thresholds: { film: 0.5, episode: 0.8 } },
+      STATUS_PAGE,
+    ],
+    [
+      "a set-settings with a percent of 100",
+      { ...SETTINGS, pauseFromPercent: 100 },
       STATUS_PAGE,
     ],
     ["a rate from the status page", RATE, STATUS_PAGE],
