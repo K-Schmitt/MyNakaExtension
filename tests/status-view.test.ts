@@ -503,6 +503,20 @@ describe("toStatusView: an untrusted answer", () => {
   });
 });
 
+describe("toStatusView: the mode switch while a change waits", () => {
+  it.each(["live", "simulation"] as const)(
+    "is disabled while a switch to %s waits",
+    (pendingMode) => {
+      expect(ready({ mode: "live", pendingMode }).switchDisabled).toBe(true);
+    },
+  );
+
+  it("is enabled with no switch waiting", () => {
+    expect(ready({ mode: "live", counts: COUNTS }).switchDisabled).toBe(false);
+    expect(ready({}).switchDisabled).toBe(false);
+  });
+});
+
 describe("bindingLine: no-break space after n°", () => {
   it("holds n°, U+00A0, then the id", () => {
     const line = bindingLine({ scUsername: "a", nakaAccount: "7" }) ?? "";

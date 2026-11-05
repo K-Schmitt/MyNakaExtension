@@ -24,6 +24,12 @@ function fill(list: HTMLElement, texts: string[]): void {
 
 // Whether an action is under way: the save button stays disabled meanwhile.
 let busyNow = false;
+// Whether the shown view says a mode change waits: the switch stays disabled meanwhile.
+let switchLocked = false;
+
+function syncSwitch(): void {
+  element<HTMLButtonElement>("switch").disabled = busyNow || switchLocked;
+}
 
 function render(view: StatusView): void {
   const ready = view.kind === "ready";
@@ -35,6 +41,8 @@ function render(view: StatusView): void {
   const toggle = element<HTMLButtonElement>("switch");
   toggle.hidden = !ready || view.switchLabel === undefined;
   toggle.textContent = ready ? (view.switchLabel ?? "") : "";
+  switchLocked = ready && view.switchDisabled;
+  syncSwitch();
 }
 
 // The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
@@ -46,7 +54,7 @@ function setBusy(busy: boolean): void {
   busyNow = busy;
   syncForm(busy);
   element<HTMLButtonElement>("resync").disabled = busy;
-  element<HTMLButtonElement>("switch").disabled = busy;
+  syncSwitch();
   element("status").setAttribute("aria-busy", String(busy));
 }
 

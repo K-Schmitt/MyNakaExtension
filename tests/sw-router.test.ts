@@ -1710,6 +1710,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       headline: `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
       mode: "simulation",
       switchLabel: "Activer les écritures",
+      switchDisabled: false,
       inProgress: false,
       previewCount: 2,
       lines: [

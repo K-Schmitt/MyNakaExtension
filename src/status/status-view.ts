@@ -25,6 +25,8 @@ export type StatusView =
       headline: string;
       mode?: Mode;
       switchLabel?: string;
+      /** A mode change waits in the worker: a second click would stack another (Ruling 22). */
+      switchDisabled: boolean;
       /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
       inProgress: boolean;
       /** A settings change waits or runs in the worker: the values shown may be the old ones. */
@@ -107,6 +109,7 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
       snapshot.running !== undefined ||
       snapshot.pendingMode !== undefined ||
       snapshot.pendingSettings !== undefined,
+    switchDisabled: snapshot.pendingMode !== undefined,
     settingsPending: snapshot.pendingSettings !== undefined,
     previewCount: preview.length,
     lines: viewLines(snapshot, format),
