@@ -3,7 +3,11 @@
 // An unreadable store rejects: the router then gives no answer rather than an invented one.
 
 import { contentKeyOf } from "../core/finish-event";
-import { cardFor, type RatingCard } from "../core/rating-cards";
+import {
+  cardFor,
+  type RatingCard,
+  type RatingLabel,
+} from "../core/rating-cards";
 import { startValue } from "../core/rating-start";
 import type { RatingCardMessage } from "../ext/rating-messages";
 import { pauseFromOf } from "../ext/settings";
@@ -13,8 +17,23 @@ export type CardAnswer = {
   card: RatingCard | null;
   pauseFromPercent: number;
   start?: number;
+  sending?: RatingLabel[]; // labels of the card whose rate is waiting or running; omitted when none
 };
-export type CardsAnswer = { cards: { card: RatingCard; start?: number }[] };
+export type CardsAnswer = {
+  cards: { card: RatingCard; start?: number; sending?: RatingLabel[] }[];
+};
+
+/** The labels being sent for a card, in target order; the field is omitted when none. */
+export function sendingOf(
+  card: RatingCard,
+  sendingLabels: (key: string) => RatingLabel[],
+): { sending?: RatingLabel[] } {
+  const sent = sendingLabels(card.key);
+  const labels = card.targets
+    .map((t) => t.label)
+    .filter((l) => sent.includes(l));
+  return labels.length === 0 ? {} : { sending: labels };
+}
 
 /** The store as the answers read it: no save. */
 export type RatingsReader = Pick<Store, "loadSettings" | "loadRatings">;

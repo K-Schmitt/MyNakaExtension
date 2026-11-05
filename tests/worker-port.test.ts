@@ -165,3 +165,47 @@ describe("answer bounds and film ids", () => {
     }
   });
 });
+
+describe("the sending labels of an answer", () => {
+  const sendingCard = episodeCard();
+  const withSending = (sending: unknown) => ({
+    card: sendingCard,
+    pauseFromPercent: 0,
+    sending,
+  });
+
+  it("keeps the labels of the card's targets, in a card answer and in a cards answer", async () => {
+    const one = await createWorkerPort(
+      ok(withSending(["épisode", "série"])),
+    ).askCard(IDS);
+    expect(one?.sending).toEqual(["épisode", "série"]);
+    const many = await createWorkerPort(
+      ok({ cards: [{ card: sendingCard, sending: ["saison"] }] }),
+    ).askCards();
+    expect(many?.cards[0]?.sending).toEqual(["saison"]);
+  });
+
+  it("an empty list is no sending", async () => {
+    const got = await createWorkerPort(ok(withSending([]))).askCard(IDS);
+    expect(got?.sending).toBeUndefined();
+  });
+
+  it("refuses an unknown label, a label the card has no target for, a duplicate, a non-list", async () => {
+    const bad = [["film"], ["épisode", "épisode"], ["season"], "épisode", [3]];
+    for (const sending of bad) {
+      const got = await createWorkerPort(ok(withSending(sending))).askCard(IDS);
+      expect(got, JSON.stringify(sending)).toBeUndefined();
+    }
+    const cards = await createWorkerPort(
+      ok({ cards: [{ card: sendingCard, sending: ["film"] }] }),
+    ).askCards();
+    expect(cards).toBeUndefined();
+  });
+
+  it("refuses sending on an answer without a card", async () => {
+    const got = await createWorkerPort(
+      ok({ card: null, pauseFromPercent: 0, sending: ["film"] }),
+    ).askCard(IDS);
+    expect(got).toBeUndefined();
+  });
+});

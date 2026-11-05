@@ -19,6 +19,8 @@ import type { JobQueue } from "./job-queue";
 import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
 import { createRateQueue } from "./rate-queue";
+import type { CardAnswer, CardsAnswer } from "./rating-answers";
+import { sendingOf } from "./rating-answers";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
 export type Respond = (answer: unknown) => void;
@@ -55,6 +57,20 @@ export function createRouter(deps: RouterDeps): Router {
     (job) => enqueue(activity.track("finish", job)),
     (msg) => jobs.finishJob(msg),
   );
+
+  // The answers add what the queue alone knows: the ratings still being sent.
+  const withSending = async (cardAnswer: Promise<CardAnswer>) => {
+    const answer = await cardAnswer;
+    return answer.card
+      ? { ...answer, ...sendingOf(answer.card, rate.sending) }
+      : answer;
+  };
+  const withSendingAll = async (cardsAnswer: Promise<CardsAnswer>) => ({
+    cards: (await cardsAnswer).cards.map((entry) => ({
+      ...entry,
+      ...sendingOf(entry.card, rate.sending),
+    })),
+  });
 
   // Chrome's responder may throw (its port already closed): that is no error of the worker.
   function answerStatus(respond: Respond): void {
@@ -98,10 +114,10 @@ export function createRouter(deps: RouterDeps): Router {
         answerStatus(respond);
         return true;
       case "rating-card":
-        answerRead(() => jobs.ratingCard(msg), respond);
+        answerRead(() => withSending(jobs.ratingCard(msg)), respond);
         return true;
       case "rating-cards":
-        answerRead(() => jobs.ratingCards(), respond);
+        answerRead(() => withSendingAll(jobs.ratingCards()), respond);
         return true;
       case "rate":
         rate(msg);

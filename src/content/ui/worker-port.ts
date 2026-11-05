@@ -3,9 +3,11 @@
 // validated field by field before the block uses it.
 
 import type { ContentIds } from "../../core/finish-event";
-import type { RatingLabel } from "../../core/rating-cards";
+import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import {
   asInt,
+  asList,
+  asOneOf,
   asRecord,
   onlyKeys,
   valuesOf,
@@ -22,11 +24,13 @@ const CARD_ANSWER_KEYS = valuesOf<keyof CardAnswer>({
   card: true,
   pauseFromPercent: true,
   start: true,
+  sending: true,
 });
 const CARDS_ANSWER_KEYS = valuesOf<keyof CardsAnswer>({ cards: true });
 const ENTRY_KEYS = valuesOf<keyof CardsAnswer["cards"][number]>({
   card: true,
   start: true,
+  sending: true,
 });
 
 function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
@@ -42,6 +46,20 @@ function startOf(raw: unknown): { start?: number } {
   return start === undefined ? {} : { start };
 }
 
+// The labels whose rating is still being sent: each one a target of the card, none twice. Empty is none.
+function sendingOf(
+  raw: unknown,
+  card: RatingCard | null,
+): { sending?: RatingLabel[] } {
+  if (raw === undefined) return {};
+  const allowed = card === null ? [] : card.targets.map((t) => t.label);
+  const labels = asList(raw, "sending", (item) =>
+    asOneOf(item, allowed, "sending"),
+  );
+  if (new Set(labels).size !== labels.length) throw new Error("sending");
+  return labels.length === 0 ? {} : { sending: labels };
+}
+
 function parseCard(raw: unknown): CardAnswer["card"] {
   if (raw === null) return null;
   const [card] = parseRatings([raw]);
@@ -54,10 +72,12 @@ function parseCardAnswer(raw: unknown): CardAnswer {
   onlyKeys(record, CARD_ANSWER_KEYS, "answer");
   const pause = asInt(record.pauseFromPercent, 0, "pauseFromPercent");
   if (pause > MAX_PAUSE_PERCENT) throw new Error("pauseFromPercent");
+  const card = parseCard(record.card);
   return {
-    card: parseCard(record.card),
+    card,
     pauseFromPercent: pause,
     ...startOf(record.start),
+    ...sendingOf(record.sending, card),
   };
 }
 
@@ -66,7 +86,7 @@ function parseEntry(raw: unknown): CardsAnswer["cards"][number] {
   onlyKeys(record, ENTRY_KEYS, "entry");
   const card = parseCard(record.card);
   if (card === null) throw new Error("card");
-  return { card, ...startOf(record.start) };
+  return { card, ...startOf(record.start), ...sendingOf(record.sending, card) };
 }
 
 function parseCardsAnswer(raw: unknown): CardsAnswer {
