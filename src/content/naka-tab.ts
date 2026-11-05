@@ -39,6 +39,8 @@ export type TabEnv = {
   urlChanged(ids: ContentIds | undefined): void;
   /** The page's pathname, at every URL poll (empty when the href is not a URL): the home block follows it. */
   pathChanged(pathname: string): void;
+  /** Naka just answered a removal of this title from « Ma liste » (an id the page reported). */
+  removed(contentId: number): void;
 };
 
 type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
@@ -60,6 +62,7 @@ function sendFinished(env: TabEnv, msg: FinishedMessage): void {
 function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "playlist") {
     env.send({ type: "playlist-changed" });
+    if (event.removed !== undefined) env.removed(event.removed);
     return;
   }
   if (event.kind === "unwatched") {

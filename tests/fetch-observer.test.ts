@@ -5,6 +5,35 @@ const CH = "mynaka/1";
 const WATCHED = "https://naka.cx/api/v1/history/watched";
 const PLAYLIST = "https://naka.cx/api/v1/playlist";
 
+describe("classifyRequest removals", () => {
+  it("DELETE /api/v1/playlist/21391 carries the removed id", () => {
+    expect(classifyRequest("DELETE", `${PLAYLIST}/21391`, undefined)).toEqual({
+      channel: CH,
+      kind: "playlist",
+      removed: 21391,
+    });
+  });
+
+  it.each(["abc", "0", "-3", "007", "1.5", "21391abc", "9007199254740993"])(
+    "DELETE …/playlist/%s is a plain playlist change",
+    (seg) => {
+      expect(
+        classifyRequest("DELETE", `${PLAYLIST}/${seg}`, undefined),
+      ).toEqual({
+        channel: CH,
+        kind: "playlist",
+      });
+    },
+  );
+
+  it("POST /api/v1/playlist carries no removed id", () => {
+    expect(classifyRequest("POST", PLAYLIST, "{}")).toEqual({
+      channel: CH,
+      kind: "playlist",
+    });
+  });
+});
+
 describe("classifyRequest playlist routes", () => {
   it("POST /api/v1/playlist is a playlist change", () => {
     expect(classifyRequest("POST", PLAYLIST, "{}")).toEqual({
@@ -17,6 +46,7 @@ describe("classifyRequest playlist routes", () => {
     expect(classifyRequest("DELETE", `${PLAYLIST}/42`, undefined)).toEqual({
       channel: CH,
       kind: "playlist",
+      removed: 42,
     });
   });
 

@@ -5,7 +5,8 @@ import { PAGE_CHANNEL, type PageEvent, parsePageEvent } from "../ext/messages";
 
 const NAKA_ORIGIN = "https://naka.cx";
 const PLAYLIST_PATH = "/api/v1/playlist";
-const PLAYLIST_ITEM = /^\/api\/v1\/playlist\/[^/]+$/;
+const PLAYLIST_ITEM = /^\/api\/v1\/playlist\/([^/]+)$/;
+const CONTENT_ID = /^[1-9][0-9]*$/;
 const WATCHED_PATH = "/api/v1/history/watched";
 
 function parseUrl(url: string): URL | undefined {
@@ -35,6 +36,24 @@ function bodyRecord(body: unknown): Record<string, unknown> | undefined {
 function isPlaylistChange(method: string, path: string): boolean {
   if (method === "POST") return path === PLAYLIST_PATH;
   return method === "DELETE" && PLAYLIST_ITEM.test(path);
+}
+
+// The id of a title removed from « Ma liste »: the last segment of DELETE /playlist/<contentId>, when it is
+// a plain positive integer. Any other segment is a playlist change with no id.
+function removedId(path: string): number | undefined {
+  const segment = PLAYLIST_ITEM.exec(path)?.[1];
+  if (segment === undefined || !CONTENT_ID.test(segment)) return undefined;
+  const id = Number(segment);
+  return Number.isSafeInteger(id) ? id : undefined;
+}
+
+function playlistEvent(method: string, path: string): PageEvent {
+  const removed = method === "DELETE" ? removedId(path) : undefined;
+  return {
+    channel: PAGE_CHANNEL,
+    kind: "playlist",
+    ...(removed === undefined ? {} : { removed }),
+  };
 }
 
 // A null season or episode is an absent one.
@@ -74,7 +93,7 @@ export function classifyRequest(
   if (target === undefined || target.origin !== NAKA_ORIGIN) return undefined;
   const verb = method.toUpperCase();
   if (isPlaylistChange(verb, target.pathname)) {
-    return { channel: PAGE_CHANNEL, kind: "playlist" };
+    return playlistEvent(verb, target.pathname);
   }
   if (verb === "PUT" && target.pathname === WATCHED_PATH) {
     return classifyWatched(body);

@@ -149,5 +149,6 @@ export function createPauseBlock(ports: PausePorts) {
       close();
     },
     close,
+    isShown: (): boolean => session.isOpen() || question.isOpen(),
   };
 }

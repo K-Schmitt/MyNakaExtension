@@ -20,7 +20,7 @@ import {
   type PageMessage,
   parsePageMessage,
 } from "./page-messages";
-import { playbackContext } from "./playback-context";
+import { playbackContext, playlistEvent } from "./playback-context";
 import {
   isQuestionType,
   parseQuestionMessage,
@@ -85,7 +85,7 @@ export type NakaReply =
   | { ok: false; error: NakaReplyError };
 
 export type PageEvent =
-  | { channel: typeof PAGE_CHANNEL; kind: "playlist" }
+  | { channel: typeof PAGE_CHANNEL; kind: "playlist"; removed?: number }
   | ({ channel: typeof PAGE_CHANNEL; kind: "watched" } & ContentIds)
   | ({ channel: typeof PAGE_CHANNEL; kind: "unwatched" } & ContentIds);
 
@@ -238,7 +238,7 @@ export function parseNakaReply(raw: unknown): NakaReply | undefined {
 function parsePageEventRecord(record: Record<string, unknown>): PageEvent {
   asOneOf(record.channel, [PAGE_CHANNEL], "channel");
   const kind = asOneOf(record.kind, PAGE_KINDS, "kind");
-  if (kind === "playlist") return { channel: PAGE_CHANNEL, kind };
+  if (kind === "playlist") return playlistEvent(PAGE_CHANNEL, record);
   return {
     channel: PAGE_CHANNEL,
     kind,

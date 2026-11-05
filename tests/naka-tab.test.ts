@@ -126,6 +126,7 @@ function tab(start = PLAYER(3)) {
   const ended: ContentIds[] = [];
   const urls: (ContentIds | undefined)[] = [];
   const paths: string[] = [];
+  const removals: number[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -160,6 +161,9 @@ function tab(start = PLAYER(3)) {
     pathChanged: (pathname) => {
       paths.push(pathname);
     },
+    removed: (contentId) => {
+      removals.push(contentId);
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -172,7 +176,7 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, ended, urls, paths, timers, page, tick, post };
+  return { sent, ended, urls, paths, removals, timers, page, tick, post };
 }
 
 describe("the Naka tab URL changes", () => {
@@ -261,6 +265,19 @@ describe("the Naka tab", () => {
       episode: 2,
     });
     expect(t.ended).toEqual([{ contentId: 7, season: 1, episode: 2 }]);
+  });
+
+  it("a removal event sends playlist-changed, then tells the removal block the id", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "playlist", removed: 21391 });
+    expect(t.sent.slice(1)).toEqual([{ type: "playlist-changed" }]);
+    expect(t.removals).toEqual([21391]);
+  });
+
+  it("a playlist event with no removed id tells the removal block nothing", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "playlist" });
+    expect(t.removals).toEqual([]);
   });
 
   it("a send that is not a finished never calls the end block", () => {

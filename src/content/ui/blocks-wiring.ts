@@ -3,7 +3,9 @@
 // page's events. The end and pause blocks draw in one overlay, a card or a question, owned by one block at
 // a time: the end block closes the pause block before it opens, and the pause block neither draws nor
 // clears while the end block is shown (a question of the end block included). Every URL change closes the pause block; leaving the player closes the end block
-// too, while an episode change (autoplay) keeps its card. The home panel has its own overlay.
+// too, while an episode change (autoplay) keeps its card. The home panel has its own overlay. The removal
+// block (after a removal on Naka, on any naka.cx path) draws in the player overlay but yields to both: it
+// shows only when neither is shown, and either one opening closes it.
 
 import type { ContentIds } from "../../core/finish-event";
 import type { VideoSample } from "../naka-tab";
@@ -16,6 +18,7 @@ import type { QuestionHandlers } from "./question-render";
 import type { QuestionView } from "./question-view";
 import type { RatingHandlers } from "./rating-render";
 import type { RatingView } from "./rating-view";
+import { createRemovalBlock } from "./removal-block";
 import type { WorkerPort } from "./worker-port";
 
 type Overlay<V, H> = { show(view: V, handlers: H): void; hide(): void };
@@ -42,16 +45,23 @@ export function wireBlocks(ports: WiringPorts) {
     show: playerUi.show,
     showQuestion: playerUi.showQuestion,
     hide: playerUi.hide,
-    opening: () => pauseBlock.close(),
+    opening: () => {
+      pauseBlock.close();
+      removalBlock.close();
+    },
   });
   const pauseBlock = createPauseBlock({
     port,
     timer,
     show: (view, handlers) => {
-      if (!endBlock.isShown()) playerUi.show(view, handlers);
+      if (endBlock.isShown()) return;
+      removalBlock.close();
+      playerUi.show(view, handlers);
     },
     showQuestion: (view, handlers) => {
-      if (!endBlock.isShown()) playerUi.showQuestion(view, handlers);
+      if (endBlock.isShown()) return;
+      removalBlock.close();
+      playerUi.showQuestion(view, handlers);
     },
     hide: () => {
       if (!endBlock.isShown()) playerUi.hide();
@@ -59,6 +69,15 @@ export function wireBlocks(ports: WiringPorts) {
     now: ports.now,
     endShown: () => endBlock.isShown(),
     titleOf: ports.titleOf,
+  });
+  const removalBlock = createRemovalBlock({
+    port,
+    timer,
+    now: ports.now,
+    show: playerUi.showQuestion,
+    hide: playerUi.hide,
+    titleOf: ports.titleOf,
+    ownerFree: () => !endBlock.isShown() && !pauseBlock.isShown(),
   });
   const homeBlock = createHomeBlock({
     port,
@@ -76,6 +95,7 @@ export function wireBlocks(ports: WiringPorts) {
       if (ids === undefined) endBlock.leave();
     },
     pathChanged: (pathname: string) => homeBlock.route(pathname),
+    removed: (contentId: number) => removalBlock.removed(contentId),
     paused: (sample: VideoSample) => pauseBlock.paused(sample, playing),
     resumed: () => pauseBlock.resumed(),
   };

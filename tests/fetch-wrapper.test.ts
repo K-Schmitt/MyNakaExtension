@@ -80,7 +80,9 @@ describe("the page's fetch, wrapped", () => {
     const p = page();
     await p.wrapped("/api/v1/playlist/12", { method: "DELETE" });
     await settle();
-    expect(p.posted).toEqual([{ channel: PAGE_CHANNEL, kind: "playlist" }]);
+    expect(p.posted).toEqual([
+      { channel: PAGE_CHANNEL, kind: "playlist", removed: 12 },
+    ]);
   });
 
   it("an explicit vu posts the watched ids", async () => {
