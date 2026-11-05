@@ -207,7 +207,13 @@ describe("removals and D1", () => {
     expect(w.writes).toEqual([]);
     expect(r).toEqual(report({ pendingRemovals: 1 }));
     expect(w.saved[0]?.pending).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: p(1), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: p(1),
+        asked: false,
+        title: "Film 1",
+      },
     ]);
     expect(w.saved[0]?.snapshot).toEqual([p(1)]);
   });
@@ -217,7 +223,13 @@ describe("removals and D1", () => {
     const r = await runSync(w.ports);
     expect(r).toEqual(report({ pendingRemovals: 1 }));
     expect(w.saved[0]?.pending).toEqual([
-      { kind: "removal", removeFrom: "sc", pair: p(1), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(1),
+        asked: false,
+        title: "Film 1",
+      },
     ]);
   });
 
@@ -231,7 +243,13 @@ describe("removals and D1", () => {
     expect(w.writes).toEqual([]);
     expect(w.saved).toHaveLength(3);
     expect(w.saved[2]?.pending).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: p(1), asked: true },
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: p(1),
+        asked: true,
+        title: "Film 1",
+      },
     ]);
     expect(w.saved[2]?.snapshot).toEqual([p(1)]);
     expect(r1).toEqual(report({ pendingRemovals: 1 }));
@@ -247,16 +265,29 @@ describe("removals and D1", () => {
     w.naka.delete(1);
     const r3 = await runSync(w.ports);
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: p(1), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(1),
+        asked: false,
+        title: "Film 1",
+      },
     ]);
     w.state = resolvePending(w.state, w.state.pending[0] as PendingItem);
     const r4 = await runSync(w.ports);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "sc", pair: p(1), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(1),
+        asked: false,
+        title: "Film 1",
+      },
     ]);
     expect(r1).toEqual(report({ pendingRemovals: 1 }));
-    expect(r2).toEqual(report({ pendingRemovals: 1 }));
+    // Both lists hold the pair at run 2: the removal is moot and closed (B3), then re-asked from the other side.
+    expect(r2).toEqual(report({ pendingRemovals: 0 }));
     expect(r3).toEqual(report({ pendingRemovals: 1 }));
     expect(r4).toEqual(report({ pendingRemovals: 1 }));
   });
@@ -281,7 +312,13 @@ describe("removals and D1", () => {
     expect(w.writes).toEqual([]);
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "sc", pair: p(1), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(1),
+        asked: false,
+        title: "Film 1",
+      },
       {
         kind: "ambiguity",
         side: "sc",
@@ -320,7 +357,13 @@ describe("removals and D1", () => {
     const r4 = await runSync(w.ports);
     expect(w.writes).toEqual([]);
     expect(w.state.pending.filter((i) => i.kind === "removal")).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: q, asked: false },
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: q,
+        asked: false,
+        title: "Film 1",
+      },
     ]);
     expect(r1).toEqual(report({ pendingRemovals: 1 }));
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
@@ -529,7 +572,13 @@ describe("the resolution cap is not wasted (R3)", () => {
     const r2 = await runSync(w.ports);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: p(21), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: p(21),
+        asked: false,
+        title: "Film 21",
+      },
     ]);
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
   });
@@ -793,7 +842,13 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     const r2 = await runSync(w.ports);
     expect(w.writes).toEqual(["addToNaka:1"]);
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "sc", pair: p(5), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(5),
+        asked: false,
+        title: "Film 5",
+      },
     ]);
     expect(r1).toEqual(report({ added: [p(1)] }));
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
@@ -860,7 +915,13 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     const r2 = await runSync(w.ports);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([
-      { kind: "removal", removeFrom: "naka", pair: p(11), asked: false },
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: p(11),
+        asked: false,
+        title: "Film 11",
+      },
     ]);
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
   });

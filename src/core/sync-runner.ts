@@ -1,5 +1,7 @@
-import { type Pair, planListSync, type Removal } from "./list-diff";
+import { type Pair, planListSync } from "./list-diff";
+import { closeMootRemovals } from "./moot-removals";
 import { nextPresence, withPairsSeenTogether } from "./presence";
+import { type TitledRemoval, titleNewRemovals } from "./removal-titles";
 import type { ResolverPorts } from "./resolver";
 import { addPending, type SyncState, setSnapshot, settlePair } from "./state";
 import {
@@ -72,7 +74,7 @@ function planFor(state: SyncState, loaded: SyncState, lists: Lists) {
 
 function queueRemovals(
   state: SyncState,
-  removals: readonly Removal[],
+  removals: readonly TitledRemoval[],
 ): SyncState {
   return removals.reduce(
     (current, removal) =>
@@ -166,7 +168,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     ports,
   );
   const queued = settleAlreadyDone(
-    queueRemovals(resolved, plan.confirmRemoval),
+    queueRemovals(
+      resolved,
+      await titleNewRemovals(resolved, plan.confirmRemoval, ports),
+    ),
     outcome,
   );
   const final = {
@@ -183,7 +188,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   };
   const known = knownSnapshot(resolved, loaded);
   const state = completeRun(
-    nextRetryLast(nextSnapshot(queued, known, final), outcome),
+    nextRetryLast(
+      nextSnapshot(closeMootRemovals(queued, final), known, final),
+      outcome,
+    ),
     final,
   );
   await ports.save(state);
