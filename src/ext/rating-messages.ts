@@ -4,7 +4,7 @@
 
 import type { ContentIds } from "../core/finish-event";
 import type { RatingLabel } from "../core/rating-cards";
-import { asId } from "./field-checks";
+import { asId, valuesOf } from "./field-checks";
 import { playbackContext } from "./playback-context";
 import { asLabel, asRating } from "./rating-schema";
 
@@ -23,13 +23,15 @@ export type DismissRatingMessage = Extract<
 
 export type RatingType = RatingMessage["type"];
 
+const RATING_TYPES = valuesOf<RatingType>({
+  "rating-card": true,
+  "rating-cards": true,
+  rate: true,
+  "dismiss-rating": true,
+});
+
 export function isRatingType(type: string): type is RatingType {
-  return (
-    type === "rating-card" ||
-    type === "rating-cards" ||
-    type === "rate" ||
-    type === "dismiss-rating"
-  );
+  return RATING_TYPES.some((known) => known === type);
 }
 
 function idsOf(record: Record<string, unknown>): ContentIds {

@@ -17,7 +17,6 @@ import {
 import type { DismissRatingMessage, RateMessage } from "../ext/rating-messages";
 import type { Store } from "../ext/store";
 import { checkBinding } from "./binding";
-import { withBreaker } from "./circuit-breaker";
 import { finishJob } from "./finish-job";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
@@ -75,10 +74,7 @@ async function sendRating(
 ): Promise<void> {
   const settings = await deps.store.loadSettings();
   await checkBinding(settings.binding, jobAccounts(jobNaka(deps), deps));
-  await withBreaker((id: number, value: number) => deps.sc.rate(id, value))(
-    productId,
-    rating,
-  );
+  await deps.sc.rate(productId, rating);
 }
 
 async function rated(
