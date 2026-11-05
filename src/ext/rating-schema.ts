@@ -55,12 +55,12 @@ const FAILED_KEYS = valuesOf<keyof NonNullable<RatingCard["failed"]>>({
   at: true,
 });
 
-function asRating(raw: unknown, path: string): number {
+export function asRating(raw: unknown, path: string): number {
   const rating = asInt(raw, 1, path);
   return rating > MAX_RATING ? fail(path) : rating;
 }
 
-function asLabel(raw: unknown, path: string): RatingLabel {
+export function asLabel(raw: unknown, path: string): RatingLabel {
   return asOneOf(raw, LABELS, path);
 }
 

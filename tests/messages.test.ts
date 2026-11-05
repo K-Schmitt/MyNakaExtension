@@ -163,6 +163,112 @@ describe("parseToWorker", () => {
   });
 });
 
+describe("rating messages", () => {
+  const ROW = { contentId: 5, season: 2, episode: 3 };
+
+  it("rating-card takes ids, with a season and episode pair or none", () => {
+    expect(parseToWorker({ type: "rating-card", contentId: 5 })).toEqual({
+      type: "rating-card",
+      contentId: 5,
+    });
+    expect(
+      parseToWorker({ type: "rating-card", ...ROW, extra: 1, token: "x" }),
+    ).toEqual({ type: "rating-card", ...ROW });
+    for (const bad of [
+      { contentId: 5, season: 2 },
+      { contentId: 5, episode: 3 },
+      { contentId: 0 },
+      { contentId: 5, season: 0, episode: 1 },
+      {},
+    ]) {
+      expect(parseToWorker({ type: "rating-card", ...bad })).toBeUndefined();
+    }
+  });
+
+  it("rating-cards is bare, and drops extra keys", () => {
+    expect(parseToWorker({ type: "rating-cards", x: 1 })).toEqual({
+      type: "rating-cards",
+    });
+  });
+
+  it.each([1, 7, 10])("rate accepts the rating %s", (rating) => {
+    expect(
+      parseToWorker({ type: "rate", ...ROW, label: "épisode", rating }),
+    ).toEqual({ type: "rate", ...ROW, label: "épisode", rating });
+  });
+
+  it.each([0, 11, 7.5, "7", null, undefined, -1, Number.NaN, 1e9])(
+    "rate rejects the rating %j",
+    (rating) => {
+      expect(
+        parseToWorker({ type: "rate", contentId: 5, label: "film", rating }),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each(["season", "Film", "", 1, null, undefined, "serie"])(
+    "rate and dismiss-rating reject the label %j",
+    (label) => {
+      expect(
+        parseToWorker({ type: "rate", contentId: 5, label, rating: 7 }),
+      ).toBeUndefined();
+      expect(
+        parseToWorker({ type: "dismiss-rating", contentId: 5, label }),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each(["film", "épisode", "saison", "série"])(
+    "accepts the label %s",
+    (label) => {
+      expect(
+        parseToWorker({ type: "dismiss-rating", contentId: 5, label }),
+      ).toEqual({ type: "dismiss-rating", contentId: 5, label });
+    },
+  );
+
+  it("rate and dismiss-rating drop extra keys", () => {
+    expect(
+      parseToWorker({
+        type: "rate",
+        contentId: 5,
+        label: "film",
+        rating: 7,
+        productId: 99,
+        token: "x",
+      }),
+    ).toEqual({ type: "rate", contentId: 5, label: "film", rating: 7 });
+    expect(
+      parseToWorker({
+        type: "dismiss-rating",
+        contentId: 5,
+        label: "film",
+        productId: 99,
+      }),
+    ).toEqual({ type: "dismiss-rating", contentId: 5, label: "film" });
+  });
+
+  it("a half season/episode pair rejects rate and dismiss-rating", () => {
+    expect(
+      parseToWorker({
+        type: "rate",
+        contentId: 5,
+        season: 1,
+        label: "film",
+        rating: 7,
+      }),
+    ).toBeUndefined();
+    expect(
+      parseToWorker({
+        type: "dismiss-rating",
+        contentId: 5,
+        episode: 1,
+        label: "film",
+      }),
+    ).toBeUndefined();
+  });
+});
+
 describe("parseToNakaTab", () => {
   it("accepts playlistIds", () => {
     expect(parseToNakaTab({ type: "naka-call", call: "playlistIds" })).toEqual({
@@ -624,9 +730,21 @@ describe("allowedFor", () => {
     { type: "status" },
     { type: "resync" },
     { type: "set-mode", mode: "live" },
+    { type: "rating-card", contentId: 1 },
+    { type: "rating-cards" },
+    { type: "rate", contentId: 1, label: "film", rating: 7 },
+    { type: "dismiss-rating", contentId: 1, label: "film" },
   ];
   const allowed: Record<SenderRole, string[]> = {
-    "naka-tab": ["naka-ready", "playlist-changed", "finished"],
+    "naka-tab": [
+      "naka-ready",
+      "playlist-changed",
+      "finished",
+      "rating-card",
+      "rating-cards",
+      "rate",
+      "dismiss-rating",
+    ],
     "status-page": ["status", "resync", "set-mode"],
   };
 
@@ -646,6 +764,17 @@ describe("allowedFor", () => {
     expect(allowedFor("naka-tab", { type: "status" })).toBe(false);
   });
 
+  it("refuses the rating messages from the status page, and rate from nobody else", () => {
+    for (const msg of messages.filter((m) =>
+      ["rating-card", "rating-cards", "rate", "dismiss-rating"].includes(
+        m.type,
+      ),
+    )) {
+      expect(allowedFor("status-page", msg)).toBe(false);
+      expect(allowedFor("naka-tab", msg)).toBe(true);
+    }
+  });
+
   it("refuses finished from the status page", () => {
     expect(
       allowedFor("status-page", {
@@ -661,6 +790,6 @@ describe("allowedFor", () => {
     const types = messages.map((m) => m.type).sort();
     const tabbed = Object.values(allowed).flat().sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(6);
+    expect(new Set(types).size).toBe(10);
   });
 });

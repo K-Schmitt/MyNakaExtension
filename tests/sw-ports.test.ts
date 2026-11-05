@@ -511,8 +511,10 @@ describe("the finish event of a finished message", () => {
   };
 
   it("a film takes its title from contentById", async () => {
-    const { asked, read } = reading(nakaItem(7, "movie"));
-    expect(await finishEventOf(finished(), read)).toEqual({
+    const item = nakaItem(7, "movie");
+    const { asked, read } = reading(item);
+    const found = await finishEventOf(finished(), read);
+    expect(found?.event).toEqual({
       source: "threshold",
       progress: 0.9,
       naka: { contentId: 7, mediaType: "movie" },
@@ -523,16 +525,19 @@ describe("the finish event of a finished message", () => {
         year: 2004,
       },
     });
+    expect(found?.item).toBe(item);
     expect(asked).toEqual([7]);
   });
 
   it("an episode keeps the message's season and episode and the series title", async () => {
-    const { read } = reading(nakaItem(7, "tv"));
-    const event = await finishEventOf(
+    const item = { ...nakaItem(7, "tv"), numberOfSeasons: 3 };
+    const { read } = reading(item);
+    const found = await finishEventOf(
       finished({ source: "explicit", progress: 1, season: 2, episode: 3 }),
       read,
     );
-    expect(event).toEqual({
+    expect(found?.item).toBe(item);
+    expect(found?.event).toEqual({
       source: "explicit",
       progress: 1,
       naka: { contentId: 7, mediaType: "tv", season: 2, episode: 3 },

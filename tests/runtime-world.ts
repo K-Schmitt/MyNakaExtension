@@ -80,6 +80,7 @@ export type JobKey =
   | "sync:button"
   | "finish"
   | "mode"
+  | "rating"
   | "status";
 
 // What the world saw of a job's tabs: the tabs it last found, the ones it tried, the one it pinned.
@@ -718,6 +719,11 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     finishJob: (msg) =>
       run("finish", { kind: "finish", msg }, () => jobs.finishJob(msg)),
     setMode: (mode) => run("mode", { kind: "other" }, () => jobs.setMode(mode)),
+    rate: (msg) => run("rating", { kind: "other" }, () => jobs.rate(msg)),
+    dismissRating: (msg) =>
+      run("rating", { kind: "other" }, () => jobs.dismissRating(msg)),
+    ratingCard: (msg) => jobs.ratingCard(msg),
+    ratingCards: () => jobs.ratingCards(),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)

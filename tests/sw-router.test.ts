@@ -38,6 +38,21 @@ const EVIL = {
 const IFRAME = { ...NAKA_TAB, frameId: 3 };
 const OTHER_EXTENSION = { ...NAKA_TAB, id: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" };
 
+const RATE = {
+  type: "rate",
+  contentId: 3,
+  label: "film",
+  rating: 7,
+};
+const DISMISS = { type: "dismiss-rating", contentId: 3, label: "film" };
+const CARD = { type: "rating-card", contentId: 3 };
+const RATING_MESSAGES: [string, unknown][] = [
+  ["a rate", RATE],
+  ["a dismiss-rating", DISMISS],
+  ["a rating-card", CARD],
+  ["a rating-cards", { type: "rating-cards" }],
+];
+
 const FINISHED = {
   type: "finished",
   source: "threshold",
@@ -79,9 +94,23 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     setMode: async (mode: Mode) => {
       calls.push(`mode:${mode}`);
     },
+    rate: async (msg) => {
+      calls.push(`rate:${JSON.stringify(msg)}`);
+    },
+    dismissRating: async (msg) => {
+      calls.push(`dismiss:${JSON.stringify(msg)}`);
+    },
     statusSnapshot: async () => {
       calls.push("status");
       return snapshot;
+    },
+    ratingCard: async (msg) => {
+      calls.push(`card:${JSON.stringify(msg)}`);
+      return { card: null, pauseFromPercent: 0 };
+    },
+    ratingCards: async () => {
+      calls.push("cards");
+      return { cards: [] };
     },
     ...over,
   };
@@ -158,6 +187,49 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls).toEqual(["mode:live"]);
   });
 
+  it("rate from the Naka tab becomes a rate job with the parsed message, unanswered", async () => {
+    const r = router();
+    expect(r.send({ ...RATE, productId: 99, token: "x" }, NAKA_TAB)).toBe(
+      false,
+    );
+    await settle();
+    expect(r.calls).toEqual([`rate:${JSON.stringify(RATE)}`]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("dismiss-rating from the Naka tab becomes a dismiss job, unanswered", async () => {
+    const r = router();
+    expect(r.send(DISMISS, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([`dismiss:${JSON.stringify(DISMISS)}`]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("rating-card and rating-cards from the Naka tab are answered, and run no job", async () => {
+    const r = router({
+      ratingCard: async () => ({ card: null, pauseFromPercent: 40 }),
+      ratingCards: async () => ({ cards: [] }),
+    });
+    expect(r.send(CARD, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "rating-cards" }, NAKA_TAB)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { card: null, pauseFromPercent: 40 },
+      { cards: [] },
+    ]);
+  });
+
+  it("a rating read that rejects gives no answer, and no unhandled rejection", async () => {
+    const r = router({
+      ratingCard: async () => {
+        throw new Error("store down");
+      },
+    });
+    expect(r.send(CARD, NAKA_TAB)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([]);
+  });
+
   it("status from the status page is answered with the snapshot", async () => {
     const r = router();
     expect(r.send({ type: "status" }, STATUS_PAGE)).toBe(true);
@@ -198,6 +270,29 @@ describe("router: everything else is ignored, unanswered", () => {
       { type: "playlist-changed" },
       STATUS_PAGE,
     ],
+    ["a rate from the status page", RATE, STATUS_PAGE],
+    ["a dismiss-rating from the status page", DISMISS, STATUS_PAGE],
+    ["a rating-card from the status page", CARD, STATUS_PAGE],
+    [
+      "a rating-cards from the status page",
+      { type: "rating-cards" },
+      STATUS_PAGE,
+    ],
+    ["a rate with a rating of 0", { ...RATE, rating: 0 }, NAKA_TAB],
+    ["a rate with a rating of 11", { ...RATE, rating: 11 }, NAKA_TAB],
+    ["a rate with an unknown label", { ...RATE, label: "season" }, NAKA_TAB],
+    ...RATING_MESSAGES.flatMap(([name, msg]) =>
+      [
+        ["https://naka.cx.evil.com/", EVIL],
+        ["an iframe", IFRAME],
+        ["another extension", OTHER_EXTENSION],
+        ["a sender with no id", { url: PLAYER, frameId: 0 }],
+      ].map(([from, sender]): [string, unknown, object] => [
+        `${name} from ${from as string}`,
+        msg,
+        sender as object,
+      ]),
+    ),
   ];
 
   it.each(ignored)("%s", async (_name, msg, sender) => {
@@ -222,6 +317,44 @@ describe("router: everything else is ignored, unanswered", () => {
     expect(read).toEqual([]);
     r.send({ type: "naka-ready" }, sender);
     expect(read).toContain("id");
+  });
+});
+
+describe("router: rating reads are answered outside the queue", () => {
+  it("a rating-card is answered while a sync still runs, then the sync ends", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(CARD, NAKA_TAB);
+    r.send({ type: "rating-cards" }, NAKA_TAB);
+    await settle();
+    expect(r.answers).toHaveLength(2);
+    blocker.open();
+    await settle();
+  });
+
+  it("a rate job is queued behind the running job, a read is not", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(RATE, NAKA_TAB);
+    r.send(CARD, NAKA_TAB);
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(false);
+    expect(r.answers).toHaveLength(1);
+    blocker.open();
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(true);
   });
 });
 
@@ -1101,6 +1234,96 @@ describe("worker end to end: the tokens stay where they belong", () => {
     expect(w.storage.data.get("settings")).toMatchObject({
       lastFinish: { key: "movie:3", outcome: "failed", error: "sc-session" },
     });
+  });
+});
+
+// The strings of a value that contain one of the markers.
+const leaksOf = (values: unknown, markers: string[]): string[] =>
+  strings(values).filter((text) => markers.some((m) => text.includes(m)));
+
+const operationsOf = (calls: Call[]): string[] =>
+  calls.map((c) => JSON.parse(c.init.body ?? "{}").operationName);
+
+async function settleAll(): Promise<void> {
+  for (let i = 0; i < 20; i += 1) await settle();
+}
+
+describe("worker end to end: ratings", () => {
+  async function ratedFilm() {
+    const w = worker();
+    w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-card", contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rate", contentId: 3, label: "film", rating: 7 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-card", contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-cards" }, NAKA_TAB);
+    await settleAll();
+    return w;
+  }
+
+  it("a finish makes the card, one rate sends one ProductRate, and the answers follow the card", async () => {
+    const w = await ratedFilm();
+    const ops = operationsOf(w.sc.calls);
+    expect(ops.filter((op) => op === "ProductRate")).toHaveLength(1);
+    expect(ops).not.toContain("ProductUnwish");
+    const [before, after, cards] = w.answers as {
+      card?: { pending: string[]; given: object };
+      cards?: unknown[];
+    }[];
+    expect(before?.card?.pending).toEqual(["film"]);
+    expect(after?.card?.pending).toEqual([]);
+    expect(after?.card?.given).toEqual({ film: 7 });
+    expect(cards?.cards).toEqual([]);
+    const rated = w.sc.calls.find((c) =>
+      (c.init.body ?? "").includes('"ProductRate"'),
+    );
+    expect(JSON.parse(rated?.init.body ?? "{}").variables).toMatchObject({
+      rating: 7,
+    });
+  });
+
+  it("neither token reaches the stored ratings, the answers, or what crossed to the tab", async () => {
+    const w = await ratedFilm();
+    const markers = [SC_TOKEN, NAKA_TOKEN];
+    expect(w.storage.data.has("ratings")).toBe(true);
+    expect(leaksOf([...w.storage.data.values()], markers)).toEqual([]);
+    expect(leaksOf(w.answers, markers)).toEqual([]);
+    expect(leaksOf([w.traffic.sent, w.traffic.returned], markers)).toEqual([]);
+  });
+
+  it("the scan fires on a planted marker (positive control)", async () => {
+    const w = await ratedFilm();
+    const planted = [...w.answers, { card: { title: `x ${SC_TOKEN}` } }];
+    expect(leaksOf(planted, [SC_TOKEN])).toHaveLength(1);
+    expect(leaksOf({ ratings: [`y${NAKA_TOKEN}`] }, [NAKA_TOKEN])).toHaveLength(
+      1,
+    );
+  });
+
+  it("the SensCritique token goes only to Apollo for the rating, as the raw authorization header", async () => {
+    const w = await ratedFilm();
+    const rating = w.sc.calls.filter((c) =>
+      (c.init.body ?? "").includes('"ProductRate"'),
+    );
+    expect(rating).toHaveLength(1);
+    expect(rating[0]?.url).toBe("https://apollo.senscritique.com/");
+    expect(rating[0]?.init.headers.authorization).toBe(SC_TOKEN);
+    expect(rating[0]?.init.body ?? "").not.toContain(SC_TOKEN);
+  });
+
+  it("a rate from the status page, and one from a forged sender, send nothing", async () => {
+    const w = worker();
+    const rate = { type: "rate", contentId: 3, label: "film", rating: 7 };
+    w.send(rate, STATUS_PAGE);
+    w.send(rate, EVIL);
+    w.send(rate, IFRAME);
+    await settleAll();
+    expect(w.sc.calls).toEqual([]);
+    expect(w.naka.calls).toEqual([]);
+    expect(w.storage.data.has("ratings")).toBe(false);
   });
 });
 

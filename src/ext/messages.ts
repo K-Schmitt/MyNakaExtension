@@ -10,8 +10,13 @@ import {
   asString,
   fail,
   valuesOf,
-  whenPresent,
 } from "./field-checks";
+import { playbackContext } from "./playback-context";
+import {
+  isRatingType,
+  parseRatingMessage,
+  type RatingMessage,
+} from "./rating-messages";
 import type { Mode } from "./settings";
 
 export const PAGE_CHANNEL = "mynaka/1";
@@ -29,7 +34,8 @@ export type ToWorker =
     }
   | { type: "status" }
   | { type: "resync" }
-  | { type: "set-mode"; mode: Mode };
+  | { type: "set-mode"; mode: Mode }
+  | RatingMessage;
 
 export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
@@ -82,6 +88,10 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   status: true,
   resync: true,
   "set-mode": true,
+  "rating-card": true,
+  "rating-cards": true,
+  rate: true,
+  "dismiss-rating": true,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
@@ -129,18 +139,6 @@ function asSearchQuery(raw: unknown): string {
   return checkQuery(asString(raw, "query"));
 }
 
-// Season and episode come as a pair: both present or both absent.
-function playbackContext(record: Record<string, unknown>): {
-  season?: number;
-  episode?: number;
-} {
-  const season = whenPresent(record.season, (v) => asId(v, "season"));
-  const episode = whenPresent(record.episode, (v) => asId(v, "episode"));
-  if (season === undefined && episode === undefined) return {};
-  if (season === undefined || episode === undefined) return fail("episode");
-  return { season, episode };
-}
-
 function parseFinished(record: Record<string, unknown>): ToWorker {
   return {
     type: "finished",
@@ -157,6 +155,7 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
   if (type === "set-mode") {
     return { type, mode: asOneOf(record.mode, MODE_VALUES, "mode") };
   }
+  if (isRatingType(type)) return parseRatingMessage(type, record);
   return { type };
 }
 
@@ -259,6 +258,10 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   status: ["status-page"],
   resync: ["status-page"],
   "set-mode": ["status-page"],
+  "rating-card": ["naka-tab"],
+  "rating-cards": ["naka-tab"],
+  rate: ["naka-tab"],
+  "dismiss-rating": ["naka-tab"],
 };
 
 // A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.

@@ -24,21 +24,25 @@ import { checkBinding } from "./binding";
 import { buildFinishPorts, finishEventOf } from "./finish-ports";
 import { preCheck } from "./finish-precheck";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
+import { buildCard, type CardInput, storeCard } from "./rating-card-builder";
 import { readNakaItem } from "./read-ports";
 import { toJobError } from "./to-job-error";
 
 type Done = { outcome: FinishRecord["outcome"]; error?: JobError };
+/** A finish that ended `done` also hands over what its rating card is built from. */
+type Attempted = Done & { card?: Omit<CardInput, "at"> };
 
 async function attempt(
   deps: JobDeps,
   settings: Settings,
   msg: FinishedMessage,
-): Promise<Done | undefined> {
+): Promise<Attempted | undefined> {
   const naka = jobNaka(deps);
   try {
     const read = (id: number) => readNakaItem(naka, deps.limiters.naka, id);
-    const event = await finishEventOf(msg, read);
-    if (event === undefined) return undefined;
+    const found = await finishEventOf(msg, read);
+    if (found === undefined) return undefined;
+    const { event, item } = found;
     await checkBinding(settings.binding, jobAccounts(naka, deps));
     const ports = buildFinishPorts({
       sc: deps.sc,
@@ -47,7 +51,10 @@ async function attempt(
       today: deps.today,
     });
     const thresholds = thresholdsOf(settings);
-    return { outcome: (await handleFinish(event, ports, thresholds)).kind };
+    const outcome = await handleFinish(event, ports, thresholds);
+    if (outcome.kind !== "done") return { outcome: outcome.kind };
+    const { productState } = ports;
+    return { outcome: "done", card: { outcome, event, item, productState } };
   } catch (error) {
     return { outcome: "failed", error: toJobError(error) };
   }
@@ -83,9 +90,22 @@ async function counted(
   }
   const reserved: Settings = { ...settings, finishWindow: withOneMore(window) };
   await deps.store.saveSettings(reserved);
-  const done = await attempt(deps, settings, msg);
-  if (done === undefined) return;
+  const attempted = await attempt(deps, settings, msg);
+  if (attempted === undefined) return;
+  const { card, ...done } = attempted;
   await record(deps, reserved, { at, key, ...done });
+  if (card !== undefined) await keepCard(deps, { ...card, at });
+}
+
+// After the finish record: the finish is a fact on SensCritique, the card only a way to rate it. Whatever
+// fails here (a read of the saison or the série, the ratings unreadable or unwritable) leaves the record
+// as saved and the ratings as they were.
+async function keepCard(deps: JobDeps, input: CardInput): Promise<void> {
+  try {
+    await storeCard(deps.store, await buildCard(input));
+  } catch {
+    // Nothing more can be recorded.
+  }
 }
 
 export async function finishJob(

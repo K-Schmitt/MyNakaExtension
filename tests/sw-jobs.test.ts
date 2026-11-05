@@ -1545,12 +1545,14 @@ describe("a worker killed at any await", () => {
       );
       const handled =
         state !== undefined && parseState(state).handled.length > 0;
+      // A kill after the record (the rating card is kept after it) leaves it: the next finish is free.
+      const recorded = parseSettings(w.area.data.get("settings")).lastFinish;
       const next = jobsOn(w.area);
       await next.jobs.finishJob(finished());
       expect(parseState(w.area.data.get("state")).handled).toEqual(["movie:3"]);
       expect(
         parseSettings(w.area.data.get("settings")).lastFinish?.outcome,
-      ).toBe(handled ? undefined : "done");
+      ).toBe(handled ? recorded?.outcome : "done");
       expect(writesOf(next.sk.calls)).toEqual(
         handled ? [] : ["markDone:1003:2026-11-04"],
       );

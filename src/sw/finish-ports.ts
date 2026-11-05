@@ -49,19 +49,22 @@ function contextOf(
   return { contentId, mediaType: "tv", season, episode };
 }
 
-// undefined when Naka does not know the content, or when its kind does not fit the message.
+// The event, and the catalogue entry it was built from (the finish builds its rating card from that entry:
+// one content read serves both). undefined when Naka does not know the content, or when its kind does
+// not fit the message.
 export async function finishEventOf(
   msg: FinishedMessage,
   read: (id: number) => Promise<NakaItem | undefined>,
-): Promise<FinishEvent | undefined> {
+): Promise<{ event: FinishEvent; item: NakaItem } | undefined> {
   const item = await read(msg.contentId);
   if (item === undefined) return undefined;
   const naka = contextOf(item, msg);
   if (naka === undefined) return undefined;
-  return {
+  const event = {
     source: msg.source,
     progress: msg.progress,
     naka,
     titled: nakaToTitled(item),
   };
+  return { event, item };
 }

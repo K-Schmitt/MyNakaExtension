@@ -2,7 +2,8 @@
 // then whether that sender may send that type, and ignores (never answers) anything that fails a step.
 // Every job of the worker then runs on ONE queue, one at a time. `status`, the only message answered, is
 // no job (Ruling 20): it is answered at once, outside the queue, from a read-only snapshot and the
-// activity kept here. `set-mode` stays queued: a sync saves the settings it loaded.
+// activity kept here. `set-mode` stays queued: a sync saves the settings it loaded. `rating-card` and
+// `rating-cards` are answered the same way (read-only); `rate` and `dismiss-rating` are queued jobs.
 
 import {
   allowedFor,
@@ -64,6 +65,13 @@ export function createRouter(deps: RouterDeps): Router {
       .catch(ignore);
   }
 
+  // A read of the stored ratings: outside the queue, never saving. An unreadable store gives no answer.
+  function answerRead(read: () => Promise<unknown>, respond: Respond): void {
+    read()
+      .then((answer) => respond(answer))
+      .catch(ignore);
+  }
+
   function dispatch(msg: ToWorker, respond: Respond): boolean {
     switch (msg.type) {
       case "naka-ready":
@@ -84,6 +92,18 @@ export function createRouter(deps: RouterDeps): Router {
       case "status":
         answerStatus(respond);
         return true;
+      case "rating-card":
+        answerRead(() => jobs.ratingCard(msg), respond);
+        return true;
+      case "rating-cards":
+        answerRead(() => jobs.ratingCards(), respond);
+        return true;
+      case "rate":
+        enqueue(() => jobs.rate(msg));
+        return false;
+      case "dismiss-rating":
+        enqueue(() => jobs.dismissRating(msg));
+        return false;
     }
   }
 
