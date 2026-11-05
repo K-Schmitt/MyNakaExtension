@@ -1,7 +1,7 @@
 import type {
-  ClickEvent,
   DocLike,
   ElementLike,
+  EventLike,
   NodeLike,
   ShadowRootLike,
 } from "../src/content/ui/dom-like";
@@ -25,6 +25,8 @@ export class FakeNode implements NodeLike {
 }
 
 export class FakeShadow extends FakeNode implements ShadowRootLike {
+  host: FakeElement | null = null;
+
   replaceChildren(...nodes: NodeLike[]): void {
     for (const child of [...this.children]) this.drop(child);
     for (const node of nodes) this.appendChild(node);
@@ -35,23 +37,21 @@ export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
   style = { cssText: "" };
   attributes: Record<string, string> = {};
-  clicks: ((event: ClickEvent) => void)[] = [];
+  listeners: Record<string, ((event: EventLike) => void)[]> = {};
   shadowInit: { mode: string }[] = [];
   shadow = new FakeShadow();
 
   constructor(readonly tag: string) {
     super();
+    this.shadow.host = this;
   }
 
   setAttribute(name: string, value: string): void {
     this.attributes[name] = value;
   }
 
-  addEventListener(
-    _type: "click",
-    listener: (event: ClickEvent) => void,
-  ): void {
-    this.clicks.push(listener);
+  addEventListener(type: string, listener: (event: EventLike) => void): void {
+    this.listeners[type] = [...(this.listeners[type] ?? []), listener];
   }
 
   attachShadow(init: { mode: "closed" }): ShadowRootLike {
@@ -63,8 +63,27 @@ export class FakeElement extends FakeNode implements ElementLike {
     this.parent?.drop(this);
   }
 
+  /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
+  dispatch(type: string, isTrusted: unknown = true): boolean {
+    let stopped = false;
+    const event = {
+      isTrusted,
+      stopPropagation: () => {
+        stopped = true;
+      },
+    } as EventLike;
+    let node: FakeNode | null = this;
+    while (node !== null && !stopped) {
+      if (node instanceof FakeElement) {
+        for (const listener of node.listeners[type] ?? []) listener(event);
+      }
+      node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
+    }
+    return !stopped;
+  }
+
   click(isTrusted: boolean): void {
-    for (const listener of this.clicks) listener({ isTrusted });
+    this.dispatch("click", isTrusted);
   }
 }
 

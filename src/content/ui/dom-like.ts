@@ -2,6 +2,7 @@
 // run on plain fakes (no DOM library) and so that a binding hands in `document` and nothing wider.
 
 export type ClickEvent = { isTrusted: boolean };
+export type EventLike = ClickEvent & { stopPropagation(): void };
 
 export interface NodeLike {
   appendChild(child: NodeLike): unknown;
@@ -11,7 +12,7 @@ export interface ElementLike extends NodeLike {
   textContent: string | null;
   style: { cssText: string };
   setAttribute(name: string, value: string): void;
-  addEventListener(type: "click", listener: (event: ClickEvent) => void): void;
+  addEventListener(type: string, listener: (event: EventLike) => void): void;
   attachShadow(init: { mode: "closed" }): ShadowRootLike;
   remove(): void;
 }

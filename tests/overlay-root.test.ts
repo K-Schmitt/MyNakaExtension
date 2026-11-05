@@ -1,6 +1,28 @@
-import { describe, expect, it } from "vitest";
-import { createOverlayRoot } from "../src/content/ui/overlay-root";
-import { FakeDoc, type FakeElement, FakeNode } from "./ui-fakes";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createOverlayRoot,
+  STOPPED_EVENTS,
+} from "../src/content/ui/overlay-root";
+import { createRatingBlock } from "../src/content/ui/rating-render";
+import { ratingView } from "../src/content/ui/rating-view";
+import { episodeCard } from "./rating-fixtures";
+import { descendants, FakeDoc, type FakeElement, FakeNode } from "./ui-fakes";
+
+const EXPECTED = [
+  "click",
+  "dblclick",
+  "auxclick",
+  "contextmenu",
+  "pointerdown",
+  "pointerup",
+  "mousedown",
+  "mouseup",
+  "touchstart",
+  "touchend",
+  "keydown",
+  "keyup",
+  "wheel",
+];
 
 function hostOf(doc: FakeDoc): FakeElement {
   const host = doc.created[0];
@@ -60,5 +82,34 @@ describe("createOverlayRoot", () => {
     expect(doc.listenerCount()).toBe(0);
     doc.enterFullscreen(new FakeNode());
     expect(hostOf(doc).parent).toBeNull();
+  });
+
+  it("lists the input events it keeps from the page", () => {
+    expect([...STOPPED_EVENTS].sort()).toEqual([...EXPECTED].sort());
+  });
+
+  it.each(EXPECTED)("stops %s at the host", (type) => {
+    const doc = new FakeDoc();
+    createOverlayRoot(doc);
+    const reached = hostOf(doc).dispatch(type);
+    expect(reached).toBe(false);
+  });
+
+  it("a click on an inner rating button runs its handler once, and stops at the host", () => {
+    const doc = new FakeDoc();
+    const { root } = createOverlayRoot(doc);
+    const onChoose = vi.fn();
+    const block = createRatingBlock(doc, root, {
+      onChoose,
+      onAction: vi.fn(),
+      onOther: vi.fn(),
+    });
+    block.show(ratingView(episodeCard(), "saison", 8));
+    const eight = descendants(hostOf(doc).shadow).find(
+      (el) => el.tag === "button" && el.textContent === "8",
+    );
+    expect(eight?.dispatch("click", true)).toBe(false);
+    expect(onChoose).toHaveBeenCalledTimes(1);
+    expect(onChoose).toHaveBeenCalledWith(8);
   });
 });

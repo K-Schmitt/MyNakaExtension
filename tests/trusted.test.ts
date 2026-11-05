@@ -23,9 +23,7 @@ describe("onTrustedClick", () => {
     const el = new FakeElement("button");
     const fn = vi.fn();
     onTrustedClick(el, fn);
-    for (const listener of el.clicks) {
-      listener({ isTrusted: "true" } as unknown as { isTrusted: boolean });
-    }
+    el.dispatch("click", "true");
     expect(fn).not.toHaveBeenCalled();
   });
 });
