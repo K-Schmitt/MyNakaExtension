@@ -154,7 +154,7 @@ describe("answer-removal with no stored item: the block right after a removal on
     expect(outcomeOf(w)?.outcome).toBe("done");
   });
 
-  it("the snapshot stands for Naka's presence (the sync's own both-listed rule)", async () => {
+  it("the snapshot does not stand for Naka's presence: refused, zero writes (Ruling 16)", async () => {
     const w = world(
       listedAt5({
         presence: { naka: [], sc: [{ id: 1021, from: 1, to: 5 }] },
@@ -162,7 +162,7 @@ describe("answer-removal with no stored item: the block right after a removal on
       }),
     );
     await w.jobs.answerRemoval(msg("sc", true));
-    expect(w.writes()).toEqual(["unwish:1021"]);
+    expect(w.writes()).toEqual([]);
   });
 
   it("Naka still lists 21: refused, zero writes, no save", async () => {
@@ -582,5 +582,25 @@ describe("Review Focus 1: forged answers never remove, link or finish", () => {
       expect(names.some((n) => n.startsWith(kind))).toBe(true);
     }
     expect(w.settings().lastAnswer?.seq).toBeGreaterThan(30);
+  });
+});
+
+describe("a stale snapshot pair (fuzz seed 4312)", () => {
+  it("is refused: Naka's presence ended at run 6 of 8, so the pair was not listed on both at the last run", async () => {
+    const start = stateWith({
+      run: 8,
+      mapping: [PAIR],
+      snapshot: [PAIR],
+      presence: {
+        naka: [{ id: 21, from: 1, to: 6 }],
+        sc: [{ id: 1021, from: 7, to: 8 }],
+      },
+    });
+    const w = world(start);
+    await w.jobs.answerRemoval(msg("sc", true));
+    expect(w.sk.calls.filter((c) => c.startsWith("unwish"))).toEqual([]);
+    expect(w.writes()).toEqual([]);
+    expect(w.settings().lastAnswer?.outcome).toBe("refused");
+    expect(w.state()).toEqual(start);
   });
 });

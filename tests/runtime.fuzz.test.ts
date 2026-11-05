@@ -72,6 +72,8 @@ const LOOK_ALIKE = {
 };
 
 const SEEDS = 450;
+// Seeds found by a longer run, kept: 4312 unwished a title through a stale snapshot pair (Ruling 16).
+const EXTRA_SEEDS = [4312];
 const STEPS = 50;
 
 type Worker = {
@@ -340,7 +342,11 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       candidateChoices: 0,
       strayChoices: 0,
     };
-    for (let seed = 1; seed <= SEEDS; seed++) {
+    const seeds = [
+      ...Array.from({ length: SEEDS }, (_, i) => i + 1),
+      ...EXTRA_SEEDS,
+    ];
+    for (const seed of seeds) {
       const result = await simulate(seed);
       violations.push(...result.violations);
       for (const key of Object.keys(totals) as (keyof Stats)[]) {

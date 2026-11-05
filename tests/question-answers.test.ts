@@ -248,12 +248,24 @@ describe("answerRemovalOffer", () => {
     expect(await offerOf()).toEqual({ offer: OFFER });
   });
 
-  it("offers it when Naka is absent but the pair is in the snapshot", async () => {
+  it("is NOT offered when Naka is absent at the last run, even if the pair is in the snapshot", async () => {
     const state = mappedAt5({
       presence: { naka: [], sc: [{ id: 101, from: 1, to: 5 }] },
       snapshot: [PAIR],
     });
-    expect((await offerOf(state)).offer).toEqual(OFFER);
+    expect((await offerOf(state)).offer).toBeNull();
+  });
+
+  it("is not offered for a stale snapshot pair: Naka's presence ended at run 6 of 8 (fuzz seed 4312)", async () => {
+    const state = mappedAt5({
+      run: 8,
+      presence: {
+        naka: [{ id: 1, from: 1, to: 6 }],
+        sc: [{ id: 101, from: 7, to: 8 }],
+      },
+      snapshot: [PAIR],
+    });
+    expect((await offerOf(state)).offer).toBeNull();
   });
 
   it("marks the offer answering when its key is being answered", async () => {
