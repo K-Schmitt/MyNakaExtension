@@ -1,12 +1,12 @@
 // Reads the owner's state on one product from a ProductCurrentUserInfos answer. Pure: no network.
 //
-// Only the two flags, the product's universe (public, non-personal: film, series, episode…), the owner's
-// own rating (currentUserInfos.rating, to be shown back to the owner) and the series' season count leave
-// this module; the date seen, the user id and everything else in the answer are dropped here. The
-// product-level `rating` is the community average and is never read. An answer that does not describe the
-// requested product, whose flags are not booleans, whose universe is not a safe integer, whose rating is
-// neither null nor an integer 1 to 10 (the key must be present) or whose season count is not a positive
-// safe integer (absent or null is fine) fails closed with one fixed message (never a piece of the answer).
+// Only the two flags, the product's universe (public, non-personal: film, series, episode…) and the
+// owner's own rating (currentUserInfos.rating, to be shown back to the owner) leave this module; the date
+// seen, the user id, the season count (Naka's is the one used, Ruling 11) and everything else in the answer
+// are dropped here. The product-level `rating` is the community average and is never read. An answer that
+// does not describe the requested product, whose flags are not booleans, whose universe is not a safe
+// integer or whose rating is neither null nor an integer 1 to 10 (the key must be present) fails closed
+// with one fixed message (never a piece of the answer).
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
 // recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
@@ -18,7 +18,6 @@ export type ProductState = {
   isWished: boolean;
   universe: number;
   rating: number | null;
-  numberOfSeasons?: number;
 };
 
 const UNEXPECTED =
@@ -65,18 +64,6 @@ function ratingOf(infos: Record<string, unknown>): number | null {
   return rating;
 }
 
-function seasonCountOf(product: Record<string, unknown>): {
-  numberOfSeasons?: number;
-} {
-  const { numberOfSeasons } = product;
-  if (numberOfSeasons === undefined || numberOfSeasons === null) return {};
-  if (typeof numberOfSeasons !== "number") throw unexpected();
-  if (!Number.isSafeInteger(numberOfSeasons) || numberOfSeasons < 1) {
-    throw unexpected();
-  }
-  return { numberOfSeasons };
-}
-
 export function readProductState(
   envelope: Envelope,
   productId: number,
@@ -92,6 +79,5 @@ export function readProductState(
     isWished,
     universe: universeOf(product),
     rating: ratingOf(infos),
-    ...seasonCountOf(product),
   };
 }

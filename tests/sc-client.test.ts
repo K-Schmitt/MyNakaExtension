@@ -1410,8 +1410,6 @@ describe("productState", () => {
     product5({ currentUserInfos: infos });
   const withUniverse = (universe: unknown): Reply =>
     product5({ universe, currentUserInfos: userInfos(5, PERSONAL) });
-  const withSeasons = (numberOfSeasons: unknown): Reply =>
-    product5({ numberOfSeasons, currentUserInfos: userInfos(5, PERSONAL) });
   const flags = (extra: Record<string, unknown>): Reply =>
     withInfos(userInfos(5, { ...PERSONAL, ...extra }));
   const without = (key: string): Reply => {
@@ -1442,11 +1440,6 @@ describe("productState", () => {
     ["a rating as a string", flags({ rating: "7" })],
     ["a rating of 7.5", flags({ rating: 7.5 })],
     ["a rating that is a boolean", flags({ rating: true })],
-    ["a numberOfSeasons of 0", withSeasons(0)],
-    ["a numberOfSeasons of -2", withSeasons(-2)],
-    ["a numberOfSeasons of 1.5", withSeasons(1.5)],
-    ["a numberOfSeasons as a string", withSeasons("3")],
-    ["a numberOfSeasons of 2 ** 53", withSeasons(2 ** 53)],
     ["no productId", without("productId")],
     ["a foreign productId", withInfos(userInfos(6, PERSONAL))],
     ["a productId as a string", flags({ productId: "5" })],
@@ -1473,7 +1466,7 @@ describe("productState", () => {
     ["a universe that is a boolean", withUniverse(true)],
   ];
 
-  describe("the owner's own rating and the season count", () => {
+  describe("the owner's own rating, and no season count", () => {
     const read = async (product: Record<string, unknown>) => {
       const { client } = setup(LOGGED_IN, () =>
         stateReply({ id: 5, universe: 1, ...product }),
@@ -1509,21 +1502,29 @@ describe("productState", () => {
       expect(state.rating).toBeNull();
     });
 
-    it("keeps a positive integer numberOfSeasons from the product", async () => {
-      const state = await read({
-        numberOfSeasons: 4,
-        currentUserInfos: userInfos(5),
-      });
-      expect(state.numberOfSeasons).toBe(4);
-    });
-
     it.each([
-      ["absent", {}],
-      ["null", { numberOfSeasons: null }],
-    ])("a numberOfSeasons %s leaves the key out", async (_n, extra) => {
-      const state = await read({ ...extra, currentUserInfos: userInfos(5) });
-      expect("numberOfSeasons" in state).toBe(false);
-    });
+      ["4", 4],
+      ["0", 0],
+      ["-2", -2],
+      ["1.5", 1.5],
+      ['"3"', "3"],
+      ["2 ** 53", 2 ** 53],
+      ["null", null],
+    ])(
+      "a product with numberOfSeasons %s still reads, without the count",
+      async (_n, numberOfSeasons) => {
+        const state = await read({
+          numberOfSeasons,
+          currentUserInfos: userInfos(5, { rating: 6 }),
+        });
+        expect(state).toEqual({
+          isDone: false,
+          isWished: true,
+          universe: 1,
+          rating: 6,
+        });
+      },
+    );
   });
 
   it.each(MALFORMED)(
