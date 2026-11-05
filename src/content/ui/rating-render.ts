@@ -20,25 +20,25 @@ export type RatingHandlers = {
   onConfirm(send: boolean): void;
 };
 
-type Maker = Pick<DocLike, "createElement">;
+export type Maker = Pick<DocLike, "createElement">;
 
 const BLOCK_CSS =
   "font: 14px/1.4 system-ui, sans-serif; color: #fff; background: rgba(20, 20, 24, 0.92); padding: 12px; margin: 12px; border-radius: 8px; display: block;";
 const ROW_CSS = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;";
-const BUTTON_CSS =
+export const BUTTON_CSS =
   "font: inherit; color: #fff; background: #3a3a44; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; cursor: pointer;";
 const MARKED_CSS = `${BUTTON_CSS} background: #2f6fdb; border-color: #9cc0ff; font-weight: 700;`;
 const WARNING_CSS = "color: #ffd479; margin-top: 8px;";
 const ERROR_CSS = "color: #ff9c9c; margin-top: 8px;";
 
-function textLine(doc: Maker, text: string, css = ""): ElementLike {
+export function textLine(doc: Maker, text: string, css = ""): ElementLike {
   const line = doc.createElement("div");
   line.textContent = text;
   line.style.cssText = css;
   return line;
 }
 
-function button(
+export function button(
   doc: Maker,
   text: string,
   css: string,
@@ -114,7 +114,7 @@ function buttonRows(
     .map((buttons) => row(doc, buttons));
 }
 
-function buildBlock(
+export function buildBlock(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,

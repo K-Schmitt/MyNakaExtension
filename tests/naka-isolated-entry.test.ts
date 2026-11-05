@@ -171,6 +171,17 @@ describe("isolated-world entry", () => {
     expect(toWorker.slice(before)).toEqual([{ type: "playlist-changed" }]);
   });
 
+  it("asks the worker for the cards to rate when the URL poll finds the home page", async () => {
+    const before = toWorker.length;
+    vi.stubGlobal("location", { href: "https://naka.cx/" });
+    for (const { ms, fn } of intervals) if (ms === 1000) fn();
+    await settle();
+    vi.stubGlobal("location", { href: PLAYER });
+    for (const { ms, fn } of intervals) if (ms === 1000) fn();
+    await settle();
+    expect(toWorker.slice(before)).toEqual([{ type: "rating-cards" }]);
+  });
+
   it("nothing it sent or answered holds the token or the e-mail", async () => {
     const all = ask({ type: "naka-call", call: "playlistIds" });
     await settle();

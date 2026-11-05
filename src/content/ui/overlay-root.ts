@@ -5,19 +5,32 @@
 import { valuesOf } from "../../ext/field-checks";
 import type { DocLike, NodeLike, ShadowRootLike } from "./dom-like";
 
-// Top right, at most 40% wide, never lower than 80% of the height (the bottom 20% is Naka's controls).
-// Every declaration is !important: an author rule marked !important must not hide or fade the host.
-const HOST_STYLE = [
+export type Placement = "top-right" | "bottom-right";
+
+// The rating blocks sit top right, at most 40% wide, never lower than 80% of the height (the bottom 20% is
+// Naka's controls). The home panel sits bottom right, 360 px wide and 60% of the height at most: the home
+// page has no player. Every declaration is !important: an author rule marked !important must not hide or
+// fade the host.
+const COMMON_STYLE = [
   "all: initial",
   "position: fixed",
-  "top: 0",
   "right: 0",
-  "max-width: 40%",
-  "max-height: 80%",
   "overflow: auto",
   "z-index: 2147483647",
 ];
-const HOST_CSS = HOST_STYLE.map((d) => `${d} !important;`).join(" ");
+const PLACED_STYLE: Record<Placement, string[]> = {
+  "top-right": ["top: 0", "max-width: 40%", "max-height: 80%"],
+  "bottom-right": [
+    "bottom: 0",
+    "width: 360px",
+    "max-width: 100%",
+    "max-height: 60vh",
+  ],
+};
+const hostCss = (placement: Placement): string =>
+  [...COMMON_STYLE, ...PLACED_STYLE[placement]]
+    .map((d) => `${d} !important;`)
+    .join(" ");
 
 type StoppedEvent =
   | "click"
@@ -56,14 +69,17 @@ function targetOf(doc: DocLike): NodeLike {
   return doc.fullscreenElement ?? doc.body;
 }
 
-export function createOverlayRoot(doc: DocLike): {
+export function createOverlayRoot(
+  doc: DocLike,
+  placement: Placement = "top-right",
+): {
   root: ShadowRootLike;
   /** Puts the host back under its target when the page removed it; does nothing when it is there. */
   attach(): void;
   detach(): void;
 } {
   const host = doc.createElement("div");
-  host.style.cssText = HOST_CSS;
+  host.style.cssText = hostCss(placement);
   for (const type of STOPPED_EVENTS) {
     host.addEventListener(type, (event) => event.stopPropagation());
   }

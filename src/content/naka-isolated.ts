@@ -13,6 +13,8 @@ import { listenToPauses } from "./pause-events";
 import { createTitleLookup } from "./title-lookup";
 import { createEndBlock } from "./ui/end-block";
 import { createEndUi } from "./ui/end-ui";
+import { createHomeBlock } from "./ui/home-block";
+import { createHomeUi } from "./ui/home-ui";
 import { createPauseBlock } from "./ui/pause-block";
 import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
@@ -67,6 +69,15 @@ const pauseBlock = createPauseBlock({
   titleOf: createTitleLookup((contentId) => client.contentById(contentId)),
 });
 
+// The home panel has its own overlay, bottom right: it never touches the end and pause blocks' one.
+const homeUi = createHomeUi(document);
+const homeBlock = createHomeBlock({
+  port,
+  timer,
+  show: homeUi.show,
+  hide: homeUi.hide,
+});
+
 let playing: ContentIds | undefined;
 listenToPauses(document, {
   paused: (sample) => pauseBlock.paused(sample, playing),
@@ -89,4 +100,5 @@ startNakaTab({
     playing = ids;
     pauseBlock.urlChanged(Date.now());
   },
+  pathChanged: (pathname) => homeBlock.route(pathname),
 });

@@ -37,6 +37,8 @@ export type TabEnv = {
   finished(ids: ContentIds): void;
   /** The player URL now holds these ids (none off a player page): the pause block counts from here. */
   urlChanged(ids: ContentIds | undefined): void;
+  /** The page's pathname, at every URL poll (empty when the href is not a URL): the home block follows it. */
+  pathChanged(pathname: string): void;
 };
 
 type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
@@ -74,6 +76,14 @@ function idsOfContext(ctx: PlayerContext | undefined): ContentIds | undefined {
   };
 }
 
+function pathOf(href: string): string {
+  try {
+    return new URL(href).pathname;
+  } catch {
+    return "";
+  }
+}
+
 const keyOfIds = (ids: ContentIds | undefined): string =>
   ids === undefined ? "" : contentKeyOf(ids);
 
@@ -82,7 +92,9 @@ export function startNakaTab(env: TabEnv): void {
   let lastKey = "";
   // The tracker ignores a context it already follows, so the URL is handed over at every poll.
   const follow = (): void => {
-    const ctx = parsePlayerUrl(env.href());
+    const href = env.href();
+    env.pathChanged(pathOf(href));
+    const ctx = parsePlayerUrl(href);
     tracker.context(ctx);
     const ids = idsOfContext(ctx);
     if (keyOfIds(ids) === lastKey) return;

@@ -39,7 +39,15 @@ const snapshotOf = (card: RatingCard, label: RatingLabel): Snapshot => ({
   failure: failureOf(card, label),
 });
 
-export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
+// `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card
+// missing from the answer has nothing left to ask. For one shown card, a missing card is "not yet".
+export type SessionOptions = { absentIsDone?: boolean };
+
+export function createRatingSession(
+  ports: SessionPorts,
+  onClosed: () => void,
+  options: SessionOptions = {},
+) {
   let current: Session | undefined;
 
   function render(s: Session): void {
@@ -88,6 +96,10 @@ export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
   ): boolean {
     if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
     const card = answer?.card;
+    if (answer && !card && options.absentIsDone === true) {
+      close(s);
+      return true;
+    }
     if (!answer || !card) return false;
     const left = at.pending && !card.pending.includes(label);
     const rated = card.given[label] !== at.given;

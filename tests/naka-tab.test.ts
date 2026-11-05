@@ -125,6 +125,7 @@ function tab(start = PLAYER(3)) {
   const sent: ToWorker[] = [];
   const ended: ContentIds[] = [];
   const urls: (ContentIds | undefined)[] = [];
+  const paths: string[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -156,6 +157,9 @@ function tab(start = PLAYER(3)) {
     urlChanged: (ids) => {
       urls.push(ids);
     },
+    pathChanged: (pathname) => {
+      paths.push(pathname);
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -168,7 +172,7 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, ended, urls, timers, page, tick, post };
+  return { sent, ended, urls, paths, timers, page, tick, post };
 }
 
 describe("the Naka tab URL changes", () => {
@@ -194,6 +198,24 @@ describe("the Naka tab URL changes", () => {
       { contentId: 5, season: 2, episode: 3 },
       undefined,
     ]);
+  });
+});
+
+describe("the Naka tab pathname", () => {
+  it("is handed to the home block at every poll", () => {
+    const t = tab("https://naka.cx/");
+    expect(t.paths).toEqual([]);
+    t.tick(1000);
+    t.tick(1000);
+    t.page.href = PLAYER(4);
+    t.tick(1000);
+    expect(t.paths).toEqual(["/", "/", "/player"]);
+  });
+
+  it("is empty for an href that is not a URL", () => {
+    const t = tab("not a url");
+    t.tick(1000);
+    expect(t.paths).toEqual([""]);
   });
 });
 
