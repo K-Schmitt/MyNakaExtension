@@ -870,4 +870,24 @@ describe("the end block ignores a click right after a label appears", () => {
     await flush();
     expect(rates(w.calls)).toEqual(["rate 5:1:1 épisode 5"]);
   });
+
+  it("a clock set back does not freeze the choices: the grace starts again", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2400);
+    let now = w.clock.now() - 3_600_000; // the system clock steps back an hour
+    w.ports.now = () => now;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toEqual([]);
+    now += 399;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toEqual([]);
+    now += 1;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 9:: film 6"]);
+  });
 });
