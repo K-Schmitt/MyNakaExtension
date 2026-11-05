@@ -186,6 +186,66 @@ describe("parseSettings accepts", () => {
     });
   });
 
+  it("a stored Plan 3 run record parses, without year, type or next", () => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "simulation",
+      outcome: "ok",
+      report: {
+        added: [],
+        deferred: [],
+        failed: [],
+        alreadyDone: [],
+        pendingRemovals: 0,
+        unresolved: 0,
+      },
+      preview: [
+        { side: "sc", title: "Film 1" },
+        { side: "naka", title: "" },
+      ],
+    };
+    expect(parseSettings({ mode: "simulation", lastRun })).toEqual({
+      mode: "simulation",
+      lastRun,
+    });
+  });
+
+  it("a run record with year, type and next parses", () => {
+    const item = { side: "sc", title: "Enemy", year: 2013, type: "film" };
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "ok",
+      preview: [item],
+      next: [item, { side: "naka", title: "", type: "serie" }],
+    };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+
+  it.each([
+    { year: 1799 },
+    { year: 2101 },
+    { year: 2013.5 },
+    { year: "2013" },
+    { type: "game" },
+    { type: 1 },
+    { extra: true },
+  ])("a preview item with %o is refused", (bad) => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "ok",
+      next: [{ side: "sc", title: "x", ...bad }],
+    };
+    expect(() => parseSettings({ mode: "live", lastRun })).toThrow();
+  });
+
   it.each(["naka-ready", "playlist", "button"])("trigger %s", (trigger) => {
     const lastRun = { at: 1, trigger, mode: "live", outcome: "ok" };
     expect(parseSettings({ mode: "live", lastRun })).toEqual({

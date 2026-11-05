@@ -4,15 +4,14 @@ import {
   asOneOf,
   asRecord,
   asString,
+  fail,
   onlyKeys,
   valuesOf,
   whenPresent,
 } from "./field-checks";
 import type { JobError } from "./job-error";
 import { parseReport } from "./report-schema";
-import type { Mode, RunRecord } from "./settings";
-
-type PreviewItem = NonNullable<RunRecord["preview"]>[number];
+import type { Mode, PreviewItem, RunRecord } from "./settings";
 
 export const MODES = valuesOf<Mode>({ simulation: true, live: true });
 const TRIGGERS = valuesOf<RunRecord["trigger"]>({
@@ -40,15 +39,38 @@ const KEYS = valuesOf<keyof RunRecord>({
   error: true,
   report: true,
   preview: true,
+  next: true,
 });
-const PREVIEW_KEYS = valuesOf<keyof PreviewItem>({ side: true, title: true });
+const TYPES = valuesOf<NonNullable<PreviewItem["type"]>>({
+  film: true,
+  serie: true,
+});
+const PREVIEW_KEYS = valuesOf<keyof PreviewItem>({
+  side: true,
+  title: true,
+  year: true,
+  type: true,
+});
+const MIN_YEAR = 1800;
+const MAX_YEAR = 2100;
 
-function parsePreviewItem(raw: unknown, path: string) {
+function parseYear(raw: unknown, path: string): number {
+  const year = asInt(raw, MIN_YEAR, path);
+  return year > MAX_YEAR ? fail(path) : year;
+}
+
+function parsePreviewItem(raw: unknown, path: string): PreviewItem {
   const record = asRecord(raw, path);
   onlyKeys(record, PREVIEW_KEYS, path);
+  const year = whenPresent(record.year, (v) => parseYear(v, `${path}.year`));
+  const type = whenPresent(record.type, (v) =>
+    asOneOf(v, TYPES, `${path}.type`),
+  );
   return {
     side: asOneOf(record.side, SIDES, `${path}.side`),
     title: asString(record.title, `${path}.title`),
+    ...(year === undefined ? {} : { year }),
+    ...(type === undefined ? {} : { type }),
   };
 }
 
@@ -64,6 +86,9 @@ export function parseRunRecord(raw: unknown, path: string): RunRecord {
   const preview = whenPresent(record.preview, (v) =>
     asList(v, `${path}.preview`, parsePreviewItem),
   );
+  const next = whenPresent(record.next, (v) =>
+    asList(v, `${path}.next`, parsePreviewItem),
+  );
   return {
     at: asInt(record.at, 0, `${path}.at`),
     trigger: asOneOf(record.trigger, TRIGGERS, `${path}.trigger`),
@@ -72,5 +97,6 @@ export function parseRunRecord(raw: unknown, path: string): RunRecord {
     ...(error === undefined ? {} : { error }),
     ...(report === undefined ? {} : { report }),
     ...(preview === undefined ? {} : { preview }),
+    ...(next === undefined ? {} : { next }),
   };
 }

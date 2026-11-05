@@ -1,5 +1,6 @@
 import type { FinishOutcome } from "../core/finish-handler";
 import type { SyncReport } from "../core/sync-runner";
+import type { MediaType } from "../core/title-match";
 import { DEFAULT_THRESHOLDS, type Thresholds } from "../core/watch-trigger";
 import { type LastAnswer, parseLastAnswer } from "./answer-record";
 import {
@@ -20,6 +21,13 @@ import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
 
 export type Mode = "simulation" | "live";
 
+export type PreviewItem = {
+  side: "naka" | "sc";
+  title: string;
+  year?: number;
+  type?: MediaType;
+};
+
 export type RunRecord = {
   at: number;
   trigger: "naka-ready" | "playlist" | "button";
@@ -27,7 +35,9 @@ export type RunRecord = {
   outcome: "ok" | "failed";
   error?: JobError;
   report?: SyncReport;
-  preview?: { side: "naka" | "sc"; title: string }[];
+  preview?: PreviewItem[];
+  /** The next pass's deferred writes (at most MAX_WRITES_PER_RUN), titled like the preview. */
+  next?: PreviewItem[];
 };
 
 export type FinishRecord = {

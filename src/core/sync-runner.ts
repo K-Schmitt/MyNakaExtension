@@ -14,6 +14,7 @@ import {
   executeWrites,
   MAX_WRITES_PER_RUN,
   selectWrites,
+  type Write,
   type WriteOutcome,
   type WritePorts,
 } from "./sync-writes";
@@ -26,6 +27,8 @@ export type SyncPorts = ResolverPorts &
     scWishlistIds(): Promise<number[]>;
     load(): Promise<SyncState>;
     save(state: SyncState): Promise<void>;
+    /** Hears, once per run, the writes the run deferred to the next pass, in order. */
+    deferred?(writes: readonly Write[]): void;
   };
 
 export type SyncReport = {
@@ -135,6 +138,7 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     selectWrites(plan, resolved.retryLast),
     ports,
   );
+  ports.deferred?.(outcome.deferredWrites);
   const queued = settleAlreadyDone(
     queueRemovals(
       resolved,

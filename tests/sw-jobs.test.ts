@@ -157,8 +157,8 @@ describe("sync job: simulation, then live", () => {
       { nakaId: 2, scId: 1002 },
     ]);
     expect(run?.preview).toEqual([
-      { side: "sc", title: "Film 1" },
-      { side: "naka", title: "Film 2" },
+      { side: "sc", title: "Film 1", year: 2001, type: "film" },
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
     ]);
   });
 
@@ -194,7 +194,9 @@ describe("sync job: simulation, then live", () => {
     await w.jobs.syncJob("button");
     const run = w.settings().lastRun;
     expect(run?.report?.alreadyDone).toEqual([{ nakaId: 1, scId: 1001 }]);
-    expect(run?.preview).toEqual([{ side: "naka", title: "Film 2" }]);
+    expect(run?.preview).toEqual([
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
+    ]);
     expect(w.state().settled).toEqual([{ nakaId: 1, scId: 1001 }]);
   });
 
@@ -216,7 +218,7 @@ describe("sync job: simulation, then live", () => {
     expect(reads).toBe(1);
     expect(w.settings().lastRun?.preview).toEqual([
       { side: "sc", title: "" },
-      { side: "naka", title: "Film 2" },
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
     ]);
   });
 });
@@ -268,8 +270,151 @@ describe("sync job: preview titles", () => {
     await w.jobs.syncJob("button");
     expect(w.settings().lastRun?.preview).toEqual([
       { side: "sc", title: "" },
-      { side: "naka", title: "Film 2" },
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
     ]);
+  });
+});
+
+const NINE = Array.from({ length: 15 }, (_, i) => i + 1);
+
+function fifteenMapped(over: Partial<NakaClient> = {}) {
+  return {
+    state: {
+      ...emptyState(),
+      mapping: NINE.map((n) => ({ nakaId: n, scId: 1000 + n })),
+    },
+    naka: catalogueNaka({
+      playlistIds: async () => NINE,
+      contentById: async (id) => naka(id),
+      ...over,
+    }),
+    sc: catalogueSc({ readWishlist: async () => [] }),
+  };
+}
+
+describe("sync job: year, type and the product label in the preview", () => {
+  const enemy = {
+    productState: async (id: number) => ({
+      isDone: false,
+      isWished: false,
+      universe: 1,
+      rating: null,
+      ...(id === 1001 ? { label: { title: "Enemy", year: 2013 } } : {}),
+    }),
+  };
+
+  it("an SC-side write is titled from the product read, with no Naka read", async () => {
+    let reads = 0;
+    const w = world({
+      state: { ...emptyState(), mapping: [{ nakaId: 1, scId: 1001 }] },
+      sc: catalogueSc(enemy),
+      naka: catalogueNaka({
+        contentById: async (id) => {
+          reads += 1;
+          return CATALOGUE.get(id);
+        },
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(reads).toBe(0);
+    expect(w.settings().lastRun?.preview?.[0]).toEqual({
+      side: "sc",
+      title: "Enemy",
+      year: 2013,
+      type: "film",
+    });
+  });
+
+  it("a series product gives the type serie", async () => {
+    const w = world({
+      state: { ...emptyState(), mapping: [{ nakaId: 7, scId: 1007 }] },
+      naka: catalogueNaka({ playlistIds: async () => [7] }),
+      sc: catalogueSc({
+        readWishlist: async () => [],
+        productState: async () => ({
+          isDone: false,
+          isWished: false,
+          universe: 4,
+          rating: null,
+          label: { title: "Dark" },
+        }),
+      }),
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.preview?.[0]).toEqual({
+      side: "sc",
+      title: "Dark",
+      type: "serie",
+    });
+  });
+
+  it("a product without a label falls back to the Naka title", async () => {
+    const w = world({
+      state: { ...emptyState(), mapping: [{ nakaId: 1, scId: 1001 }] },
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.preview?.[0]).toEqual({
+      side: "sc",
+      title: "Film 1",
+      year: 2001,
+      type: "film",
+    });
+  });
+
+  it("15 planned writes: the next pass holds the 5 deferred ones, in order, with titles", async () => {
+    const w = world(fifteenMapped());
+    await w.jobs.syncJob("button");
+    const run = w.settings().lastRun;
+    expect(run?.report?.deferred.map((p) => p.nakaId)).toEqual([
+      11, 12, 13, 14, 15,
+    ]);
+    expect(run?.next).toEqual(
+      [11, 12, 13, 14, 15].map((n) => ({
+        side: "sc",
+        title: `Film ${n}`,
+        year: 2000 + n,
+        type: "film",
+      })),
+    );
+  });
+
+  it("the next pass is listed in live mode too", async () => {
+    const w = world({
+      ...fifteenMapped(),
+      settings: { mode: "live", binding: BOUND },
+    });
+    await w.jobs.syncJob("button");
+    const run = w.settings().lastRun;
+    expect(run?.mode).toBe("live");
+    expect(run?.next?.map((item) => item.title)).toEqual([
+      "Film 11",
+      "Film 12",
+      "Film 13",
+      "Film 14",
+      "Film 15",
+    ]);
+  });
+
+  it("a Naka title that cannot be read gives an empty title, the item stays listed", async () => {
+    const w = world(
+      fifteenMapped({
+        contentById: async (id) => {
+          if (id > 10) throw new NakaUnavailableError("Naka content: gone");
+          return naka(id);
+        },
+      }),
+    );
+    await w.jobs.syncJob("button");
+    const next = w.settings().lastRun?.next;
+    expect(next).toHaveLength(5);
+    expect(next?.every((item) => item.title === "")).toBe(true);
+    expect(next?.[0]).toEqual({ side: "sc", title: "" });
+  });
+
+  it("no deferred write: no next", async () => {
+    const w = world();
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun).not.toHaveProperty("next");
   });
 });
 

@@ -2052,8 +2052,8 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       outcome: "ok",
     });
     expect(run?.preview).toEqual([
-      { side: "sc", title: "Film 1" },
-      { side: "naka", title: "Film 2" },
+      { side: "sc", title: "Film 1", year: 2001, type: "film" },
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
     ]);
   });
 
