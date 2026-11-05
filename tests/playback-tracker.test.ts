@@ -5,6 +5,7 @@ import {
   type PlaybackTracker,
   PROGRESS_MARKS,
 } from "../src/content/playback-tracker";
+import { THRESHOLD_CHOICES } from "../src/core/watch-trigger";
 import { PAGE_CHANNEL, type PageEvent } from "../src/ext/messages";
 
 const FILM = { contentId: 5, mediaType: "movie" as const };
@@ -38,6 +39,12 @@ describe("PROGRESS_MARKS", () => {
   it("are the five marks, and the floor is 5 minutes", () => {
     expect([...PROGRESS_MARKS]).toEqual([0.8, 0.85, 0.9, 0.95, 0.99]);
     expect(DURATION_FLOOR_S).toBe(300);
+  });
+
+  it("hold every threshold choice: whatever threshold is saved, the tracker offers that mark", () => {
+    for (const choice of THRESHOLD_CHOICES) {
+      expect(PROGRESS_MARKS, String(choice)).toContain(choice);
+    }
   });
 });
 
