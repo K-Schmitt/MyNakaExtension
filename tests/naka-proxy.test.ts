@@ -537,6 +537,19 @@ describe("re-validation of the value", () => {
     expect(Object.keys(result ?? {})).not.toContain("admin");
   });
 
+  it("keeps a valid numberOfSeasons through the tab's reply, drops an invalid one", async () => {
+    const kept = await proxyAnswering(() =>
+      ok({ ...item(7), numberOfSeasons: 7 }),
+    ).proxy.contentById(7);
+    expect(kept?.numberOfSeasons).toBe(7);
+    for (const bad of [0, -1, 1.5, "7", null]) {
+      const result = await proxyAnswering(() =>
+        ok({ ...item(7), numberOfSeasons: bad }),
+      ).proxy.contentById(7);
+      expect(result).toStrictEqual(item(7));
+    }
+  });
+
   it("drops a forged field inside search items", async () => {
     const { proxy } = proxyAnswering(() => ok([{ ...item(1), admin: true }]));
     expect(await proxy.search("a")).toStrictEqual([item(1)]);

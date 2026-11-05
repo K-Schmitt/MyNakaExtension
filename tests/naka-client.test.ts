@@ -236,6 +236,35 @@ describe("search", () => {
     }
   });
 
+  it("keeps numberOfSeasons when it is a positive safe integer", async () => {
+    const { client } = setup(() =>
+      json({ data: [entry(1, { numberOfSeasons: 7 })] }),
+    );
+    const [item] = await client.search("x");
+    expect(item?.numberOfSeasons).toBe(7);
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["zero", 0],
+    ["negative", -2],
+    ["fractional", 2.5],
+    ["a string", "7"],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 2],
+    ["NaN as text", "NaN"],
+  ])(
+    "drops numberOfSeasons when it is %s, and the item stays valid",
+    async (_name, value) => {
+      const { client } = setup(() =>
+        json({ data: [entry(1, { numberOfSeasons: value })] }),
+      );
+      const items = await client.search("x");
+      expect(items).toHaveLength(1);
+      expect(items[0]).not.toHaveProperty("numberOfSeasons");
+    },
+  );
+
   it("drops entries that cannot be trusted and keeps the rest", async () => {
     const bad: unknown[] = [
       entry(0),

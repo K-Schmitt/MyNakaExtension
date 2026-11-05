@@ -33,6 +33,7 @@ export function asItem(value: unknown): NakaItem {
     title: value.title,
     originalTitle: value.originalTitle,
     releaseDate: value.releaseDate,
+    numberOfSeasons: value.numberOfSeasons,
   });
   return item ?? unexpected();
 }
