@@ -15,6 +15,7 @@
 
 import type { LastAnswer } from "../../ext/question-offer-schema";
 import type { QuestionOffer } from "../../sw/question-offers";
+import { graceOver, startGrace } from "./click-grace";
 import type { EndTimer } from "./end-poll";
 import { pollSchedule } from "./end-poll";
 import { UNREACHABLE_LINE } from "./question-copy";
@@ -25,7 +26,6 @@ import type {
   QuestionChoice,
   QuestionView,
 } from "./question-view";
-import { GRACE_MS } from "./rating-session";
 
 export type QuestionState = {
   present: boolean;
@@ -67,7 +67,7 @@ export function createQuestionSession(
   // The buttons appear again: the grace counts from now.
   function unlock(s: Shown, error?: string): void {
     s.locked = false;
-    s.shownAt = ports.now();
+    startGrace(s, ports.now);
     if (error === undefined) delete s.error;
     else s.error = error;
     render(s);
@@ -154,12 +154,8 @@ export function createQuestionSession(
   }
 
   function handlersOf(s: Shown): QuestionHandlers {
-    // A clock set back puts the draw in the future: the grace then starts again from now.
-    const settled = (): boolean => {
-      if (current !== s || s.locked) return false;
-      if (ports.now() < s.shownAt) s.shownAt = ports.now();
-      return ports.now() - s.shownAt >= GRACE_MS;
-    };
+    const settled = (): boolean =>
+      current === s && !s.locked && graceOver(s, ports.now);
     return {
       onChoose: (choice) => settled() && lock(s, ports.send(choice)),
       onAction: (action) => settled() && act(s, action),

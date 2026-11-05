@@ -7,6 +7,7 @@
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
+import { GRACE_MS, graceOver, startGrace } from "./click-grace";
 import { pollUntil } from "./end-poll";
 import { type RatingAction, UNREACHABLE_LINE } from "./rating-copy";
 import { type JudgeActs, judge, snapshotOf } from "./rating-judge";
@@ -14,9 +15,8 @@ import type { RatingHandlers } from "./rating-render";
 import type { SessionPorts } from "./session-ports";
 import { labelOf, needsConfirm, type Session, viewFor } from "./session-views";
 
-export const GRACE_MS = 400;
-
 export type { SessionPorts };
+export { GRACE_MS };
 
 // `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card
 // missing from the answer has nothing left to ask. For one shown card, a missing card is "not yet".
@@ -50,7 +50,7 @@ export function createRatingSession(
   // The label's buttons appear again: the grace counts from now.
   function unlock(s: Session): void {
     s.locked = false;
-    s.shownAt = ports.now();
+    startGrace(s, ports.now);
     render(s);
   }
 
@@ -150,13 +150,7 @@ export function createRatingSession(
 
   function handlersOf(s: Session): RatingHandlers {
     const live = (): boolean => current === s && !s.locked;
-    // A clock set back puts the draw in the future: the grace then starts again from now, instead of
-    // leaving every button dead until the clock catches up.
-    const settled = (): boolean => {
-      if (!live()) return false;
-      if (ports.now() < s.shownAt) s.shownAt = ports.now();
-      return ports.now() - s.shownAt >= GRACE_MS;
-    };
+    const settled = (): boolean => live() && graceOver(s, ports.now);
     return {
       onChoose: (value) => settled() && choose(s, value),
       onAction: (action) => settled() && act(s, action),
