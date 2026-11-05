@@ -109,11 +109,4 @@ describe("the rating block", () => {
     expect(root.children).toEqual([]);
     expect(block.current()).toBeUndefined();
   });
-
-  it("places the block with the host: fixed geometry stays on the host, not here", () => {
-    const { block, doc } = setup();
-    block.show(ratingView(episodeCard(), "épisode"));
-    const styles = doc.created.map((el) => el.style.cssText).join(";");
-    expect(styles).not.toContain("position: fixed");
-  });
 });

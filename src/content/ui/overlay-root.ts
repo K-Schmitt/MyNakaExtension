@@ -17,7 +17,7 @@ const HOST_STYLE = [
   "overflow: auto",
   "z-index: 2147483647",
 ];
-const HOST_CSS = HOST_STYLE.map((d) => `${d};`).join(" ");
+const HOST_CSS = HOST_STYLE.map((d) => `${d} !important;`).join(" ");
 
 type StoppedEvent =
   | "click"

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerPort } from "../src/content/ui/worker-port";
+import type { RatingMessage } from "../src/ext/rating-messages";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
 const ok = (answer: unknown) => vi.fn(() => Promise.resolve(answer));
@@ -118,5 +119,37 @@ describe("rate and dismiss", () => {
     const port = createWorkerPort(send);
     await expect(port.rate(IDS, "film", 5)).resolves.toBeUndefined();
     await expect(port.dismiss(IDS, "film")).resolves.toBeUndefined();
+  });
+});
+
+describe("answer bounds and film ids", () => {
+  it("accepts pauseFromPercent 0 and 99, start 1 and 10", async () => {
+    for (const [pauseFromPercent, start] of [
+      [0, 1],
+      [99, 10],
+    ]) {
+      const answer = await createWorkerPort(
+        ok({ card: null, pauseFromPercent, start }),
+      ).askCard(IDS);
+      expect(answer, `${pauseFromPercent}/${start}`).toEqual({
+        card: null,
+        pauseFromPercent,
+        start,
+      });
+    }
+  });
+
+  it("a film sends no season and no episode key at all", async () => {
+    const send = vi.fn((_msg: RatingMessage) => Promise.resolve(undefined));
+    const port = createWorkerPort(send);
+    await port.askCard({ contentId: 9 });
+    await port.rate({ contentId: 9 }, "film", 7);
+    await port.dismiss({ contentId: 9 }, "film");
+    expect(send).toHaveBeenCalledTimes(3);
+    for (const [msg] of send.mock.calls) {
+      const keys = Object.keys(msg);
+      expect(keys).not.toContain("season");
+      expect(keys).not.toContain("episode");
+    }
   });
 });

@@ -112,4 +112,15 @@ describe("createOverlayRoot", () => {
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(onChoose).toHaveBeenCalledWith(8);
   });
+
+  it("every declaration of the host style is important", () => {
+    const doc = new FakeDoc();
+    createOverlayRoot(doc);
+    const declarations = hostOf(doc)
+      .style.cssText.split(";")
+      .map((d) => d.trim())
+      .filter((d) => d !== "");
+    expect(declarations.length).toBeGreaterThan(5);
+    for (const d of declarations) expect(d, d).toMatch(/ !important$/);
+  });
 });
