@@ -5,7 +5,8 @@ import { PAGE_CHANNEL, type PageEvent, parsePageEvent } from "../ext/messages";
 
 const NAKA_ORIGIN = "https://naka.cx";
 const PLAYLIST_PATH = "/api/v1/playlist";
-const PLAYLIST_ITEM = /^\/api\/v1\/playlist\/[^/]+$/;
+const PLAYLIST_ITEM = /^\/api\/v1\/playlist\/([^/]+)$/;
+const CONTENT_ID = /^[1-9][0-9]*$/;
 const WATCHED_PATH = "/api/v1/history/watched";
 
 function parseUrl(url: string): URL | undefined {
@@ -37,17 +38,37 @@ function isPlaylistChange(method: string, path: string): boolean {
   return method === "DELETE" && PLAYLIST_ITEM.test(path);
 }
 
+// The id of a title removed from « Ma liste »: the last segment of DELETE /playlist/<contentId>, when it is
+// a plain positive integer. Any other segment is a playlist change with no id.
+function removedId(path: string): number | undefined {
+  const segment = PLAYLIST_ITEM.exec(path)?.[1];
+  if (segment === undefined || !CONTENT_ID.test(segment)) return undefined;
+  const id = Number(segment);
+  return Number.isSafeInteger(id) ? id : undefined;
+}
+
+function playlistEvent(method: string, path: string): PageEvent {
+  const removed = method === "DELETE" ? removedId(path) : undefined;
+  return {
+    channel: PAGE_CHANNEL,
+    kind: "playlist",
+    ...(removed === undefined ? {} : { removed }),
+  };
+}
+
 // A null season or episode is an absent one.
 function orAbsent(value: unknown): unknown {
   return value === null ? undefined : value;
 }
 
+// Ticking and unticking « vu » are the same call: `watched` is true or false, nothing else counts.
 function readWatched(body: unknown): PageEvent | undefined {
   const record = bodyRecord(body);
-  if (record === undefined || record.watched !== true) return undefined;
+  if (record === undefined) return undefined;
+  if (record.watched !== true && record.watched !== false) return undefined;
   return parsePageEvent({
     channel: PAGE_CHANNEL,
-    kind: "watched",
+    kind: record.watched ? "watched" : "unwatched",
     contentId: record.contentId,
     season: orAbsent(record.seasonNumber),
     episode: orAbsent(record.episodeNumber),
@@ -72,7 +93,7 @@ export function classifyRequest(
   if (target === undefined || target.origin !== NAKA_ORIGIN) return undefined;
   const verb = method.toUpperCase();
   if (isPlaylistChange(verb, target.pathname)) {
-    return { channel: PAGE_CHANNEL, kind: "playlist" };
+    return playlistEvent(verb, target.pathname);
   }
   if (verb === "PUT" && target.pathname === WATCHED_PATH) {
     return classifyWatched(body);

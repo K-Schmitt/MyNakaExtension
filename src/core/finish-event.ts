@@ -133,3 +133,18 @@ export function contentKeyOf({ contentId, season, episode }: ContentIds) {
       : { kind: "film", contentId },
   );
 }
+
+const KEY_PARTS = /^(?:movie:(\d+)|tv:(\d+):S(\d+)E(\d+))$/;
+
+// The inverse of contentKeyOf; undefined for anything contentKey does not write.
+export function idsOfKey(key: string): ContentIds | undefined {
+  const parts = KEY_PARTS.exec(key);
+  if (!parts) return undefined;
+  const [, film, series, season, episode] = parts;
+  if (film !== undefined) return { contentId: Number(film) };
+  return {
+    contentId: Number(series),
+    season: Number(season),
+    episode: Number(episode),
+  };
+}

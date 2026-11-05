@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPauseBlock } from "../src/content/ui/pause-block";
+import { SENDING_LINE as QUESTION_SENDING_LINE } from "../src/content/ui/question-copy";
 import {
   errorLine,
   NEEDS_CHOICE_LINE,
@@ -11,7 +12,14 @@ import {
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard } from "../src/core/rating-cards";
 import type { CardAnswer } from "../src/sw/rating-answers";
-import { EP_IDS, FILM_IDS, fakePorts, flush } from "./end-block-fakes";
+import {
+  EP_IDS,
+  FILM_IDS,
+  fakePorts,
+  flush,
+  QUESTION,
+  questionAnswer,
+} from "./end-block-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
 const DURATION = 1000;
@@ -476,5 +484,179 @@ describe("a card-less pause rating that could not go", () => {
       expect(w.last().view.choices).toEqual([]);
       expect(w.last().view.error).not.toBe(NOT_RATED_LINE);
     }
+  });
+});
+
+describe("the pause block question", () => {
+  const none = (extra: Partial<CardAnswer> = {}): CardAnswer => ({
+    card: null,
+    pauseFromPercent: 0,
+    ...extra,
+  });
+  const answers = (calls: string[]) =>
+    calls.filter((c) => c.startsWith("answer"));
+
+  it("a card-less pause whose answer has a question shows the question, not the rating", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer());
+    await w.pauseAt(0.5);
+    expect(w.shown).toEqual([]);
+    expect(w.questions).toHaveLength(1);
+    expect(w.lastQuestion().view.actions).toEqual(["plus-tard"]);
+    expect(w.titleCalls).toEqual([]);
+  });
+
+  it("the pause threshold still applies to a question", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer({ pauseFromPercent: 50 }));
+    await w.pauseAt(0.49);
+    expect(w.questions).toEqual([]);
+  });
+
+  it("after a candidate is answered, it asks again and offers the view-only rating", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer(), none());
+    await w.pauseAt(0.5);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    expect(answers(w.calls)).toEqual(["answer naka 5 2005"]);
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("Une série");
+    expect(w.titleCalls).toEqual([5]);
+  });
+
+  it("after a candidate is answered, a card offers its first pending label", async () => {
+    const w = world();
+    w.script(
+      EP_IDS,
+      questionAnswer(),
+      asked(episodeCard({ pending: ["saison"] })),
+    );
+    await w.pauseAt(0.5);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2006 });
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.heading).toContain("Noter la saison 1");
+  });
+
+  it("« Plus tard » closes the question and offers no rating", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer(), none());
+    await w.pauseAt(0.5);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onAction("plus-tard");
+    await w.clock.advance(60000);
+    expect(w.shown).toEqual([]);
+    expect(w.hidden()).toBe(1);
+  });
+
+  it("a play closes the question", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer());
+    await w.pauseAt(0.5);
+    expect(w.questions).toHaveLength(1);
+    w.block.resumed();
+    expect(w.hidden()).toBe(1);
+  });
+
+  it("the end block shown while the question travels wins", async () => {
+    const w = world();
+    w.script(EP_IDS, questionAnswer());
+    w.block.paused({ currentTime: 500, duration: DURATION }, EP_IDS);
+    w.setEndShown(true);
+    await flush();
+    expect(w.questions).toEqual([]);
+  });
+
+  it("a view-only rating whose re-ask returns the question hands over to it", async () => {
+    const w = world();
+    w.script(EP_IDS, none(), none({ sending: ["épisode"] }), questionAnswer());
+    await w.pauseAt(0.5);
+    await w.ready();
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.questions).toEqual([]);
+    await w.clock.advance(3000);
+    expect(w.questions).toHaveLength(1);
+    expect(w.lastQuestion().view.heading).toContain(QUESTION.title);
+    expect(w.last().view.error).toBeUndefined();
+    expect(w.hidden()).toBe(1);
+  });
+
+  it("a stale last answer on the handed-over question is not the click's outcome", async () => {
+    const w = world();
+    const stale = {
+      seq: 3,
+      at: 1,
+      target: QUESTION.key,
+      outcome: "failed",
+      error: "sc-session",
+    } as const;
+    const staleQ = questionAnswer({ lastAnswer: stale });
+    w.script(
+      EP_IDS,
+      none(),
+      none({ sending: ["épisode"] }),
+      staleQ,
+      staleQ,
+      staleQ,
+      none({ lastAnswer: { ...stale, seq: 4, outcome: "done" } }),
+      asked(null),
+    );
+    await w.pauseAt(0.5);
+    await w.ready();
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(5000);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    for (const ms of [2000, 3000]) {
+      await w.clock.advance(ms);
+      expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+      expect(w.lastQuestion().view.error).toBeUndefined();
+    }
+    const rated = w.shown.length;
+    await w.clock.advance(5000); // seq 4, done: asks again and offers the rating
+    expect(w.shown.length).toBeGreaterThan(rated);
+    expect(w.last().view.heading).toContain("Une série");
+  });
+
+  it("a view-only rating with no question still says why it did not go", async () => {
+    const w = world();
+    w.script(EP_IDS, none(), none({ sending: ["épisode"] }), none());
+    await w.pauseAt(0.5);
+    await w.ready();
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(5000);
+    expect(w.questions).toEqual([]);
+    expect(w.last().view.error).toBe(NOT_RATED_LINE);
+  });
+});
+
+describe("the pause block label of a rated title", () => {
+  it("offers the label that failed before the first pending one", async () => {
+    const w = world();
+    w.script(
+      EP_IDS,
+      asked(
+        episodeCard({
+          pending: ["saison", "série"],
+          failed: { label: "série", error: "unavailable", at: 5 },
+        }),
+      ),
+    );
+    await w.pauseAt(0.5);
+    expect(w.last().view.heading).toContain("Noter la série");
   });
 });

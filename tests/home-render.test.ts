@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { HomeHandlers } from "../src/content/ui/home-block";
 import { createHomeUi } from "../src/content/ui/home-ui";
 import { homeView } from "../src/content/ui/home-view";
+import { questionView } from "../src/content/ui/question-view";
+import type { AmbiguityOffer } from "../src/sw/question-offers";
 import { filmCard } from "./rating-fixtures";
 import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
 
@@ -12,11 +14,13 @@ const handlersOf = () => {
     onOther: vi.fn(),
     onConfirm: vi.fn(),
   };
+  const question = { onChoose: vi.fn(), onAction: vi.fn() };
   const handlers: HomeHandlers = {
     entry: vi.fn(() => entry),
+    question: vi.fn(() => question),
     onFold: vi.fn(),
   };
-  return { handlers, entry };
+  return { handlers, entry, question };
 };
 
 const hostOf = (doc: FakeDoc): FakeElement => {
@@ -30,6 +34,14 @@ const buttons = (doc: FakeDoc, text: string): FakeElement[] =>
     (el) => el.tag === "button" && el.textContent === text,
   );
 
+const OFFER: AmbiguityOffer = {
+  kind: "ambiguity",
+  key: "ambiguity:naka:1",
+  side: "naka",
+  id: 1,
+  title: "<b>Dune</b>",
+  candidates: [{ id: 10, title: "Dune", year: 2021, type: "film" }],
+};
 const FILM = filmCard({ title: "<b>Un film</b>" });
 
 describe("the home panel's drawing", () => {
@@ -148,5 +160,49 @@ describe("the home panel's drawing", () => {
     createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
     expect(hostOf(doc).dispatch("click")).toBe(false);
     expect(hostOf(doc).dispatch("wheel")).toBe(false);
+  });
+
+  it("draws the questions after the cards under « Questions »; a trusted click reaches that question's handler", () => {
+    const doc = new FakeDoc();
+    const { handlers, question } = handlersOf();
+    const view = questionView(OFFER, ["ecarter"]);
+    createHomeUi(doc).show(
+      homeView([{ card: FILM }], false, [{ key: OFFER.key, view }]),
+      handlers,
+    );
+    const texts = descendants(hostOf(doc).shadow).map((el) => el.textContent);
+    expect(texts.indexOf("À noter")).toBeLessThan(texts.indexOf("Questions"));
+    expect(texts.some((t) => t?.includes("<b>Dune</b>"))).toBe(true);
+    const [skip] = buttons(doc, "Écarter");
+    skip?.click(false);
+    expect(question.onAction).not.toHaveBeenCalled();
+    skip?.click(true);
+    expect(question.onAction).toHaveBeenCalledWith("ecarter");
+    expect(handlers.question).toHaveBeenCalledWith(OFFER.key);
+  });
+
+  it("with no card, « Questions » heads the panel and « À noter » is not drawn", () => {
+    const doc = new FakeDoc();
+    const { handlers } = handlersOf();
+    const view = questionView(OFFER, ["ecarter"]);
+    createHomeUi(doc).show(
+      homeView([], false, [{ key: OFFER.key, view }]),
+      handlers,
+    );
+    const texts = descendants(hostOf(doc).shadow).map((el) => el.textContent);
+    expect(texts.filter((t) => t === "Questions")).toHaveLength(1);
+    expect(texts).not.toContain("À noter");
+    expect(buttons(doc, "Réduire")).toHaveLength(1);
+  });
+
+  it("folded, the questions are not drawn either", () => {
+    const doc = new FakeDoc();
+    const { handlers } = handlersOf();
+    const view = questionView(OFFER, ["ecarter"]);
+    createHomeUi(doc).show(
+      homeView([{ card: FILM }], true, [{ key: OFFER.key, view }]),
+      handlers,
+    );
+    expect(buttons(doc, "Écarter")).toHaveLength(0);
   });
 });

@@ -6,6 +6,8 @@ import { createJobQueue } from "../src/sw/job-queue";
 import { createJobs } from "../src/sw/jobs";
 import type { Timer } from "../src/sw/naka-proxy";
 import { createRouter } from "../src/sw/router";
+import { answerSend, askQuestion, forgedAnswer } from "./runtime-answers";
+import { oracleOf } from "./runtime-oracles";
 import {
   clockFor,
   createWorld,
@@ -13,7 +15,6 @@ import {
   FILMS,
   type JobKey,
   observed,
-  oracleOf,
   ownerEdit,
   randomThresholds,
   SERIES,
@@ -28,11 +29,11 @@ import {
 } from "./runtime-world";
 
 // Model-based fuzz of the whole worker (router, queue, jobs, ports, Plan 2's runSync and handleFinish)
-// against an in-memory world. It interleaves the five message kinds from their senders, forged messages
+// against an in-memory world. It interleaves the five message kinds and the owner's answers (B5a) from their senders, forged messages
 // from the wrong sender or a look-alike site, worker restarts (the in-memory queue, limiters and
 // debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, orphan
 // tabs, account switches, the owner's list edits and stored thresholds.
-// Oracles, checked at each write (tests/runtime-world.ts):
+// Oracles, checked at each write (tests/runtime-oracles.ts):
 //   O1 never two jobs at once (per worker); the status answer is no job (Ruling 20);
 //   O2 the stored state always passes parseState (and the settings parseSettings);
 //   O3 no list write while the stored mode is simulation;
@@ -51,6 +52,11 @@ import {
 //   O12 a status answer, given at once outside the queue, never writes storage (Ruling 20);
 //   O13 the owner's first rule: every SensCritique finish write (markDone, unwish) comes from a finished
 //       message a Naka tab sent, explicit or with a progress at least the threshold of its kind stored at that moment;
+//   O14 a removal write (unwish, removeFromPlaylist) happens only in an answer-removal job with remove true, on the
+//       message's side, at most once, for a stored removal or a mapped pair the WORLD's lists had on both sides at
+//       the last completed run (the block's case);
+//   O15 after a « Non », no run writes that title back to the side it left until the owner adds it there;
+//   O16 an answer-question choice outside the stored candidates changes nothing;
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -66,6 +72,8 @@ const LOOK_ALIKE = {
 };
 
 const SEEDS = 450;
+// Seeds found by a longer run, kept: 4312 unwished a title through a stale snapshot pair (Ruling 16).
+const EXTRA_SEEDS = [4312];
 const STEPS = 50;
 
 type Worker = {
@@ -195,8 +203,26 @@ function forgedMessage(w: World): Sent {
   return { msg: pick(w, [...statusTypes, ...nakaTypes]), sender: LOOK_ALIKE };
 }
 
+const SENDERS = { "naka-tab": NAKA_TAB, "status-page": STATUS_PAGE };
+
+// The owner's answers (B5a): trusted from the block or the page, or forged from a sender that may not.
+function answerMessage(w: World): Sent {
+  if (w.r() < 0.8) {
+    const { msg, role } = answerSend(w);
+    return { msg, sender: SENDERS[role], key: "answer" };
+  }
+  const { msg, from } = forgedAnswer(w);
+  return { msg, sender: from === "look-alike" ? LOOK_ALIKE : SENDERS[from] };
+}
+
 function send(w: World, worker: Worker): void {
-  const sent = w.r() < 0.75 ? trustedMessage(w) : forgedMessage(w);
+  const kind = w.r();
+  const sent =
+    kind < 0.12
+      ? answerMessage(w)
+      : kind < 0.8
+        ? trustedMessage(w)
+        : forgedMessage(w);
   if (sent.key !== undefined) {
     w.allowed.set(sent.key, (w.allowed.get(sent.key) ?? 0) + 1);
   }
@@ -252,7 +278,8 @@ async function step(w: World, worker: Worker): Promise<Worker> {
     for (let i = 0; i < count; i++) send(w, worker);
   } else if (a < 0.6) {
     await drain();
-    ownerEdit(w, pick(w, TITLES), w.r() < 0.5 ? "naka" : "sc");
+    if (w.r() < 0.3) askQuestion(w);
+    else ownerEdit(w, pick(w, TITLES), w.r() < 0.5 ? "naka" : "sc");
   } else if (a < 0.625) {
     await drain();
     switchAccount(w);
@@ -306,8 +333,20 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       pinnedPastOrphan: 0,
       statusDuringJob: 0,
       incompleteFinishes: 0,
+      removalAnswers: 0,
+      blockAnswers: 0,
+      questionAnswers: 0,
+      hides: 0,
+      removalWrites: 0,
+      declines: 0,
+      candidateChoices: 0,
+      strayChoices: 0,
     };
-    for (let seed = 1; seed <= SEEDS; seed++) {
+    const seeds = [
+      ...Array.from({ length: SEEDS }, (_, i) => i + 1),
+      ...EXTRA_SEEDS,
+    ];
+    for (const seed of seeds) {
       const result = await simulate(seed);
       violations.push(...result.violations);
       for (const key of Object.keys(totals) as (keyof Stats)[]) {
@@ -318,16 +357,22 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     for (const found of violations) {
       byOracle[oracleOf(found)] = (byOracle[oracleOf(found)] ?? 0) + 1;
     }
-    expect(byOracle).toEqual({});
     expect(violations.slice(0, 3)).toEqual([]);
-    // Every oracle's situation arises (measured: 801 list writes, 5220 finish writes, 737 simulated
-    // runs with planned writes, 914 jobs stopped by the binding, 237 calls of dead workers, 471
-    // protected sides, 484 guarded films, 352 finish jobs started with the hour's budget spent, 780
-    // jobs that lost their tab, 7241 sends refused by an orphan tab, 6564 jobs that pinned the live
-    // tab after an orphan refused, 819 status answers given while a job ran, 1585 finished messages
+    expect(byOracle).toEqual({});
+    // Every oracle's situation arises (measured: 681 list writes, 4893 finish writes, 720 simulated
+    // runs with planned writes, 885 jobs stopped by the binding, 227 calls of dead workers, 333
+    // protected sides, 405 guarded films, 372 finish jobs started with the hour's budget spent, 780
+    // jobs that lost their tab, 7089 sends refused by an orphan tab, 6411 jobs that pinned the live
+    // tab after an orphan refused, 810 status answers given while a job ran, 1431 finished messages
     // sent below the stored threshold). The oracles' positive controls: tests/runtime-oracles.test.ts.
+    // The answers (measured over the 450 seeds: 1500 removal answers, 1400 block answers, 1100 question
+    // answers, 120 candidate choices, 900 stray choices, 90 dismissals, 19 removal writes, 20 « Non »
+    // that closed a stored removal): the last three kinds are rare by nature, a lower floor.
+    const rare = ["hides", "removalWrites", "declines"];
     for (const [situation, count] of Object.entries(totals)) {
-      expect(count, situation).toBeGreaterThan(100);
+      expect(count, situation).toBeGreaterThan(
+        rare.includes(situation) ? 10 : 100,
+      );
     }
   }, 20_000);
 });

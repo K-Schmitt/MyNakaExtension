@@ -29,7 +29,12 @@ import { readNakaItem } from "./read-ports";
 import { readSeasons, type SeasonsRead } from "./season-read";
 import { toJobError } from "./to-job-error";
 
-type Done = { outcome: FinishRecord["outcome"]; error?: JobError };
+type Done = {
+  outcome: FinishRecord["outcome"];
+  error?: JobError;
+  /** The Naka title, once the item was read. */
+  title?: string;
+};
 /** A finish that ended `done` also hands over what its rating card is built from. */
 type Attempted = Done & {
   card?: Omit<CardInput, "at" | "seasons">;
@@ -43,11 +48,15 @@ async function attempt(
   msg: FinishedMessage,
 ): Promise<Attempted | undefined> {
   const naka = jobNaka(deps);
+  let title: string | undefined;
+  const named = <T extends object>(done: T) =>
+    title === undefined ? done : { ...done, title };
   try {
     const read = (id: number) => readNakaItem(naka, deps.limiters.naka, id);
     const found = await finishEventOf(msg, read);
     if (found === undefined) return undefined;
     const { event, item } = found;
+    title = item.title;
     await checkBinding(settings.binding, jobAccounts(naka, deps));
     const ports = buildFinishPorts({
       sc: deps.sc,
@@ -57,15 +66,15 @@ async function attempt(
     });
     const thresholds = thresholdsOf(settings);
     const outcome = await handleFinish(event, ports, thresholds);
-    if (outcome.kind !== "done") return { outcome: outcome.kind };
+    if (outcome.kind !== "done") return named({ outcome: outcome.kind });
     const { productState } = ports;
-    return {
-      outcome: "done",
+    return named({
+      outcome: "done" as const,
       card: { outcome, event, item, productState },
       seasons: () => readSeasons(naka, deps.limiters.naka, event),
-    };
+    });
   } catch (error) {
-    return { outcome: "failed", error: toJobError(error) };
+    return named({ outcome: "failed" as const, error: toJobError(error) });
   }
 }
 

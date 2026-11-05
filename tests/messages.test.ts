@@ -774,6 +774,120 @@ describe("isTrustedSender", () => {
   });
 });
 
+describe("the question messages", () => {
+  it("parse to the known keys only", () => {
+    expect(parseToWorker({ type: "open-questions", x: 1 })).toEqual({
+      type: "open-questions",
+    });
+    expect(parseToWorker({ type: "page-lists", x: 1 })).toEqual({
+      type: "page-lists",
+    });
+    expect(
+      parseToWorker({ type: "removal-offer", contentId: 7, x: 1 }),
+    ).toEqual({ type: "removal-offer", contentId: 7 });
+  });
+
+  it("a removal-offer needs a positive integer content id", () => {
+    for (const contentId of [undefined, 0, -1, 1.5, "7", null]) {
+      expect(
+        parseToWorker({ type: "removal-offer", contentId }),
+      ).toBeUndefined();
+    }
+  });
+
+  it("page-lists is the status page's, the other two the Naka tab's", () => {
+    expect(allowedFor("naka-tab", { type: "page-lists" })).toBe(false);
+    expect(allowedFor("status-page", { type: "page-lists" })).toBe(true);
+    for (const msg of [
+      { type: "open-questions" },
+      { type: "removal-offer", contentId: 1 },
+    ] as const) {
+      expect(allowedFor("status-page", msg)).toBe(false);
+      expect(allowedFor("naka-tab", msg)).toBe(true);
+    }
+  });
+});
+
+describe("the answer messages", () => {
+  const ANSWER = { type: "answer-question", side: "naka", id: 5, choice: 2005 };
+  const REMOVAL = {
+    type: "answer-removal",
+    removeFrom: "sc",
+    nakaId: 21,
+    scId: 1021,
+    remove: true,
+  };
+
+  it("parse to the known keys only", () => {
+    expect(parseToWorker({ ...ANSWER, token: "T", x: 1 })).toEqual(ANSWER);
+    expect(parseToWorker({ ...REMOVAL, x: 1 })).toEqual(REMOVAL);
+    expect(
+      parseToWorker({ type: "hide-question", key: "removal:sc:21:1021", x: 1 }),
+    ).toEqual({ type: "hide-question", key: "removal:sc:21:1021" });
+  });
+
+  it("a null choice is « Aucun de ceux-là »; an absent one is no message", () => {
+    expect(parseToWorker({ ...ANSWER, choice: null })).toEqual({
+      ...ANSWER,
+      choice: null,
+    });
+    const { choice: _dropped, ...noChoice } = ANSWER;
+    expect(parseToWorker(noChoice)).toBeUndefined();
+  });
+
+  it("refuses a bad side, id, choice or flag", () => {
+    for (const bad of [
+      { ...ANSWER, side: "both" },
+      { ...ANSWER, id: 0 },
+      { ...ANSWER, id: "5" },
+      { ...ANSWER, choice: 1.5 },
+      { ...ANSWER, choice: -1 },
+      { ...ANSWER, choice: "2005" },
+      { ...ANSWER, choice: false },
+      { ...REMOVAL, removeFrom: "x" },
+      { ...REMOVAL, nakaId: 2 ** 53 },
+      { ...REMOVAL, scId: null },
+      { ...REMOVAL, remove: "true" },
+      { ...REMOVAL, remove: undefined },
+    ]) {
+      expect(parseToWorker(bad)).toBeUndefined();
+    }
+  });
+
+  it("a hide-question needs a question key", () => {
+    for (const key of [
+      undefined,
+      "",
+      "hide:ambiguity:naka:5",
+      "ambiguity:naka:0",
+      "removal:sc:21",
+      "ambiguity:naka:5 ",
+      7,
+    ]) {
+      expect(parseToWorker({ type: "hide-question", key })).toBeUndefined();
+    }
+    for (const key of ["ambiguity:sc:3", "link:naka:9", "removal:naka:1:2"]) {
+      expect(parseToWorker({ type: "hide-question", key })).toEqual({
+        type: "hide-question",
+        key,
+      });
+    }
+  });
+
+  it("the answers come from the Naka tab or the page; a hide from the Naka tab only", () => {
+    const answer = parseToWorker(ANSWER);
+    const removal = parseToWorker(REMOVAL);
+    if (answer === undefined || removal === undefined) throw new Error("x");
+    for (const role of ["naka-tab", "status-page"] as const) {
+      expect(allowedFor(role, answer)).toBe(true);
+      expect(allowedFor(role, removal)).toBe(true);
+    }
+    const hide = { type: "hide-question", key: "ambiguity:naka:5" } as const;
+    expect(allowedFor("naka-tab", hide)).toBe(true);
+    expect(allowedFor("status-page", hide)).toBe(false);
+  });
+});
+
 describe("allowedFor", () => {
   const messages: ToWorker[] = [
     { type: "naka-ready" },
@@ -791,6 +905,21 @@ describe("allowedFor", () => {
     { type: "rating-cards" },
     { type: "rate", contentId: 1, label: "film", rating: 7 },
     { type: "dismiss-rating", contentId: 1, label: "film" },
+    { type: "open-questions" },
+    { type: "removal-offer", contentId: 1 },
+    { type: "page-lists" },
+    { type: "answer-question", side: "naka", id: 1, choice: 2 },
+    {
+      type: "answer-removal",
+      removeFrom: "sc",
+      nakaId: 1,
+      scId: 2,
+      remove: true,
+    },
+    { type: "hide-question", key: "ambiguity:naka:1" },
+    { type: "search-titles", side: "sc", query: "cowboy bebop" },
+    { type: "link-title", side: "naka", id: 1, otherId: 2 },
+    { type: "requeue-question", side: "naka", id: 1 },
     {
       type: "set-settings",
       thresholds: { film: 0.9, episode: 0.8 },
@@ -806,8 +935,24 @@ describe("allowedFor", () => {
       "rating-cards",
       "rate",
       "dismiss-rating",
+      "open-questions",
+      "removal-offer",
+      "answer-question",
+      "answer-removal",
+      "hide-question",
     ],
-    "status-page": ["status", "resync", "set-mode", "set-settings"],
+    "status-page": [
+      "status",
+      "resync",
+      "set-mode",
+      "set-settings",
+      "page-lists",
+      "answer-question",
+      "answer-removal",
+      "search-titles",
+      "link-title",
+      "requeue-question",
+    ],
   };
 
   it("allows each type for its role only", () => {
@@ -860,8 +1005,103 @@ describe("allowedFor", () => {
 
   it("covers every ToWorker type exactly once", () => {
     const types = messages.map((m) => m.type).sort();
-    const tabbed = Object.values(allowed).flat().sort();
+    const tabbed = [...new Set(Object.values(allowed).flat())].sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(11);
+    expect(new Set(types).size).toBe(20);
+  });
+});
+
+describe("the manual link messages (B6)", () => {
+  const SEARCH = { type: "search-titles", side: "sc", query: "cowboy bebop" };
+  const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
+  const REQUEUE = { type: "requeue-question", side: "sc", id: 7 };
+
+  it("parse to the known keys only; the query is trimmed", () => {
+    expect(
+      parseToWorker({ ...SEARCH, query: "  cowboy bebop ", x: 1 }),
+    ).toEqual(SEARCH);
+    expect(parseToWorker({ ...LINK, token: "T" })).toEqual(LINK);
+    expect(parseToWorker({ ...REQUEUE, x: 1 })).toEqual(REQUEUE);
+  });
+
+  it("refuse a bad query, side or id", () => {
+    for (const bad of [
+      { ...SEARCH, query: "   " },
+      { ...SEARCH, query: "x".repeat(201) },
+      { ...SEARCH, query: "\ud800" },
+      { ...SEARCH, side: "both" },
+      { ...LINK, id: 0 },
+      { ...LINK, otherId: 1.5 },
+      { ...LINK, otherId: null },
+      { ...REQUEUE, id: "7" },
+    ]) {
+      expect(parseToWorker(bad)).toBeUndefined();
+    }
+  });
+
+  it("only the status page may send them", () => {
+    for (const msg of [SEARCH, LINK, REQUEUE] as const) {
+      const parsed = parseToWorker(msg);
+      expect(parsed).toBeDefined();
+      if (parsed === undefined) continue;
+      expect(allowedFor("status-page", parsed)).toBe(true);
+      expect(allowedFor("naka-tab", parsed)).toBe(false);
+    }
+  });
+});
+
+describe("unwatched page event", () => {
+  const u = { channel: CH, kind: "unwatched", contentId: 4 };
+
+  it("is accepted with and without season and episode", () => {
+    expect(parsePageEvent(u)).toEqual(u);
+    expect(parsePageEvent({ ...u, season: 1, episode: 2 })).toEqual({
+      ...u,
+      season: 1,
+      episode: 2,
+    });
+  });
+
+  it("rejects a missing content id and a partial pair", () => {
+    expect(parsePageEvent({ channel: CH, kind: "unwatched" })).toBeUndefined();
+    expect(parsePageEvent({ ...u, season: 1 })).toBeUndefined();
+  });
+});
+
+describe("forget-handled and handled-titles messages", () => {
+  const forget = { type: "forget-handled", contentId: 21391 };
+
+  it("forget-handled keeps its ids and drops any other key", () => {
+    expect(parseToWorker({ ...forget, token: "x" })).toEqual(forget);
+    expect(
+      parseToWorker({ ...forget, season: 1, episode: 2, title: "forged" }),
+    ).toEqual({ ...forget, season: 1, episode: 2 });
+  });
+
+  it.each([
+    ["no content id", { type: "forget-handled" }],
+    ["content id 0", { ...forget, contentId: 0 }],
+    ["content id as text", { ...forget, contentId: "7" }],
+    ["a season alone", { ...forget, season: 1 }],
+  ])("forget-handled with %s is refused", (_name, raw) => {
+    expect(parseToWorker(raw)).toBeUndefined();
+  });
+
+  it("handled-titles is a bare message", () => {
+    expect(parseToWorker({ type: "handled-titles", x: 1 })).toEqual({
+      type: "handled-titles",
+    });
+  });
+
+  it("forget-handled is allowed for the Naka tab and the status page", () => {
+    const msg = parseToWorker(forget) as ToWorker;
+    expect(allowedFor("naka-tab", msg)).toBe(true);
+    expect(allowedFor("status-page", msg)).toBe(true);
+  });
+
+  it("handled-titles is allowed for the status page only", () => {
+    const msg: ToWorker = { type: "handled-titles" };
+    expect(allowedFor("status-page", msg)).toBe(true);
+    expect(allowedFor("naka-tab", msg)).toBe(false);
   });
 });

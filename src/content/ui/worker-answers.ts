@@ -14,6 +14,10 @@ import {
   valuesOf,
   whenPresent,
 } from "../../ext/field-checks";
+import {
+  parseAmbiguityOffer,
+  parseLastAnswer,
+} from "../../ext/question-offer-schema";
 import { asRating, parseRatings } from "../../ext/rating-schema";
 import { type LastFinish, parseOutcome } from "../../ext/settings";
 import type { CardAnswer, CardsAnswer } from "../../sw/rating-answers";
@@ -25,6 +29,9 @@ const CARD_ANSWER_KEYS = valuesOf<keyof CardAnswer>({
   start: true,
   sending: true,
   lastFinish: true,
+  question: true,
+  questionSending: true,
+  lastAnswer: true,
 });
 const CARDS_ANSWER_KEYS = valuesOf<keyof CardsAnswer>({ cards: true });
 const ENTRY_KEYS = valuesOf<keyof CardsAnswer["cards"][number]>({
@@ -77,6 +84,31 @@ function parseCard(raw: unknown): CardAnswer["card"] {
   return card;
 }
 
+// The title's question, its sending and its last outcome come with a title that has no card only.
+function questionOf(
+  record: Record<string, unknown>,
+  card: CardAnswer["card"],
+): Pick<CardAnswer, "question" | "questionSending" | "lastAnswer"> {
+  const { question, questionSending, lastAnswer } = record;
+  const given = [question, questionSending, lastAnswer];
+  if (card !== null) {
+    if (given.some((v) => v !== undefined)) throw new Error("question");
+    return {};
+  }
+  if (questionSending !== undefined && questionSending !== true) {
+    throw new Error("questionSending");
+  }
+  return {
+    ...whenPresent(question, (v) => ({
+      question: parseAmbiguityOffer(v, "question"),
+    })),
+    ...(questionSending === true ? { questionSending } : {}),
+    ...whenPresent(lastAnswer, (v) => ({
+      lastAnswer: parseLastAnswer(v, "lastAnswer"),
+    })),
+  };
+}
+
 /** The answer to a `rating-card` for these ids. */
 export function parseCardAnswer(raw: unknown, ids: ContentIds): CardAnswer {
   const record = asRecord(raw, "answer");
@@ -90,6 +122,7 @@ export function parseCardAnswer(raw: unknown, ids: ContentIds): CardAnswer {
     ...startOf(record.start),
     ...sendingOf(record.sending, sendableOf(card, ids)),
     ...lastFinishOf(record.lastFinish),
+    ...questionOf(record, card),
   };
 }
 

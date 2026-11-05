@@ -7,10 +7,14 @@ import {
   SENDING_LINE,
   SERIES_WARNING,
 } from "../src/content/ui/rating-copy";
-import { renderRating } from "../src/content/ui/rating-render";
+import {
+  button,
+  renderRating,
+  textLine,
+} from "../src/content/ui/rating-render";
 import { type RatingView, ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
-import { descendants, FakeDoc, FakeShadow } from "./ui-fakes";
+import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
 
 function setup() {
   const doc = new FakeDoc();
@@ -166,5 +170,28 @@ describe("the rating block", () => {
     expect(
       descendants(root).filter((el) => el.style.cssText.includes("flex")),
     ).toEqual([]);
+  });
+});
+
+describe("the shared draw pieces", () => {
+  it("makes a button that acts on a trusted click only, with text", () => {
+    const doc = new FakeDoc();
+    const fn = vi.fn();
+    const el = button(doc, "<b>x</b>", "", fn) as FakeElement;
+    expect(el.textContent).toBe("<b>x</b>");
+    el.click(false);
+    expect(fn).not.toHaveBeenCalled();
+    el.click(true);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes a text line holding text, not markup", () => {
+    const line = textLine(
+      new FakeDoc(),
+      "<i>y</i>",
+      "color: red;",
+    ) as FakeElement;
+    expect(line.textContent).toBe("<i>y</i>");
+    expect(line.style.cssText).toBe("color: red;");
   });
 });

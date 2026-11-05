@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { wireBlocks } from "../src/content/ui/blocks-wiring";
 import type { HomeHandlers } from "../src/content/ui/home-block";
 import type { HomeView } from "../src/content/ui/home-view";
+import type { QuestionHandlers } from "../src/content/ui/question-render";
+import type { QuestionView } from "../src/content/ui/question-view";
 import type { RatingHandlers } from "../src/content/ui/rating-render";
 import { GRACE_MS } from "../src/content/ui/rating-session";
 import type { RatingView } from "../src/content/ui/rating-view";
@@ -9,7 +11,7 @@ import type { WorkerPort } from "../src/content/ui/worker-port";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard, RatingLabel } from "../src/core/rating-cards";
 import type { CardAnswer } from "../src/sw/rating-answers";
-import { fakeClock, flush } from "./end-block-fakes";
+import { fakeClock, flush, questionAnswer } from "./end-block-fakes";
 import { episodeCard } from "./rating-fixtures";
 
 const keyOf = (ids: ContentIds): string =>
@@ -36,6 +38,11 @@ function wiringWorld() {
       | { view: RatingView; handlers: RatingHandlers }
       | undefined,
   };
+  const asked = {
+    drawn: undefined as
+      | { view: QuestionView; handlers: QuestionHandlers }
+      | undefined,
+  };
   const home = {
     drawn: undefined as { view: HomeView; handlers: HomeHandlers } | undefined,
   };
@@ -51,6 +58,8 @@ function wiringWorld() {
       calls.push("askCards");
       return { cards: [] };
     },
+    askQuestions: async () => undefined,
+    askRemovalOffer: async () => undefined,
     rate: async (ids, label, rating) => {
       calls.push(`rate ${keyOf(ids)} ${label} ${rating}`);
       return true;
@@ -59,6 +68,9 @@ function wiringWorld() {
       calls.push(`dismiss ${keyOf(ids)} ${label}`);
       return true;
     },
+    answerQuestion: async () => true,
+    answerRemoval: async () => true,
+    hideQuestion: async () => true,
   };
   const blocks = wireBlocks({
     port,
@@ -67,8 +79,12 @@ function wiringWorld() {
       show: (view, handlers) => {
         player.drawn = { view, handlers };
       },
+      showQuestion: (view, handlers) => {
+        asked.drawn = { view, handlers };
+      },
       hide: () => {
         player.drawn = undefined;
+        asked.drawn = undefined;
       },
     },
     homeUi: {
@@ -91,6 +107,7 @@ function wiringWorld() {
     clock,
     calls,
     player,
+    asked,
     home,
     held,
     drawn,
@@ -104,6 +121,9 @@ function wiringWorld() {
         pauseFromPercent: 0,
         ...(sending === undefined ? {} : { sending }),
       });
+    },
+    setAnswer(ids: ContentIds, answer: CardAnswer): void {
+      answers.set(keyOf(ids), answer);
     },
     sends: () => calls.filter((c) => !c.startsWith("ask")),
     async pause(progress: number): Promise<void> {
@@ -217,6 +237,43 @@ describe("one owner for the overlay over the player", () => {
     await flush();
     expect(w.sends()).toEqual([]);
     expect(w.drawn().view.heading).toContain("Noter la saison 1");
+  });
+});
+
+describe("one owner for the overlay: a question of the end block", () => {
+  it("a pause draws nothing and asks nothing while the end block's question shows", async () => {
+    const w = wiringWorld();
+    await w.play(E1);
+    w.setAnswer(E1, questionAnswer());
+    w.blocks.finished(E1);
+    await w.clock.advance(2000);
+    expect(w.asked.drawn).toBeDefined();
+    const asks = w.calls.filter((c) => c.startsWith("ask")).length;
+    await w.pause(0.5);
+    expect(w.player.drawn).toBeUndefined();
+    expect(w.calls.filter((c) => c.startsWith("ask"))).toHaveLength(asks);
+    expect(w.asked.drawn?.view.heading).toContain("Une série");
+  });
+
+  it("the end block's question replaces a pause question, and closing it gives the overlay back", async () => {
+    const w = wiringWorld();
+    await w.play(E1);
+    w.setAnswer(E1, questionAnswer());
+    await w.pause(0.5);
+    const paused = w.asked.drawn?.handlers;
+    expect(paused).toBeDefined();
+    w.blocks.finished(E1);
+    await w.clock.advance(2000);
+    await w.ready();
+    paused?.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    expect(w.sends()).toEqual([]);
+    w.asked.drawn?.handlers.onAction("plus-tard");
+    expect(w.asked.drawn).toBeUndefined();
+    w.set(E1, episodeCard());
+    await w.clock.advance(1000);
+    await w.pause(0.5);
+    expect(w.drawn().view.heading).toContain("épisode 1");
   });
 });
 

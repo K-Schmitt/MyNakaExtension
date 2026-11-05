@@ -65,7 +65,12 @@ describe("episode", () => {
       "save",
     ]);
     expect(w.saved).toStrictEqual([
-      { ...emptyState(), mapping: [SERIES_PAIR], handled: ["tv:7:S1E2"] },
+      {
+        ...emptyState(),
+        mapping: [SERIES_PAIR],
+        handled: ["tv:7:S1E2"],
+        handledTitles: { "tv:7:S1E2": "La Série" },
+      },
     ]);
   });
 
@@ -162,6 +167,23 @@ describe("episode", () => {
       expect(await lastOf([1, 2, 4], 2)).toBe(false);
     });
 
+    it("another season's higher episode does not count (E3 of S1 beside E9 of S2)", async () => {
+      const w = world({
+        seasons: {
+          [`${SERIES_SC}:1`]: {
+            seasonProductId: SEASON1_SC,
+            episodes: [ep(1, 3, 5003), ep(2, 9, 6009)],
+          },
+        },
+      });
+      const outcome = await handleFinish(
+        episode(1, 3),
+        w.ports,
+        DEFAULT_THRESHOLDS,
+      );
+      expect(outcome).toMatchObject({ kind: "done", lastOfSeason: true });
+    });
+
     it("an episode already done still reports lastOfSeason", async () => {
       const w = world({
         seasons: season([1, 2, 3]),
@@ -203,6 +225,9 @@ describe("episode", () => {
         "tv:7:S1E4",
         "tv:7:S1E5",
       ],
+      handledTitles: Object.fromEntries(
+        [1, 2, 3, 4, 5].map((n) => [`tv:7:S1E${n}`, "La Série"]),
+      ),
     });
   });
 
@@ -254,5 +279,23 @@ describe("episode threshold", () => {
     );
     expect(outcome).toEqual({ kind: "ignored", reason: "below-threshold" });
     expect(w.calls).toEqual(["load"]);
+  });
+});
+
+describe("the handled title of an episode", () => {
+  it("is the series' title, stored under the episode's key", async () => {
+    const w = world();
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handledTitles).toEqual({ "tv:7:S1E2": "La Série" });
+  });
+
+  it("keeps the titles of the earlier episodes", async () => {
+    const w = world();
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
+    await handleFinish(episode(1, 3), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handledTitles).toEqual({
+      "tv:7:S1E2": "La Série",
+      "tv:7:S1E3": "La Série",
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEndUi } from "../src/content/ui/end-ui";
+import { questionView } from "../src/content/ui/question-view";
 import { ratingView } from "../src/content/ui/rating-view";
+import { QUESTION } from "./end-block-fakes";
 import { filmCard } from "./rating-fixtures";
 import { descendants, FakeDoc, FakeNode } from "./ui-fakes";
 
@@ -60,5 +62,24 @@ describe("the end block's surface", () => {
     ui.show(view(), handlers());
     ui.hide();
     expect(buttonsIn(doc)).toEqual([]);
+  });
+
+  it("draws a question in the same host and root, and its click reaches the handler", () => {
+    const doc = new FakeDoc();
+    const h = { onChoose: vi.fn(), onAction: vi.fn() };
+    const ui = createEndUi(doc);
+    ui.show(view(), handlers());
+    ui.showQuestion(questionView(QUESTION, ["plus-tard"]), h);
+    expect(doc.body.children).toHaveLength(1);
+    const buttons = descendants(
+      doc.created[0]?.shadow ?? new FakeNode(),
+    ).filter((el) => el.tag === "button");
+    expect(buttons).toHaveLength(4);
+    buttons[0]?.click(true);
+    expect(h.onChoose).toHaveBeenCalledWith({ kind: "candidate", id: 2005 });
+    buttons[3]?.click(false);
+    expect(h.onAction).not.toHaveBeenCalled();
+    buttons[3]?.click(true);
+    expect(h.onAction).toHaveBeenCalledWith("plus-tard");
   });
 });

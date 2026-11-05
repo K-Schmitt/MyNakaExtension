@@ -1,16 +1,20 @@
-import { type Pair, planListSync, type Removal } from "./list-diff";
+import { type Pair, planListSync } from "./list-diff";
+import { closeMootRemovals } from "./moot-removals";
 import { nextPresence, withPairsSeenTogether } from "./presence";
+import { type TitledRemoval, titleNewRemovals } from "./removal-titles";
 import type { ResolverPorts } from "./resolver";
-import { addPending, type SyncState, setSnapshot, settlePair } from "./state";
+import { addPending, type SyncState, settlePair } from "./state";
 import {
   countWaiting,
   MAX_RESOLVE_PER_RUN,
   resolveUnlinked,
 } from "./sync-resolve";
+import { nextSnapshot, pairKey, pendingRemovalPairs } from "./sync-snapshot";
 import {
   executeWrites,
   MAX_WRITES_PER_RUN,
   selectWrites,
+  type Write,
   type WriteOutcome,
   type WritePorts,
 } from "./sync-writes";
@@ -23,6 +27,8 @@ export type SyncPorts = ResolverPorts &
     scWishlistIds(): Promise<number[]>;
     load(): Promise<SyncState>;
     save(state: SyncState): Promise<void>;
+    /** Hears, once per run, the writes the run deferred to the next pass, in order. */
+    deferred?(writes: readonly Write[]): void;
   };
 
 export type SyncReport = {
@@ -35,14 +41,6 @@ export type SyncReport = {
   /** Ids still waiting for a search, counted per side (a title unmapped on both sides counts 2). */
   unresolved: number;
 };
-
-const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
-
-function pendingRemovalPairs(state: SyncState): Pair[] {
-  return state.pending.flatMap((item) =>
-    item.kind === "removal" ? [item.pair] : [],
-  );
-}
 
 function effectiveSettled(state: SyncState): Pair[] {
   const unique = new Map<string, Pair>();
@@ -72,7 +70,7 @@ function planFor(state: SyncState, loaded: SyncState, lists: Lists) {
 
 function queueRemovals(
   state: SyncState,
-  removals: readonly Removal[],
+  removals: readonly TitledRemoval[],
 ): SyncState {
   return removals.reduce(
     (current, removal) =>
@@ -92,31 +90,6 @@ async function effectiveList(
   } catch {
     return original;
   }
-}
-
-// A known pair (snapshotted, or seen together) the planner skipped (conflicted,
-// settled) and that is still mapped and on one side must stay known: if it
-// dropped out, it would be treated as an addition once the skip ends.
-function nextSnapshot(
-  state: SyncState,
-  known: readonly Pair[],
-  lists: { naka: number[]; sc: number[] },
-): SyncState {
-  const inNaka = new Set(lists.naka);
-  const inSc = new Set(lists.sc);
-  const both = state.mapping.filter(
-    (pair) => inNaka.has(pair.nakaId) && inSc.has(pair.scId),
-  );
-  const carried = known.filter(
-    (pair) =>
-      state.mapping.some((m) => pairKey(m) === pairKey(pair)) &&
-      (inNaka.has(pair.nakaId) || inSc.has(pair.scId)),
-  );
-  return setSnapshot(state, [
-    ...both,
-    ...pendingRemovalPairs(state),
-    ...carried,
-  ]);
 }
 
 // The run is complete: its final lists extend the presence intervals.
@@ -165,8 +138,12 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
     selectWrites(plan, resolved.retryLast),
     ports,
   );
+  ports.deferred?.(outcome.deferredWrites);
   const queued = settleAlreadyDone(
-    queueRemovals(resolved, plan.confirmRemoval),
+    queueRemovals(
+      resolved,
+      await titleNewRemovals(resolved, plan.confirmRemoval, ports),
+    ),
     outcome,
   );
   const final = {
@@ -183,7 +160,10 @@ export async function runSync(ports: SyncPorts): Promise<SyncReport> {
   };
   const known = knownSnapshot(resolved, loaded);
   const state = completeRun(
-    nextRetryLast(nextSnapshot(queued, known, final), outcome),
+    nextRetryLast(
+      nextSnapshot(closeMootRemovals(queued, final), known, final),
+      outcome,
+    ),
     final,
   );
   await ports.save(state);

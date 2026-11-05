@@ -7,8 +7,10 @@ import {
   ScUnauthenticatedError,
   ScUnavailableError,
 } from "../src/sc/sc-client";
+import { readProductState } from "../src/sc/sc-product-state";
 import { GQL } from "../src/sc/sc-queries";
 import { createSessionReader } from "../src/sc/sc-session";
+import type { Envelope } from "../src/sc/sc-transport";
 import seasonHtml from "./fixtures/season-widow-s-bay-s1.html?raw";
 
 const TOKEN = "T0K3N-FAKE";
@@ -1385,7 +1387,7 @@ describe("productState", () => {
       review: { url: LEAK },
     });
     const { client } = setup(LOGGED_IN, () =>
-      stateReply({ id: 5, universe: 1, title: LEAK, currentUserInfos: infos }),
+      stateReply({ id: 5, universe: 1, slug: LEAK, currentUserInfos: infos }),
     );
     const state = await client.productState(5);
     expect(state).toStrictEqual({
@@ -1916,5 +1918,99 @@ describe("search", () => {
         expect(seen).not.toContain(LEAK);
       },
     );
+  });
+});
+
+describe("productState: the label for the preview", () => {
+  const stateOf = async (extra: Record<string, unknown>) => {
+    const { client } = setup(LOGGED_IN, () =>
+      stateReply({
+        id: 5,
+        universe: 1,
+        currentUserInfos: userInfos(5),
+        ...extra,
+      }),
+    );
+    return client.productState(5);
+  };
+
+  it("reads the title and the year of dateRelease", async () => {
+    const state = await stateOf({
+      title: "Enemy",
+      dateRelease: "2013-09-08",
+    });
+    expect(state.label).toEqual({ title: "Enemy", year: 2013 });
+  });
+
+  it.each([
+    [{ dateRelease: "2013-09-08", originalRun: "1999-01-01" }, 2013],
+    [{ originalRun: "1999-01-01", yearOfProduction: 2005 }, 1999],
+    [{ yearOfProduction: 2005 }, 2005],
+    [{ yearOfProduction: "2005" }, 2005],
+    [{ dateRelease: "abcd", yearOfProduction: 2005 }, 2005],
+  ])("the year comes in order from %o: %s", async (dates, year) => {
+    const state = await stateOf({ title: "T", ...dates });
+    expect(state.label).toEqual({ title: "T", year });
+  });
+
+  it("a title with no usable year still gives a label", async () => {
+    expect((await stateOf({ title: "T" })).label).toEqual({ title: "T" });
+    expect((await stateOf({ title: "T", dateRelease: "abcd" })).label).toEqual({
+      title: "T",
+    });
+  });
+
+  it("an empty or non-string title gives no label, and the state is still read", async () => {
+    for (const title of ["", 42, null, undefined, {}, [], true]) {
+      const state = await stateOf({ title, dateRelease: "2013-09-08" });
+      expect(state).toStrictEqual({
+        isDone: false,
+        isWished: true,
+        universe: 1,
+        rating: null,
+      });
+    }
+  });
+
+  const hostile = (patch: Record<string, unknown>) => patch;
+  const THROWING = {
+    get title(): string {
+      throw new Error("boom");
+    },
+  };
+  const THROWING_DATE = {
+    title: "T",
+    get dateRelease(): string {
+      throw new Error("boom");
+    },
+  };
+  const HOSTILE: [string, Record<string, unknown>][] = [
+    ["title null", hostile({ title: null })],
+    ["title {}", hostile({ title: {} })],
+    ["title a getter that throws", THROWING],
+    ["dateRelease a getter that throws", THROWING_DATE],
+    ["dateRelease abcd", hostile({ title: "T", dateRelease: "abcd" })],
+    ["dateRelease a boolean", hostile({ title: "T", dateRelease: true })],
+    ["dateRelease {}", hostile({ title: "T", dateRelease: {} })],
+    ["originalRun a list", hostile({ title: "T", originalRun: [1, 2] })],
+    ["year 99999", hostile({ title: "T", yearOfProduction: 99999 })],
+    ["year 12", hostile({ title: "T", yearOfProduction: 12 })],
+    ["year NaN", hostile({ title: "T", yearOfProduction: Number.NaN })],
+    ["year -2005", hostile({ title: "T", yearOfProduction: -2005 })],
+    ["year 2005.5", hostile({ title: "T", yearOfProduction: 2005.5 })],
+    ["date 99999-01-01", hostile({ title: "T", dateRelease: "99999-01-01" })],
+  ];
+
+  it.each(HOSTILE)("never throws: %s", (_name, patch) => {
+    const product = { id: 5, universe: 1, currentUserInfos: userInfos(5) };
+    Object.defineProperties(product, Object.getOwnPropertyDescriptors(patch));
+    const state = readProductState({ data: { product } } as Envelope, 5);
+    expect(state).toMatchObject({ isDone: false, isWished: true, universe: 1 });
+    expect(state.label?.year).toBeUndefined();
+  });
+
+  it("a hostile year only drops the year, not the title", async () => {
+    const state = await stateOf({ title: "T", yearOfProduction: 99999 });
+    expect(state.label).toEqual({ title: "T" });
   });
 });

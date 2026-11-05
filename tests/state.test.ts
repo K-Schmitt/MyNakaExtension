@@ -3,6 +3,7 @@ import type { Pair } from "../src/core/list-diff";
 import {
   addPending,
   emptyState,
+  forgetHandled,
   isHandled,
   markAsked,
   markHandled,
@@ -423,4 +424,64 @@ describe("immutability", () => {
       expect(result).not.toBe(input);
     });
   }
+});
+
+describe("markHandled with a title", () => {
+  it("stores the title under the key", () => {
+    const s = markHandled(emptyState(), "movie:3", "Un film");
+    expect(s.handledTitles).toEqual({ "movie:3": "Un film" });
+  });
+  it("keeps the other titles, and a key handled with no title gets none", () => {
+    const s = markHandled(markHandled(emptyState(), "movie:3", "A"), "movie:4");
+    expect(s.handledTitles).toEqual({ "movie:3": "A" });
+    expect(s.handled).toEqual(["movie:3", "movie:4"]);
+  });
+  it("a key already handled keeps its first title", () => {
+    const s = markHandled(
+      markHandled(emptyState(), "movie:3", "A"),
+      "movie:3",
+      "B",
+    );
+    expect(s.handledTitles).toEqual({ "movie:3": "A" });
+  });
+});
+
+describe("forgetHandled", () => {
+  const base = (): SyncState =>
+    deepFreeze({
+      ...emptyState(),
+      handled: ["movie:1", "tv:2:S1E1", "movie:3"],
+      handledTitles: { "movie:1": "Un", "tv:2:S1E1": "Deux" },
+      settled: [p(1, 10)],
+      mapping: [p(1, 10)],
+    });
+
+  it("removes the key and its title, and nothing else", () => {
+    expect(forgetHandled(base(), "tv:2:S1E1")).toEqual({
+      ...base(),
+      handled: ["movie:1", "movie:3"],
+      handledTitles: { "movie:1": "Un" },
+    });
+  });
+  it("a key with no stored title is removed all the same", () => {
+    const s = forgetHandled(base(), "movie:3");
+    expect(s.handled).toEqual(["movie:1", "tv:2:S1E1"]);
+    expect(s.handledTitles).toEqual({ "movie:1": "Un", "tv:2:S1E1": "Deux" });
+  });
+  it("a state with no titles at all gets none", () => {
+    const s = forgetHandled(
+      { ...emptyState(), handled: ["movie:1"] },
+      "movie:1",
+    );
+    expect(s.handled).toEqual([]);
+    expect(s).not.toHaveProperty("handledTitles");
+  });
+  it("a key that is not handled gives the same contents", () => {
+    expect(forgetHandled(base(), "movie:99")).toEqual(base());
+  });
+  it("then the key can be handled again", () => {
+    const s = markHandled(forgetHandled(base(), "movie:1"), "movie:1", "Neuf");
+    expect(isHandled(s, "movie:1")).toBe(true);
+    expect(s.handledTitles?.["movie:1"]).toBe("Neuf");
+  });
 });

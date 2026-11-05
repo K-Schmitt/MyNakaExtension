@@ -11,7 +11,7 @@ import { type Candidate, matchTitle, type Titled } from "./title-match";
 export type ScMatch =
   | { kind: "pair"; pair: Pair; isNew: boolean }
   /** The owner must choose: a new Naka-side question is to be saved. */
-  | { kind: "needs-choice"; candidateIds: number[] }
+  | { kind: "needs-choice"; candidateIds: number[]; candidates: Candidate[] }
   /** The owner was already asked about this title or its mapped product: nothing changes. */
   | { kind: "asked"; candidateIds: number[] }
   | { kind: "not-found" };
@@ -62,10 +62,10 @@ export async function matchOnSc(
   const result = matchTitle(titled, candidates);
   if (result.kind === "none") return { kind: "not-found" };
   if (result.kind === "ambiguous") {
-    return { kind: "needs-choice", candidateIds: result.ids };
+    return { kind: "needs-choice", candidateIds: result.ids, candidates };
   }
   if (isHeld(state, result.id) || openQuestion(state, "sc", result.id)) {
-    return { kind: "needs-choice", candidateIds: [result.id] };
+    return { kind: "needs-choice", candidateIds: [result.id], candidates };
   }
   return { kind: "pair", pair: { nakaId, scId: result.id }, isNew: true };
 }

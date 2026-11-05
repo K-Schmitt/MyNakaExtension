@@ -221,6 +221,42 @@ describe("sync ports: writes in simulation", () => {
     const { ports, sc, planned } = syncWorld("simulation");
     expect(await ports.addToSc(1005)).toBe("added");
     expect(sc.calls).toEqual(["productState:1005"]);
+    expect(planned).toEqual([{ side: "sc", id: 1005, type: "film" }]);
+  });
+
+  it("addToSc records the product label and the type of its universe", async () => {
+    const sc = fakeSc({
+      productState: async () => ({
+        isDone: false,
+        isWished: false,
+        universe: 4,
+        rating: null,
+        label: { title: "Dark", year: 2017 },
+      }),
+    });
+    const { ports, planned } = syncWorld("simulation", sc);
+    await ports.addToSc(1005);
+    expect(planned).toEqual([
+      {
+        side: "sc",
+        id: 1005,
+        label: { title: "Dark", year: 2017 },
+        type: "serie",
+      },
+    ]);
+  });
+
+  it("addToSc records no type for a universe that is neither film nor series", async () => {
+    const sc = fakeSc({
+      productState: async () => ({
+        isDone: false,
+        isWished: false,
+        universe: 32,
+        rating: null,
+      }),
+    });
+    const { ports, planned } = syncWorld("simulation", sc);
+    await ports.addToSc(1005);
     expect(planned).toEqual([{ side: "sc", id: 1005 }]);
   });
 

@@ -16,9 +16,10 @@ import {
   parsePauseFromPercent,
   parseThresholds,
 } from "../ext/thresholds-schema";
-import type { Running } from "../sw/activity";
+import type { LocalAction, Running } from "../sw/activity";
 import type { Counts, StatusSnapshot } from "../sw/status-snapshot";
 
+const LOCAL_ACTIONS = valuesOf<LocalAction>({ forget: true, reset: true });
 const RUNNING_KINDS = valuesOf<Running["kind"]>({ sync: true, finish: true });
 
 function parseRunning(raw: unknown): Running {
@@ -43,6 +44,15 @@ function parsePending(raw: unknown): true {
   return raw === true ? true : fail("pendingSettings");
 }
 
+// A non-empty list of known actions, each once: an empty or repeating list is refused.
+function parseActions(raw: unknown): LocalAction[] {
+  if (!Array.isArray(raw) || raw.length === 0) return fail("pendingActions");
+  const actions = raw.map((v) => asOneOf(v, LOCAL_ACTIONS, "pendingActions"));
+  return new Set(actions).size === actions.length
+    ? actions
+    : fail("pendingActions");
+}
+
 function parseSnapshot(raw: unknown): StatusSnapshot {
   const record = asRecord(raw, "status");
   const mode = whenPresent(record.mode, (v) => asOneOf<Mode>(v, MODES, "mode"));
@@ -65,7 +75,9 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
     parsePauseFromPercent,
   );
   const pendingSettings = whenPresent(record.pendingSettings, parsePending);
+  const pendingActions = whenPresent(record.pendingActions, parseActions);
   return {
+    ...(pendingActions === undefined ? {} : { pendingActions }),
     ...(pendingSettings === undefined ? {} : { pendingSettings }),
     ...(mode === undefined ? {} : { mode }),
     ...(binding === undefined ? {} : { binding }),

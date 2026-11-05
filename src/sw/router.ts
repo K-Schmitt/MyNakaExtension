@@ -12,21 +12,25 @@ import {
   isTrustedSender,
   parseToWorker,
   type Sender,
+  type SenderRole,
   type ToWorker,
 } from "../ext/messages";
 import type { RatingCardMessage } from "../ext/rating-messages";
 import { createActivity, overlapping } from "./activity";
+import { answerRead, type Respond } from "./answer-read";
 import { createDebounce } from "./debounce";
 import { createFinishQueue } from "./finish-queue";
+import { createForgetQueue } from "./forget-queue";
 import type { JobQueue } from "./job-queue";
 import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
+import { createQuestionRoutes } from "./question-routes";
 import { createRateQueue } from "./rate-queue";
 import type { CardAnswer, CardsAnswer } from "./rating-answers";
 import { cardlessSendingOf, sendingOf } from "./rating-answers";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
-export type Respond = (answer: unknown) => void;
+export type { Respond };
 
 export type Router = {
   /** true when `respond` will be called later (Chrome keeps the channel open). */
@@ -61,6 +65,11 @@ export function createRouter(deps: RouterDeps): Router {
     (msg) => jobs.finishJob(msg),
   );
 
+  const tabForgets = createForgetQueue(enqueue, (msg) =>
+    jobs.forgetHandledFromTab(msg),
+  );
+  const questions = createQuestionRoutes(enqueue, jobs);
+
   // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
   // ids say which label a rate of the title can have.
   const withSending = async (
@@ -68,9 +77,10 @@ export function createRouter(deps: RouterDeps): Router {
     cardAnswer: Promise<CardAnswer>,
   ) => {
     const answer = await cardAnswer;
-    return answer.card
-      ? { ...answer, ...sendingOf(answer.card, rate.sending) }
-      : { ...answer, ...cardlessSendingOf(msg, rate.sending) };
+    if (answer.card)
+      return { ...answer, ...sendingOf(answer.card, rate.sending) };
+    const cardless = { ...answer, ...cardlessSendingOf(msg, rate.sending) };
+    return questions.withQuestionSending(msg, cardless);
   };
   const withSendingAll = async (cardsAnswer: Promise<CardsAnswer>) => ({
     cards: (await cardsAnswer).cards.map((entry) => ({
@@ -90,17 +100,6 @@ export function createRouter(deps: RouterDeps): Router {
       .catch(ignore);
   }
 
-  // A read of the stored ratings: outside the queue, never saving. An unreadable store is answered
-  // `undefined` (an invented answer would be worse), so that the tab's ask resolves at once.
-  function answerRead(read: () => Promise<unknown>, respond: Respond): void {
-    read()
-      .then(
-        (answer) => respond(answer),
-        () => respond(undefined),
-      )
-      .catch(ignore);
-  }
-
   // The job is queued first: a responder that throws does not stop it.
   function queued(queue: () => void, respond: Respond): false {
     queue();
@@ -112,7 +111,11 @@ export function createRouter(deps: RouterDeps): Router {
     return false;
   }
 
-  function dispatch(msg: ToWorker, respond: Respond): boolean {
+  function dispatch(
+    msg: ToWorker,
+    respond: Respond,
+    role: SenderRole,
+  ): boolean {
     switch (msg.type) {
       case "naka-ready":
         sync("naka-ready");
@@ -149,6 +152,37 @@ export function createRouter(deps: RouterDeps): Router {
         return queued(() => rate(msg), respond);
       case "dismiss-rating":
         return queued(() => enqueue(() => jobs.dismissRating(msg)), respond);
+      case "forget-binding":
+        return queued(
+          () => enqueue(activity.queueLocal("forget", () => jobs.forget())),
+          respond,
+        );
+      case "reset":
+        return queued(
+          () => enqueue(activity.queueLocal("reset", () => jobs.reset())),
+          respond,
+        );
+      case "forget-handled":
+        return queued(
+          () =>
+            role === "naka-tab"
+              ? tabForgets(msg)
+              : enqueue(() => jobs.forgetHandled(msg)),
+          respond,
+        );
+      case "handled-titles":
+        answerRead(() => jobs.handledTitles(), respond);
+        return true;
+      case "open-questions":
+      case "removal-offer":
+      case "page-lists":
+      case "answer-question":
+      case "answer-removal":
+      case "hide-question":
+      case "search-titles":
+      case "link-title":
+      case "requeue-question":
+        return questions.route(msg, respond);
     }
   }
 
@@ -158,7 +192,7 @@ export function createRouter(deps: RouterDeps): Router {
       if (msg === undefined) return false;
       const role = isTrustedSender(sender, deps.extensionId);
       if (role === undefined || !allowedFor(role, msg)) return false;
-      return dispatch(msg, respond);
+      return dispatch(msg, respond, role);
     },
   };
 }

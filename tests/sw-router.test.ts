@@ -60,6 +60,37 @@ const RATING_MESSAGES: [string, unknown][] = [
   ["a rating-cards", { type: "rating-cards" }],
 ];
 
+const ANSWER = { type: "answer-question", side: "naka", id: 5, choice: 2005 };
+const REMOVAL = {
+  type: "answer-removal",
+  removeFrom: "sc",
+  nakaId: 21,
+  scId: 1021,
+  remove: true,
+};
+const HIDE = { type: "hide-question", key: "ambiguity:naka:5" };
+const SEARCH = { type: "search-titles", side: "naka", query: "cowboy bebop" };
+const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
+const REQUEUE = { type: "requeue-question", side: "naka", id: 5 };
+const PAGE_MESSAGES: [string, unknown][] = [
+  ["a forget-binding", { type: "forget-binding" }],
+  ["a reset", { type: "reset" }],
+  ["a forget-handled", { type: "forget-handled", contentId: 3 }],
+  ["a handled-titles", { type: "handled-titles" }],
+];
+// Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
+const QUESTION_MESSAGES: [string, unknown][] = [
+  ["an open-questions", { type: "open-questions" }],
+  ["a removal-offer", { type: "removal-offer", contentId: 3 }],
+  ["a page-lists", { type: "page-lists" }],
+  ["an answer-question", ANSWER],
+  ["an answer-removal", REMOVAL],
+  ["a hide-question", HIDE],
+  ["a search-titles", SEARCH],
+  ["a link-title", LINK],
+  ["a requeue-question", REQUEUE],
+];
+
 const FINISHED = {
   type: "finished",
   source: "threshold",
@@ -112,6 +143,15 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     dismissRating: async (msg) => {
       calls.push(`dismiss:${JSON.stringify(msg)}`);
     },
+    answerQuestion: async (msg) => {
+      calls.push(`answer:${JSON.stringify(msg)}`);
+    },
+    answerRemoval: async (msg) => {
+      calls.push(`removal:${JSON.stringify(msg)}`);
+    },
+    hideQuestion: async (msg) => {
+      calls.push(`hide:${JSON.stringify(msg)}`);
+    },
     statusSnapshot: async () => {
       calls.push("status");
       return snapshot;
@@ -123,6 +163,44 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     ratingCards: async () => {
       calls.push("cards");
       return { cards: [] };
+    },
+    openQuestions: async (answering) => {
+      calls.push(`open-questions:${JSON.stringify(answering)}`);
+      return { questions: [] };
+    },
+    removalOffer: async (contentId, answering) => {
+      calls.push(`removal-offer:${contentId}:${JSON.stringify(answering)}`);
+      return { offer: null };
+    },
+    pageLists: async (answering) => {
+      calls.push(`page-lists:${JSON.stringify(answering)}`);
+      return { questions: [], unlinked: [] };
+    },
+    linkTitle: async (msg) => {
+      calls.push(`link:${JSON.stringify(msg)}`);
+    },
+    requeueQuestion: async (msg) => {
+      calls.push(`requeue:${JSON.stringify(msg)}`);
+    },
+    forget: async () => {
+      calls.push("forget");
+    },
+    reset: async () => {
+      calls.push("reset");
+    },
+    forgetHandled: async (msg) => {
+      calls.push(`forget-handled:${JSON.stringify(msg)}`);
+    },
+    forgetHandledFromTab: async (msg) => {
+      calls.push(`forget-handled-tab:${JSON.stringify(msg)}`);
+    },
+    handledTitles: async () => {
+      calls.push("handled-titles");
+      return { titles: [{ key: "movie:3", label: "Trois" }] };
+    },
+    searchTitles: async (msg) => {
+      calls.push(`search:${JSON.stringify(msg)}`);
+      return { candidates: [] };
     },
     ...over,
   };
@@ -289,6 +367,54 @@ describe("router: trusted messages become jobs", () => {
     ]);
   });
 
+  it("the question reads are answered outside the queue, with the keys being answered", async () => {
+    const r = router({
+      openQuestions: async () => ({ questions: [] }),
+      pageLists: async () => ({ questions: [], unlinked: [] }),
+      removalOffer: async () => ({ offer: null }),
+    });
+    expect(r.send({ type: "open-questions" }, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB)).toBe(
+      true,
+    );
+    expect(r.send({ type: "page-lists" }, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { questions: [] },
+      { offer: null },
+      { questions: [], unlinked: [] },
+    ]);
+  });
+
+  it("the question reads get the answering keys of the queue, empty until an answer is queued", async () => {
+    const r = router();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([
+      "open-questions:[]",
+      "removal-offer:3:[]",
+      "page-lists:[]",
+    ]);
+  });
+
+  it("a question read that rejects is answered undefined at once", async () => {
+    const boom = async () => {
+      throw new Error("store down");
+    };
+    const r = router({
+      openQuestions: boom,
+      removalOffer: boom,
+      pageLists: boom,
+    });
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers).toEqual([undefined, undefined, undefined]);
+  });
+
   it("a rating read that rejects is answered undefined at once, with no unhandled rejection", async () => {
     const r = router({
       ratingCard: async () => {
@@ -358,7 +484,7 @@ describe("router: everything else is ignored, unanswered", () => {
     ["a message from an iframe", FINISHED, IFRAME],
     ["a message from another extension", FINISHED, OTHER_EXTENSION],
     ["a sender with no id", { type: "status" }, { url: STATUS_URL }],
-    ["an unknown type", { type: "reset" }, STATUS_PAGE],
+    ["an unknown type", { type: "wipe-everything" }, STATUS_PAGE],
     ["a malformed finished", { ...FINISHED, progress: 2 }, NAKA_TAB],
     ["not an object", "naka-ready", NAKA_TAB],
     [
@@ -394,20 +520,61 @@ describe("router: everything else is ignored, unanswered", () => {
       { type: "rating-cards" },
       STATUS_PAGE,
     ],
+    ["a page-lists from the Naka tab", { type: "page-lists" }, NAKA_TAB],
+    [
+      "an open-questions from the status page",
+      { type: "open-questions" },
+      STATUS_PAGE,
+    ],
+    [
+      "a removal-offer from the status page",
+      { type: "removal-offer", contentId: 3 },
+      STATUS_PAGE,
+    ],
+    [
+      "a removal-offer without a content id",
+      { type: "removal-offer" },
+      NAKA_TAB,
+    ],
     ["a rate with a rating of 0", { ...RATE, rating: 0 }, NAKA_TAB],
     ["a rate with a rating of 11", { ...RATE, rating: 11 }, NAKA_TAB],
     ["a rate with an unknown label", { ...RATE, label: "season" }, NAKA_TAB],
-    ...RATING_MESSAGES.flatMap(([name, msg]) =>
-      [
-        ["https://naka.cx.evil.com/", EVIL],
-        ["an iframe", IFRAME],
-        ["another extension", OTHER_EXTENSION],
-        ["a sender with no id", { url: PLAYER, frameId: 0 }],
-      ].map(([from, sender]): [string, unknown, object] => [
-        `${name} from ${from as string}`,
-        msg,
-        sender as object,
-      ]),
+    ["a hide-question from the status page", HIDE, STATUS_PAGE],
+    [
+      "an answer-question without a choice",
+      { type: "answer-question", side: "naka", id: 5 },
+      NAKA_TAB,
+    ],
+    [
+      "an answer-question with a text choice",
+      { ...ANSWER, choice: "2005" },
+      NAKA_TAB,
+    ],
+    ["an answer-question with choice 0", { ...ANSWER, choice: 0 }, NAKA_TAB],
+    [
+      "an answer-question with an unknown side",
+      { ...ANSWER, side: "x" },
+      NAKA_TAB,
+    ],
+    ["an answer-removal with remove 1", { ...REMOVAL, remove: 1 }, NAKA_TAB],
+    [
+      "an answer-removal without a SensCritique id",
+      { ...REMOVAL, scId: undefined },
+      NAKA_TAB,
+    ],
+    ["a hide-question with a bad key", { ...HIDE, key: "hide:x" }, NAKA_TAB],
+    ...[...RATING_MESSAGES, ...QUESTION_MESSAGES, ...PAGE_MESSAGES].flatMap(
+      ([name, msg]) =>
+        [
+          ["https://naka.cx.evil.com/", EVIL],
+          ["an iframe", IFRAME],
+          ["another extension", OTHER_EXTENSION],
+          ["a sender with no id", { url: PLAYER, frameId: 0 }],
+        ].map(([from, sender]): [string, unknown, object] => [
+          `${name} from ${from as string}`,
+          msg,
+          sender as object,
+        ]),
     ),
   ];
 
@@ -500,6 +667,163 @@ describe("router: one waiting rate per title and label", () => {
     r.send(rateOf(5), NAKA_TAB);
     await settle();
     expect(rates(r.calls)).toHaveLength(2);
+  });
+});
+
+describe("router: the owner's answers are queued, one waiting per question", () => {
+  const blockedRouter = (over: Partial<Jobs> = {}) => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+      ...over,
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    return { ...r, blocker };
+  };
+  const answered = (calls: string[]) =>
+    calls.filter((c) => /^(answer|removal|hide):/.test(c));
+
+  it("each answer is queued and answered { ok: true } at once, from the Naka tab and from the page", async () => {
+    const r = router();
+    expect(r.send(ANSWER, NAKA_TAB)).toBe(false);
+    expect(r.send({ ...ANSWER, id: 6 }, STATUS_PAGE)).toBe(false);
+    expect(r.send(REMOVAL, NAKA_TAB)).toBe(false);
+    expect(r.send({ ...REMOVAL, nakaId: 22 }, STATUS_PAGE)).toBe(false);
+    expect(r.send(HIDE, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([
+      { ok: true },
+      { ok: true },
+      { ok: true },
+      { ok: true },
+      { ok: true },
+    ]);
+    await settle();
+    expect(r.calls).toEqual([
+      `answer:${JSON.stringify(ANSWER)}`,
+      `answer:${JSON.stringify({ ...ANSWER, id: 6 })}`,
+      `removal:${JSON.stringify(REMOVAL)}`,
+      `removal:${JSON.stringify({ ...REMOVAL, nakaId: 22 })}`,
+      `hide:${JSON.stringify(HIDE)}`,
+    ]);
+  });
+
+  it("a « none » answer keeps its null choice", async () => {
+    const r = router();
+    r.send({ ...ANSWER, choice: null, extra: 1 }, NAKA_TAB);
+    await settle();
+    expect(r.calls).toEqual([
+      `answer:${JSON.stringify({ ...ANSWER, choice: null })}`,
+    ]);
+  });
+
+  it("an answer-removal from an untrusted sender does nothing", async () => {
+    const r = router();
+    for (const sender of [EVIL, IFRAME, OTHER_EXTENSION, {}]) {
+      expect(r.send(REMOVAL, sender)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("answering lists a waiting key, then the running key, then nothing: open-questions carries it", async () => {
+    const running = latch();
+    const r = blockedRouter({
+      answerRemoval: async () => {
+        await running.opened;
+      },
+    });
+    await settle();
+    r.send(REMOVAL, NAKA_TAB);
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    r.blocker.open();
+    await settle();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    running.open();
+    await settle();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("open-questions"))).toEqual([
+      'open-questions:["removal:sc:21:1021"]',
+      'open-questions:["removal:sc:21:1021"]',
+      "open-questions:[]",
+    ]);
+  });
+
+  it("the keys of the brief: ambiguity:<side>:<id> and removal:<removeFrom>:<nakaId>:<scId>; a hide is never answering", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, side: "sc", id: 1021, choice: 21 }, STATUS_PAGE);
+    r.send({ ...REMOVAL, removeFrom: "naka" }, STATUS_PAGE);
+    r.send({ ...HIDE, key: "removal:sc:21:1021" }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("page-lists"))).toEqual([
+      'page-lists:["ambiguity:sc:1021","removal:naka:21:1021"]',
+    ]);
+    r.blocker.open();
+    await settle();
+  });
+
+  it("two answer-removal for one key while it waits: one job, with the latest message", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...REMOVAL, remove: true }, NAKA_TAB);
+    r.send({ ...REMOVAL, remove: false }, STATUS_PAGE);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([
+      `removal:${JSON.stringify({ ...REMOVAL, remove: false })}`,
+    ]);
+  });
+
+  it("two answers for one question while it waits: one job, the latest choice", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, choice: 1005 }, NAKA_TAB);
+    r.send(ANSWER, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([`answer:${JSON.stringify(ANSWER)}`]);
+  });
+
+  it("a hide-question for a question whose answer-question waits: both jobs run (separate keys)", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send(ANSWER, NAKA_TAB);
+    r.send(HIDE, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([
+      `answer:${JSON.stringify(ANSWER)}`,
+      `hide:${JSON.stringify(HIDE)}`,
+    ]);
+  });
+
+  it("an answer and a removal of the same ids are different keys", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send(REMOVAL, NAKA_TAB);
+    r.send({ ...REMOVAL, removeFrom: "naka" }, NAKA_TAB);
+    r.send({ ...ANSWER, id: 21 }, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toHaveLength(3);
+  });
+
+  it("a title with no card shows its question sending while its answer waits", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, id: 3 }, NAKA_TAB);
+    r.send(CARD, NAKA_TAB);
+    await settle();
+    expect(r.answers.at(-1)).toMatchObject({ questionSending: true });
+    r.blocker.open();
+    await settle();
   });
 });
 
@@ -998,6 +1322,99 @@ describe("router: the status answer waits for no job", () => {
     r.send({ type: "status" }, STATUS_PAGE);
     await settle();
     expect(r.answers.at(-1)).not.toHaveProperty("pendingSettings");
+  });
+
+  it("forget-binding and reset from the status page run their job, answered at once", async () => {
+    const r = router();
+    expect(r.send({ type: "forget-binding", x: 1 }, STATUS_PAGE)).toBe(false);
+    expect(r.send({ type: "reset" }, STATUS_PAGE)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual(["forget", "reset"]);
+  });
+
+  it("forget-handled from the status page and from a Naka tab each queue one job, answered at once", async () => {
+    const r = router();
+    const msg = { type: "forget-handled", contentId: 3, season: 1, episode: 2 };
+    expect(r.send({ ...msg, title: "forged" }, STATUS_PAGE)).toBe(false);
+    expect(r.send(msg, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([
+      `forget-handled:${JSON.stringify(msg)}`,
+      `forget-handled-tab:${JSON.stringify(msg)}`,
+    ]);
+  });
+
+  it("forget-handled runs on the queue, behind a running sync", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send({ type: "forget-handled", contentId: 3 }, NAKA_TAB);
+    await settle();
+    expect(g.r.calls.filter((c) => c.startsWith("forget-handled"))).toEqual([]);
+    g.sync.open();
+    await settle();
+    expect(
+      g.r.calls.filter((c) => c.startsWith("forget-handled")),
+    ).toHaveLength(1);
+  });
+
+  it("handled-titles from the status page is answered from the read, outside the queue", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(g.r.send({ type: "handled-titles" }, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(g.r.answers.at(-1)).toEqual({
+      titles: [{ key: "movie:3", label: "Trois" }],
+    });
+    g.sync.open();
+  });
+
+  it("handled-titles from a Naka tab is ignored", async () => {
+    const r = router();
+    expect(r.send({ type: "handled-titles" }, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("forget-binding and reset from a Naka tab are ignored", async () => {
+    const r = router();
+    expect(r.send({ type: "forget-binding" }, NAKA_TAB)).toBe(false);
+    expect(r.send({ type: "reset" }, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("a reset queued behind a sync shows pendingActions until it is applied, then nothing", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send({ type: "reset" }, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({ pendingActions: ["reset"] });
+    g.r.send({ type: "forget-binding" }, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({
+      pendingActions: ["forget", "reset"],
+    });
+    g.sync.open();
+    await settle();
+    expect(await g.status()).not.toHaveProperty("pendingActions");
+  });
+
+  it("a rejected reset releases the mark", async () => {
+    const r = router({
+      reset: async () => {
+        throw new Error("storage");
+      },
+    });
+    r.send({ type: "reset" }, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).not.toHaveProperty("pendingActions");
   });
 
   it("an idle worker answers the snapshot alone", async () => {
@@ -1693,8 +2110,8 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       outcome: "ok",
     });
     expect(run?.preview).toEqual([
-      { side: "sc", title: "Film 1" },
-      { side: "naka", title: "Film 2" },
+      { side: "sc", title: "Film 1", year: 2001, type: "film" },
+      { side: "naka", title: "Film 2", year: 2002, type: "film" },
     ]);
   });
 
@@ -1710,10 +2127,13 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       headline: `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
       mode: "simulation",
       switchLabel: "Activer les écritures",
+      switchDisabled: false,
+      actionsDisabled: false,
       inProgress: false,
       previewCount: 2,
+      next: [],
       lines: [
-        `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+        `Comptes liés${NB}: owner sur SensCritique, compte Naka n°\u00A077`,
         `Dernière synchronisation (simulation)${NB}: 04/11/2026 12:00 (ouverture de Naka)`,
         `Prévus${NB}: 2`,
         `Reportés (10 écritures au plus par passage)${NB}: 0`,
@@ -1722,11 +2142,116 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         "Rien en attente",
       ],
       preview: [
-        `Envies SensCritique${NB}: Film 1`,
-        `Ma liste Naka${NB}: Film 2`,
+        `Envies SensCritique${NB}: Film 1 (2001, film)`,
+        `Ma liste Naka${NB}: Film 2 (2002, film)`,
       ],
       settingsPending: false,
       settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),
     });
+  });
+});
+
+describe("router: the manual link family (B6)", () => {
+  it("search-titles from the status page is answered by the job, outside the queue", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+      searchTitles: async () => ({
+        candidates: [{ id: 1, title: "A", type: "film" }],
+      }),
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(r.send(SEARCH, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { candidates: [{ id: 1, title: "A", type: "film" }] },
+    ]);
+    blocker.open();
+  });
+
+  it("link-title and requeue-question from the status page are queued and answered { ok: true } at once", async () => {
+    const r = router();
+    expect(r.send(LINK, STATUS_PAGE)).toBe(false);
+    expect(r.send(REQUEUE, STATUS_PAGE)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([
+      `link:${JSON.stringify(LINK)}`,
+      `requeue:${JSON.stringify(REQUEUE)}`,
+    ]);
+  });
+
+  it("the message keeps its known keys only", async () => {
+    const r = router();
+    r.send({ ...LINK, token: "T" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([`link:${JSON.stringify(LINK)}`]);
+  });
+
+  it("a second link of the same title replaces the waiting one (queue key link:naka:5)", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(LINK, STATUS_PAGE);
+    r.send({ ...LINK, otherId: 2006 }, STATUS_PAGE);
+    blocker.open();
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("link:"))).toEqual([
+      `link:${JSON.stringify({ ...LINK, otherId: 2006 })}`,
+    ]);
+  });
+
+  it("a waiting link is reported as answering by its key; a requeue is not", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(LINK, STATUS_PAGE);
+    r.send(REQUEUE, STATUS_PAGE);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toContain('page-lists:["link:naka:5"]');
+    blocker.open();
+  });
+
+  it("a malformed query or id is no message", async () => {
+    const r = router();
+    for (const bad of [
+      { ...SEARCH, query: "" },
+      { ...SEARCH, query: "x".repeat(201) },
+      { ...SEARCH, query: 5 },
+      { ...SEARCH, side: "x" },
+      { ...LINK, otherId: 0 },
+      { ...LINK, otherId: "2005" },
+      { ...LINK, otherId: undefined },
+      { ...REQUEUE, id: -1 },
+    ]) {
+      expect(r.send(bad, STATUS_PAGE)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("link-title, search-titles and requeue-question from a Naka tab are ignored (Review Focus 1)", async () => {
+    const r = router();
+    for (const msg of [LINK, SEARCH, REQUEUE]) {
+      expect(r.send(msg, NAKA_TAB)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
   });
 });

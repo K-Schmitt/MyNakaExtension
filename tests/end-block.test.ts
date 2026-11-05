@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createEndBlock } from "../src/content/ui/end-block";
+import { SENDING_LINE as QUESTION_SENDING_LINE } from "../src/content/ui/question-copy";
 import {
   chosenLine,
   errorLine,
@@ -8,7 +9,9 @@ import {
   UNREACHABLE_LINE,
   WAIT_LINE,
 } from "../src/content/ui/rating-copy";
+import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard } from "../src/core/rating-cards";
+import type { CardAnswer } from "../src/sw/rating-answers";
 import {
   answer,
   asks,
@@ -17,6 +20,8 @@ import {
   fakePorts,
   flush,
   OTHER_IDS,
+  QUESTION,
+  questionAnswer,
 } from "./end-block-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
@@ -258,6 +263,7 @@ describe("the end block série confirmation", () => {
   it("Envoyer sends the chosen rating", async () => {
     const w = await serieShown();
     w.last().handlers.onChoose(9);
+    await w.ready(); // Ruling F2: the confirmation view has its own grace
     w.last().handlers.onConfirm(true);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
@@ -268,6 +274,7 @@ describe("the end block série confirmation", () => {
   it("Annuler sends nothing and goes back to the choices", async () => {
     const w = await serieShown();
     w.last().handlers.onChoose(9);
+    await w.ready(); // Ruling F2
     w.last().handlers.onConfirm(false);
     await flush();
     await w.clock.advance(10000);
@@ -276,6 +283,7 @@ describe("the end block série confirmation", () => {
     expect(w.last().view.choices).toHaveLength(10);
     // The choices work again.
     w.last().handlers.onChoose(4);
+    await w.ready(); // Ruling F2
     w.last().handlers.onConfirm(true);
     await flush();
     expect(w.calls).toContain("rate 5:1:1 série 4");
@@ -336,6 +344,7 @@ describe("the end block lock and manual choice", () => {
     await w.clock.advance(2000);
     await w.ready();
     w.last().handlers.onOther("série");
+    await w.ready(); // Ruling F1: another label's buttons have their own grace
     w.last().handlers.onChoose(5);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
@@ -353,6 +362,7 @@ describe("the end block waits for a manual choice to show", () => {
     await w.clock.advance(2000);
     await w.ready();
     w.last().handlers.onOther("épisode");
+    await w.ready(); // Ruling F1
     w.last().handlers.onChoose(8);
     await flush();
     await w.clock.advance(2000);
@@ -835,6 +845,7 @@ describe("the end block ignores a click right after a label appears", () => {
         : Promise.resolve(true);
     };
     w.last().handlers.onChoose(7);
+    await w.ready(); // Ruling F2
     w.last().handlers.onConfirm(true);
     w.script(
       EP_IDS,
@@ -846,6 +857,7 @@ describe("the end block ignores a click right after a label appears", () => {
     await w.ready();
     w.last().handlers.onChoose(5);
     expect(w.last().view.confirm).toBe(true);
+    await w.clock.advance(1000); // the grace of the confirmation view is long spent: only the unlock restarts it
     fail(new Error("gone"));
     await flush();
     expect(w.last().view.error).toBe(UNREACHABLE_LINE);
@@ -860,15 +872,80 @@ describe("the end block ignores a click right after a label appears", () => {
     expect(sends).toEqual(["série 7", "série 5"]);
   });
 
-  it("a manual choice of another label does not start the grace again", async () => {
+  // Ruling F1 (4a audit, owner's decision of 2026-11-05): the label's buttons are drawn again.
+  it("a click on « Noter la saison »: a rating at 100 ms is ignored, at 400 ms taken", async () => {
     const w = world();
     w.script(EP_IDS, answer(toSaison()));
     w.block.finished(EP_IDS);
     await w.clock.advance(2400);
-    w.last().handlers.onOther("épisode");
+    w.last().handlers.onOther("saison");
+    await w.clock.advance(100);
     w.last().handlers.onChoose(5);
     await flush();
-    expect(rates(w.calls)).toEqual(["rate 5:1:1 épisode 5"]);
+    expect(rates(w.calls)).toEqual([]);
+    await w.clock.advance(300);
+    w.last().handlers.onChoose(5);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 5:1:1 saison 5"]);
+  });
+
+  // Ruling F2: entering and leaving the série confirmation view draws the buttons again.
+  it("Envoyer 100 ms after the confirmation view came is ignored, at 400 ms taken", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie(), 7));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2400);
+    w.last().handlers.onChoose(9);
+    await w.clock.advance(100);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(rates(w.calls)).toEqual([]);
+    await w.clock.advance(300);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 5:1:1 série 9"]);
+  });
+
+  it("a click 100 ms after Annuler brought the choices back is ignored, at 400 ms taken", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie(), 7));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2400);
+    w.last().handlers.onChoose(9);
+    await w.clock.advance(400);
+    w.last().handlers.onConfirm(false);
+    expect(w.last().view.confirm).toBeUndefined();
+    await w.clock.advance(100);
+    w.last().handlers.onChoose(4);
+    expect(w.last().view.confirm).toBeUndefined();
+    await w.clock.advance(300);
+    w.last().handlers.onChoose(4);
+    expect(w.last().view.confirm).toBe(true);
+    expect(rates(w.calls)).toEqual([]);
+  });
+
+  // Ruling L3: a re-send of the same rating that succeeds after a failed one closes the block.
+  it("a re-send of a given rating that succeeds after a failed one closes the block", async () => {
+    const w = world();
+    const failedBefore = toSaison({
+      pending: ["saison"],
+      given: { épisode: 8 },
+      failed: { label: "épisode", error: "sc-session", at: 5 },
+    });
+    const sentNow = toSaison({ pending: [], given: { épisode: 8 } });
+    w.script(EP_IDS, answer(failedBefore), answer(sentNow));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2400);
+    w.last().handlers.onOther("épisode");
+    await w.clock.advance(400);
+    w.last().handlers.onChoose(8);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 5:1:1 épisode 8"]);
+    const shownBefore = w.shown.length;
+    await w.clock.advance(2000);
+    expect(w.block.isShown()).toBe(false);
+    expect(w.hidden()).toBe(1);
+    expect(w.shown).toHaveLength(shownBefore);
   });
 
   it("a clock set back does not freeze the choices: the grace starts again", async () => {
@@ -889,5 +966,243 @@ describe("the end block ignores a click right after a label appears", () => {
     w.last().handlers.onChoose(6);
     await flush();
     expect(rates(w.calls)).toEqual(["rate 9:: film 6"]);
+  });
+});
+
+// A film (content 9) waiting on an ambiguity, as the worker answers while no card exists.
+const FILM_QUESTION = {
+  ...QUESTION,
+  key: "ambiguity:naka:9",
+  id: 9,
+  title: "Un film",
+} as const;
+const filmQuestion = (over: Partial<CardAnswer> = {}): CardAnswer =>
+  questionAnswer({ question: FILM_QUESTION, ...over });
+const done = (seq: number): CardAnswer["lastAnswer"] => ({
+  seq,
+  at: 1,
+  target: FILM_QUESTION.key,
+  outcome: "done",
+});
+const answers = (calls: string[]): string[] =>
+  calls.filter((c) => c.startsWith("answer"));
+
+describe("the end block asks a question before the rating", () => {
+  it("shows the question at 2 s, sends the candidate once, then rates the film", async () => {
+    const w = world();
+    w.script(
+      FILM_IDS,
+      filmQuestion(),
+      filmQuestion({ questionSending: true }),
+      answer(filmCard({ pending: ["film"] })),
+    );
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(1999);
+    expect(w.questions).toEqual([]);
+    await w.clock.advance(1);
+    expect(w.questions).toHaveLength(1);
+    expect(w.shown).toEqual([]);
+    expect(w.lastQuestion().view.choices.map((c) => c.choice)).toEqual([
+      { kind: "candidate", id: 2005 },
+      { kind: "candidate", id: 2006 },
+      { kind: "none" },
+    ]);
+    expect(w.lastQuestion().view.actions).toEqual(["plus-tard"]);
+    expect(w.block.isShown()).toBe(true);
+
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2006 });
+    await flush();
+    expect(answers(w.calls)).toEqual(["answer naka 9 2005"]);
+    expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+
+    await w.clock.advance(2000); // sending: not yet
+    expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(3000); // the question is gone: answered
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(2000); // the card poll, counted from the answer
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("Un film");
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(answers(w.calls)).toEqual(["answer naka 9 2005"]);
+  });
+
+  it("a stale last answer on the opening answer is not the click's outcome", async () => {
+    const w = world();
+    const stale = {
+      seq: 3,
+      at: 1,
+      target: FILM_QUESTION.key,
+      outcome: "failed",
+      error: "sc-session",
+    } as const;
+    w.script(
+      FILM_IDS,
+      filmQuestion({ lastAnswer: stale }),
+      filmQuestion({ lastAnswer: stale }),
+      filmQuestion({ lastAnswer: stale }),
+      { card: null, pauseFromPercent: 0, lastAnswer: done(4) },
+      answer(filmCard({ pending: ["film"] })),
+    );
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    for (const ms of [2000, 3000]) {
+      await w.clock.advance(ms);
+      expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+      expect(w.lastQuestion().view.error).toBeUndefined();
+      expect(w.lastQuestion().view.choices).toEqual([]);
+    }
+    await w.clock.advance(5000); // seq 4, done
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("Un film");
+  });
+
+  it("« Aucun de ceux-là » sends a null choice, then the block hides and no card is awaited", async () => {
+    const w = world();
+    w.script(
+      FILM_IDS,
+      filmQuestion(),
+      filmQuestion({ questionSending: true }),
+      { card: null, pauseFromPercent: 0, lastAnswer: done(1) },
+    );
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "none" });
+    await flush();
+    expect(answers(w.calls)).toEqual(["answer naka 9 null"]);
+    await w.clock.advance(2000);
+    expect(w.block.isShown()).toBe(true);
+    await w.clock.advance(3000);
+    expect(w.block.isShown()).toBe(false);
+    expect(w.hidden()).toBeGreaterThan(0);
+    const before = asks(w.calls).length;
+    await w.clock.advance(60000);
+    expect(asks(w.calls)).toHaveLength(before);
+    expect(w.shown).toEqual([]);
+  });
+
+  it("« Plus tard » closes the block and sends nothing", async () => {
+    const w = world();
+    w.script(FILM_IDS, filmQuestion());
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onAction("plus-tard");
+    expect(w.block.isShown()).toBe(false);
+    expect(w.hidden()).toBe(1);
+    await w.clock.advance(60000);
+    expect(answers(w.calls)).toEqual([]);
+    expect(w.shown).toEqual([]);
+  });
+
+  it("a card with nothing pending is no question", async () => {
+    const w = world();
+    w.script(
+      FILM_IDS,
+      questionAnswer({
+        card: filmCard({ pending: [] }),
+        question: FILM_QUESTION,
+      }),
+    );
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.questions).toEqual([]);
+  });
+
+  it("a second title finishing behind a shown question waits, then opens when it closes", async () => {
+    const w = world();
+    w.script(FILM_IDS, filmQuestion());
+    w.script(OTHER_IDS, answer(filmCard({ key: "movie:7", contentId: 7 })));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    expect(w.questions).toHaveLength(1);
+    expect(w.shown).toEqual([]);
+    await w.ready();
+    w.lastQuestion().handlers.onAction("plus-tard");
+    await flush();
+    expect(w.shown).toHaveLength(1);
+  });
+
+  it("leaving the player closes the question", async () => {
+    const w = world();
+    w.script(FILM_IDS, filmQuestion());
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.questions).toHaveLength(1);
+    w.block.leave();
+    expect(w.block.isShown()).toBe(false);
+    expect(w.hidden()).toBe(1);
+  });
+});
+
+describe("the end block queue", () => {
+  // Two cards wait behind a shown one: A on screen, then B and C queued.
+  async function queued() {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard({ pending: ["épisode"] })));
+    w.script(OTHER_IDS, answer(filmCard({ key: "movie:7", contentId: 7 })));
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    return w;
+  }
+
+  it("a leave while the next ask is awaited opens no card", async () => {
+    const w = await queued();
+    const release: (() => void)[] = [];
+    const inner = w.ports.port.askCard;
+    w.ports.port.askCard = vi.fn(async (ids: ContentIds) => {
+      if (ids.contentId === EP_IDS.contentId) return inner(ids);
+      await new Promise<void>((go) => release.push(go));
+      return answer(filmCard({ key: `movie:${ids.contentId}` }));
+    });
+    await w.ready();
+    w.last().handlers.onChoose(7);
+    await flush();
+    w.script(
+      EP_IDS,
+      answer(episodeCard({ pending: [], given: { épisode: 7 } })),
+    );
+    await w.clock.advance(2000); // the rating went: the card moves on, openNext awaits its ask
+    const shownBefore = w.shown.length;
+    w.block.leave();
+    for (const go of release) go();
+    await flush();
+    expect(w.shown).toHaveLength(shownBefore);
+    expect(w.block.isShown()).toBe(false);
+  });
+
+  it("a rejected ask for the first queued title still opens the second", async () => {
+    const w = await queued();
+    const inner = w.ports.port.askCard;
+    let reject = true;
+    w.ports.port.askCard = vi.fn(async (ids: ContentIds) => {
+      if (reject && ids.contentId === OTHER_IDS.contentId) {
+        reject = false;
+        throw new Error("rejected");
+      }
+      return inner(ids);
+    });
+    await w.ready();
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    expect(w.shown).toHaveLength(2);
+    expect(w.last().view.heading).toContain("Un film");
   });
 });

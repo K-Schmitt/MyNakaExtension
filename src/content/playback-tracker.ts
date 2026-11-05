@@ -33,6 +33,8 @@ export type PlaybackTracker = {
   context(ctx: PlayerContext | undefined): void;
   sample(s: VideoSample): FinishedMessage | undefined;
   watched(ev: PageEvent): FinishedMessage | undefined;
+  /** An unticked « vu »: that key can send its explicit finish again. */
+  unwatched(ev: PageEvent): void;
 };
 
 // The worker keys the same content with the same function.
@@ -137,6 +139,11 @@ export function createPlaybackTracker(): PlaybackTracker {
         progress: highest,
         ...idsOf(current),
       };
+    },
+    unwatched(ev) {
+      if (ev.kind !== "unwatched") return;
+      const state = states.get(keyOf(idsOf(ev)));
+      if (state !== undefined) state.watched = false;
     },
     watched(ev) {
       if (ev.kind !== "watched") return undefined;

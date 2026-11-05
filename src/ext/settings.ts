@@ -1,6 +1,8 @@
 import type { FinishOutcome } from "../core/finish-handler";
 import type { SyncReport } from "../core/sync-runner";
+import type { MediaType } from "../core/title-match";
 import { DEFAULT_THRESHOLDS, type Thresholds } from "../core/watch-trigger";
+import { type LastAnswer, parseLastAnswer } from "./answer-record";
 import {
   asInt,
   asOneOf,
@@ -12,12 +14,21 @@ import {
   whenPresent,
 } from "./field-checks";
 import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
+import { MAX_FORGETS_PER_WINDOW } from "./forget-window";
 import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
 import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
 import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
+import { parseWindow } from "./window-schema";
 
 export type Mode = "simulation" | "live";
+
+export type PreviewItem = {
+  side: "naka" | "sc";
+  title: string;
+  year?: number;
+  type?: MediaType;
+};
 
 export type RunRecord = {
   at: number;
@@ -26,7 +37,9 @@ export type RunRecord = {
   outcome: "ok" | "failed";
   error?: JobError;
   report?: SyncReport;
-  preview?: { side: "naka" | "sc"; title: string }[];
+  preview?: PreviewItem[];
+  /** The next pass's deferred writes (at most MAX_WRITES_PER_RUN), titled like the preview. */
+  next?: PreviewItem[];
 };
 
 export type FinishRecord = {
@@ -35,6 +48,8 @@ export type FinishRecord = {
   outcome: FinishOutcome["kind"] | "failed";
   /** Present if and only if the outcome is "failed" (Ruling 13). */
   error?: JobError;
+  /** The Naka title of the film or the series, when the finish got as far as reading it. */
+  title?: string;
 };
 
 /** A finish without its date and key: what a rating-card answer tells the tab. */
@@ -48,10 +63,14 @@ export type Settings = {
   lastFinish?: FinishRecord;
   /** The hour's budget of finishes (Ruling 15). */
   finishWindow?: FinishWindow;
+  /** The hour's budget of forgets asked by a Naka tab (a forged unticked « vu »). */
+  forgetWindow?: FinishWindow;
   /** The end of a viewing, per kind (each on the grid of THRESHOLD_CHOICES). Absent: the defaults. */
   thresholds?: Thresholds;
   /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
   pauseFromPercent?: number;
+  /** The outcome of the last answer to a question (D8). */
+  lastAnswer?: LastAnswer;
 };
 
 // A Record, so that a field added to Settings without being added here does not compile.
@@ -62,8 +81,10 @@ const KEYS = valuesOf<keyof Settings>({
   lastRun: true,
   lastFinish: true,
   finishWindow: true,
+  forgetWindow: true,
   thresholds: true,
   pauseFromPercent: true,
+  lastAnswer: true,
 });
 const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
@@ -112,23 +133,23 @@ export function parseOutcome(
 export function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
-  onlyKeys(record, ["at", "key", "outcome", "error"], path);
+  onlyKeys(record, ["at", "key", "outcome", "error", "title"], path);
   const done = parseOutcome(record, path);
+  const title = whenPresent(record.title, (v) => asString(v, `${path}.title`));
   return {
     at: asInt(record.at, 0, `${path}.at`),
     key: parseContentKey(record.key, `${path}.key`),
     ...done,
+    ...(title === undefined ? {} : { title }),
   };
 }
 
+function parseForgetWindow(raw: unknown): FinishWindow {
+  return parseWindow(raw, "settings.forgetWindow", MAX_FORGETS_PER_WINDOW);
+}
+
 function parseFinishWindow(raw: unknown): FinishWindow {
-  const path = "settings.finishWindow";
-  const record = asRecord(raw, path);
-  onlyKeys(record, ["from", "count"], path);
-  const from = asInt(record.from, 0, `${path}.from`);
-  const count = asInt(record.count, 0, `${path}.count`);
-  if (count > MAX_FINISHES_PER_WINDOW) return fail(`${path}.count`);
-  return { from, count };
+  return parseWindow(raw, "settings.finishWindow", MAX_FINISHES_PER_WINDOW);
 }
 
 // The settings read from storage. An absent key (undefined) is a first install: simulation, nothing else.
@@ -145,10 +166,14 @@ export function parseSettings(raw: unknown): Settings {
   );
   const lastFinish = whenPresent(record.lastFinish, parseFinish);
   const finishWindow = whenPresent(record.finishWindow, parseFinishWindow);
+  const forgetWindow = whenPresent(record.forgetWindow, parseForgetWindow);
   const thresholds = whenPresent(record.thresholds, parseThresholds);
   const pauseFromPercent = whenPresent(
     record.pauseFromPercent,
     parsePauseFromPercent,
+  );
+  const lastAnswer = whenPresent(record.lastAnswer, (v) =>
+    parseLastAnswer(v, "settings.lastAnswer"),
   );
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
@@ -157,8 +182,10 @@ export function parseSettings(raw: unknown): Settings {
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(finishWindow === undefined ? {} : { finishWindow }),
+    ...(forgetWindow === undefined ? {} : { forgetWindow }),
     ...(thresholds === undefined ? {} : { thresholds }),
     ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
+    ...(lastAnswer === undefined ? {} : { lastAnswer }),
   };
 }
 

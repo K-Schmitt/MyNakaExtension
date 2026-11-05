@@ -13,6 +13,23 @@ describe("acceptPageEvent", () => {
     ).toEqual(GOOD);
   });
 
+  it("keeps a removed id of a playlist event", () => {
+    const data = { channel: CH, kind: "playlist", removed: 21391 };
+    expect(
+      acceptPageEvent({ source: SELF, origin: ORIGIN, data }, SELF),
+    ).toEqual(data);
+  });
+
+  it.each(["21", -1, 0, 1.5, null, Number.MAX_SAFE_INTEGER + 2, {}])(
+    "refuses the whole event when removed is %j",
+    (removed) => {
+      const data = { channel: CH, kind: "playlist", removed };
+      expect(
+        acceptPageEvent({ source: SELF, origin: ORIGIN, data }, SELF),
+      ).toBeUndefined();
+    },
+  );
+
   it("rejects a foreign source", () => {
     expect(
       acceptPageEvent({ source: {}, origin: ORIGIN, data: GOOD }, SELF),
