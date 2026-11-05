@@ -62,13 +62,14 @@ describe("createOverlayRoot", () => {
     expect(root).toBe(hostOf(doc).shadow);
   });
 
-  it("styles the host: reset, top right, above everything, not past 80% of the height", () => {
+  it("styles the host: reset, right, above everything, between Naka's top bar (5%) and its bottom bar (95%)", () => {
     const doc = new FakeDoc();
     createOverlayRoot(doc);
     const css = hostOf(doc).style.cssText;
     expect(css).toContain("all: initial");
     expect(css).toContain("z-index: 2147483647");
-    expect(css).toContain("top: 0");
+    expect(css).not.toContain("top: 0");
+    expect(css).toContain("top: 7%");
     expect(css).toContain("right: 0");
     expect(css).toContain("max-width: 40%");
     expect(css).toContain("max-height: 80%");
