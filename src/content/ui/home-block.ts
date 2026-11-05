@@ -82,6 +82,9 @@ export function createHomeBlock(ports: HomePorts) {
       entry: (key) => ratings.handlersOf(key) ?? NO_HANDLERS,
       onFold: () => {
         folded = !folded;
+        // Folding or unfolding moves the panel under the cursor (it is anchored at the bottom).
+        ratings.regrace();
+        questions.regrace();
         draw();
       },
     });

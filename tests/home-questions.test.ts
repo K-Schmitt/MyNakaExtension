@@ -505,3 +505,37 @@ describe("Ruling 30: a title lookup that never answers", () => {
     expect(w.clock.count()).toBe(0);
   });
 });
+
+describe("Ruling 32: folding and unfolding give every entry a fresh grace", () => {
+  it("a rating entry after unfolding: a click at 100 ms sends nothing, at 400 ms is taken", async () => {
+    const w = await arrived([A], questionsOf(REMOVAL));
+    await w.ready();
+    w.last().handlers.onFold();
+    w.last().handlers.onFold(); // unfolded again: the entries come back under the cursor
+    await w.clock.advance(100);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    await w.clock.advance(300);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 7"]);
+  });
+
+  it("a removal's « Retirer aussi… » after unfolding: a click at 100 ms sends nothing, at 400 ms is taken", async () => {
+    const w = await arrived([A], questionsOf(REMOVAL));
+    await w.ready();
+    w.last().handlers.onFold();
+    w.last().handlers.onFold();
+    await w.clock.advance(100);
+    w.questionHandlersOf(REMOVAL.key).onChoose({ kind: "remove" });
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    await w.clock.advance(300);
+    w.questionHandlersOf(REMOVAL.key).onChoose({ kind: "remove" });
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([
+      "answer-removal naka 21391 112240873 true",
+    ]);
+  });
+});
