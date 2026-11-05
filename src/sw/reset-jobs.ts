@@ -19,18 +19,26 @@ export async function forgetJob(store: SettingsStore): Promise<void> {
   await store.saveSettings(withoutBinding(settings));
 }
 
-// What survives a reset. The last run, the last finish and the last answer describe the erased state.
+/** One decision per setting: a field added to Settings does not compile until it is kept or dropped. */
+export type ResetRules = Record<keyof Settings, "keep" | "drop">;
+export const RESET_RULES: ResetRules = {
+  mode: "drop", // always simulation
+  binding: "keep",
+  thresholds: "keep",
+  pauseFromPercent: "keep",
+  lastAutoRunAt: "keep",
+  finishWindow: "keep",
+  // These describe the erased state.
+  lastRun: "drop",
+  lastFinish: "drop",
+  lastAnswer: "drop",
+};
+
 function keptOf(settings: Settings): Settings {
-  const { binding, thresholds, pauseFromPercent, lastAutoRunAt, finishWindow } =
-    settings;
-  return {
-    mode: "simulation",
-    ...(binding === undefined ? {} : { binding }),
-    ...(thresholds === undefined ? {} : { thresholds }),
-    ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
-    ...(lastAutoRunAt === undefined ? {} : { lastAutoRunAt }),
-    ...(finishWindow === undefined ? {} : { finishWindow }),
-  };
+  const kept = Object.entries(settings).filter(
+    ([key]) => RESET_RULES[key as keyof Settings] === "keep",
+  );
+  return { ...Object.fromEntries(kept), mode: "simulation" };
 }
 
 async function keptSettings(store: SettingsStore): Promise<Settings> {
@@ -43,12 +51,13 @@ async function keptSettings(store: SettingsStore): Promise<Settings> {
 
 /**
  * « Réinitialiser »: the sync state and the ratings are replaced, never loaded, so that a store that no
- * longer parses is repaired. The settings that matter stay; unreadable ones become the defaults.
+ * longer parses is repaired. The settings that matter stay; unreadable ones become the defaults. They are
+ * saved FIRST: a failed save after an emptied state would leave the live mode over an empty state.
  */
 export async function resetJob(
   store: SettingsStore & Pick<Store, "saveState" | "saveRatings">,
 ): Promise<void> {
+  await store.saveSettings(await keptSettings(store));
   await store.saveState(emptyState());
   await store.saveRatings([]);
-  await store.saveSettings(await keptSettings(store));
 }
