@@ -1,9 +1,11 @@
 // Every chrome.runtime message is untrusted. Ruling 8: the router parses it, then checks who sent it,
 // then whether that sender may send that type, and ignores (never answers) anything that fails a step.
-// Every job of the worker then runs on ONE queue, one at a time. `status`, the only message answered, is
-// no job (Ruling 20): it is answered at once, outside the queue, from a read-only snapshot and the
+// Every job of the worker then runs on ONE queue, one at a time. `status` is no job (Ruling 20): it is
+// answered at once, outside the queue, from a read-only snapshot and the
 // activity kept here. `set-mode` and `set-settings` stay queued: a sync saves the settings it loaded. `rating-card` and
-// `rating-cards` are answered the same way (read-only); `rate` and `dismiss-rating` are queued jobs.
+// `rating-cards` are answered the same way (read-only). `rate` and `dismiss-rating` are queued jobs, answered
+// `{ ok: true }` at once: the tab reads a resolved send as "sent", and a listener that neither answers nor
+// keeps the channel may make Chrome reject the send.
 
 import {
   allowedFor,
@@ -83,11 +85,26 @@ export function createRouter(deps: RouterDeps): Router {
       .catch(ignore);
   }
 
-  // A read of the stored ratings: outside the queue, never saving. An unreadable store gives no answer.
+  // A read of the stored ratings: outside the queue, never saving. An unreadable store is answered
+  // `undefined` (an invented answer would be worse), so that the tab's ask resolves at once.
   function answerRead(read: () => Promise<unknown>, respond: Respond): void {
     read()
-      .then((answer) => respond(answer))
+      .then(
+        (answer) => respond(answer),
+        () => respond(undefined),
+      )
       .catch(ignore);
+  }
+
+  // The job is queued first: a responder that throws does not stop it.
+  function queued(queue: () => void, respond: Respond): false {
+    queue();
+    try {
+      respond({ ok: true });
+    } catch {
+      // Chrome's port already closed: the job runs all the same.
+    }
+    return false;
   }
 
   function dispatch(msg: ToWorker, respond: Respond): boolean {
@@ -124,11 +141,9 @@ export function createRouter(deps: RouterDeps): Router {
         answerRead(() => withSendingAll(jobs.ratingCards()), respond);
         return true;
       case "rate":
-        rate(msg);
-        return false;
+        return queued(() => rate(msg), respond);
       case "dismiss-rating":
-        enqueue(() => jobs.dismissRating(msg));
-        return false;
+        return queued(() => enqueue(() => jobs.dismissRating(msg)), respond);
     }
   }
 

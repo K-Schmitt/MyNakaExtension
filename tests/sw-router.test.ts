@@ -231,22 +231,48 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls.some((c) => c.startsWith("settings:"))).toBe(true);
   });
 
-  it("rate from the Naka tab becomes a rate job with the parsed message, unanswered", async () => {
+  it("rate from the Naka tab becomes a rate job with the parsed message, answered at once", async () => {
     const r = router();
     expect(r.send({ ...RATE, productId: 99, token: "x" }, NAKA_TAB)).toBe(
       false,
     );
+    expect(r.answers).toEqual([{ ok: true }]);
     await settle();
     expect(r.calls).toEqual([`rate:${JSON.stringify(RATE)}`]);
-    expect(r.answers).toEqual([]);
+    expect(r.answers).toEqual([{ ok: true }]);
   });
 
-  it("dismiss-rating from the Naka tab becomes a dismiss job, unanswered", async () => {
+  it("dismiss-rating from the Naka tab becomes a dismiss job, answered at once", async () => {
     const r = router();
     expect(r.send(DISMISS, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }]);
     await settle();
     expect(r.calls).toEqual([`dismiss:${JSON.stringify(DISMISS)}`]);
-    expect(r.answers).toEqual([]);
+    expect(r.answers).toEqual([{ ok: true }]);
+  });
+
+  it("a responder that throws on rate or dismiss-rating stops neither job", async () => {
+    const recorded = recordingJobs();
+    const r = createRouter({
+      extensionId: EXT,
+      queue: createJobQueue(),
+      jobs: recorded.jobs,
+      timer: fakeTimer().timer,
+      now: () => ROUTER_NOW,
+    });
+    const answered: unknown[] = [];
+    const respond = (answer: unknown) => {
+      answered.push(answer);
+      throw new Error("The message port closed.");
+    };
+    expect(r.handle(RATE, NAKA_TAB, respond)).toBe(false);
+    expect(r.handle(DISMISS, NAKA_TAB, respond)).toBe(false);
+    await settle();
+    expect(answered).toEqual([{ ok: true }, { ok: true }]);
+    expect(recorded.calls).toEqual([
+      `rate:${JSON.stringify(RATE)}`,
+      `dismiss:${JSON.stringify(DISMISS)}`,
+    ]);
   });
 
   it("rating-card and rating-cards from the Naka tab are answered, and run no job", async () => {
@@ -263,15 +289,50 @@ describe("router: trusted messages become jobs", () => {
     ]);
   });
 
-  it("a rating read that rejects gives no answer, and no unhandled rejection", async () => {
+  it("a rating read that rejects is answered undefined at once, with no unhandled rejection", async () => {
     const r = router({
       ratingCard: async () => {
         throw new Error("store down");
       },
+      ratingCards: async () => {
+        throw new Error("store down");
+      },
     });
     expect(r.send(CARD, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "rating-cards" }, NAKA_TAB)).toBe(true);
     await settle();
-    expect(r.answers).toEqual([]);
+    expect(r.answers).toEqual([undefined, undefined]);
+  });
+
+  it("a rejected read whose responder throws becomes no unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listener);
+    try {
+      const r = createRouter({
+        extensionId: EXT,
+        queue: createJobQueue(),
+        jobs: recordingJobs({
+          ratingCard: async () => {
+            throw new Error("store down");
+          },
+        }).jobs,
+        timer: fakeTimer().timer,
+        now: () => ROUTER_NOW,
+      });
+      const answered: unknown[] = [];
+      const respond = (answer: unknown) => {
+        answered.push(answer);
+        throw new Error("The message port closed.");
+      };
+      expect(r.handle(CARD, NAKA_TAB, respond)).toBe(true);
+      await settle();
+      await settle();
+      expect(answered).toEqual([undefined]);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
   });
 
   it("status from the status page is answered with the snapshot", async () => {
@@ -473,7 +534,10 @@ describe("router: rating reads are answered outside the queue", () => {
     r.send(CARD, NAKA_TAB);
     await settle();
     expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(false);
-    expect(r.answers).toHaveLength(1);
+    expect(r.answers).toEqual([
+      { ok: true },
+      { card: null, pauseFromPercent: 0 },
+    ]);
     blocker.open();
     await settle();
     expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(true);
@@ -1441,10 +1505,11 @@ describe("worker end to end: ratings", () => {
     const ops = operationsOf(w.sc.calls);
     expect(ops.filter((op) => op === "ProductRate")).toHaveLength(1);
     expect(ops).not.toContain("ProductUnwish");
-    const [before, after, cards] = w.answers as {
+    const [before, answeredRate, after, cards] = w.answers as {
       card?: { pending: string[]; given: object };
       cards?: unknown[];
     }[];
+    expect(answeredRate).toEqual({ ok: true });
     expect(before?.card?.pending).toEqual(["film"]);
     expect(after?.card?.pending).toEqual([]);
     expect(after?.card?.given).toEqual({ film: 7 });
