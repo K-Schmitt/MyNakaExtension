@@ -960,8 +960,20 @@ describe("finish job", () => {
     await w.jobs.finishJob(finished());
     expect(writesOf(w.sk.calls)).toEqual([]);
     expect(w.settings().lastFinish?.outcome).toBe("needs-choice");
+    const listed = { title: "Film 3", year: 2003, type: "film" };
     expect(w.state().pending).toEqual([
-      { kind: "ambiguity", side: "naka", id: 3, candidateIds: [1003, 2003] },
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: 3,
+        candidateIds: [1003, 2003],
+        title: "Film 3",
+        candidates: [
+          { id: 1003, ...listed },
+          { id: 2003, ...listed },
+        ],
+        finish: "movie:3",
+      },
     ]);
   });
 

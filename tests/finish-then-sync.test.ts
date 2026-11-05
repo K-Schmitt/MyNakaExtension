@@ -5,6 +5,7 @@ import {
   handleFinish,
 } from "../src/core/finish-handler";
 import type { Pair } from "../src/core/list-diff";
+import { chooseNone } from "../src/core/questions";
 import { emptyState, type SyncState, upsertMapping } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
@@ -360,16 +361,23 @@ describe("episode finishes, then the sync", () => {
       side: "naka",
       id: SERIES,
       candidateIds: [SERIES_SC, 2007],
+      title: "La Série",
+      candidates: [
+        { id: SERIES_SC, title: "La Série", year: 2010, type: "serie" },
+        { id: 2007, title: "La Série", year: 1990, type: "serie" },
+      ],
     };
     expect(w.state.pending).toEqual([asked]);
     expect(await handleFinish(episode(1), ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [SERIES_SC, 2007],
     });
+    const waiting = { ...asked, finish: `tv:${SERIES}:S1E1` };
+    expect(w.state.pending).toEqual([waiting]);
     await runSync(ports);
     expect(w.writes).toEqual([]);
     expect(w.state.mapping).toEqual([]);
-    expect(w.state.pending).toEqual([asked]);
+    expect(w.state.pending).toEqual([waiting]);
   });
 });
 
@@ -377,14 +385,9 @@ describe("episode finishes, then the sync", () => {
 // does a question whose candidates another answer took (steps 5 and 6). The open question then stops
 // the finish (it asks again, with no write) and the other direction of the sync (G1).
 function noneOfThese(state: SyncState, side: "naka" | "sc", id: number) {
-  return {
-    ...state,
-    pending: state.pending.map((item) =>
-      item.kind === "ambiguity" && item.side === side && item.id === id
-        ? { ...item, candidateIds: [] }
-        : item,
-    ),
-  };
+  const out = chooseNone(state, side, id);
+  if (!out) throw new Error("expected an open question");
+  return out;
 }
 
 // Steps 3 to 5: the chosen pair is upserted, the questions about its own ids are resolved, and its ids
@@ -399,6 +402,7 @@ function answerByContract(state: SyncState, pair: Pair): SyncState {
       return {
         ...item,
         candidateIds: item.candidateIds.filter((id) => id !== taken),
+        candidates: item.candidates?.filter((c) => c.id !== taken),
       };
     }),
   };
@@ -414,11 +418,19 @@ describe("the owner answers 'none of these' (amended contract)", () => {
       nakaCatalogue: { [FILM]: FILM_TITLE },
       scTitles: { [FILM_SC]: FILM_TITLE },
     });
-  const asked = (side: "naka" | "sc", id: number, candidateIds: number[]) => ({
+  const asked = (
+    side: "naka" | "sc",
+    id: number,
+    candidateIds: number[],
+    finish?: string,
+  ) => ({
     kind: "ambiguity",
     side,
     id,
     candidateIds,
+    title: "Le Film",
+    candidates: candidateIds.map((cid) => ({ id: cid, ...FILM_TITLE })),
+    ...(finish === undefined ? {} : { finish }),
   });
 
   it("P1: a finish carrying the year writes nothing to the rejected product and asks again", async () => {
@@ -432,7 +444,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     });
     expect(w.writes).toEqual([]);
     expect(w.state.mapping).toEqual([]);
-    expect(w.state.pending).toEqual([asked("naka", FILM, [])]);
+    expect(w.state.pending).toEqual([asked("naka", FILM, [], `movie:${FILM}`)]);
   });
 
   it("P1b: the explicit replay of the stored finish writes nothing either", async () => {

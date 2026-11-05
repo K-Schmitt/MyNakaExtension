@@ -173,8 +173,22 @@ describe("a pair seen together before it was mapped", () => {
       });
       expect(await runSync(ports)).toEqual(report());
       expect(w.state.pending).toEqual([
-        { kind: "ambiguity", side: "naka", id: 5, candidateIds: [1005] },
-        { kind: "ambiguity", side: "sc", id: 1005, candidateIds: [5] },
+        {
+          kind: "ambiguity",
+          side: "naka",
+          id: 5,
+          candidateIds: [1005],
+          title: "Film 5",
+          candidates: [{ id: 1005, title: "Film 5", year: 2005, type: "film" }],
+        },
+        {
+          kind: "ambiguity",
+          side: "sc",
+          id: 1005,
+          candidateIds: [5],
+          title: "Film 5",
+          candidates: [{ id: 5, title: "Film 5", year: 2005, type: "film" }],
+        },
       ]);
       w.sc.delete(1005);
       if (runBetween) {

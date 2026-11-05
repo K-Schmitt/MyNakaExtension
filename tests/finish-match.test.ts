@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { handleFinish } from "../src/core/finish-handler";
+import { type FinishEvent, handleFinish } from "../src/core/finish-handler";
 import { emptyState, type PendingItem } from "../src/core/state";
 import type { Titled } from "../src/core/title-match";
 import { DEFAULT_THRESHOLDS } from "../src/core/watch-trigger";
+import { parseState } from "../src/ext/state-schema";
 import {
   cand,
   episode,
@@ -19,6 +20,11 @@ import {
   world,
   writesOf,
 } from "./finish-fakes";
+
+const finishKeyOf = (event: FinishEvent): string =>
+  event.naka.mediaType === "movie"
+    ? `movie:${event.naka.contentId}`
+    : `tv:${event.naka.contentId}:S${event.naka.season}E${event.naka.episode}`;
 
 describe("matching on SensCritique", () => {
   const BILINGUAL: Titled = {
@@ -118,6 +124,12 @@ describe("matching on SensCritique", () => {
             side: "naka",
             id: FILM,
             candidateIds: [FILM_SC, 2042],
+            title: "Le Film",
+            candidates: [
+              { id: FILM_SC, title: "Le Film", year: 2001, type: "film" },
+              { id: 2042, title: "Le Film", year: 2001, type: "film" },
+            ],
+            finish: `movie:${FILM}`,
           },
         ],
       },
@@ -143,6 +155,12 @@ describe("matching on SensCritique", () => {
         side: "naka",
         id: SERIES,
         candidateIds: [SERIES_SC, 2007],
+        title: "La Série",
+        candidates: [
+          { id: SERIES_SC, title: "La Série", year: 2010, type: "serie" },
+          { id: 2007, title: "La Série", year: 2010, type: "serie" },
+        ],
+        finish: `tv:${SERIES}:S1E2`,
       },
     ]);
   });
@@ -184,7 +202,15 @@ describe("matching on SensCritique", () => {
       expect(w.calls.filter((c) => c === "save")).toHaveLength(1);
       expect(w.state.mapping).toEqual([other]);
       expect(w.state.pending).toEqual([
-        { kind: "ambiguity", side: "naka", id: nakaId, candidateIds: [scId] },
+        {
+          kind: "ambiguity",
+          side: "naka",
+          id: nakaId,
+          candidateIds: [scId],
+          title: event.titled.title,
+          candidates: [{ id: scId, ...event.titled }],
+          finish: finishKeyOf(event),
+        },
       ]);
     },
   );
@@ -235,7 +261,7 @@ describe("an open question about the same title wins over a fresh match", () => 
     candidateIds: number[],
   ): PendingItem => ({ kind: "ambiguity", side, id, candidateIds });
 
-  it("R5bis: the runner's open question on the film is returned as is: no search, no write, no save", async () => {
+  it("R5bis: the runner's open question on the film is returned: no search, no write, one save of its finish key", async () => {
     const w = world({
       state: { pending: [question("naka", FILM, [FILM_SC, 2042])] },
     });
@@ -243,8 +269,10 @@ describe("an open question about the same title wins over a fresh match", () => 
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
-    expect(w.calls).toEqual(["load"]);
-    expect(w.saved).toEqual([]);
+    expect(w.calls).toEqual(["load", "save"]);
+    expect(w.state.pending).toStrictEqual([
+      { ...question("naka", FILM, [FILM_SC, 2042]), finish: `movie:${FILM}` },
+    ]);
   });
 
   it("V3: the outcome gives the stored question's ids, not a fresh search's", async () => {
@@ -263,7 +291,7 @@ describe("an open question about the same title wins over a fresh match", () => 
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
-    expect(w.state.pending).toEqual([stored]);
+    expect(w.state.pending).toEqual([{ ...stored, finish: `movie:${FILM}` }]);
   });
 
   it("V1: an open question on the series stops an episode before any season read or write", async () => {
@@ -276,7 +304,8 @@ describe("an open question about the same title wins over a fresh match", () => 
       kind: "needs-choice",
       candidateIds: [SERIES_SC, 2007],
     });
-    expect(w.calls).toEqual(["load"]);
+    expect(w.calls).toEqual(["load", "save"]);
+    expect(writesOf(w.calls)).toEqual([]);
   });
 
   it("a mapped title with an open question on it is asked again: the question comes before the mapping", async () => {
@@ -290,7 +319,7 @@ describe("an open question about the same title wins over a fresh match", () => 
       kind: "needs-choice",
       candidateIds: [FILM_SC, 2042],
     });
-    expect(w.calls).toEqual(["load"]);
+    expect(w.calls).toEqual(["load", "save"]);
     expect(writesOf(w.calls)).toEqual([]);
   });
 
@@ -353,7 +382,112 @@ describe("an open question about the same title wins over a fresh match", () => 
       expect(w.calls.filter((c) => c === "save")).toHaveLength(1);
       expect(writesOf(w.calls)).toEqual([]);
       expect(w.state.mapping).toEqual([]);
-      expect(w.state.pending).toEqual([open, question("naka", nakaId, [scId])]);
+      expect(w.state.pending).toEqual([
+        open,
+        {
+          ...question("naka", nakaId, [scId]),
+          title: event.titled.title,
+          candidates: [{ id: scId, ...event.titled }],
+          finish: finishKeyOf(event),
+        },
+      ]);
     },
   );
+});
+
+describe("a question saved by the finish handler carries its titles", () => {
+  const two = [cand(FILM_SC, FILM_TITLE), cand(2042, FILM_TITLE)];
+  const saved = [
+    { id: FILM_SC, title: "Le Film", year: 2001, type: "film" },
+    { id: 2042, title: "Le Film", year: 2001, type: "film" },
+  ];
+
+  it("an ambiguous film saves title, candidates and its own finish key", async () => {
+    const w = world({ search: { "Le Film": two } });
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.pending).toStrictEqual([
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: FILM,
+        candidateIds: [FILM_SC, 2042],
+        title: "Le Film",
+        candidates: saved,
+        finish: `movie:${FILM}`,
+      },
+    ]);
+  });
+
+  it("a swap-guard question saves the one candidate", async () => {
+    const w = world({ state: { mapping: [{ nakaId: 99, scId: FILM_SC }] } });
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.pending).toStrictEqual([
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: FILM,
+        candidateIds: [FILM_SC],
+        title: "Le Film",
+        candidates: [saved[0]],
+        finish: `movie:${FILM}`,
+      },
+    ]);
+  });
+
+  it("caps 25 candidates at 20 with equal ids, and the state parses back", async () => {
+    const many = Array.from({ length: 25 }, (_, i) =>
+      cand(3000 + i, FILM_TITLE),
+    );
+    const w = world({ search: { "Le Film": many } });
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    const [question] = w.state.pending;
+    if (question?.kind !== "ambiguity") throw new Error("expected a question");
+    expect(question.candidates).toHaveLength(20);
+    expect(question.candidateIds).toEqual(
+      question.candidates?.map((c) => c.id),
+    );
+    expect(parseState(JSON.parse(JSON.stringify(w.state)))).toEqual(w.state);
+  });
+
+  it("an episode finish while the series' question is open keeps the question and the latest key", async () => {
+    const open: PendingItem = {
+      kind: "ambiguity",
+      side: "naka",
+      id: SERIES,
+      candidateIds: [SERIES_SC, 2007],
+      title: "La Série",
+      candidates: [
+        { id: SERIES_SC, title: "La Série", year: 2010, type: "serie" },
+        { id: 2007, title: "La Série", year: 2010, type: "serie" },
+      ],
+      finish: `tv:${SERIES}:S1E1`,
+    };
+    const w = world({ state: { pending: [open] } });
+    const outcome = await handleFinish(
+      episode(1, 2),
+      w.ports,
+      DEFAULT_THRESHOLDS,
+    );
+    expect(outcome).toEqual({
+      kind: "needs-choice",
+      candidateIds: [SERIES_SC, 2007],
+    });
+    expect(w.state.pending).toStrictEqual([
+      { ...open, finish: `tv:${SERIES}:S1E2` },
+    ]);
+  });
+
+  it("a legacy question (no candidates) also records the finish key", async () => {
+    const legacy: PendingItem = {
+      kind: "ambiguity",
+      side: "naka",
+      id: FILM,
+      candidateIds: [FILM_SC, 2042],
+    };
+    const w = world({ state: { pending: [legacy] } });
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.pending).toStrictEqual([
+      { ...legacy, finish: `movie:${FILM}` },
+    ]);
+  });
 });

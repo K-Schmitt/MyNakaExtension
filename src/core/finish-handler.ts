@@ -20,6 +20,7 @@ import {
 } from "./finish-event";
 import { matchOnSc } from "./finish-match";
 import type { Pair } from "./list-diff";
+import { openAmbiguity, toCandidates, withFinish } from "./questions";
 import {
   addPending,
   isHandled,
@@ -75,21 +76,41 @@ export function isComplete(
   return isWatchComplete(signal, thresholds[event.kind]);
 }
 
+// The question keeps the asked title, what the search listed (capped, so its ids are the stored
+// candidates') and the key of this finish, which runs when the owner answers.
 async function askOwner(
   state: SyncState,
-  nakaId: number,
-  candidateIds: number[],
+  event: CheckedEvent,
+  match: { candidateIds: number[]; candidates: Candidate[] },
   ports: FinishPorts,
 ): Promise<FinishOutcome> {
+  const candidates = toCandidates(match.candidates, match.candidateIds);
   await ports.save(
     addPending(state, {
       kind: "ambiguity",
       side: "naka",
-      id: nakaId,
-      candidateIds,
+      id: event.contentId,
+      candidateIds: candidates.map((c) => c.id),
+      title: event.titled.title,
+      candidates,
+      finish: contentKey(event),
     }),
   );
-  return { kind: "needs-choice", candidateIds };
+  return { kind: "needs-choice", candidateIds: candidates.map((c) => c.id) };
+}
+
+// The owner is already asked: the latest finish waits on the question, and nothing else changes.
+async function remindOwner(
+  state: SyncState,
+  event: CheckedEvent,
+  key: string,
+  match: { candidateIds: number[] },
+  ports: FinishPorts,
+): Promise<FinishOutcome> {
+  if (openAmbiguity(state, "naka", event.contentId)) {
+    await ports.save(withFinish(state, event.contentId, key));
+  }
+  return { kind: "needs-choice", candidateIds: match.candidateIds };
 }
 
 async function finishFilm(
@@ -189,12 +210,10 @@ export async function handleFinish(
   }
   const match = await matchOnSc(state, event.contentId, event.titled, ports);
   if (match.kind === "not-found") return { kind: "not-found" };
-  if (match.kind === "asked") {
-    return { kind: "needs-choice", candidateIds: match.candidateIds };
-  }
-  if (match.kind === "needs-choice") {
-    return askOwner(state, event.contentId, match.candidateIds, ports);
-  }
+  if (match.kind === "asked")
+    return remindOwner(state, event, key, match, ports);
+  if (match.kind === "needs-choice")
+    return askOwner(state, event, match, ports);
   const mapped = match.isNew ? upsertMapping(state, match.pair) : state;
   const found = { state: mapped, key, pair: match.pair };
   return event.kind === "film"

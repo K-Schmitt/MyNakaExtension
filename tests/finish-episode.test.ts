@@ -162,6 +162,23 @@ describe("episode", () => {
       expect(await lastOf([1, 2, 4], 2)).toBe(false);
     });
 
+    it("another season's higher episode does not count (E3 of S1 beside E9 of S2)", async () => {
+      const w = world({
+        seasons: {
+          [`${SERIES_SC}:1`]: {
+            seasonProductId: SEASON1_SC,
+            episodes: [ep(1, 3, 5003), ep(2, 9, 6009)],
+          },
+        },
+      });
+      const outcome = await handleFinish(
+        episode(1, 3),
+        w.ports,
+        DEFAULT_THRESHOLDS,
+      );
+      expect(outcome).toMatchObject({ kind: "done", lastOfSeason: true });
+    });
+
     it("an episode already done still reports lastOfSeason", async () => {
       const w = world({
         seasons: season([1, 2, 3]),

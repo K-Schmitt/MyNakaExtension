@@ -1,12 +1,41 @@
 import type { Pair } from "./list-diff";
 import type { Presence } from "./presence";
+import type { MediaType } from "./title-match";
 import { DEFAULT_THRESHOLD } from "./watch-trigger";
 
-type Side = "naka" | "sc";
+export type Side = "naka" | "sc";
+
+/** One title the owner may choose for a question, as listed by the search that asked it. */
+export type QuestionCandidate = {
+  id: number;
+  title: string;
+  year?: number;
+  type: MediaType;
+};
 
 export type PendingItem =
-  | { kind: "removal"; removeFrom: Side; pair: Pair; asked: boolean }
-  | { kind: "ambiguity"; side: Side; id: number; candidateIds: number[] };
+  | {
+      kind: "removal";
+      removeFrom: Side;
+      pair: Pair;
+      /** Dismissed from the home panel. */
+      asked: boolean;
+      title?: string;
+    }
+  | {
+      kind: "ambiguity";
+      side: Side;
+      id: number;
+      candidateIds: number[];
+      /** Dismissed from the home panel (design §7). */
+      asked?: true;
+      /** The asked title, on its own side. */
+      title?: string;
+      /** Absent: a question saved before 4b ("legacy"). When present, its ids are `candidateIds`. */
+      candidates?: QuestionCandidate[];
+      /** Content key of the latest finish waiting on this question (a naka-side question only). */
+      finish?: string;
+    };
 
 export type UnlinkedItem = {
   side: Side;
@@ -34,7 +63,7 @@ export type SyncState = {
 
 const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
-function samePair(a: Pair, b: Pair): boolean {
+export function samePair(a: Pair, b: Pair): boolean {
   return pairKey(a) === pairKey(b);
 }
 

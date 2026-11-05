@@ -1,5 +1,6 @@
 import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
+import { type AmbiguityItem, toCandidates } from "./questions";
 import {
   addPending,
   type SyncState,
@@ -70,26 +71,42 @@ function isSettled(state: SyncState, dir: Direction, id: number): boolean {
   return mapped || asked || unlinked;
 }
 
+// The question keeps the asked title and what the search listed, so that showing it needs no network
+// read. Its candidateIds are those of the stored candidates (the list is capped, the match's ids are not).
+function questionOf(
+  dir: Direction,
+  id: number,
+  titled: Titled,
+  found: readonly Candidate[],
+  ids: readonly number[],
+): AmbiguityItem {
+  const candidates = toCandidates(found, ids);
+  return {
+    kind: "ambiguity",
+    side: dir.side,
+    id,
+    candidateIds: candidates.map((c) => c.id),
+    title: titled.title,
+    candidates,
+  };
+}
+
 // The owner decides, and the mapping is unchanged, when the match is held by another title (the swap
 // guard) or when the owner is still asked about the match on its own side: a question left open by
 // one direction of the sync is never decided by the other.
 function mapOrAsk(
   state: SyncState,
   dir: Direction,
-  id: number,
+  asked: { id: number; titled: Titled; found: readonly Candidate[] },
   otherId: number,
 ): SyncState {
+  const { id, titled, found } = asked;
   const heldByAnother = state.mapping.some(
     (pair) => dir.other(pair) === otherId,
   );
   const askedAboutOther = isAsked(state, otherSide(dir.side), otherId);
   if (heldByAnother || askedAboutOther) {
-    return addPending(state, {
-      kind: "ambiguity",
-      side: dir.side,
-      id,
-      candidateIds: [otherId],
-    });
+    return addPending(state, questionOf(dir, id, titled, found, [otherId]));
   }
   return upsertMapping(state, dir.pairOf(id, otherId));
 }
@@ -112,15 +129,11 @@ async function resolveOne(
   const candidates = await findCandidates((q) => dir.search(q), titled);
   const result = matchTitle(titled, candidates);
   if (result.kind === "match") {
-    return { kind: "state", state: mapOrAsk(state, dir, id, result.id) };
+    const asked = { id, titled, found: candidates };
+    return { kind: "state", state: mapOrAsk(state, dir, asked, result.id) };
   }
   if (result.kind === "ambiguous") {
-    const item = {
-      kind: "ambiguity",
-      side: dir.side,
-      id,
-      candidateIds: result.ids,
-    } as const;
+    const item = questionOf(dir, id, titled, candidates, result.ids);
     return { kind: "state", state: addPending(state, item) };
   }
   const item = {

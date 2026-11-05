@@ -282,7 +282,14 @@ describe("removals and D1", () => {
     expect(r2).toEqual(report({ pendingRemovals: 1 }));
     expect(w.state.pending).toEqual([
       { kind: "removal", removeFrom: "sc", pair: p(1), asked: false },
-      { kind: "ambiguity", side: "sc", id: 1001, candidateIds: [1] },
+      {
+        kind: "ambiguity",
+        side: "sc",
+        id: 1001,
+        candidateIds: [1],
+        title: "Film 1",
+        candidates: [{ id: 1, title: "Film 1", year: 2000, type: "film" }],
+      },
     ]);
   });
 
