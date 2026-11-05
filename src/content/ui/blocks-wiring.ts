@@ -85,6 +85,7 @@ export function wireBlocks(ports: WiringPorts) {
     now: ports.now,
     show: homeUi.show,
     hide: homeUi.hide,
+    titleOf: ports.titleOf,
   });
   let playing: ContentIds | undefined;
   return {

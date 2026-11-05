@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { homeView } from "../src/content/ui/home-view";
+import { questionView } from "../src/content/ui/question-view";
 import { SERIES_WARNING } from "../src/content/ui/rating-copy";
 import { ratingView } from "../src/content/ui/rating-view";
+import type { AmbiguityOffer } from "../src/sw/question-offers";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
+const OFFER: AmbiguityOffer = {
+  kind: "ambiguity",
+  key: "ambiguity:naka:1",
+  side: "naka",
+  id: 1,
+  title: "Dune",
+  candidates: [{ id: 10, title: "Dune", year: 2021, type: "film" }],
+};
 const old = filmCard({
   key: "movie:1",
   contentId: 1,
@@ -84,5 +94,20 @@ describe("homeView", () => {
 
   it("tells when it is folded", () => {
     expect(homeView([{ card: old }], true).folded).toBe(true);
+  });
+
+  it("carries the questions after the cards, headed « Questions » when no card comes first", () => {
+    const q = {
+      key: "ambiguity:naka:1",
+      view: questionView(OFFER, ["ecarter"]),
+    };
+    const both = homeView([{ card: old }], false, [q]);
+    expect(both.heading).toBe("À noter");
+    expect(both.questionsHeading).toBe("Questions");
+    expect(both.questions).toEqual([q]);
+    const only = homeView([], false, [q]);
+    expect(only.heading).toBe("Questions");
+    expect(only.entries).toEqual([]);
+    expect(homeView([{ card: old }]).questions).toEqual([]);
   });
 });

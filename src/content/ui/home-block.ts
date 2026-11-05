@@ -1,14 +1,22 @@
-// The home block: on the Naka home page, a panel lists the cards still to rate. Each entry is its own
-// rating session (lock after a choice, re-ask counted from the click, confirmation of a série, the
-// unreachable line), so a locked entry never stops the others. The panel asks the worker once per
-// arrival on a home path, and takes itself down on leaving it.
+// The home block: on the Naka home page, a panel lists the cards still to rate (« À noter ») and the open
+// questions (« Questions »). Each entry is its own session (lock after a choice, re-ask counted from the
+// click, confirmation of a série, the unreachable line), so a locked entry never stops the others. The
+// panel asks the worker once per arrival on a home path, and takes itself down on leaving it. When an
+// entry leaves, the entries under it move up under the cursor: each remaining one, rating or question,
+// gets a fresh click grace from that redraw.
 
 import type { ContentIds } from "../../core/finish-event";
+import type { QuestionKey } from "../../core/questions";
 import type { RatingCard } from "../../core/rating-cards";
+import type { QuestionOffer } from "../../sw/question-offers";
 import type { CardsAnswer } from "../../sw/rating-answers";
 import type { EndTimer } from "./end-poll";
 import { entryAsker } from "./home-asker";
+import { createQuestionSlots } from "./home-question-slots";
 import { type HomeEntry, type HomeView, homeView } from "./home-view";
+import { NO_HANDLERS, NO_QUESTION_HANDLERS } from "./idle-handlers";
+import { titledOffer } from "./offer-title";
+import type { QuestionHandlers } from "./question-render";
 import type { RatingHandlers } from "./rating-render";
 import { createRatingSession } from "./rating-session";
 import { labelOf } from "./session-views";
@@ -19,11 +27,22 @@ export const HOME_PATHS = ["/"];
 
 export type HomeHandlers = {
   entry(key: string): RatingHandlers;
+  question(key: QuestionKey): QuestionHandlers;
   onFold(): void;
 };
 
 export type HomePorts = {
-  port: Pick<WorkerPort, "askCards" | "rate" | "dismiss">;
+  port: Pick<
+    WorkerPort,
+    | "askCards"
+    | "askQuestions"
+    | "rate"
+    | "dismiss"
+    | "answerQuestion"
+    | "answerRemoval"
+    | "hideQuestion"
+  >;
+  titleOf(contentId: number): Promise<string | undefined>;
   timer: EndTimer;
   now(): number;
   show(view: HomeView, handlers: HomeHandlers): void;
@@ -34,13 +53,6 @@ type Slot = {
   entry: HomeEntry;
   session: ReturnType<typeof createRatingSession>;
   handlers?: RatingHandlers;
-};
-
-const NO_HANDLERS: RatingHandlers = {
-  onChoose: () => {},
-  onAction: () => {},
-  onOther: () => {},
-  onConfirm: () => {},
 };
 
 function idsOf({ contentId, season, episode }: RatingCard): ContentIds {
@@ -57,10 +69,15 @@ export function createHomeBlock(ports: HomePorts) {
   let arrival = 0; // each arrival and each departure starts a new one: an older answer is dropped
   let slots: Slot[] = [];
   let opening = false;
+  const questions = createQuestionSlots(ports, {
+    redraw: () => draw(),
+    left: () => moved(),
+  });
 
   function draw(): void {
     if (opening) return;
-    if (slots.length === 0) {
+    const asked = questions.views();
+    if (slots.length === 0 && asked.length === 0) {
       ports.hide();
       return;
     }
@@ -68,8 +85,10 @@ export function createHomeBlock(ports: HomePorts) {
       homeView(
         slots.map((slot) => slot.entry),
         folded,
+        asked,
       ),
       {
+        question: (key) => questions.handlersOf(key) ?? NO_QUESTION_HANDLERS,
         entry: (key) =>
           slots.find((slot) => slot.entry.card.key === key)?.handlers ??
           NO_HANDLERS,
@@ -79,6 +98,13 @@ export function createHomeBlock(ports: HomePorts) {
         },
       },
     );
+  }
+
+  // An entry left: the ones under it moved up, so each gets a fresh grace from this redraw.
+  function moved(): void {
+    for (const slot of slots) slot.session.regrace();
+    questions.regrace();
+    draw();
   }
 
   function slotOf({ card, start }: { card: RatingCard; start?: number }): Slot {
@@ -103,7 +129,7 @@ export function createHomeBlock(ports: HomePorts) {
         },
         () => {
           slots = slots.filter((s) => s !== slot);
-          draw();
+          moved();
         },
         { absentIsDone: true },
       ),
@@ -111,7 +137,11 @@ export function createHomeBlock(ports: HomePorts) {
     return slot;
   }
 
-  function open(cards: CardsAnswer["cards"]): void {
+  function open(
+    cards: CardsAnswer["cards"],
+    offers: QuestionOffer[],
+    baseline: number,
+  ): void {
     opening = true;
     const shown = cards.filter(({ card }) => card.pending.length > 0);
     slots = shown.map(slotOf);
@@ -123,14 +153,24 @@ export function createHomeBlock(ports: HomePorts) {
         session?.open(idsOf(card), card, label, { start, sending });
       }
     });
+    questions.open(offers, baseline);
     opening = false;
     draw();
   }
 
+  // Cards and questions are asked together; one that does not answer leaves the other's part alone.
   async function arrive(mine: number): Promise<void> {
-    const answer = await ports.port.askCards();
-    if (arrival !== mine || answer === undefined) return;
-    open(answer.cards);
+    const [cards, asked] = await Promise.all([
+      ports.port.askCards(),
+      ports.port.askQuestions(),
+    ]);
+    const offers = await Promise.all(
+      (asked?.questions ?? []).map((q) => titledOffer(ports.titleOf, q)),
+    );
+    if (arrival !== mine || (cards === undefined && asked === undefined)) {
+      return;
+    }
+    open(cards?.cards ?? [], offers, asked?.lastAnswer?.seq ?? 0);
   }
 
   function leave(): void {
@@ -138,6 +178,7 @@ export function createHomeBlock(ports: HomePorts) {
     const gone = slots;
     slots = [];
     for (const slot of gone) slot.session.closeShown();
+    questions.closeAll();
     ports.hide();
   }
 

@@ -170,6 +170,10 @@ export function createQuestionSession(
     closeShown(): void {
       if (current !== undefined) close(current, "closed");
     },
+    /** The panel moved under the cursor: the grace counts again from now. */
+    regrace(): void {
+      if (current !== undefined) startGrace(current, ports.now);
+    },
     isOpen: (): boolean => current !== undefined,
   };
 }

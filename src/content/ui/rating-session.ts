@@ -124,6 +124,7 @@ export function createRatingSession(
     if (s.confirming !== undefined) return;
     if (needsConfirm(s)) {
       s.confirming = value;
+      startGrace(s, ports.now); // the confirmation view is drawn: its buttons have a grace of their own
       render(s);
       return;
     }
@@ -134,6 +135,7 @@ export function createRatingSession(
     const value = s.confirming;
     delete s.confirming;
     if (!send || value === undefined) {
+      startGrace(s, ports.now); // the choices are drawn again under the cursor
       render(s);
       return;
     }
@@ -157,6 +159,7 @@ export function createRatingSession(
       onOther: (label) => {
         if (!live()) return;
         s.label = label;
+        startGrace(s, ports.now); // another label's buttons are drawn under the cursor
         render(s);
       },
       onConfirm: (send) => settled() && confirm(s, send),
@@ -184,6 +187,10 @@ export function createRatingSession(
     },
     closeShown(): void {
       if (current !== undefined) close(current);
+    },
+    /** The panel moved under the cursor: the grace counts again from now. */
+    regrace(): void {
+      if (current !== undefined) startGrace(current, ports.now);
     },
     isOpen: (): boolean => current !== undefined,
   };

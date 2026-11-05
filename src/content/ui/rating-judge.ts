@@ -87,9 +87,13 @@ export function judge(
   if (!card) return absent(acts, s, at, answer);
   const left = at.pending && !card.pending.includes(label);
   const rated = card.given[label] !== at.given;
-  const failed = failureOf(card, label) !== at.failure;
+  const failure = failureOf(card, label);
+  const failed = failure !== at.failure;
   if (!left && !rated && !failed) return false;
-  if (failed && !left && !rated) showFailure(acts, s, card, label);
-  else acts.settle(s, answer);
+  // Only a failure the card still carries for this label keeps the block: a failure that left (a re-send
+  // that went through) is a move on.
+  if (failed && failure !== undefined && !left && !rated) {
+    showFailure(acts, s, card, label);
+  } else acts.settle(s, answer);
   return true;
 }
