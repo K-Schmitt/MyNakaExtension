@@ -34,7 +34,7 @@ export type StatusSnapshot = {
   counts?: Counts;
   /** The end of a viewing per kind. Absent when the settings cannot be read. */
   thresholds?: Thresholds;
-  /** The progress from which the end block appears (0: at any time). Absent with the thresholds. */
+  /** The progress from which the pause block appears (0: at any time). Absent with the thresholds. */
   pauseFromPercent?: number;
   /** Why the settings or the state could not be read. */
   error?: JobError;

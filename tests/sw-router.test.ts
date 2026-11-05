@@ -6,6 +6,7 @@ import { type Mode, parseSettings } from "../src/ext/settings";
 import { createStore } from "../src/ext/store";
 import { createNakaClient } from "../src/naka/naka-client";
 import type { Fetch } from "../src/sc/sc-client";
+import { toSettingsView } from "../src/status/settings-view";
 import { localFormat } from "../src/status/status-format";
 import { toStatusView } from "../src/status/status-view";
 import { MAX_QUEUED_FINISHES } from "../src/sw/finish-queue";
@@ -1609,6 +1610,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         `Envies SensCritique${NB}: Film 1`,
         `Ma liste Naka${NB}: Film 2`,
       ],
+      settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),
     });
   });
 });

@@ -20,6 +20,32 @@
         <button type="button" id="resync" disabled>Resynchroniser</button>
         <button type="button" id="switch" disabled hidden></button>
       </p>
+      <section id="settings" hidden>
+        <h2>Réglages</h2>
+        <p>
+          <label for="film-threshold">Seuil pour les films</label>
+          <select id="film-threshold"></select>
+        </p>
+        <p>
+          <label for="episode-threshold">Seuil pour les épisodes</label>
+          <select id="episode-threshold"></select>
+        </p>
+        <fieldset>
+          <legend>Bloc sur la pause</legend>
+          <p>
+            <input type="radio" name="pause" id="pause-any" />
+            <label for="pause-any">À tout moment</label>
+          </p>
+          <p>
+            <input type="radio" name="pause" id="pause-from" />
+            <label for="pause-from" id="pause-from-before">À partir de</label>
+            <input type="text" inputmode="numeric" size="3" id="pause-text" aria-labelledby="pause-from-before" aria-describedby="pause-error" />&#8239;%
+          </p>
+          <p id="pause-error" role="alert"></p>
+        </fieldset>
+        <p><button type="button" id="save-settings" disabled>Enregistrer les réglages</button></p>
+        <p id="settings-note" role="status"></p>
+      </section>
     </main>
     <script src="status.js"></script>
   </body>

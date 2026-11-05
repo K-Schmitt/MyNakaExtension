@@ -3,6 +3,12 @@
 
 import type { ToWorker } from "../ext/messages";
 import type { Mode } from "../ext/settings";
+import {
+  SETTINGS_COPY,
+  type SettingsDraft,
+  sameValues,
+  settingsMessage,
+} from "./settings-view";
 import type { StatusFormat } from "./status-format";
 import { confirmText } from "./status-mode-copy";
 import { LOADING_VIEW, type StatusView, toStatusView } from "./status-view";
@@ -23,6 +29,8 @@ export type Ports = {
   show(view: StatusView): void;
   setBusy(busy: boolean): void;
   focus(target: FocusTarget): void;
+  /** The line under the settings (« Réglages enregistrés »), or "" for none. */
+  note(text: string): void;
   format: StatusFormat;
   timer: PageTimer;
 };
@@ -31,6 +39,7 @@ export type Controller = {
   load(): Promise<void>;
   resync(): Promise<void>;
   toggleMode(): Promise<void>;
+  saveSettings(draft: SettingsDraft): Promise<void>;
 };
 
 // A rejected send (worker restarted, port closed) is an absent answer, which the view model words.
@@ -77,14 +86,16 @@ export function createController(ports: Ports): Controller {
   }
 
   // Only the answer to the latest question is shown: an older one arriving late is dropped.
-  async function refresh(): Promise<void> {
+  // It returns the view it showed, or nothing when a newer question took over.
+  async function refresh(): Promise<StatusView | undefined> {
     asked += 1;
     const question = asked;
     const view = toStatusView(await askStatus(ports), ports.format);
-    if (question !== asked) return;
+    if (question !== asked) return undefined;
     current = view;
     ports.show(view);
     schedule(view);
+    return view;
   }
 
   async function reload(): Promise<void> {
@@ -123,6 +134,23 @@ export function createController(ports: Ports): Controller {
     return switchTo("live");
   }
 
+  // The answer to one new question tells whether the worker kept the values: only then is it « saved ».
+  async function save(draft: SettingsDraft): Promise<void> {
+    const message = settingsMessage(draft);
+    if (message?.type !== "set-settings") return;
+    await sendQuietly(ports, message);
+    const view = await refresh();
+    const sent = {
+      ...message.thresholds,
+      pauseFromPercent: message.pauseFromPercent,
+    };
+    const kept =
+      view?.kind === "ready" &&
+      view.settings !== undefined &&
+      sameValues(view.settings.values, sent);
+    ports.note(kept ? SETTINGS_COPY.saved : "");
+  }
+
   return {
     load: () => exclusive(reload),
     resync: () =>
@@ -131,5 +159,6 @@ export function createController(ports: Ports): Controller {
         await reload();
       }, "resync"),
     toggleMode: () => exclusive(toggle, "switch"),
+    saveSettings: (draft) => exclusive(() => save(draft)),
   };
 }

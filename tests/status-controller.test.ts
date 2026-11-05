@@ -62,6 +62,7 @@ function setup(answers: unknown[], confirmAnswer = true) {
   const clock = fakeTimer();
   // What the page did, in order: the buttons enabled or not, and where the focus went.
   const page: string[] = [];
+  const notes: string[] = [];
   const controller = createController({
     send: (message) => {
       sent.push(message);
@@ -85,10 +86,21 @@ function setup(answers: unknown[], confirmAnswer = true) {
       page.push(`busy:${b}`);
     },
     focus: (target) => page.push(`focus:${target}`),
+    note: (text) => notes.push(text),
     format: localFormat("UTC"),
     timer: clock.timer,
   });
-  return { controller, sent, shown, busy, confirms, pending, clock, page };
+  return {
+    controller,
+    sent,
+    shown,
+    busy,
+    confirms,
+    pending,
+    clock,
+    page,
+    notes,
+  };
 }
 
 describe("load", () => {
@@ -152,6 +164,7 @@ describe("resync", () => {
       show: () => {},
       setBusy: () => {},
       focus: () => {},
+      note: () => {},
       format: localFormat("UTC"),
       timer: fakeTimer().timer,
     });
@@ -359,5 +372,106 @@ describe("focus after an action", () => {
     void t.controller.load();
     await t.controller.resync();
     expect(t.page).toEqual(["busy:true"]);
+  });
+});
+
+const SETTINGS = {
+  mode: "live",
+  thresholds: { film: 0.9, episode: 0.8 },
+  pauseFromPercent: 0,
+};
+const SAVED = {
+  mode: "live",
+  thresholds: { film: 0.95, episode: 0.8 },
+  pauseFromPercent: 50,
+};
+const DRAFT = {
+  film: "0.95",
+  episode: "0.8",
+  pauseAny: false,
+  pauseText: "50",
+};
+
+describe("saveSettings", () => {
+  it("sends set-settings, asks the status once, and says the settings are saved", async () => {
+    const t = setup([SETTINGS, SAVED]);
+    await t.controller.load();
+    await t.controller.saveSettings(DRAFT);
+    expect(t.sent.slice(1)).toEqual([
+      {
+        type: "set-settings",
+        thresholds: { film: 0.95, episode: 0.8 },
+        pauseFromPercent: 50,
+      },
+      { type: "status" },
+    ]);
+    expect(t.notes).toEqual(["Réglages enregistrés"]);
+    expect(t.shown.map((v) => v.kind)).toEqual(["loading", "ready", "ready"]);
+  });
+
+  it("sends 0 for « À tout moment »", async () => {
+    const t = setup([SETTINGS, SETTINGS]);
+    await t.controller.load();
+    await t.controller.saveSettings({
+      ...DRAFT,
+      film: "0.9",
+      pauseAny: true,
+      pauseText: "50",
+    });
+    expect(t.sent[1]).toEqual({
+      type: "set-settings",
+      thresholds: { film: 0.9, episode: 0.8 },
+      pauseFromPercent: 0,
+    });
+    expect(t.notes).toEqual(["Réglages enregistrés"]);
+  });
+
+  it("claims nothing when the answer does not show the saved values", async () => {
+    const t = setup([SETTINGS, SETTINGS]);
+    await t.controller.load();
+    await t.controller.saveSettings(DRAFT);
+    expect(t.notes).toEqual([""]);
+  });
+
+  it.each([
+    { name: "the pause", answer: { ...SAVED, pauseFromPercent: 0 } },
+    {
+      name: "the episode threshold",
+      answer: { ...SAVED, thresholds: { film: 0.95, episode: 0.85 } },
+    },
+    {
+      name: "the film threshold",
+      answer: { ...SAVED, thresholds: { film: 0.9, episode: 0.8 } },
+    },
+  ])(
+    "claims nothing when only $name differs in the answer",
+    async ({ answer }) => {
+      const t = setup([SETTINGS, answer]);
+      await t.controller.load();
+      await t.controller.saveSettings(DRAFT);
+      expect(t.notes).toEqual([""]);
+    },
+  );
+
+  it("claims nothing when the engine stays silent", async () => {
+    const t = setup([SETTINGS, new Error("port closed")]);
+    await t.controller.load();
+    await t.controller.saveSettings(DRAFT);
+    expect(t.notes).toEqual([""]);
+  });
+
+  it("sends nothing for an invalid pause", async () => {
+    const t = setup([SETTINGS]);
+    await t.controller.load();
+    await t.controller.saveSettings({ ...DRAFT, pauseText: "100" });
+    expect(t.sent.map((m) => m.type)).toEqual(["status"]);
+    expect(t.notes).toEqual([]);
+  });
+
+  it("does nothing while an answer is pending", async () => {
+    const t = setup(["hang"]);
+    void t.controller.load();
+    await t.controller.saveSettings(DRAFT);
+    expect(t.sent.map((m) => m.type)).toEqual(["status"]);
   });
 });
