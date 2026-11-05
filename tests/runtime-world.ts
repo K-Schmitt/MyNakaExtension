@@ -1,12 +1,12 @@
-// Test-only in-memory world for the runtime fuzz: both sites, the Naka tab (running the REAL tab handler),
-// the storage area, and the oracles, checked at the moment each write happens.
+// Test-only in-memory world for the runtime fuzz: both sites, the Naka tab (running the REAL tab handler)
+// and the storage area. The oracles it calls, checked at the moment each write happens, live in
+// tests/runtime-oracles.ts.
 //
 // A worker restart bumps the generation: every port built for an older generation then hangs forever, so
 // a job of a dead worker stops at its next await (Review Focus 3) and never touches the world again.
 // The owner switches accounts and edits the lists only while no job runs (the fuzz drains the queue
 // first), so every oracle compares a write with the world the job itself checked.
 
-import { AsyncLocalStorage } from "node:async_hooks";
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import {
@@ -27,13 +27,25 @@ import {
 import type { ScWishItem } from "../src/sc/wishlist-page";
 import type { Jobs } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
+import {
+  answering,
+  checkBinding,
+  checkListWrite,
+  checkQuery,
+  checkSend,
+  checkStatusWrite,
+  checkTabCall,
+  guard,
+  settingsOf,
+  violation,
+} from "./runtime-oracles";
 
 export const FILMS = [1, 2, 3, 4];
 export const SERIES = [11, 12];
 export const TITLES = [...FILMS, ...SERIES];
 export const EPISODES = 40;
 
-type Side = "naka" | "sc";
+export type Side = "naka" | "sc";
 
 export const scOf = (n: number): number => n + 1000;
 const isFilm = (n: number): boolean => FILMS.includes(n);
@@ -208,88 +220,10 @@ export function sentFinish(w: World, msg: FinishedMessage): void {
   if (!complete) w.stats.incompleteFinishes += 1;
 }
 
-const ORACLES: [string, RegExp][] = [
-  ["O1 two jobs at once", /two jobs at once/],
-  ["O2 invalid storage", /invalid (state|settings) w/],
-  ["O3 write in simulation", /in simulation/],
-  ["O4 binding", /after a binding mismatch/],
-  ["O5 re-add", /re-add of/],
-  ["O6 re-wish", /re-wish of/],
-  ["O7 forged message", /ran without a message/],
-  ["O9 finish budget", /hour's finishes spent/],
-  ["O10 lost tab", /after the job lost its tab/],
-  ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
-  ["O12 read-only status", /a status answer wrote/],
-  ["O13 threshold rule", /incomplete viewing|never sent|outside a finish job/],
-];
-
-// The oracle a violation belongs to, for the fuzz's failure message.
-export function oracleOf(found: string): string {
-  return (
-    ORACLES.find(([, pattern]) => pattern.test(found))?.[0] ??
-    "O8 forbidden write"
-  );
-}
-
-function violation(w: World, what: string): void {
-  w.violations.push(`seed ${w.seed}: ${what} | ${w.log.slice(-12).join("; ")}`);
-}
-
 // A port of a dead worker: the job that called it stops here, as the worker died at this await.
 function frozen<T>(w: World): Promise<T> {
   w.stats.frozen += 1;
   return forever<T>();
-}
-
-// Plan 2's re-wish oracle: from now on, no run may wish this film again.
-function guard(w: World, id: number, why: string): void {
-  w.guarded.set(id, why);
-  w.stats.guards += 1;
-}
-
-function stored<T>(
-  w: World,
-  key: string,
-  parse: (raw: unknown) => T,
-): T | undefined {
-  try {
-    return parse(w.storage.get(key));
-  } catch {
-    return undefined;
-  }
-}
-
-const settingsOf = (w: World): Settings | undefined =>
-  stored(w, "settings", parseSettings);
-
-// Oracle: no write and no state save while the bound accounts are not the ones signed in.
-function checkBinding(w: World, what: string): void {
-  const binding = settingsOf(w)?.binding;
-  if (binding === undefined) return;
-  const sc = w.scLoggedIn ? w.scAccount : undefined;
-  const naka = w.nakaLoggedIn ? w.nakaAccount : undefined;
-  const otherSc = sc !== undefined && sc !== binding.scUsername;
-  const otherNaka =
-    naka !== undefined &&
-    binding.nakaAccount !== undefined &&
-    naka !== binding.nakaAccount;
-  if (otherSc || otherNaka) violation(w, `${what} after a binding mismatch`);
-}
-
-// Oracles of a list write (a wish, a playlist add): live mode only, the binding, Plan 2's re-add and re-wish.
-function checkListWrite(w: World, side: Side, id: number): void {
-  w.stats.liveWrites += 1;
-  if ((settingsOf(w)?.mode ?? "simulation") !== "live") {
-    violation(w, `${side} write ${id} in simulation`);
-  }
-  checkBinding(w, `${side} write ${id}`);
-  const n = side === "naka" ? id : id - 1000;
-  if (w.protectedFrom.get(n) === side) {
-    violation(w, `re-add of ${n} to ${side} after the owner removed it`);
-  }
-  if (side === "sc" && w.guarded.has(id)) {
-    violation(w, `re-wish of ${id} after ${w.guarded.get(id)}`);
-  }
 }
 
 function flaky(w: World, what: string): void {
@@ -348,18 +282,8 @@ function onWrite(w: World, key: string, value: unknown): void {
   }
 }
 
-// The status answers in flight. AsyncLocalStorage follows an answer's own promise chain and no other, so
-// a storage write made inside it is the answer's, whatever job runs meanwhile (Ruling 20).
-const answering = new AsyncLocalStorage<true>();
-
 export function answerStatus<T>(read: () => Promise<T>): Promise<T> {
   return answering.run(true, read);
-}
-
-// Oracle O12: a status answer never writes storage.
-export function checkStatusWrite(w: World, keys: string[]): void {
-  if (answering.getStore() === true)
-    violation(w, `a status answer wrote ${keys.join(",")}`);
 }
 
 export function storageFor(w: World, gen: number): StorageArea {
@@ -422,38 +346,6 @@ function nakaClient(w: World): NakaClient {
       return undefined;
     },
   };
-}
-
-// Oracle O10 (Ruling 17): once the job's pinned tab refused a send, or every tab it found did, its tab is
-// lost, and the job calls the tabs no more.
-export function checkTabCall(w: World): void {
-  if (w.current?.tabLost)
-    violation(w, "a tabs call after the job lost its tab");
-}
-
-// Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one
-// answers, and then sends to that pinned tab only, with no new lookup. A lost tab is O10's.
-export function checkQuery(w: World): void {
-  const ctx = w.current;
-  if (ctx?.tabLost) return;
-  if (ctx?.pinned !== undefined)
-    violation(w, `a tab query after the job pinned tab ${ctx.pinned}`);
-}
-
-export function checkSend(w: World, tabId: number): void {
-  const ctx = w.current;
-  if (ctx === undefined || ctx.tabLost) return;
-  if (ctx.pinned !== undefined) {
-    if (tabId !== ctx.pinned)
-      violation(w, `a send to tab ${tabId}, not the pinned tab ${ctx.pinned}`);
-    return;
-  }
-  if (ctx.found === undefined) {
-    violation(w, `a send to tab ${tabId} before any tab query`);
-    return;
-  }
-  const next = ctx.found.find((id) => !ctx.tried?.has(id));
-  if (tabId !== next) violation(w, `a try of tab ${tabId} out of query order`);
 }
 
 function loseTab(ctx: TabTrace, w: World): void {

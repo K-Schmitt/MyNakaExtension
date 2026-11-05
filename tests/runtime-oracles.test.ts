@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import { emptyState } from "../src/core/state";
 import type { Jobs } from "../src/sw/jobs";
+import { oracleOf } from "./runtime-oracles";
 import {
   answerStatus,
   clockFor,
   createWorld,
   LIVE_TAB,
   observed,
-  oracleOf,
   ownerEdit,
   scFor,
   sentFinish,
@@ -18,7 +18,7 @@ import {
   type World,
 } from "./runtime-world";
 
-// Positive controls of the runtime fuzz's oracles (tests/runtime-world.ts): for each one, a hand-made trace
+// Positive controls of the runtime fuzz's oracles (tests/runtime-oracles.ts): for each one, a hand-made trace
 // that breaks its rule must make it fire, and a clean trace must not. Without these, a green fuzz could
 // mean an oracle that can never fire.
 

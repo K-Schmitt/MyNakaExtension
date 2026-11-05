@@ -6,6 +6,7 @@ import { createJobQueue } from "../src/sw/job-queue";
 import { createJobs } from "../src/sw/jobs";
 import type { Timer } from "../src/sw/naka-proxy";
 import { createRouter } from "../src/sw/router";
+import { oracleOf } from "./runtime-oracles";
 import {
   clockFor,
   createWorld,
@@ -13,7 +14,6 @@ import {
   FILMS,
   type JobKey,
   observed,
-  oracleOf,
   ownerEdit,
   randomThresholds,
   SERIES,
@@ -32,7 +32,7 @@ import {
 // from the wrong sender or a look-alike site, worker restarts (the in-memory queue, limiters and
 // debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, orphan
 // tabs, account switches, the owner's list edits and stored thresholds.
-// Oracles, checked at each write (tests/runtime-world.ts):
+// Oracles, checked at each write (tests/runtime-oracles.ts):
 //   O1 never two jobs at once (per worker); the status answer is no job (Ruling 20);
 //   O2 the stored state always passes parseState (and the settings parseSettings);
 //   O3 no list write while the stored mode is simulation;
