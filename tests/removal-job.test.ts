@@ -311,14 +311,27 @@ describe("an empty Naka list is a failed read, never « gone »", () => {
     });
   });
 
-  it("removeFrom naka with an item: moot, zero writes (no write can follow an empty read)", async () => {
-    const w = world(withItem("naka"), {
+  it("(c) removeFrom naka with an item: failed with naka-list-empty, zero writes, the question still open (Ruling 15)", async () => {
+    const before = withItem("naka");
+    const w = world(before, {
       ...empty,
       product: () => ({ isWished: false }),
     });
     await w.jobs.answerRemoval(msg("naka", true));
+    expect(w.sk.calls.filter((c) => c.startsWith("unwish"))).toEqual([]);
+    expect(
+      w.nk.calls.filter((c) => c.startsWith("removeFromPlaylist")),
+    ).toEqual([]);
     expect(w.writes()).toEqual([]);
-    expect(outcomeOf(w)?.outcome).toBe("moot");
+    expect(w.state()).toEqual(before);
+    expect(w.stateSaves()).toBe(0);
+    expect(outcomeOf(w)).toEqual({
+      seq: 1,
+      at: NOW,
+      target: "removal:naka:21:1021",
+      outcome: "failed",
+      error: "naka-list-empty",
+    });
   });
 });
 

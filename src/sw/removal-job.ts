@@ -77,11 +77,11 @@ async function removeFromSc(deps: JobDeps, answer: Answer): Promise<Ending> {
   return "done";
 }
 
-// An empty list lacks the id too: it ends moot, and no write follows it.
+// An empty list fails here too (Ruling 15): it would otherwise read as "gone" and close the question.
 async function removeFromNaka(deps: JobDeps, { msg }: Answer): Promise<Ending> {
   const naka = await boundNaka(deps);
   if ((await deps.sc.productState(msg.scId)).isWished) return "moot";
-  if (!(await naka.playlistIds()).includes(msg.nakaId)) return "moot";
+  if (!(await listedOnNaka(naka, msg.nakaId))) return "moot";
   await naka.removeFromPlaylist(msg.nakaId);
   return "done";
 }
