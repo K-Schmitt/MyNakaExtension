@@ -107,14 +107,6 @@ export class FakeDoc implements DocLike {
     this.listeners.push(listener);
   }
 
-  removeEventListener(_type: "fullscreenchange", listener: () => void): void {
-    this.listeners = this.listeners.filter((l) => l !== listener);
-  }
-
-  listenerCount(): number {
-    return this.listeners.length;
-  }
-
   enterFullscreen(el: FakeNode | null): void {
     this.fullscreenElement = el;
     for (const listener of [...this.listeners]) listener();

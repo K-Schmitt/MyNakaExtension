@@ -3,7 +3,7 @@ import {
   createOverlayRoot,
   STOPPED_EVENTS,
 } from "../src/content/ui/overlay-root";
-import { createRatingBlock } from "../src/content/ui/rating-render";
+import { renderRating } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
 import { descendants, FakeDoc, type FakeElement, FakeNode } from "./ui-fakes";
@@ -90,16 +90,6 @@ describe("createOverlayRoot", () => {
     expect(hostOf(doc).dispatch("click")).toBe(false);
   });
 
-  it("detach removes the host and stops listening", () => {
-    const doc = new FakeDoc();
-    const { detach } = createOverlayRoot(doc);
-    detach();
-    expect(hostOf(doc).parent).toBeNull();
-    expect(doc.listenerCount()).toBe(0);
-    doc.enterFullscreen(new FakeNode());
-    expect(hostOf(doc).parent).toBeNull();
-  });
-
   it("lists the input events it keeps from the page", () => {
     expect([...STOPPED_EVENTS].sort()).toEqual([...EXPECTED].sort());
   });
@@ -115,13 +105,12 @@ describe("createOverlayRoot", () => {
     const doc = new FakeDoc();
     const { root } = createOverlayRoot(doc);
     const onChoose = vi.fn();
-    const block = createRatingBlock(doc, root, {
+    renderRating(doc, root, ratingView(episodeCard(), "saison", 8), {
       onChoose,
       onAction: vi.fn(),
       onOther: vi.fn(),
       onConfirm: vi.fn(),
     });
-    block.show(ratingView(episodeCard(), "saison", 8));
     const eight = descendants(hostOf(doc).shadow).find(
       (el) => el.tag === "button" && el.textContent === "8",
     );

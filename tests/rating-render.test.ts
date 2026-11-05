@@ -7,8 +7,8 @@ import {
   SENDING_LINE,
   SERIES_WARNING,
 } from "../src/content/ui/rating-copy";
-import { createRatingBlock } from "../src/content/ui/rating-render";
-import { ratingView } from "../src/content/ui/rating-view";
+import { renderRating } from "../src/content/ui/rating-render";
+import { type RatingView, ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
 import { descendants, FakeDoc, FakeShadow } from "./ui-fakes";
 
@@ -21,7 +21,9 @@ function setup() {
     onOther: vi.fn(),
     onConfirm: vi.fn(),
   };
-  const block = createRatingBlock(doc, root, handlers);
+  const block = {
+    show: (view: RatingView) => renderRating(doc, root, view, handlers),
+  };
   const buttons = () => descendants(root).filter((el) => el.tag === "button");
   const button = (text: string) => {
     const found = buttons().find((b) => b.textContent === text);
@@ -108,18 +110,13 @@ describe("the rating block", () => {
     );
   });
 
-  it("replaces the previous content, and keeps its state readable", () => {
+  it("replaces the previous content", () => {
     const { block, root } = setup();
-    expect(block.current()).toBeUndefined();
     block.show(ratingView(episodeCard(), "épisode"));
-    const first = root.children.length;
-    const view = ratingView(episodeCard(), "saison", 8);
-    block.show(view);
-    expect(root.children.length).toBe(first);
-    expect(block.current()).toBe(view);
-    block.hide();
-    expect(root.children).toEqual([]);
-    expect(block.current()).toBeUndefined();
+    const first = [...root.children];
+    block.show(ratingView(episodeCard(), "saison", 8));
+    expect(root.children).toHaveLength(first.length);
+    expect(root.children.some((child) => first.includes(child))).toBe(false);
   });
 
   it("a confirm view draws the warning and Envoyer / Annuler only, on trusted clicks", () => {

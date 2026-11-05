@@ -1,5 +1,5 @@
 // Draws a RatingView in the overlay's shadow root. Every text goes through textContent; every button
-// acts on a trusted click only. The block remembers the view it shows, for the caller to query.
+// acts on a trusted click only.
 
 import type { RatingLabel } from "../../core/rating-cards";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
@@ -135,25 +135,4 @@ export function renderRating(
   handlers: RatingHandlers,
 ): void {
   root.replaceChildren(buildBlock(doc, view, handlers));
-}
-
-export function createRatingBlock(
-  doc: Maker,
-  root: ShadowRootLike,
-  handlers: RatingHandlers,
-) {
-  let shown: RatingView | undefined;
-  return {
-    show(view: RatingView): void {
-      renderRating(doc, root, view, handlers);
-      shown = view;
-    },
-    hide(): void {
-      root.replaceChildren();
-      shown = undefined;
-    },
-    current(): RatingView | undefined {
-      return shown;
-    },
-  };
 }

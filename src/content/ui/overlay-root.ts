@@ -76,7 +76,6 @@ export function createOverlayRoot(
   root: ShadowRootLike;
   /** Puts the host back under its target when the page removed it; does nothing when it is there. */
   attach(): void;
-  detach(): void;
 } {
   const host = doc.createElement("div");
   host.style.cssText = hostCss(placement);
@@ -92,12 +91,5 @@ export function createOverlayRoot(
     if (host.parentNode !== targetOf(doc)) place();
   };
   doc.addEventListener("fullscreenchange", place);
-  return {
-    root,
-    attach,
-    detach() {
-      doc.removeEventListener("fullscreenchange", place);
-      host.remove();
-    },
-  };
+  return { root, attach };
 }

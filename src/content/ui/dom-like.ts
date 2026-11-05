@@ -27,5 +27,4 @@ export interface DocLike {
   fullscreenElement: NodeLike | null;
   createElement(tag: string): ElementLike;
   addEventListener(type: "fullscreenchange", listener: () => void): void;
-  removeEventListener(type: "fullscreenchange", listener: () => void): void;
 }
