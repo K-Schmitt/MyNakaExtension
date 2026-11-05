@@ -801,3 +801,43 @@ describe("a rating-card during a running rate job", () => {
     expect(answers[1]?.card.given).toEqual({ film: 7 });
   });
 });
+
+describe("three rates for one title and label while a sync runs", () => {
+  const EXT = "abcdefghijklmnopabcdefghijklmnop";
+  const PLAYER = "https://naka.cx/player?id=3&type=movie";
+  const TAB = { id: EXT, url: PLAYER, frameId: 0, tab: { url: PLAYER } };
+  const settleAll = async () => {
+    for (let i = 0; i < 20; i += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  };
+
+  it("send one ProductRate with the third rating", async () => {
+    const w = world();
+    await w.jobs.finishJob(finished());
+    w.sk.calls.length = 0;
+    let open: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const router = createRouter({
+      extensionId: EXT,
+      queue: createJobQueue(),
+      jobs: { ...w.jobs, syncJob: () => gate },
+      timer: { set: () => 0, clear: () => undefined },
+      now: () => NOW,
+    });
+    router.handle(
+      { type: "resync" },
+      { id: EXT, url: `chrome-extension://${EXT}/status.html` },
+      () => undefined,
+    );
+    await settleAll();
+    for (const rating of [5, 6, 9]) {
+      router.handle(rate("film", rating), TAB, () => undefined);
+    }
+    open();
+    await settleAll();
+    expect(ratesOf(w.sk.calls)).toEqual(["rate:1003:9"]);
+  });
+});

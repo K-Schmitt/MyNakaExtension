@@ -374,6 +374,73 @@ describe("router: everything else is ignored, unanswered", () => {
   });
 });
 
+describe("router: one waiting rate per title and label", () => {
+  const rateOf = (rating: number, over: object = {}) => ({
+    ...RATE,
+    rating,
+    ...over,
+  });
+  const rates = (calls: string[]) => calls.filter((c) => c.startsWith("rate:"));
+
+  it("three rates for the same key and label sent while a sync runs give one job, with the third rating", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    for (const rating of [5, 6, 9]) r.send(rateOf(rating), NAKA_TAB);
+    blocker.open();
+    await settle();
+    expect(rates(r.calls)).toEqual([`rate:${JSON.stringify(rateOf(9))}`]);
+  });
+
+  it("different labels or different keys are different jobs", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(rateOf(5), NAKA_TAB);
+    r.send(rateOf(6, { label: "série" }), NAKA_TAB);
+    r.send(rateOf(7, { contentId: 4 }), NAKA_TAB);
+    blocker.open();
+    await settle();
+    expect(rates(r.calls)).toHaveLength(3);
+  });
+
+  it("a rate for a running job queues behind it", async () => {
+    const running = latch();
+    const ratings: number[] = [];
+    const r = router({
+      rate: async (msg) => {
+        ratings.push(msg.rating);
+        if (ratings.length === 1) await running.opened;
+      },
+    });
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    r.send(rateOf(8), NAKA_TAB);
+    running.open();
+    await settle();
+    expect(ratings).toEqual([5, 8]);
+  });
+
+  it("a rate sent again after its job ended runs again", async () => {
+    const r = router();
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    expect(rates(r.calls)).toHaveLength(2);
+  });
+});
+
 describe("router: rating reads are answered outside the queue", () => {
   it("a rating-card is answered while a sync still runs, then the sync ends", async () => {
     const blocker = latch();

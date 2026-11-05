@@ -18,6 +18,7 @@ import { createFinishQueue } from "./finish-queue";
 import type { JobQueue } from "./job-queue";
 import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
+import { createRateQueue } from "./rate-queue";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
 export type Respond = (answer: unknown) => void;
@@ -49,6 +50,7 @@ export function createRouter(deps: RouterDeps): Router {
   };
   const sync = (trigger: Trigger) =>
     enqueue(activity.track("sync", () => jobs.syncJob(trigger)));
+  const rate = createRateQueue(enqueue, (msg) => jobs.rate(msg));
   const finish = createFinishQueue(
     (job) => enqueue(activity.track("finish", job)),
     (msg) => jobs.finishJob(msg),
@@ -102,7 +104,7 @@ export function createRouter(deps: RouterDeps): Router {
         answerRead(() => jobs.ratingCards(), respond);
         return true;
       case "rate":
-        enqueue(() => jobs.rate(msg));
+        rate(msg);
         return false;
       case "dismiss-rating":
         enqueue(() => jobs.dismissRating(msg));
