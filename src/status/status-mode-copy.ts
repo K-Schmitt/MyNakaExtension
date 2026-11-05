@@ -30,9 +30,11 @@ const CAP = `Chaque synchronisation fera au plus ${MAX_WRITES_PER_RUN} écriture
 // `count` is the number of titles in the simulation's preview; one agrees in the singular (Ruling 21).
 export function confirmText(count: number): string {
   const ask = "Activer les écritures\u202F?";
-  if (count === 0) return `${ask} ${CAP}, sans aperçu.`;
+  if (count === 0) {
+    return `${ask} ${CAP}. La page de l'extension montre les écritures prévues au prochain passage.`;
+  }
   const next =
     "La prochaine (bouton «\u202FResynchroniser\u202F» ou prochaine ouverture de Naka)";
   const titles = count === 1 ? "le titre" : `les ${count} titres`;
-  return `${ask} ${CAP}. ${next} reprendra ${titles} de l'aperçu, puis les suivants, sans nouvel aperçu.`;
+  return `${ask} ${CAP}. ${next} reprendra ${titles} de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`;
 }

@@ -37,6 +37,8 @@ export type StatusView =
       previewCount: number;
       lines: string[];
       preview: string[];
+      /** The next pass's deferred writes, in both modes. */
+      next: string[];
       /** The « Réglages » section; absent while the settings cannot be read. */
       settings?: SettingsView;
     };
@@ -97,6 +99,11 @@ function previewLines(snapshot: StatusSnapshot): string[] {
   return (snapshot.lastRun?.preview ?? []).map(previewLine);
 }
 
+// The next pass's deferred writes, in both modes.
+function nextLines(snapshot: StatusSnapshot): string[] {
+  return (snapshot.lastRun?.next ?? []).map(previewLine);
+}
+
 // Both come together or not at all, like the worker's answer.
 function settingsOf(snapshot: StatusSnapshot): { settings?: SettingsView } {
   const { thresholds, pauseFromPercent } = snapshot;
@@ -121,6 +128,7 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
     previewCount: preview.length,
     lines: viewLines(snapshot, format),
     preview,
+    next: nextLines(snapshot),
   };
   if (snapshot.mode === undefined) return { ...base, headline: UNKNOWN_MODE };
   const text = MODE_TEXT[snapshot.mode];

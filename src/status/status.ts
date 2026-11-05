@@ -5,7 +5,14 @@ import { createHandledController } from "./handled-controller";
 import { showHandled } from "./handled-dom";
 import { createListsController } from "./lists-controller";
 import { showLists } from "./lists-dom";
-import { readDraft, showNote, showSettings, syncForm } from "./settings-dom";
+import {
+  markEdited,
+  markSaved,
+  readDraft,
+  showNote,
+  showSettings,
+  syncForm,
+} from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
 import type { StatusView } from "./status-view";
@@ -50,6 +57,8 @@ function render(view: StatusView): void {
   fill(element("lines"), ready ? view.lines : []);
   fill(element("preview"), ready ? view.preview : []);
   element("preview-section").hidden = !ready || view.preview.length === 0;
+  fill(element("next"), ready ? view.next : []);
+  element("next-section").hidden = !ready || view.next.length === 0;
   const toggle = element<HTMLButtonElement>("switch");
   toggle.hidden = !ready || view.switchLabel === undefined;
   toggle.textContent = ready ? (view.switchLabel ?? "") : "";
@@ -134,6 +143,7 @@ element("forget").addEventListener(
 );
 element("reset").addEventListener("click", () => void controller.reset());
 function onFormEdit(): void {
+  markEdited();
   showNote("");
   syncForm(busyNow);
 }
@@ -147,10 +157,10 @@ for (const id of [
   element(id).addEventListener("change", onFormEdit);
 }
 element("pause-text").addEventListener("input", onFormEdit);
-element("save-settings").addEventListener(
-  "click",
-  () => void controller.saveSettings(readDraft()),
-);
+element("save-settings").addEventListener("click", () => {
+  markSaved();
+  void controller.saveSettings(readDraft());
+});
 void controller.load();
 void handled.load();
 void lists.load();

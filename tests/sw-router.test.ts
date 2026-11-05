@@ -2131,6 +2131,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       actionsDisabled: false,
       inProgress: false,
       previewCount: 2,
+      next: [],
       lines: [
         `Comptes liés${NB}: owner sur SensCritique, compte Naka n°\u00A077`,
         `Dernière synchronisation (simulation)${NB}: 04/11/2026 12:00 (ouverture de Naka)`,
@@ -2141,8 +2142,8 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         "Rien en attente",
       ],
       preview: [
-        `Envies SensCritique${NB}: Film 1`,
-        `Ma liste Naka${NB}: Film 2`,
+        `Envies SensCritique${NB}: Film 1 (2001, film)`,
+        `Ma liste Naka${NB}: Film 2 (2002, film)`,
       ],
       settingsPending: false,
       settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),

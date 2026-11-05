@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formState,
   SETTINGS_COPY,
@@ -143,5 +143,76 @@ describe("copy", () => {
       expect(html, label).toContain(`>${label}<`);
     }
     expect(html).toContain("/>&#8239;%");
+  });
+});
+
+// settings-dom reads the page through `document`: a map of plain objects stands for the controls.
+type Control = Record<string, unknown> & { replaceChildren(): void };
+
+function fakePage() {
+  const controls = new Map<string, Control>();
+  const fake = {
+    getElementById: (id: string) => {
+      if (!controls.has(id)) {
+        controls.set(id, { replaceChildren() {} } as Control);
+      }
+      return controls.get(id);
+    },
+    createElement: () => ({}),
+  };
+  vi.stubGlobal("document", fake);
+  return controls;
+}
+
+describe("the settings form while polls arrive", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const OLD = toSettingsView({ film: 0.9, episode: 0.8 }, 0);
+  const NEW = toSettingsView({ film: 0.95, episode: 0.85 }, 40);
+
+  async function open() {
+    vi.resetModules();
+    const page = fakePage();
+    const dom = await import("../src/status/settings-dom");
+    dom.showSettings(OLD, false);
+    return { page, dom };
+  }
+
+  it("fills the controls from the first view, and from a changed one", async () => {
+    const { page, dom } = await open();
+    expect(page.get("film-threshold")?.value).toBe("0.9");
+    dom.showSettings(NEW, false);
+    expect(page.get("film-threshold")?.value).toBe("0.95");
+    expect(page.get("pause-text")?.value).toBe("40");
+  });
+
+  it("a poll during an edit keeps the typed value", async () => {
+    const { page, dom } = await open();
+    const typed = page.get("pause-text");
+    if (typed === undefined) throw new Error("no control");
+    typed.value = "7";
+    dom.markEdited();
+    dom.showSettings(NEW, false);
+    expect(page.get("pause-text")?.value).toBe("7");
+    expect(page.get("film-threshold")?.value).toBe("0.9");
+  });
+
+  it("a save clears the edit: the next changed view fills", async () => {
+    const { page, dom } = await open();
+    dom.markEdited();
+    dom.markSaved();
+    dom.showSettings(NEW, false);
+    expect(page.get("film-threshold")?.value).toBe("0.95");
+  });
+
+  it("a reload (the section hidden) clears the edit too", async () => {
+    const { page, dom } = await open();
+    dom.markEdited();
+    dom.showSettings(undefined, false);
+    dom.showSettings(NEW, false);
+    expect(page.get("film-threshold")?.value).toBe("0.95");
   });
 });

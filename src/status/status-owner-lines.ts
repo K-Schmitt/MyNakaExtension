@@ -20,10 +20,10 @@ export function bindingLine(binding: Partial<Binding>): string | undefined {
     : `Comptes liés\u202F: ${parts.join(", ")}`;
 }
 
-// The copy stays as it is until a later task rewrites it. A Record: a new count without a label fails to compile.
+// A Record: a new count without a label fails to compile.
 export const WAITING_LABELS: Record<keyof Counts, string> = {
-  openQuestions: "Questions à traiter dans une prochaine version",
-  pendingRemovals: "Retraits à confirmer dans une prochaine version",
+  openQuestions: "Questions à traiter",
+  pendingRemovals: "Retraits à confirmer",
   unlinked: "Titres non reliés",
 };
 

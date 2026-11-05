@@ -2,6 +2,7 @@
 // error. One function per sentence; text only; dates go through the format. A run is worded by its own
 // mode, whatever the mode is now. French typography: U+202F before « : ; ? ! ».
 
+import { idsOfKey } from "../core/finish-event";
 import { MAX_WRITES_PER_RUN } from "../core/sync-writes";
 import { MAX_FINISHES_PER_WINDOW } from "../ext/finish-window";
 import type { JobError } from "../ext/job-error";
@@ -10,6 +11,11 @@ import { JOB_ERROR_LABELS } from "./job-error-labels";
 import type { StatusFormat } from "./status-format";
 
 type PreviewItem = NonNullable<RunRecord["preview"]>[number];
+
+const TYPE_WORDS: Record<NonNullable<PreviewItem["type"]>, string> = {
+  film: "film",
+  serie: "série",
+};
 
 const TRIGGERS: Record<RunRecord["trigger"], string> = {
   "naka-ready": "ouverture de Naka",
@@ -70,16 +76,36 @@ export function runErrorLine(run: RunRecord): string | undefined {
   return `Terminée, mais arrêtée en cours${because(run.error)}`;
 }
 
+// « Titre », then the season and the episode of a series, when the record holds the title.
+function finishWhat(finish: FinishRecord): string {
+  if (finish.title === undefined) return "";
+  const ids = idsOfKey(finish.key);
+  const place =
+    ids?.season === undefined || ids.episode === undefined
+      ? ""
+      : `, saison ${ids.season}, épisode ${ids.episode}`;
+  return `\u00AB\u202F${finish.title}\u202F\u00BB${place}, `;
+}
+
 export function finishLine(finish: FinishRecord, format: StatusFormat): string {
   if (finish.error === "finish-limit") {
     return `Fins de visionnage\u202F: limite de ${MAX_FINISHES_PER_WINDOW} par heure atteinte le ${format.date(finish.at)} à ${format.time(finish.at)}`;
   }
   const outcome = FINISH_OUTCOMES[finish.outcome];
-  return `Dernière fin de visionnage\u202F: ${format.dateTime(finish.at)}, ${outcome}${because(finish.error)}`;
+  return `Dernière fin de visionnage\u202F: ${finishWhat(finish)}${format.dateTime(finish.at)}, ${outcome}${because(finish.error)}`;
+}
+
+// The year and the type, when known, in parentheses after the title.
+function details(item: PreviewItem): string {
+  const known = [
+    item.year === undefined ? undefined : String(item.year),
+    item.type === undefined ? undefined : TYPE_WORDS[item.type],
+  ].filter((part) => part !== undefined);
+  return known.length === 0 ? "" : ` (${known.join(", ")})`;
 }
 
 // A title Naka could not give is empty in the record.
 export function previewLine(item: PreviewItem): string {
   const title = item.title === "" ? "(titre inconnu)" : item.title;
-  return `${TARGETS[item.side]}\u202F: ${title}`;
+  return `${TARGETS[item.side]}\u202F: ${title}${details(item)}`;
 }

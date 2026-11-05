@@ -17,6 +17,8 @@ function element<T extends HTMLElement>(id: string): T {
 
 // What the controls were last filled with: a poll that brings the same values leaves a half-typed form alone.
 let applied: SettingsValues | undefined;
+// Whether the owner edited the form since the last save or reload: a poll then leaves the fields alone.
+let dirty = false;
 
 export function readDraft(): SettingsDraft {
   return {
@@ -64,11 +66,21 @@ export function showSettings(
   element("settings").hidden = view === undefined;
   if (view === undefined) {
     applied = undefined;
+    dirty = false;
     return;
   }
-  if (applied === undefined || !sameValues(applied, view.values)) fill(view);
+  const changed = applied === undefined || !sameValues(applied, view.values);
+  if (changed && !dirty) fill(view);
   applied = view.values;
   syncForm(busy);
+}
+
+export function markEdited(): void {
+  dirty = true;
+}
+
+export function markSaved(): void {
+  dirty = false;
 }
 
 export function showNote(text: string): void {

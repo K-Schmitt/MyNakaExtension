@@ -259,6 +259,31 @@ describe("toStatusView: the last run, by its own mode", () => {
     );
   });
 
+  it("names the finished title, the season and the episode of a series", () => {
+    const lastFinish: FinishRecord = {
+      at: AT,
+      key: "tv:21391:S1E3",
+      outcome: "done",
+      title: "Un Job Mortel",
+    };
+    expect(ready({ mode: "live", lastFinish }).lines).toContain(
+      `Dernière fin de visionnage${NB}: «${NB}Un Job Mortel${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
+    );
+  });
+
+  it("names the finished title of a film without a place", () => {
+    const lastFinish: FinishRecord = {
+      at: AT,
+      key: "movie:12",
+      outcome: "failed",
+      error: "unavailable",
+      title: "Alien",
+    };
+    expect(ready({ mode: "live", lastFinish }).lines).toContain(
+      `Dernière fin de visionnage${NB}: «${NB}Alien${NB}», 04/11/2026 14:05, échec${NB}: ${LABELS.unavailable}`,
+    );
+  });
+
   it("shows no run line before the first run", () => {
     expect(ready({ mode: "live", counts: ZERO }).lines).toEqual([
       "Rien en attente",
@@ -267,8 +292,8 @@ describe("toStatusView: the last run, by its own mode", () => {
 });
 
 describe("toStatusView: what waits for the owner", () => {
-  const QUESTIONS = "Questions à traiter dans une prochaine version";
-  const REMOVALS = "Retraits à confirmer dans une prochaine version";
+  const QUESTIONS = "Questions à traiter";
+  const REMOVALS = "Retraits à confirmer";
   const UNLINKED = "Titres non reliés";
 
   it("each count above zero on its own line", () => {
@@ -367,6 +392,26 @@ describe("toStatusView: preview", () => {
     expect(view.previewCount).toBe(1);
   });
 
+  it("adds the year and the type of a title, only the known parts", () => {
+    const view = ready({
+      mode: "simulation",
+      lastRun: run({
+        preview: [
+          { side: "sc", title: "Cowboy Bebop", year: 2021, type: "serie" },
+          { side: "naka", title: "Alien", type: "film" },
+          { side: "naka", title: "Dune", year: 2021 },
+          { side: "naka", title: "Heat" },
+        ],
+      }),
+    });
+    expect(view.preview).toEqual([
+      `Envies SensCritique${NB}: Cowboy Bebop (2021, série)`,
+      `Ma liste Naka${NB}: Alien (film)`,
+      `Ma liste Naka${NB}: Dune (2021)`,
+      `Ma liste Naka${NB}: Heat`,
+    ]);
+  });
+
   it("hides the preview when writes are live", () => {
     const view = ready({ mode: "live", lastRun: run({ preview }) });
     expect(view.preview).toEqual([]);
@@ -383,17 +428,52 @@ describe("toStatusView: preview", () => {
   });
 });
 
+describe("toStatusView: the next pass's writes", () => {
+  const next = [
+    {
+      side: "sc" as const,
+      title: "Cowboy Bebop",
+      year: 2021,
+      type: "serie" as const,
+    },
+    { side: "naka" as const, title: "Alien", type: "film" as const },
+    { side: "naka" as const, title: "" },
+  ];
+  const lines = [
+    `Envies SensCritique${NB}: Cowboy Bebop (2021, série)`,
+    `Ma liste Naka${NB}: Alien (film)`,
+    `Ma liste Naka${NB}: (titre inconnu)`,
+  ];
+
+  it("lists them in live mode", () => {
+    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual(lines);
+  });
+
+  it("lists them in simulation too", () => {
+    const view = ready({ mode: "simulation", lastRun: run({ next }) });
+    expect(view.next).toEqual(lines);
+  });
+
+  it("is empty for a record without them", () => {
+    expect(ready({ mode: "live", lastRun: run() }).next).toEqual([]);
+    expect(ready({ mode: "live" }).next).toEqual([]);
+  });
+});
+
 describe("the confirmation before going live", () => {
-  it("with a preview: the cap, and that the next pass takes up its titles without a new preview", () => {
+  const ASK = `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures.`;
+  const NEXT = `La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka)`;
+
+  it("with a preview: the cap, and that the page shows the writes before each pass", () => {
     expect(confirmText(3)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra les 3 titres de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+      `${ASK} ${NEXT} reprendra les 3 titres de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
   // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
   it("with one title in the preview: le titre de l'aperçu", () => {
     expect(confirmText(1)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra le titre de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+      `${ASK} ${NEXT} reprendra le titre de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
@@ -403,9 +483,9 @@ describe("the confirmation before going live", () => {
     );
   });
 
-  it("without a preview: the cap, and no preview", () => {
+  it("without a preview: the cap, and where the page shows the writes", () => {
     expect(confirmText(0)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures, sans aperçu.`,
+      `${ASK} La page de l'extension montre les écritures prévues au prochain passage.`,
     );
   });
 });

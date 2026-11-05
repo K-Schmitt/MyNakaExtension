@@ -68,11 +68,17 @@ const SNAPSHOTS: StatusSnapshot[] = [
     lastRun: run({
       error: "unavailable",
       preview: [
-        { side: "sc", title: "Alien" },
+        { side: "sc", title: "Alien", year: 1979, type: "film" },
         { side: "naka", title: "" },
       ],
+      next: [{ side: "naka", title: "Dune", year: 2021, type: "serie" }],
     }),
-    lastFinish: { at: AT, key: "movie:1", outcome: "done" },
+    lastFinish: {
+      at: AT,
+      key: "tv:21391:S1E3",
+      outcome: "done",
+      title: "Un Job Mortel",
+    },
     counts: { pendingRemovals: 1, openQuestions: 2, unlinked: 3 },
     running: { kind: "sync", since: AT },
     pendingMode: "live",
@@ -94,6 +100,7 @@ function texts(view: StatusView): string[] {
     view.switchLabel ?? "",
     ...view.lines,
     ...view.preview,
+    ...view.next,
   ];
 }
 
