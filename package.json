@@ -8,10 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "biome check . && tsc --noEmit && tsc --noEmit -p tsconfig.tests.json",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json",
     "test": "vitest run",
     "build": "node scripts/build.mjs",
-    "check": "npm run lint && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
