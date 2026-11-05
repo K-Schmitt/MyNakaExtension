@@ -167,7 +167,7 @@ describe("the pause block card", () => {
       asked(episodeCard({ pending: ["saison", "série"] }), 0, 7),
     );
     await w.pauseAt(0.5);
-    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.heading).toContain("Noter la saison 1");
     expect(w.last().view.start).toBeDefined();
   });
 

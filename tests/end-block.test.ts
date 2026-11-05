@@ -141,7 +141,7 @@ describe("the end block chain", () => {
     await flush();
     expect(w.calls).toContain("rate 5:1:1 épisode 9");
     await w.clock.advance(2000);
-    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.heading).toContain("Noter la saison 1");
     expect(w.last().view.start).toContain("8");
     expect(w.last().view.choices.filter((c) => c.marked)).toEqual([
       { value: 8, marked: true },
@@ -390,7 +390,7 @@ describe("the end block actions", () => {
     await flush();
     expect(w.calls).toContain("dismiss 5:1:1 épisode");
     await w.clock.advance(2000);
-    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.heading).toContain("Noter la saison 1");
   });
 
   it("Ignorer waits with « Un instant… », not the sending line", async () => {
@@ -577,7 +577,7 @@ describe("the end block waits for the rating to be sent", () => {
     await w.clock.advance(2000);
     expect(w.last().view.notice).toBe(SENDING_LINE);
     await w.clock.advance(5000);
-    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.heading).toContain("Noter la saison 1");
     expect(w.last().view.notice).toBeUndefined();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
       "rate 5:1:1 épisode 7",
@@ -761,7 +761,7 @@ describe("the end block ignores a click right after a label appears", () => {
     w.script(EP_IDS, answer(toSaison({ given: { épisode: 9 } })));
     w.last().handlers.onChoose(9);
     await w.clock.advance(2000);
-    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.heading).toContain("Noter la saison 1");
     await w.clock.advance(399);
     w.last().handlers.onChoose(4);
     await flush();

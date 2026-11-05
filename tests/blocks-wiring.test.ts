@@ -147,7 +147,7 @@ describe("one owner for the overlay over the player", () => {
       lastEpisode({ pending: ["saison", "série"], given: { épisode: 7 } }),
     );
     await w.clock.advance(5000);
-    expect(w.drawn().view.heading).toContain("saison 1");
+    expect(w.drawn().view.heading).toContain("Noter la saison 1");
     // 4. The saison is rated on what is drawn, once its buttons have settled.
     await w.ready();
     w.drawn().handlers.onChoose(8);
@@ -188,7 +188,7 @@ describe("one owner for the overlay over the player", () => {
       ["épisode"],
     );
     await w.clock.advance(3000);
-    expect(w.drawn().view.heading).toContain("saison 1");
+    expect(w.drawn().view.heading).toContain("Noter la saison 1");
     await w.ready();
     w.drawn().handlers.onAction("plus-tard");
     expect(w.player.drawn).toBeUndefined();
@@ -211,12 +211,12 @@ describe("one owner for the overlay over the player", () => {
     w.set(E1, episodeCard({ pending: ["saison"], given: { épisode: 6 } }));
     w.blocks.finished(E1);
     await w.clock.advance(2000);
-    expect(w.drawn().view.heading).toContain("saison 1");
+    expect(w.drawn().view.heading).toContain("Noter la saison 1");
     paused.onChoose(3);
     paused.onAction("fermer");
     await flush();
     expect(w.sends()).toEqual([]);
-    expect(w.drawn().view.heading).toContain("saison 1");
+    expect(w.drawn().view.heading).toContain("Noter la saison 1");
   });
 });
 

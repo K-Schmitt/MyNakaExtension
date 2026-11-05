@@ -114,7 +114,7 @@ describe("the home panel with a rating still being sent", () => {
     });
     w.state.answer = { cards: [{ card: rated }] };
     await w.clock.advance(2000);
-    expect(w.viewOf(EP.key)?.heading).toContain("saison 1");
+    expect(w.viewOf(EP.key)?.heading).toContain("Noter la saison 1");
     expect(w.viewOf(EP.key)?.choices).toHaveLength(10);
   });
 
@@ -128,7 +128,7 @@ describe("the home panel with a rating still being sent", () => {
     w.state.answer = listOf(rated, ["saison"]);
     await w.clock.advance(2000);
     expect(w.viewOf(EP.key)?.notice).toBe(SENDING_LINE);
-    expect(w.viewOf(EP.key)?.heading).toContain("saison 1");
+    expect(w.viewOf(EP.key)?.heading).toContain("Noter la saison 1");
   });
 
   it("another entry that is not being sent stays usable", async () => {
