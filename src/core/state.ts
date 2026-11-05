@@ -165,14 +165,31 @@ export function markHandled(
   };
 }
 
-/** The title is no longer handled: its key and its stored title go, nothing else changes. */
+function waitsOnKey(item: PendingItem, key: string): boolean {
+  return item.kind === "ambiguity" && item.finish === key;
+}
+
+/** Something is kept about this key: it is handled, or a question holds its finish. */
+export function holdsKey(state: SyncState, key: string): boolean {
+  return isHandled(state, key) || state.pending.some((i) => waitsOnKey(i, key));
+}
+
+// An open question waiting on the forgotten finish forgets it: answering it later must not mark the
+// unticked title seen.
+function withoutFinish(item: PendingItem, key: string): PendingItem {
+  if (!waitsOnKey(item, key) || item.kind !== "ambiguity") return item;
+  const { finish: _forgotten, ...rest } = item;
+  return rest;
+}
+
+/** The title is no longer handled: its key, its stored title and any finish waiting on it go. */
 export function forgetHandled(state: SyncState, key: string): SyncState {
-  if (!isHandled(state, key)) return { ...state };
+  const pending = state.pending.map((item) => withoutFinish(item, key));
   const { handledTitles, ...rest } = state;
   const handled = state.handled.filter((k) => k !== key);
-  if (handledTitles === undefined) return { ...rest, handled };
-  const { [key]: _forgotten, ...titles } = handledTitles;
-  return { ...rest, handled, handledTitles: titles };
+  if (handledTitles === undefined) return { ...rest, handled, pending };
+  const { [key]: _gone, ...titles } = handledTitles;
+  return { ...rest, handled, pending, handledTitles: titles };
 }
 
 export function isHandled(state: SyncState, key: string): boolean {

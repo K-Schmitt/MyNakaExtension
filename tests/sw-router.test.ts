@@ -191,6 +191,9 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     forgetHandled: async (msg) => {
       calls.push(`forget-handled:${JSON.stringify(msg)}`);
     },
+    forgetHandledFromTab: async (msg) => {
+      calls.push(`forget-handled-tab:${JSON.stringify(msg)}`);
+    },
     handledTitles: async () => {
       calls.push("handled-titles");
       return { titles: [{ key: "movie:3", label: "Trois" }] };
@@ -1339,7 +1342,7 @@ describe("router: the status answer waits for no job", () => {
     await settle();
     expect(r.calls).toEqual([
       `forget-handled:${JSON.stringify(msg)}`,
-      `forget-handled:${JSON.stringify(msg)}`,
+      `forget-handled-tab:${JSON.stringify(msg)}`,
     ]);
   });
 

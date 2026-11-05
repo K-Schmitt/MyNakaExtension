@@ -65,6 +65,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     forget: async () => undefined,
     reset: async () => undefined,
     forgetHandled: async () => undefined,
+    forgetHandledFromTab: async () => undefined,
     handledTitles: async () => ({ titles: [] }),
     searchTitles: async () => ({ candidates: [] }),
     statusSnapshot: async () => ({}),

@@ -4,7 +4,9 @@
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor, type RatingCard } from "../core/rating-cards";
-import { forgetHandled, isHandled } from "../core/state";
+import { forgetHandled, holdsKey } from "../core/state";
+import { windowAt, withOneMore } from "../ext/finish-window";
+import { isForgetFull } from "../ext/forget-window";
 import type { ForgetHandledMessage } from "../ext/page-messages";
 import type { Store } from "../ext/store";
 
@@ -15,7 +17,7 @@ type ForgetStore = Pick<
 
 async function forgetKey(store: ForgetStore, key: string): Promise<void> {
   const state = await store.loadState();
-  if (isHandled(state, key)) await store.saveState(forgetHandled(state, key));
+  if (holdsKey(state, key)) await store.saveState(forgetHandled(state, key));
 }
 
 // An unwatched title is not « à noter »: its card goes, other cards stay.
@@ -32,4 +34,18 @@ export async function forgetHandledJob(
   const key = contentKeyOf(msg);
   await forgetKey(store, key);
   await dropCard(store, key);
+}
+
+// A forget a Naka tab asked for takes a slot of the hour's budget first (a naka.cx script can forge the
+// event), reserved before the forget so that a restart cannot give it back. Over budget: nothing changes.
+export async function forgetFromTabJob(
+  store: ForgetStore & Pick<Store, "loadSettings" | "saveSettings">,
+  now: () => number,
+  msg: ForgetHandledMessage,
+): Promise<void> {
+  const settings = await store.loadSettings();
+  const window = windowAt(settings.forgetWindow, now());
+  if (isForgetFull(window)) return;
+  await store.saveSettings({ ...settings, forgetWindow: withOneMore(window) });
+  await forgetHandledJob(store, msg);
 }

@@ -28,6 +28,7 @@ export const RESET_RULES: ResetRules = {
   pauseFromPercent: "keep",
   lastAutoRunAt: "keep",
   finishWindow: "keep",
+  forgetWindow: "keep",
   // These describe the erased state.
   lastRun: "drop",
   lastFinish: "drop",

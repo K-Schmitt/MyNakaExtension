@@ -724,6 +724,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     reset: () => jobs.reset(),
     // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.
     forgetHandled: (msg) => jobs.forgetHandled(msg),
+    forgetHandledFromTab: (msg) => jobs.forgetHandledFromTab(msg),
     handledTitles: () => jobs.handledTitles(),
     searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),

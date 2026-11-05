@@ -23,7 +23,7 @@ import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { finishJob } from "./finish-job";
-import { forgetHandledJob } from "./forget-handled-job";
+import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
   answerHandledTitles,
   type HandledTitlesAnswer,
@@ -77,6 +77,8 @@ export type Jobs = {
   forgetHandled(msg: ForgetHandledMessage): Promise<void>;
   /** The handled titles for the page: read-only, answered outside the queue. */
   handledTitles(): Promise<HandledTitlesAnswer>;
+  /** The same, asked by a Naka tab: counted against the hour's budget of forgets. */
+  forgetHandledFromTab(msg: ForgetHandledMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
@@ -124,6 +126,8 @@ export function createJobs(deps: JobDeps): Jobs {
     forget: () => quietly(() => forgetJob(deps.store)),
     reset: () => quietly(() => resetJob(deps.store)),
     forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
+    forgetHandledFromTab: (msg) =>
+      quietly(() => forgetFromTabJob(deps.store, deps.now, msg)),
     handledTitles: () => answerHandledTitles(deps.store),
     searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),

@@ -14,6 +14,7 @@ import {
   whenPresent,
 } from "./field-checks";
 import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
+import { MAX_FORGETS_PER_WINDOW } from "./forget-window";
 import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
 import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
@@ -62,6 +63,8 @@ export type Settings = {
   lastFinish?: FinishRecord;
   /** The hour's budget of finishes (Ruling 15). */
   finishWindow?: FinishWindow;
+  /** The hour's budget of forgets asked by a Naka tab (a forged unticked « vu »). */
+  forgetWindow?: FinishWindow;
   /** The end of a viewing, per kind (each on the grid of THRESHOLD_CHOICES). Absent: the defaults. */
   thresholds?: Thresholds;
   /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
@@ -78,6 +81,7 @@ const KEYS = valuesOf<keyof Settings>({
   lastRun: true,
   lastFinish: true,
   finishWindow: true,
+  forgetWindow: true,
   thresholds: true,
   pauseFromPercent: true,
   lastAnswer: true,
@@ -140,6 +144,10 @@ export function parseFinish(raw: unknown): FinishRecord {
   };
 }
 
+function parseForgetWindow(raw: unknown): FinishWindow {
+  return parseWindow(raw, "settings.forgetWindow", MAX_FORGETS_PER_WINDOW);
+}
+
 function parseFinishWindow(raw: unknown): FinishWindow {
   return parseWindow(raw, "settings.finishWindow", MAX_FINISHES_PER_WINDOW);
 }
@@ -158,6 +166,7 @@ export function parseSettings(raw: unknown): Settings {
   );
   const lastFinish = whenPresent(record.lastFinish, parseFinish);
   const finishWindow = whenPresent(record.finishWindow, parseFinishWindow);
+  const forgetWindow = whenPresent(record.forgetWindow, parseForgetWindow);
   const thresholds = whenPresent(record.thresholds, parseThresholds);
   const pauseFromPercent = whenPresent(
     record.pauseFromPercent,
@@ -173,6 +182,7 @@ export function parseSettings(raw: unknown): Settings {
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(finishWindow === undefined ? {} : { finishWindow }),
+    ...(forgetWindow === undefined ? {} : { forgetWindow }),
     ...(thresholds === undefined ? {} : { thresholds }),
     ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
     ...(lastAnswer === undefined ? {} : { lastAnswer }),

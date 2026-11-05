@@ -12,6 +12,7 @@ import {
   isTrustedSender,
   parseToWorker,
   type Sender,
+  type SenderRole,
   type ToWorker,
 } from "../ext/messages";
 import type { RatingCardMessage } from "../ext/rating-messages";
@@ -19,6 +20,7 @@ import { createActivity, overlapping } from "./activity";
 import { answerRead, type Respond } from "./answer-read";
 import { createDebounce } from "./debounce";
 import { createFinishQueue } from "./finish-queue";
+import { createForgetQueue } from "./forget-queue";
 import type { JobQueue } from "./job-queue";
 import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
@@ -63,6 +65,9 @@ export function createRouter(deps: RouterDeps): Router {
     (msg) => jobs.finishJob(msg),
   );
 
+  const tabForgets = createForgetQueue(enqueue, (msg) =>
+    jobs.forgetHandledFromTab(msg),
+  );
   const questions = createQuestionRoutes(enqueue, jobs);
 
   // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
@@ -106,7 +111,11 @@ export function createRouter(deps: RouterDeps): Router {
     return false;
   }
 
-  function dispatch(msg: ToWorker, respond: Respond): boolean {
+  function dispatch(
+    msg: ToWorker,
+    respond: Respond,
+    role: SenderRole,
+  ): boolean {
     switch (msg.type) {
       case "naka-ready":
         sync("naka-ready");
@@ -154,7 +163,13 @@ export function createRouter(deps: RouterDeps): Router {
           respond,
         );
       case "forget-handled":
-        return queued(() => enqueue(() => jobs.forgetHandled(msg)), respond);
+        return queued(
+          () =>
+            role === "naka-tab"
+              ? tabForgets(msg)
+              : enqueue(() => jobs.forgetHandled(msg)),
+          respond,
+        );
       case "handled-titles":
         answerRead(() => jobs.handledTitles(), respond);
         return true;
@@ -177,7 +192,7 @@ export function createRouter(deps: RouterDeps): Router {
       if (msg === undefined) return false;
       const role = isTrustedSender(sender, deps.extensionId);
       if (role === undefined || !allowedFor(role, msg)) return false;
-      return dispatch(msg, respond);
+      return dispatch(msg, respond, role);
     },
   };
 }
