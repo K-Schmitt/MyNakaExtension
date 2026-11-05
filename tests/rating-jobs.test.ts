@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import type { RatingCard } from "../src/core/rating-cards";
+import { emptyState } from "../src/core/state";
 import { JobRejected } from "../src/ext/job-error";
 import type { Settings } from "../src/ext/settings";
 import {
@@ -605,13 +606,13 @@ describe("rate", () => {
     expect(w.nk.calls).toEqual([]);
   });
 
-  it("a content already handled whose card is gone is not rated, and nothing throws (known limit)", async () => {
+  it("a content already handled whose card is gone is rated from a card rebuilt read-only (Ruling L2)", async () => {
     const w = world();
     await w.jobs.finishJob(finished());
     w.area.data.delete("ratings");
     w.sk.calls.length = 0;
     await expect(w.jobs.rate(rate("film", 7))).resolves.toBeUndefined();
-    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(writesOf(w.sk.calls)).toEqual(["rate:1003:7"]);
   });
 
   it("a forged sequence of 50 rates for keys never finished sends no ProductRate", async () => {
@@ -731,6 +732,206 @@ describe("rate: the binding is checked before the write (Plan 3)", () => {
     await w.jobs.finishJob(finished());
     await w.jobs.rate(rate("film", 7));
     expect(ratesOf(w.sk.calls)).toEqual(["rate:1003:7"]);
+  });
+});
+
+describe("rate a handled title that has no card (Ruling L2)", () => {
+  const FILM_PAIR = { nakaId: FILM, scId: 1003 };
+  const SERIES_PAIR = { nakaId: SERIES, scId: 1007 };
+  const LAST: Settings["lastFinish"] = {
+    at: 1,
+    key: "movie:3",
+    outcome: "done",
+  };
+  // Finished under Plan 3, or before its card existed: handled, mapped, no card.
+  function handled(
+    o: Opts,
+    keys: string[],
+    mapping = [FILM_PAIR, SERIES_PAIR],
+  ) {
+    const w = world({ settings: { mode: "live", lastFinish: LAST }, ...o });
+    w.area.data.set("state", {
+      ...emptyState(),
+      mapping,
+      settled: [FILM_PAIR],
+      handled: keys,
+    });
+    return w;
+  }
+  const markDones = (calls: string[]) =>
+    calls.filter((c) => c.startsWith("markDone"));
+
+  it("a handled film: one ProductRate on its mapped product, no markDone, no unwish, lastFinish unchanged, and a card with the rating", async () => {
+    const w = handled({}, ["movie:3"]);
+    await w.jobs.rate(rate("film", 8));
+    expect(writesOf(w.sk.calls)).toEqual(["rate:1003:8"]);
+    expect(w.settings().lastFinish).toEqual(LAST);
+    expect(w.settings().finishWindow).toBeUndefined();
+    expect(w.cards()).toEqual([
+      {
+        key: "movie:3",
+        contentId: 3,
+        title: "Film 3",
+        at: NOW,
+        targets: [{ label: "film", productId: 1003, current: 8 }],
+        pending: [],
+        given: { film: 8 },
+        seriesFinished: false,
+      },
+    ]);
+  });
+
+  it("its reads: one Naka content read first, through the Naka limiter, then the product's state", async () => {
+    const w = handled({}, ["movie:3"]);
+    await w.jobs.rate(rate("film", 8));
+    expect(w.nk.calls).toEqual(["contentById:3"]);
+    expect(w.slots).toEqual(["limit:naka"]);
+    expect(w.sk.calls).toEqual(["productState:1003", "rate:1003:8"]);
+  });
+
+  it("a handled episode: one seasonInfo, then one ProductRate on the episode product, no markDone", async () => {
+    const w = handled({}, ["tv:7:S1E2"]);
+    await w.jobs.rate(
+      rate("épisode", 7, { contentId: SERIES, season: 1, episode: 2 }),
+    );
+    expect(w.sk.calls).toEqual([
+      "seasonInfo:1007:1",
+      "productState:5002",
+      "rate:5002:7",
+    ]);
+    expect(markDones(w.sk.calls)).toEqual([]);
+    expect(w.cards()[0]).toMatchObject({
+      key: "tv:7:S1E2",
+      contentId: 7,
+      title: "Serie 7",
+      season: 1,
+      episode: 2,
+      targets: [{ label: "épisode", productId: 5002, current: 7 }],
+      given: { épisode: 7 },
+      seriesFinished: false,
+    });
+  });
+
+  it("the owner's current rating is kept on the card's target until the rate", async () => {
+    const w = handled(
+      {
+        sc: {
+          rate: async () => {
+            throw new ScUnavailableError("x");
+          },
+        },
+        rated: { 1003: 6 },
+      },
+      ["movie:3"],
+    );
+    await w.jobs.rate(rate("film", 8));
+    expect(w.cards()[0]).toMatchObject({
+      targets: [{ label: "film", productId: 1003, current: 6 }],
+      pending: ["film"],
+      failed: { label: "film", error: "unavailable" },
+    });
+  });
+
+  it("checkBinding throwing other-account: zero ProductRate, and a card with the failure", async () => {
+    const w = handled({ username: { current: "intruder" } }, ["movie:3"]);
+    w.area.data.set("settings", { mode: "live", binding: BOUND });
+    await w.jobs.rate(rate("film", 8));
+    expect(ratesOf(w.sk.calls)).toEqual([]);
+    expect(writesOf(w.sk.calls)).toEqual([]);
+    expect(w.cards()[0]).toMatchObject({
+      key: "movie:3",
+      pending: ["film"],
+      given: {},
+      failed: { label: "film", error: "other-account", at: NOW },
+    });
+  });
+
+  it("a forged rate for a key that is NOT handled takes 4a's path: the explicit finish, its budget, then the rate", async () => {
+    const w = handled({}, []);
+    await w.jobs.rate(rate("film", 8));
+    expect(writesOf(w.sk.calls)).toEqual([
+      "markDone:1003:2026-11-04",
+      "rate:1003:8",
+    ]);
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "movie:3",
+      outcome: "done",
+    });
+    expect(w.settings().finishWindow?.count).toBe(1);
+  });
+
+  it("a handled key with no mapping: zero ProductRate, nothing stored", async () => {
+    const w = handled({}, ["movie:3"], []);
+    await w.jobs.rate(rate("film", 8));
+    expect(w.sk.calls).toEqual([]);
+    expect(w.area.data.has("ratings")).toBe(false);
+  });
+
+  it("a handled key rated with a saison or a série label: nothing at all", async () => {
+    const w = handled({}, ["tv:7:S1E2"]);
+    const ids = { contentId: SERIES, season: 1, episode: 2 };
+    await w.jobs.rate(rate("saison", 7, ids));
+    await w.jobs.rate(rate("série", 7, ids));
+    expect(w.sk.calls).toEqual([]);
+    expect(w.nk.calls).toEqual([]);
+    expect(w.area.data.has("ratings")).toBe(false);
+  });
+
+  it("a product of the wrong universe: zero ProductRate, nothing stored", async () => {
+    const film = handled({}, ["movie:3"], [{ nakaId: FILM, scId: 1007 }]);
+    await film.jobs.rate(rate("film", 8));
+    const episodeOfFilm = handled(
+      {
+        sc: {
+          productState: async () => ({
+            isDone: true,
+            isWished: false,
+            universe: 1,
+            rating: null,
+          }),
+        },
+      },
+      ["tv:7:S1E2"],
+    );
+    await episodeOfFilm.jobs.rate(
+      rate("épisode", 7, { contentId: SERIES, season: 1, episode: 2 }),
+    );
+    for (const w of [film, episodeOfFilm]) {
+      expect(ratesOf(w.sk.calls)).toEqual([]);
+      expect(w.area.data.has("ratings")).toBe(false);
+    }
+  });
+
+  it("an episode SensCritique does not list, or a Naka content of the other kind: nothing stored", async () => {
+    const missing = handled({ episodesPerSeason: 1 }, ["tv:7:S1E2"]);
+    await missing.jobs.rate(
+      rate("épisode", 7, { contentId: SERIES, season: 1, episode: 2 }),
+    );
+    const otherKind = handled({}, ["movie:7"]);
+    await otherKind.jobs.rate(rate("film", 7, { contentId: SERIES }));
+    for (const w of [missing, otherKind]) {
+      expect(ratesOf(w.sk.calls)).toEqual([]);
+      expect(w.area.data.has("ratings")).toBe(false);
+    }
+    expect(otherKind.sk.calls).toEqual([]);
+  });
+
+  it("Naka not knowing the content: nothing stored, nothing thrown", async () => {
+    const w = handled({ naka: { contentById: async () => undefined } }, [
+      "movie:3",
+    ]);
+    await expect(w.jobs.rate(rate("film", 8))).resolves.toBeUndefined();
+    expect(w.sk.calls).toEqual([]);
+    expect(w.area.data.has("ratings")).toBe(false);
+  });
+
+  it("a forged flood of rates for handled keys makes no write but the rates of mapped titles", async () => {
+    const w = handled({}, ["movie:3", "movie:40", "tv:7:S9E9"]);
+    await w.jobs.rate(rate("film", 5, { contentId: 40 }));
+    await w.jobs.rate(
+      rate("épisode", 5, { contentId: SERIES, season: 9, episode: 9 }),
+    );
+    expect(writesOf(w.sk.calls)).toEqual([]);
   });
 });
 

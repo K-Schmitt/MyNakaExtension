@@ -1,7 +1,8 @@
 // The rating jobs. A rating goes out only for a target of a STORED card: the worker never takes a product id
-// from a message. The card is the one the finish made, or the one the explicit finish of the pause case makes
-// here (a film or an épisode only: a saison or a série is never rated without its card). The binding is
-// checked before the write, as the finish does. A failure is stored on the card as a code, never as text.
+// from a message. The card is the one the finish made, the one the explicit finish of the pause case makes
+// here, or, for a title already handled, the one rebuilt read-only (handled-card.ts). A film or an épisode
+// only: a saison or a série is never rated without its card. The binding is checked before the write, as
+// the finish does. A failure is stored on the card as a code, never as text.
 
 import { cardlessLabel } from "../core/cardless-label";
 import { contentKeyOf } from "../core/finish-event";
@@ -14,11 +15,13 @@ import {
   type RatingCard,
   type RatingLabel,
 } from "../core/rating-cards";
+import { isHandled } from "../core/state";
 import type { DismissRatingMessage, RateMessage } from "../ext/rating-messages";
 import type { Store } from "../ext/store";
 import { checkBinding } from "./binding";
 import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
+import { handledCard } from "./handled-card";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
 
@@ -33,16 +36,34 @@ function foundIn(
   return target === undefined ? undefined : { cards, target };
 }
 
-// The card's target, or none. With no card, a film or an épisode runs its explicit finish first (the
-// design's §2.4 pause case), through the same job as any finish: its pre-check, its budget, its binding.
+// With no card, a film or an épisode runs its explicit finish first (the design's §2.4 pause case), through
+// the same job as any finish: its pre-check, its budget, its binding. A title already handled (finished
+// under Plan 3, or before its card existed) has a free finish that makes no card: its card is built
+// read-only instead (Ruling L2), with no write and no finish record.
+async function makeCard(
+  deps: JobDeps,
+  msg: RateMessage,
+  cards: RatingCard[],
+): Promise<void> {
+  const key = contentKeyOf(msg);
+  const cardless = cardFor(cards, key) === undefined;
+  if (cardless && isHandled(await deps.store.loadState(), key)) {
+    await handledCard(deps, msg);
+    return;
+  }
+  await finishJob(deps, explicitFinish(msg));
+}
+
+// The card's target, or none.
 async function targetFor(
   deps: JobDeps,
   msg: RateMessage,
 ): Promise<Found | undefined> {
   const key = contentKeyOf(msg);
-  const known = foundIn(await deps.store.loadRatings(), key, msg.label);
+  const cards = await deps.store.loadRatings();
+  const known = foundIn(cards, key, msg.label);
   if (known !== undefined || cardlessLabel(msg) !== msg.label) return known;
-  await finishJob(deps, explicitFinish(msg));
+  await makeCard(deps, msg, cards);
   return foundIn(await deps.store.loadRatings(), key, msg.label);
 }
 
