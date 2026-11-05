@@ -340,6 +340,14 @@ describe("O10 no tabs call once the job lost its tab", () => {
     expect(fired(w)).toEqual(["O10 lost tab"]);
   });
 
+  it("fires on a send to another tab after the allowed query", async () => {
+    const { w, tabs } = await pinnedThenRefused();
+    w.orphans = [ORPHAN];
+    await tabs.query("https://naka.cx/*");
+    await expect(tabs.send(ORPHAN, ACCOUNT)).rejects.toThrow();
+    expect(fired(w)).toEqual(["O10 lost tab"]);
+  });
+
   it("fires on a send after the pinned tab refused a send", async () => {
     const { w, tabs } = await pinnedThenRefused();
     await expect(tabs.send(LIVE_TAB, ACCOUNT)).rejects.toThrow();

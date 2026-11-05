@@ -378,6 +378,65 @@ describe("sync job: year, type and the product label in the preview", () => {
     );
   });
 
+  it("25 planned writes: next is the first 10 deferred, with 10 Naka title reads for them", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => i + 1);
+    const late: number[] = [];
+    const w = world({
+      state: {
+        ...emptyState(),
+        mapping: many.map((n) => ({ nakaId: n, scId: 1000 + n })),
+      },
+      naka: catalogueNaka({
+        playlistIds: async () => many,
+        contentById: async (id) => {
+          if (id > 10) late.push(id);
+          return naka(id);
+        },
+      }),
+      sc: catalogueSc({ readWishlist: async () => [] }),
+    });
+    await w.jobs.syncJob("button");
+    const run = w.settings().lastRun;
+    expect(run?.report?.deferred).toHaveLength(15);
+    expect(run?.next?.map((item) => item.title)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `Film ${11 + i}`),
+    );
+    expect(late).toHaveLength(10);
+  });
+
+  it("a mix of both sides: Naka-side items are titled from the wishlist, in order", async () => {
+    const w = world({
+      state: {
+        ...emptyState(),
+        mapping: Array.from({ length: 15 }, (_, i) => ({
+          nakaId: i + 1,
+          scId: 1001 + i,
+        })),
+      },
+      naka: catalogueNaka({
+        playlistIds: async () => Array.from({ length: 12 }, (_, i) => i + 1),
+        contentById: async (id) => naka(id),
+      }),
+      sc: catalogueSc({
+        readWishlist: async () => [sc(1013), sc(1014), sc(1015)],
+      }),
+    });
+    await w.jobs.syncJob("button");
+    const film = (side: "sc" | "naka", n: number) => ({
+      side,
+      title: `Film ${n}`,
+      year: 2000 + n,
+      type: "film",
+    });
+    expect(w.settings().lastRun?.next).toEqual([
+      film("sc", 11),
+      film("sc", 12),
+      film("naka", 13),
+      film("naka", 14),
+      film("naka", 15),
+    ]);
+  });
+
   it("the next pass is listed in live mode too", async () => {
     const w = world({
       ...fifteenMapped(),

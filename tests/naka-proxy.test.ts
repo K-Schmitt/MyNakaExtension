@@ -8,6 +8,7 @@ import {
   type TabsPort,
   type Timer,
 } from "../src/sw/naka-proxy";
+import { pinFirstAnswering } from "../src/sw/pinned-tab";
 import {
   clientOn,
   failure,
@@ -342,6 +343,35 @@ describe("pinning the first tab that answers", () => {
     expect((error as JobRejected).code).toBe("no-naka-tab");
     expect(strings(error).join("|")).not.toContain(MARKER);
     expect(queries).toBe(2);
+  });
+
+  it("a query that never settles after the pinned tab refused still latches the loss", async () => {
+    const sends: number[] = [];
+    let queries = 0;
+    const port: TabsPort = {
+      query: () => {
+        queries += 1;
+        if (queries === 1) return Promise.resolve([{ id: 31 }]);
+        return new Promise(() => undefined);
+      },
+      send: async (id) => {
+        sends.push(id);
+        if (sends.length > 1) throw new Error(MARKER);
+        return ok([1]);
+      },
+    };
+    const exchange = pinFirstAnswering(port);
+    await exchange({ type: "naka-call", call: "playlistIds" });
+    void exchange({ type: "naka-call", call: "playlistIds" }).catch(
+      () => undefined,
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    const second = await failure(
+      exchange({ type: "naka-call", call: "playlistIds" }),
+    );
+    expect((second as JobRejected).code).toBe("no-naka-tab");
+    expect(sends).toEqual([31, 31]);
   });
 
   it("a send that rejects before any pin asks nothing more: no-naka-tab", async () => {
