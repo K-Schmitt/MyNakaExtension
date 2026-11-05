@@ -191,6 +191,78 @@ de visionnage, page d'état minimale. L'interface complète vient au Plan 4.
 - Aperçu des écritures reportées.
 - Le nom du titre dans la ligne de fin de visionnage.
 
+## 2026-11-04 — Recette du Plan 3
+
+La recette dans Brave a validé le moteur :
+- 265 films et séries lus dans les envies, soit les 268 envies moins 1 livre et 2 jeux ;
+- les fins d'épisode par seuil et par le bouton « vu » de Naka ;
+- le passage automatique à l'épisode suivant ;
+- la synchronisation après un changement de « Ma liste » ;
+- les messages de session expirée et d'onglet absent.
+
+Le 2026-11-04 à 20:11, le propriétaire a passé les listes en écritures actives. Le premier passage a
+écrit 10 titres, justes des deux côtés.
+
+Faits appris pendant la recette :
+- marquer un épisode vu laisse la série dans les envies ;
+- le propriétaire quitte au début du générique, vers 84 % pour un épisode d'« Un Job Mortel ».
+
+## 2026-11-05 — Plan 4a : noter depuis Naka
+
+Ce plan ajoute la note sur SensCritique sans quitter Naka : à la fin d'un visionnage, sur la pause, et
+dans une liste « À noter » sur l'accueil. La page de l'extension gagne des réglages.
+
+### Décisions
+- **Seuils par type.** 90 % pour un film, 80 % pour un épisode, réglables parmi 80, 85, 90, 95 et
+  99 %. Le seuil à 80 % vient de l'habitude du propriétaire de quitter au générique. L'ancien seuil
+  unique reste dans l'état enregistré, mais il n'est plus lu.
+- **Une note vaut « vu ».** Noter à la pause un titre pas encore vu le marque d'abord vu, comme le
+  bouton « vu » de Naka. Le propriétaire l'a validé.
+- **Une fiche de note par titre fini**, gardée par l'extension (100 au plus). Elle dit quoi noter :
+  le film, ou l'épisode, puis la saison et la série quand elles sont finies.
+- **La fin d'une saison se juge sur Naka** (`available-seasons`), qui donne le nombre d'épisodes de
+  chaque saison. Si Naka ne répond pas, la liste d'épisodes de SensCritique prend le relais.
+- **Moyennes de départ.** La saison propose la moyenne arrondie des notes d'épisodes données par
+  l'extension, et la série celle des saisons.
+- **Une série pas finie demande confirmation**, dans le bloc lui-même : SensCritique retire de vos
+  envies une série que vous notez. Une fenêtre du navigateur aurait fait quitter le plein écran.
+- **Le mode simulation ne concerne que les listes.** Une note est un clic sur un titre : elle part
+  dans les deux modes.
+- **Un clic, une note.**
+  - Une note ne part que sur un vrai clic dans un bloc de l'extension, isolé de la page Naka.
+  - Un clic n'est pris en compte que 0,4 s après l'apparition du bloc.
+  - Après le clic, le bloc reste verrouillé sur « Envoi de la note… » jusqu'à ce que la fiche montre
+    la note.
+  - Si la note ne part pas, le bloc dit pourquoi.
+- **L'extension dit quelles notes sont en cours d'envoi.** Une note qui attend derrière une
+  synchronisation reste affichée verrouillée partout, même après un aller-retour sur l'accueil, donc
+  un second clic ne la renvoie pas.
+- **Vérification des comptes avant chaque note**, comme pour une fin de visionnage.
+- **Rien ne gêne le lecteur.**
+  - Un clic sur un bloc n'atteint pas le lecteur de Naka.
+  - Les blocs restent hors des commandes du bas, et ceux du lecteur se ferment quand on quitte le
+    lecteur.
+  - L'extension ne met jamais la vidéo en pause.
+
+### Rejeté
+- Lire la saison et la série sur SensCritique d'abord : la conception validée juge la fin sur ce que
+  Naka propose.
+- Fermer le bloc deux secondes après un clic : pendant une synchronisation, la note n'était pas encore
+  partie, et un second clic la renvoyait.
+- Lire le nombre de saisons dans la réponse SensCritique d'un produit : la valeur ne servait à rien,
+  et une valeur inattendue aurait bloqué tout le moteur.
+
+### Reporté au Plan 4b
+- Répondre aux titres ambigus (dans le bloc de fin et sur l'accueil) et aux retraits ; relier les
+  titres non reliés.
+- « Oublier les comptes liés » et « Réinitialiser ».
+- Les reprises du Plan 3 :
+  - l'année dans l'aperçu ;
+  - le message trompeur quand l'onglet change de page ;
+  - la fermeture d'un retrait sans objet ;
+  - le nom du titre dans la ligne de fin de visionnage.
+- Une note donnée à la pause sur un titre ambigu ne part pas : la question passe d'abord.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
@@ -200,3 +272,6 @@ de visionnage, page d'état minimale. L'interface complète vient au Plan 4.
 - Un plafond contre les abus se compte sur l'action qui coûte (un appel réseau, une écriture), pas
   sur les messages reçus. Les messages que l'on peut trancher sur place passent gratuitement :
   sinon l'usage normal, qui répète les messages, épuise le plafond.
+- Un bloc qui écrit sur un vrai compte doit savoir si son écriture attend encore. Une relecture à
+  heure fixe ne suffit pas quand la file de l'extension peut être occupée plusieurs minutes. La file,
+  qui sait, doit le dire.

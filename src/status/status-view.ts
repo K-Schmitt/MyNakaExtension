@@ -2,6 +2,7 @@
 
 import type { Mode } from "../ext/settings";
 import type { StatusSnapshot } from "../sw/status-snapshot";
+import { type SettingsView, toSettingsView } from "./settings-view";
 import { pendingModeLine, runningLine } from "./status-activity-lines";
 import type { StatusFormat } from "./status-format";
 import { readSnapshot } from "./status-input";
@@ -26,9 +27,13 @@ export type StatusView =
       switchLabel?: string;
       /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
       inProgress: boolean;
+      /** A settings change waits or runs in the worker: the values shown may be the old ones. */
+      settingsPending: boolean;
       previewCount: number;
       lines: string[];
       preview: string[];
+      /** The « Réglages » section; absent while the settings cannot be read. */
+      settings?: SettingsView;
     };
 
 export const LOADING_VIEW: StatusView = {
@@ -86,12 +91,23 @@ function previewLines(snapshot: StatusSnapshot): string[] {
   return (snapshot.lastRun?.preview ?? []).map(previewLine);
 }
 
+// Both come together or not at all, like the worker's answer.
+function settingsOf(snapshot: StatusSnapshot): { settings?: SettingsView } {
+  const { thresholds, pauseFromPercent } = snapshot;
+  if (thresholds === undefined || pauseFromPercent === undefined) return {};
+  return { settings: toSettingsView(thresholds, pauseFromPercent) };
+}
+
 function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
   const preview = previewLines(snapshot);
   const base = {
+    ...settingsOf(snapshot),
     kind: "ready" as const,
     inProgress:
-      snapshot.running !== undefined || snapshot.pendingMode !== undefined,
+      snapshot.running !== undefined ||
+      snapshot.pendingMode !== undefined ||
+      snapshot.pendingSettings !== undefined,
+    settingsPending: snapshot.pendingSettings !== undefined,
     previewCount: preview.length,
     lines: viewLines(snapshot, format),
     preview,

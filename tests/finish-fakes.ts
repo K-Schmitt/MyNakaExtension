@@ -95,7 +95,11 @@ export function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export type Flags = { isDone: boolean; isWished: boolean };
+export type Flags = {
+  isDone: boolean;
+  isWished: boolean;
+  rating?: number | null;
+};
 export type Port =
   | "load"
   | "searchSc"
@@ -146,8 +150,16 @@ export function world(o: Opts = {}) {
     productState: async (id) => {
       w.calls.push(`productState:${id}`);
       failing("productState");
-      const flags = o.flags?.[id] ?? { isDone: false, isWished: true };
-      return { ...flags, universe: universeOf(id) };
+      const { isDone, isWished, rating } = o.flags?.[id] ?? {
+        isDone: false,
+        isWished: true,
+      };
+      return {
+        isDone,
+        isWished,
+        rating: rating ?? null,
+        universe: universeOf(id),
+      };
     },
     unwish: async (id) => {
       w.calls.push(`unwish:${id}`);

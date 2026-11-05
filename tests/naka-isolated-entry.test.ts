@@ -23,6 +23,7 @@ const runtimeListeners: Listener[] = [];
 const toWorker: unknown[] = [];
 const intervals: { ms: number; fn: () => void }[] = [];
 const pageListeners: { type: string; fn: PageListener }[] = [];
+const documentListeners: { type: string; fn: unknown; capture: boolean }[] = [];
 const requests: { url: string; init: RequestInit }[] = [];
 
 const page = {
@@ -65,6 +66,9 @@ beforeAll(async () => {
         : null,
   });
   vi.stubGlobal("document", {
+    addEventListener: (type: string, fn: unknown, capture: boolean) => {
+      documentListeners.push({ type, fn, capture });
+    },
     querySelector: (selector: string) =>
       selector === "video" ? player.video : null,
   });
@@ -103,6 +107,13 @@ describe("isolated-world entry", () => {
     expect(runtimeListeners).toHaveLength(1);
     expect(pageListeners.map((l) => l.type)).toEqual(["message"]);
     expect(intervals.map((i) => i.ms).sort()).toEqual([1000, 5000]);
+  });
+
+  it("listens to the video's pause and play on the document, in capture", () => {
+    expect(documentListeners.map((l) => [l.type, l.capture])).toEqual([
+      ["pause", true],
+      ["play", true],
+    ]);
   });
 
   it("runs the worker's calls with the page's token, sent only to the Naka API", async () => {
@@ -158,6 +169,17 @@ describe("isolated-world entry", () => {
     });
     await settle();
     expect(toWorker.slice(before)).toEqual([{ type: "playlist-changed" }]);
+  });
+
+  it("asks the worker for the cards to rate when the URL poll finds the home page", async () => {
+    const before = toWorker.length;
+    vi.stubGlobal("location", { href: "https://naka.cx/" });
+    for (const { ms, fn } of intervals) if (ms === 1000) fn();
+    await settle();
+    vi.stubGlobal("location", { href: PLAYER });
+    for (const { ms, fn } of intervals) if (ms === 1000) fn();
+    await settle();
+    expect(toWorker.slice(before)).toEqual([{ type: "rating-cards" }]);
   });
 
   it("nothing it sent or answered holds the token or the e-mail", async () => {

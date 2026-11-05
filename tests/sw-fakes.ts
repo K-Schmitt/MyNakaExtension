@@ -50,7 +50,12 @@ export function fakeSc(over: Partial<ScClient> = {}) {
     markDone: async () => undefined,
     unmarkDone: async () => undefined,
     rate: async () => undefined,
-    productState: async () => ({ isDone: false, isWished: false, universe: 1 }),
+    productState: async () => ({
+      isDone: false,
+      isWished: false,
+      universe: 1,
+      rating: null,
+    }),
     readWishlist: async () => [],
     search: async () => [],
     seasonInfo: async () => ({ episodes: [] }),
@@ -105,6 +110,7 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     removeFromPlaylist: async () => undefined,
     search: async () => [],
     contentById: async () => undefined,
+    availableSeasons: async () => undefined,
     ...over,
   };
   const client: NakaClient = {
@@ -127,6 +133,10 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     contentById: (id) => {
       calls.push(`contentById:${id}`);
       return base.contentById(id);
+    },
+    availableSeasons: (id) => {
+      calls.push(`availableSeasons:${id}`);
+      return base.availableSeasons(id);
     },
   };
   return { client, calls };

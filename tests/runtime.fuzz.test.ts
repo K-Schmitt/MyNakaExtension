@@ -15,13 +15,13 @@ import {
   observed,
   oracleOf,
   ownerEdit,
+  randomThresholds,
   SERIES,
   scFor,
   scUsernameFor,
   sentFinish,
-  setThreshold,
+  setThresholds,
   storageFor,
-  THRESHOLDS,
   TITLES,
   tabsFor,
   type World,
@@ -50,7 +50,7 @@ import {
 //       only, with no new lookup (Rulings 9 and 20); orphan tabs, with no content script, come first;
 //   O12 a status answer, given at once outside the queue, never writes storage (Ruling 20);
 //   O13 the owner's first rule: every SensCritique finish write (markDone, unwish) comes from a finished
-//       message a Naka tab sent, explicit or with a progress at least the threshold stored at that moment;
+//       message a Naka tab sent, explicit or with a progress at least the threshold of its kind stored at that moment;
 //   plus: never a removal from Naka, an "undone", a rating, or an unwish of anything but a film.
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
@@ -137,7 +137,7 @@ function finishedFor(w: World): Record<string, unknown> {
   const base = {
     type: "finished",
     source: w.r() < 0.4 ? "explicit" : "threshold",
-    progress: w.r() < 0.5 ? pick(w, [0.85, 0.9, 0.95, 0.99, 1]) : w.r(),
+    progress: w.r() < 0.5 ? pick(w, [0.8, 0.85, 0.9, 0.95, 0.99, 1]) : w.r(),
     contentId: n,
   };
   if (FILMS.includes(n) || w.r() < 0.1) return base;
@@ -258,7 +258,7 @@ async function step(w: World, worker: Worker): Promise<Worker> {
     switchAccount(w);
   } else if (a < 0.645) {
     await drain();
-    setThreshold(w, pick(w, THRESHOLDS));
+    setThresholds(w, randomThresholds(w.r));
   } else if (a < 0.665) {
     w.gen += 1;
     w.log.push("worker restart");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type FinishEvent, handleFinish } from "../src/core/finish-handler";
+import { DEFAULT_THRESHOLDS, type Thresholds } from "../src/core/watch-trigger";
 import {
   asEvent,
   cand,
@@ -151,7 +152,9 @@ describe("the event is checked before any port call", () => {
     "rejects %s with a RangeError and calls no port",
     async (_name, event, message) => {
       const w = world();
-      const error = await failure(handleFinish(event, w.ports));
+      const error = await failure(
+        handleFinish(event, w.ports, DEFAULT_THRESHOLDS),
+      );
       expect(error).toBeInstanceOf(RangeError);
       expect(error.message).toBe(message);
       expect(w.calls).toEqual([]);
@@ -164,9 +167,9 @@ describe("the event is checked before any port call", () => {
       progress: Number.NaN,
       naka: { ...MOVIE, contentId: 0 },
     });
-    expect((await failure(handleFinish(event, w.ports))).message).toBe(
-      CONTENT_ID,
-    );
+    expect(
+      (await failure(handleFinish(event, w.ports, DEFAULT_THRESHOLDS))).message,
+    ).toBe(CONTENT_ID);
   });
 
   it.each([
@@ -186,9 +189,9 @@ describe("the event is checked before any port call", () => {
     ],
   ])("accepts %s", async (_name, event) => {
     const w = world({ search: { " Le Film ": [cand(FILM_SC, FILM_TITLE)] } });
-    expect(await handleFinish(event, w.ports)).toEqual({
+    expect(await handleFinish(event, w.ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "done",
-      ratingTargets: [{ label: "film", productId: FILM_SC }],
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
     });
   });
 
@@ -201,24 +204,34 @@ describe("the event is checked before any port call", () => {
     ["no originalTitle", withTitled({ originalTitle: undefined })],
   ])("accepts %s and goes on to the load", async (_name, event) => {
     const w = world();
-    await handleFinish(event, w.ports);
+    await handleFinish(event, w.ports, DEFAULT_THRESHOLDS);
     expect(w.calls[0]).toBe("load");
   });
 
   it("accepts season 1 episode 1", async () => {
     const w = world();
-    const outcome = await handleFinish(episode(1, 1), w.ports);
+    const outcome = await handleFinish(
+      episode(1, 1),
+      w.ports,
+      DEFAULT_THRESHOLDS,
+    );
     expect(outcome.kind).toBe("done");
     expect(w.calls).toContain("markDone:5001:2026-11-03");
   });
 });
 
+const both = (threshold: number): Thresholds => ({
+  film: threshold,
+  episode: threshold,
+});
+
 describe("order of the run: load, threshold, handled", () => {
   it("a load that fails rejects with no other call", async () => {
     const w = world({ fail: ["load"] });
-    expect((await failure(handleFinish(film(), w.ports))).message).toBe(
-      "load failed",
-    );
+    expect(
+      (await failure(handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)))
+        .message,
+    ).toBe("load failed");
     expect(w.calls).toEqual(["load"]);
   });
 
@@ -230,26 +243,30 @@ describe("order of the run: load, threshold, handled", () => {
     ["explicit", 0],
     ["explicit", Number.NaN],
   ] as const)(
-    "a %s event with a stored threshold of %s rejects after the load only",
+    "a %s event with a threshold of %s rejects after the load only",
     async (source, threshold) => {
-      const w = world({ state: { threshold } });
-      const error = await failure(handleFinish(film({ source }), w.ports));
+      const w = world();
+      const error = await failure(
+        handleFinish(film({ source }), w.ports, both(threshold)),
+      );
       expect(error).toBeInstanceOf(RangeError);
       expect(error.message).toContain("threshold must be in (0, 1]");
       expect(w.calls).toEqual(["load"]);
     },
   );
 
-  it("a bad stored threshold rejects even for a handled title", async () => {
-    const w = world({ state: { threshold: 0, handled: ["movie:42"] } });
-    expect(await failure(handleFinish(film(), w.ports))).toBeInstanceOf(
-      RangeError,
-    );
+  it("a bad threshold rejects even for a handled title", async () => {
+    const w = world({ state: { handled: ["movie:42"] } });
+    expect(
+      await failure(handleFinish(film(), w.ports, both(0))),
+    ).toBeInstanceOf(RangeError);
   });
 
   it("a low progress on a handled title reports below-threshold", async () => {
     const w = world({ state: { handled: ["movie:42"] } });
-    expect(await handleFinish(film({ progress: 0.5 }), w.ports)).toEqual({
+    expect(
+      await handleFinish(film({ progress: 0.5 }), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "ignored",
       reason: "below-threshold",
     });
@@ -260,7 +277,9 @@ describe("order of the run: load, threshold, handled", () => {
     "a complete %s event on a handled film is ignored after the load only",
     async (source) => {
       const w = world({ state: { handled: ["movie:42"] } });
-      expect(await handleFinish(film({ source }), w.ports)).toEqual({
+      expect(
+        await handleFinish(film({ source }), w.ports, DEFAULT_THRESHOLDS),
+      ).toEqual({
         kind: "ignored",
         reason: "already-handled",
       });
@@ -272,7 +291,9 @@ describe("order of the run: load, threshold, handled", () => {
 describe("threshold", () => {
   it("a threshold event at 0.01 is ignored after the load only (anti-goal)", async () => {
     const w = world();
-    expect(await handleFinish(film({ progress: 0.01 }), w.ports)).toEqual({
+    expect(
+      await handleFinish(film({ progress: 0.01 }), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "ignored",
       reason: "below-threshold",
     });
@@ -284,6 +305,7 @@ describe("threshold", () => {
     const outcome = await handleFinish(
       film({ source: "explicit", progress: 0.01 }),
       w.ports,
+      DEFAULT_THRESHOLDS,
     );
     expect(outcome.kind).toBe("done");
     expect(writesOf(w.calls)).toEqual([
@@ -297,7 +319,7 @@ describe("threshold", () => {
     [episode(1, 2), "markDone:5002:2027-01-31"],
   ])("marks done on the date today() gives", async (event, write) => {
     const w = world({ today: "2027-01-31" });
-    await handleFinish(event, w.ports);
+    await handleFinish(event, w.ports, DEFAULT_THRESHOLDS);
     expect(writesOf(w.calls).slice(-1)).toEqual([write]);
   });
 
@@ -308,10 +330,14 @@ describe("threshold", () => {
     [0.97, 0.96, "ignored"],
     [1, 1, "done"],
   ])(
-    "with a stored threshold of %s, a progress of %s is %s",
+    "with a film threshold of %s, a progress of %s is %s",
     async (threshold, progress, kind) => {
-      const w = world({ state: { threshold } });
-      const outcome = await handleFinish(film({ progress }), w.ports);
+      const w = world();
+      const outcome = await handleFinish(
+        film({ progress }),
+        w.ports,
+        both(threshold),
+      );
       expect(outcome.kind).toBe(kind);
     },
   );
@@ -325,7 +351,9 @@ describe("content keys", () => {
     [["tv:42:S1E1"], "done"],
   ])("handled %j: film 42 is %s", async (handled, kind) => {
     const w = world({ state: { handled } });
-    expect((await handleFinish(film(), w.ports)).kind).toBe(kind);
+    expect((await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS)).kind).toBe(
+      kind,
+    );
   });
 
   it.each([
@@ -339,21 +367,27 @@ describe("content keys", () => {
     "handled %j: S%sE%s of series 7 is %s",
     async (handled, season, number, kind) => {
       const w = world({ state: { handled } });
-      expect((await handleFinish(episode(season, number), w.ports)).kind).toBe(
-        kind,
-      );
+      expect(
+        (
+          await handleFinish(
+            episode(season, number),
+            w.ports,
+            DEFAULT_THRESHOLDS,
+          )
+        ).kind,
+      ).toBe(kind);
     },
   );
 
   it("records movie:<id> after a film", async () => {
     const w = world({ state: { handled: ["other"] } });
-    await handleFinish(film(), w.ports);
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
     expect(w.state.handled).toEqual(["other", "movie:42"]);
   });
 
   it("records tv:<id>:S<s>E<e> after an episode", async () => {
     const w = world();
-    await handleFinish(episode(2, 1), w.ports);
+    await handleFinish(episode(2, 1), w.ports, DEFAULT_THRESHOLDS);
     expect(w.state.handled).toEqual(["tv:7:S2E1"]);
   });
 });

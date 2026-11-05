@@ -7,6 +7,7 @@
 import { NakaUnavailableError } from "./naka-errors";
 import { checkContentId, checkQuery } from "./naka-input";
 import { type NakaItem, toItem, toItems, toPlaylistIds } from "./naka-items";
+import { type NakaSeasons, toSeasons } from "./naka-seasons";
 import {
   isRecord,
   type NakaDeps,
@@ -19,6 +20,7 @@ import {
 export type { Fetch } from "../sc/sc-client";
 export { NakaUnavailableError } from "./naka-errors";
 export type { NakaItem } from "./naka-items";
+export type { NakaSeasons } from "./naka-seasons";
 export type { NakaDeps } from "./naka-transport";
 
 export type NakaClient = {
@@ -27,6 +29,7 @@ export type NakaClient = {
   removeFromPlaylist(contentId: number): Promise<void>;
   search(query: string): Promise<NakaItem[]>;
   contentById(contentId: number): Promise<NakaItem | undefined>;
+  availableSeasons(contentId: number): Promise<NakaSeasons | undefined>;
 };
 
 async function run(deps: NakaDeps, request: Request): Promise<string> {
@@ -97,6 +100,28 @@ async function contentById(
   return item;
 }
 
+// 404 and an answer that does not parse both mean "no season list": the caller keeps its fallback.
+async function availableSeasons(
+  deps: NakaDeps,
+  contentId: number,
+): Promise<NakaSeasons | undefined> {
+  checkContentId(contentId);
+  let text: string;
+  try {
+    text = await run(deps, {
+      method: "GET",
+      path: `/browse/${contentId}/available-seasons`,
+      label: "seasons",
+    });
+  } catch (error) {
+    if (error instanceof NakaUnavailableError && error.status === 404) {
+      return undefined;
+    }
+    throw error;
+  }
+  return toSeasons(parseJson(text, "seasons"));
+}
+
 // The entry is the bare object, or the `data` object of a wrapper that has no `id` of its own.
 function unwrap(json: unknown): unknown {
   if (isRecord(json) && !("id" in json)) {
@@ -112,5 +137,6 @@ export function createNakaClient(deps: NakaDeps): NakaClient {
     removeFromPlaylist: (contentId) => removeFromPlaylist(deps, contentId),
     search: (query) => search(deps, query),
     contentById: (contentId) => contentById(deps, contentId),
+    availableSeasons: (contentId) => availableSeasons(deps, contentId),
   };
 }

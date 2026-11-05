@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { handleFinish } from "../src/core/finish-handler";
 import { emptyState } from "../src/core/state";
+import { DEFAULT_THRESHOLDS } from "../src/core/watch-trigger";
 import {
   ep,
   episode,
@@ -28,7 +29,9 @@ describe("episode", () => {
         },
       };
       const w = world({ seasons });
-      const error = await failure(handleFinish(episode(1, 2), w.ports));
+      const error = await failure(
+        handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+      );
       expect(error.constructor).toBe(Error);
       expect(error.message).toBe(
         "finish: the SensCritique product is not an episode",
@@ -41,13 +44,16 @@ describe("episode", () => {
 
   it("marks the episode done, never unwishes, saves once with the new mapping", async () => {
     const w = world();
-    expect(await handleFinish(episode(1, 2), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "done",
       ratingTargets: [
-        { label: "épisode", productId: 5002 },
-        { label: "saison", productId: SEASON1_SC },
-        { label: "série", productId: SERIES_SC },
+        { label: "épisode", productId: 5002, current: null },
+        { label: "saison", productId: SEASON1_SC, current: null },
+        { label: "série", productId: SERIES_SC, current: null },
       ],
+      lastOfSeason: false,
     });
     expect(w.calls).toEqual([
       "load",
@@ -65,12 +71,15 @@ describe("episode", () => {
 
   it("without a season product, the targets are the episode and the series", async () => {
     const w = world();
-    expect(await handleFinish(episode(2, 1), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(2, 1), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "done",
       ratingTargets: [
-        { label: "épisode", productId: 6001 },
-        { label: "série", productId: SERIES_SC },
+        { label: "épisode", productId: 6001, current: null },
+        { label: "série", productId: SERIES_SC, current: null },
       ],
+      lastOfSeason: true,
     });
     expect(w.calls).toContain("seasonInfo:1007:2");
   });
@@ -83,28 +92,89 @@ describe("episode", () => {
       },
     };
     const w = world({ seasons });
-    await handleFinish(episode(1, 2), w.ports);
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
     expect(writesOf(w.calls)).toEqual(["markDone:5002:2026-11-03"]);
   });
 
   it("an unknown episode is not found: no read of its state, no write, nothing saved", async () => {
     const w = world();
-    expect(await handleFinish(episode(1, 9), w.ports)).toEqual({
+    expect(
+      await handleFinish(episode(1, 9), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "not-found",
     });
     expect(w.calls).toEqual(["load", "searchSc:La Série", "seasonInfo:1007:1"]);
     expect(w.saved).toEqual([]);
   });
 
-  it("an episode already done is not rewritten and prompts nothing", async () => {
-    const w = world({ flags: { 5002: { isDone: true, isWished: true } } });
-    expect(await handleFinish(episode(1, 2), w.ports)).toEqual({
+  it("an episode already done is not rewritten but returns its targets with its rating", async () => {
+    const w = world({
+      flags: { 5002: { isDone: true, isWished: true, rating: 8 } },
+    });
+    expect(
+      await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS),
+    ).toEqual({
       kind: "done",
-      ratingTargets: [],
+      ratingTargets: [
+        { label: "épisode", productId: 5002, current: 8 },
+        { label: "saison", productId: SEASON1_SC, current: null },
+        { label: "série", productId: SERIES_SC, current: null },
+      ],
+      lastOfSeason: false,
     });
     expect(writesOf(w.calls)).toEqual([]);
     expect(w.calls).not.toContain("today");
     expect(w.state.handled).toEqual(["tv:7:S1E2"]);
+  });
+
+  describe("lastOfSeason", () => {
+    const season = (numbers: number[]) => ({
+      [`${SERIES_SC}:1`]: {
+        seasonProductId: SEASON1_SC,
+        episodes: numbers.map((n) => ep(1, n, 5000 + n)),
+      },
+    });
+    const lastOf = async (numbers: number[], played: number) => {
+      const w = world({ seasons: season(numbers) });
+      const outcome = await handleFinish(
+        episode(1, played),
+        w.ports,
+        DEFAULT_THRESHOLDS,
+      );
+      return outcome.kind === "done" ? outcome.lastOfSeason : undefined;
+    };
+
+    it("E3 of a season holding E1 to E3 is the last", async () => {
+      expect(await lastOf([1, 2, 3], 3)).toBe(true);
+    });
+
+    it("E2 of a season holding E1 to E3 is not the last", async () => {
+      expect(await lastOf([1, 2, 3], 2)).toBe(false);
+    });
+
+    it("the order of the listing does not matter (E3, E1, E2)", async () => {
+      expect(await lastOf([3, 1, 2], 3)).toBe(true);
+      expect(await lastOf([3, 1, 2], 1)).toBe(false);
+    });
+
+    it("the highest number decides, not the count (E1, E2, E4)", async () => {
+      expect(await lastOf([1, 2, 4], 4)).toBe(true);
+      expect(await lastOf([1, 2, 4], 2)).toBe(false);
+    });
+
+    it("an episode already done still reports lastOfSeason", async () => {
+      const w = world({
+        seasons: season([1, 2, 3]),
+        flags: { 5003: { isDone: true, isWished: false } },
+      });
+      const outcome = await handleFinish(
+        episode(1, 3),
+        w.ports,
+        DEFAULT_THRESHOLDS,
+      );
+      expect(outcome).toMatchObject({ kind: "done", lastOfSeason: true });
+      expect(writesOf(w.calls)).toEqual([]);
+    });
   });
 
   it("five episodes of one series: zero unwish and the series pair is never settled", async () => {
@@ -112,9 +182,10 @@ describe("episode", () => {
       state: { mapping: [SERIES_PAIR], snapshot: [SERIES_PAIR] },
     });
     for (const number of [1, 2, 3, 4, 5]) {
-      expect((await handleFinish(episode(1, number), w.ports)).kind).toBe(
-        "done",
-      );
+      expect(
+        (await handleFinish(episode(1, number), w.ports, DEFAULT_THRESHOLDS))
+          .kind,
+      ).toBe("done");
     }
     expect(w.calls.filter((c) => c.startsWith("unwish"))).toEqual([]);
     expect(writesOf(w.calls)).toEqual(
@@ -145,9 +216,10 @@ describe("episode", () => {
     ],
   ])("a rejected %s rejects with nothing saved", async (name, opts, writes) => {
     const w = world(opts);
-    expect((await failure(handleFinish(episode(1, 2), w.ports))).message).toBe(
-      `${name} failed`,
-    );
+    expect(
+      (await failure(handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS)))
+        .message,
+    ).toBe(`${name} failed`);
     expect(writesOf(w.calls)).toEqual(writes);
     expect(w.calls).not.toContain("save");
     expect(w.saved).toEqual([]);
@@ -155,8 +227,32 @@ describe("episode", () => {
 
   it("a rejected save rejects after the write", async () => {
     const w = world({ failSave: [1] });
-    await failure(handleFinish(episode(1, 2), w.ports));
+    await failure(handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS));
     expect(w.calls.slice(-2)).toEqual(["markDone:5002:2026-11-03", "save"]);
     expect(w.saved).toEqual([]);
+  });
+});
+
+describe("episode threshold", () => {
+  it("an episode at 0.8 under the default thresholds is marked done", async () => {
+    const w = world();
+    const outcome = await handleFinish(
+      episode(1, 2, { progress: 0.8 }),
+      w.ports,
+      DEFAULT_THRESHOLDS,
+    );
+    expect(outcome.kind).toBe("done");
+    expect(writesOf(w.calls)).toEqual(["markDone:5002:2026-11-03"]);
+  });
+
+  it("an episode at 0.79 is ignored after the load only", async () => {
+    const w = world();
+    const outcome = await handleFinish(
+      episode(1, 2, { progress: 0.79 }),
+      w.ports,
+      DEFAULT_THRESHOLDS,
+    );
+    expect(outcome).toEqual({ kind: "ignored", reason: "below-threshold" });
+    expect(w.calls).toEqual(["load"]);
   });
 });

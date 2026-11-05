@@ -236,6 +236,35 @@ describe("search", () => {
     }
   });
 
+  it("keeps numberOfSeasons when it is a positive safe integer", async () => {
+    const { client } = setup(() =>
+      json({ data: [entry(1, { numberOfSeasons: 7 })] }),
+    );
+    const [item] = await client.search("x");
+    expect(item?.numberOfSeasons).toBe(7);
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["zero", 0],
+    ["negative", -2],
+    ["fractional", 2.5],
+    ["a string", "7"],
+    ["unsafe", Number.MAX_SAFE_INTEGER + 2],
+    ["NaN as text", "NaN"],
+  ])(
+    "drops numberOfSeasons when it is %s, and the item stays valid",
+    async (_name, value) => {
+      const { client } = setup(() =>
+        json({ data: [entry(1, { numberOfSeasons: value })] }),
+      );
+      const items = await client.search("x");
+      expect(items).toHaveLength(1);
+      expect(items[0]).not.toHaveProperty("numberOfSeasons");
+    },
+  );
+
   it("drops entries that cannot be trusted and keeps the rest", async () => {
     const bad: unknown[] = [
       entry(0),
@@ -500,6 +529,70 @@ describe("contentById", () => {
     });
     const error = await failure(client.contentById(9));
     expect((error as NakaUnavailableError).status).toBe(0);
+  });
+});
+
+describe("availableSeasons", () => {
+  const MALCOLM = {
+    seasons: [1, 2, 3],
+    episodeCounts: { "1": 16, "2": 25, "3": 22 },
+  };
+
+  it("GETs /browse/{id}/available-seasons with the token and no profile id", async () => {
+    const { client, calls } = setup(() => json(MALCOLM));
+    await client.availableSeasons(1428);
+    const [call] = calls;
+    expect(calls).toHaveLength(1);
+    expect(call?.url).toBe(`${BASE}/browse/1428/available-seasons`);
+    expect(call?.init.method).toBe("GET");
+    expect(call?.init.headers).toEqual({
+      accept: "application/json",
+      authorization: `Bearer ${TOKEN}`,
+    });
+    expect(call?.init.credentials).toBe("include");
+    expect(call?.init.redirect).toBe("error");
+  });
+
+  it("maps the recorded answer", async () => {
+    const { client } = setup(() => json(MALCOLM));
+    expect(await client.availableSeasons(1428)).toEqual({
+      seasons: [1, 2, 3],
+      episodeCounts: { 1: 16, 2: 25, 3: 22 },
+    });
+  });
+
+  it("is undefined on 404 and on an answer that does not map", async () => {
+    const gone = setup(() => raw(404, "not found"));
+    expect(await gone.client.availableSeasons(1)).toBeUndefined();
+    for (const body of [
+      { seasons: [1], episodeCounts: { "0": 5 } },
+      { seasons: [1], episodeCounts: { "1": 1.5 } },
+      {},
+      [],
+    ]) {
+      const { client } = setup(() => json(body));
+      expect(await client.availableSeasons(1)).toBeUndefined();
+    }
+  });
+
+  it("rejects the other failures with a NakaUnavailableError", async () => {
+    for (const status of [401, 403, 429, 500]) {
+      const { client } = setup(() => raw(status, "x"));
+      const error = await failure(client.availableSeasons(1));
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expect((error as NakaUnavailableError).status).toBe(status);
+    }
+    const html = setup(() => raw(200, "<html>"));
+    expect(await failure(html.client.availableSeasons(1))).toBeInstanceOf(
+      NakaUnavailableError,
+    );
+  });
+
+  it("checks the content id before any token read or request", async () => {
+    const { client, calls, token } = setup(() => json(MALCOLM));
+    await expect(client.availableSeasons(0)).rejects.toThrow(RangeError);
+    expect(calls).toHaveLength(0);
+    expect(token).not.toHaveBeenCalled();
   });
 });
 

@@ -3,10 +3,24 @@
 // overwriting unreadable settings would drop the binding.
 
 import type { FinishedMessage } from "../content/playback-tracker";
+import type { Thresholds } from "../core/watch-trigger";
+import type {
+  DismissRatingMessage,
+  RateMessage,
+  RatingCardMessage,
+} from "../ext/rating-messages";
 import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
+import {
+  answerCard,
+  answerCards,
+  type CardAnswer,
+  type CardsAnswer,
+} from "./rating-answers";
+import { dismissJob, rateJob } from "./rating-jobs";
+import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
 
@@ -18,8 +32,14 @@ export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
   setMode(mode: Mode): Promise<void>;
+  setSettings(thresholds: Thresholds, pauseFromPercent: number): Promise<void>;
+  rate(msg: RateMessage): Promise<void>;
+  dismissRating(msg: DismissRatingMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
+  /** No job either: read-only, rejects when the store cannot be read. */
+  ratingCard(msg: RatingCardMessage): Promise<CardAnswer>;
+  ratingCards(): Promise<CardsAnswer>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -41,6 +61,12 @@ export function createJobs(deps: JobDeps): Jobs {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) => quietly(() => finishJob(deps, msg)),
     setMode: (mode) => quietly(() => setMode(deps.store, mode)),
+    setSettings: (thresholds, pause) =>
+      quietly(() => settingsJob(deps.store, thresholds, pause)),
+    rate: (msg) => quietly(() => rateJob(deps, msg)),
+    dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
     statusSnapshot: () => statusSnapshot(deps.store),
+    ratingCard: (msg) => answerCard(deps.store, msg),
+    ratingCards: () => answerCards(deps.store),
   };
 }
