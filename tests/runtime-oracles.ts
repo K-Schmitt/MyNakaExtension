@@ -20,6 +20,9 @@ export const ORACLES: [string, RegExp][] = [
   ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
   ["O12 read-only status", /a status answer wrote/],
   ["O13 threshold rule", /incomplete viewing|never sent|outside a finish job/],
+  ["O14 removal write", /removal write/],
+  ["O15 written back", /written back after a Non/],
+  ["O16 stray choice", /changed by an answer to a non-candidate/],
 ];
 
 // The oracle a violation belongs to, for the fuzz's failure message.
@@ -79,6 +82,9 @@ export function checkListWrite(w: World, side: Side, id: number): void {
   const n = side === "naka" ? id : id - 1000;
   if (w.protectedFrom.get(n) === side) {
     violation(w, `re-add of ${n} to ${side} after the owner removed it`);
+  }
+  if (w.declined.get(n) === side) {
+    violation(w, `${side} write ${id} written back after a Non`);
   }
   if (side === "sc" && w.guarded.has(id)) {
     violation(w, `re-wish of ${id} after ${w.guarded.get(id)}`);

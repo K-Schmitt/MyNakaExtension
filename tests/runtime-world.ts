@@ -14,6 +14,7 @@ import {
   MAX_FINISHES_PER_WINDOW,
 } from "../src/ext/finish-window";
 import type { ToNakaTab } from "../src/ext/messages";
+import type { AnswerMessage } from "../src/ext/question-messages";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import { parseState } from "../src/ext/state-schema";
 import type { StorageArea } from "../src/ext/store";
@@ -27,6 +28,14 @@ import {
 import type { ScWishItem } from "../src/sc/wishlist-page";
 import type { Jobs } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
+import {
+  type AnswerContext,
+  beginAnswer,
+  checkAnswerFinish,
+  checkRemovalWrite,
+  endAnswer,
+  isLocalAnswer,
+} from "./runtime-answer-oracles";
 import {
   answering,
   checkBinding,
@@ -106,9 +115,10 @@ type TabTrace = {
 };
 
 type Context = (
-  | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number> }
+  | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number>; saved?: true }
   | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
   | { kind: "other" }
+  | AnswerContext
 ) &
   TabTrace;
 
@@ -146,6 +156,10 @@ export function createWorld(seed: number) {
     log: [] as string[],
     violations: [] as string[],
     seenBoth: new Set<number>(),
+    // The titles listed on BOTH sides when the last completed run read its lists (O14's own record).
+    lastRunBoth: new Set<number>(),
+    // After a « Non »: title -> the side it left, until the owner adds it back there (O15).
+    declined: new Map<number, Side>(),
     protectedFrom: new Map<number, Side>(),
     guarded: new Map<number, string>(),
     active: new Map<number, number>(),
@@ -169,6 +183,14 @@ export function createWorld(seed: number) {
       pinnedPastOrphan: 0,
       statusDuringJob: 0,
       incompleteFinishes: 0,
+      removalAnswers: 0,
+      blockAnswers: 0,
+      questionAnswers: 0,
+      hides: 0,
+      removalWrites: 0,
+      declines: 0,
+      candidateChoices: 0,
+      strayChoices: 0,
     },
   };
   for (const n of TITLES) {
@@ -234,15 +256,38 @@ function flaky(w: World, what: string): void {
   }
 }
 
+// A finish that parked behind an open question of its title (D4) is not handled yet: its film may still
+// be wished once the owner answers.
+function waitsOnQuestion(state: unknown, contentId: number): boolean {
+  const pending = (state as { pending?: { side?: string; id?: number }[] })
+    .pending;
+  return (pending ?? []).some((p) => p.side === "naka" && p.id === contentId);
+}
+
+// O14's record: the titles on both sides when the last completed run ended, its own writes included (the
+// run's final lists, as the world holds them: the owner edits only between jobs).
+function recordFinalLists(w: World): void {
+  w.lastRunBoth.clear();
+  for (const n of TITLES) {
+    if (w.playlist.has(n) && w.wishlist.has(scOf(n))) w.lastRunBoth.add(n);
+  }
+}
+
 // A completed run (its state saved) saw the pairs that were in both lists when it read them.
-function onStateSave(w: World): void {
+function onStateSave(w: World, value: unknown): void {
   const ctx = w.current;
   if (ctx?.kind === "sync" && ctx.nakaAt && ctx.scAt) {
+    ctx.saved = true;
+    recordFinalLists(w);
     for (const n of TITLES) {
       if (ctx.nakaAt.has(n) && ctx.scAt.has(scOf(n))) w.seenBoth.add(n);
     }
   }
-  if (ctx?.kind === "finish" && isFilm(ctx.msg.contentId)) {
+  if (
+    ctx?.kind === "finish" &&
+    isFilm(ctx.msg.contentId) &&
+    !waitsOnQuestion(value, ctx.msg.contentId)
+  ) {
     const id = scOf(ctx.msg.contentId);
     if (!w.guarded.has(id)) guard(w, id, "a save of its finish");
   }
@@ -269,8 +314,8 @@ function onWrite(w: World, key: string, value: unknown): void {
     } catch {
       violation(w, "an invalid state was stored");
     }
-    checkBinding(w, "state save");
-    onStateSave(w);
+    if (!isLocalAnswer(w)) checkBinding(w, "state save");
+    onStateSave(w, value);
   }
   if (key === "settings") {
     let next: Settings | undefined;
@@ -332,7 +377,15 @@ function nakaClient(w: World): NakaClient {
       w.playlist.add(id);
     },
     removeFromPlaylist: async (id) => {
-      violation(w, `removeFromPlaylist ${id}`);
+      if (w.current?.kind !== "answer") {
+        violation(w, `removeFromPlaylist ${id}`);
+        return;
+      }
+      nakaGate(w, "remove");
+      checkRemovalWrite(w, "naka", id);
+      w.log.push(`answer remove naka ${id}`);
+      flaky(w, `remove naka ${id}`);
+      w.playlist.delete(id);
     },
     search: async (q) => {
       nakaGate(w, "search");
@@ -490,6 +543,11 @@ export function scFor(w: World, gen: number): ScClient {
     },
     unwish: async (id) => {
       if (!mayWrite()) return frozen(w);
+      if (
+        w.current?.kind === "answer" &&
+        w.current.msg.type === "answer-removal"
+      )
+        return removeFromSc(w, id);
       checkFinishWrite(w, `unwish ${id}`);
       w.stats.finishWrites += 1;
       if (!isFilmProduct(id)) violation(w, `unwish of ${id}, not a film`);
@@ -521,14 +579,17 @@ export function scFor(w: World, gen: number): ScClient {
 export function clockFor(w: World): () => number {
   return () => {
     const ctx = w.current;
-    if (ctx?.kind === "finish" && ctx.spent === undefined) {
+    if (
+      (ctx?.kind === "finish" || ctx?.kind === "answer") &&
+      ctx.spent === undefined
+    ) {
       const stored = settingsOf(w)?.finishWindow;
       ctx.spent =
         stored !== undefined &&
         w.time >= stored.from &&
         w.time - stored.from < FINISH_WINDOW_MS &&
         stored.count >= MAX_FINISHES_PER_WINDOW;
-      if (ctx.spent) w.stats.spentBudgets += 1;
+      if (ctx.spent && ctx.kind === "finish") w.stats.spentBudgets += 1;
     }
     return w.time;
   };
@@ -537,10 +598,20 @@ export function clockFor(w: World): () => number {
 // Oracles of a finish write: the binding, and the hour's budget (at most 30 finishes per window).
 function checkFinishWrite(w: World, what: string): void {
   checkBinding(w, what);
-  if (w.current?.kind === "finish" && w.current.spent) {
+  const ctx = w.current;
+  if ((ctx?.kind === "finish" || ctx?.kind === "answer") && ctx.spent) {
     violation(w, `${what} with the hour's finishes spent`);
   }
-  checkViewing(w, what);
+  if (ctx?.kind === "answer") checkAnswerFinish(w, what);
+  else checkViewing(w, what);
+}
+
+// The unwish of a removal answer: « Retirer aussi… » from SensCritique, judged by O14.
+function removeFromSc(w: World, id: number): void {
+  checkRemovalWrite(w, "sc", id);
+  w.log.push(`answer unwish ${id}`);
+  flaky(w, `unwish ${id}`);
+  w.wishlist.delete(id);
 }
 
 const sameFinish = (a: FinishedMessage, b: FinishedMessage): boolean =>
@@ -592,12 +663,22 @@ export function checkInvoked(w: World, key: JobKey): void {
 
 // The jobs as the router sees them, counted, with the oracle O1 "never two jobs at once" per worker. The
 // status answer is no job (Ruling 20): O1 does not count it, O7 and O12 judge it.
+type Run = <T>(key: JobKey, ctx: Context, job: () => Promise<T>) => Promise<T>;
+
+// An answer job: O14 to O16 judge it from the state it started from (tests/runtime-answer-oracles.ts).
+async function answerRun(
+  w: World,
+  msg: AnswerMessage,
+  run: Run,
+  job: () => Promise<void>,
+): Promise<void> {
+  const ctx = beginAnswer(w, msg);
+  await run("answer", ctx, job);
+  endAnswer(w, ctx);
+}
+
 export function observed(w: World, gen: number, jobs: Jobs): Jobs {
-  const run = async <T>(
-    key: JobKey,
-    ctx: Context,
-    job: () => Promise<T>,
-  ): Promise<T> => {
+  const run: Run = async (key, ctx, job) => {
     checkInvoked(w, key);
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);
@@ -608,7 +689,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
       return await job();
     } finally {
       w.active.set(gen, (w.active.get(gen) ?? 1) - 1);
-      if (w.current === ctx) w.current = undefined;
+      if (w.current === ctx) {
+        if (ctx.kind === "sync" && ctx.saved) recordFinalLists(w);
+        w.current = undefined;
+      }
     }
   };
   return {
@@ -624,13 +708,11 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     rate: (msg) => run("rating", { kind: "other" }, () => jobs.rate(msg)),
     dismissRating: (msg) =>
       run("rating", { kind: "other" }, () => jobs.dismissRating(msg)),
-    // The fuzz sends no answer: any answer job is O1's "ran without a message from its sender".
     answerQuestion: (msg) =>
-      run("answer", { kind: "other" }, () => jobs.answerQuestion(msg)),
+      answerRun(w, msg, run, () => jobs.answerQuestion(msg)),
     answerRemoval: (msg) =>
-      run("answer", { kind: "other" }, () => jobs.answerRemoval(msg)),
-    hideQuestion: (msg) =>
-      run("answer", { kind: "other" }, () => jobs.hideQuestion(msg)),
+      answerRun(w, msg, run, () => jobs.answerRemoval(msg)),
+    hideQuestion: (msg) => answerRun(w, msg, run, () => jobs.hideQuestion(msg)),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),
     openQuestions: (answering) => jobs.openQuestions(answering),
@@ -662,6 +744,7 @@ export function ownerEdit(w: World, n: number, side: Side): void {
     w.log.push(`owner remove ${side} ${n}`);
   } else {
     list.add(id);
+    if (w.declined.get(n) === side) w.declined.delete(n);
     w.protectedFrom.delete(n);
     w.log.push(`owner add ${side} ${n}`);
   }
