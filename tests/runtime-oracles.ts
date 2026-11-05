@@ -102,10 +102,22 @@ export function checkStatusWrite(w: World, keys: string[]): void {
 }
 
 // Oracle O10 (Ruling 17): once the job's pinned tab refused a send, or every tab it found did, its tab is
-// lost, and the job calls the tabs no more.
+// lost, and the job calls the tabs no more, but for the one query that classifies a pinned tab's loss.
 export function checkTabCall(w: World): void {
   if (w.current?.tabLost)
     violation(w, "a tabs call after the job lost its tab");
+}
+
+// The one query a job makes right after its pinned tab refused (naka-tab-changed or no-naka-tab); any
+// other call on a lost tab is O10's, any query once pinned is O11's.
+export function checkQueryCall(w: World): void {
+  const ctx = w.current;
+  if (ctx?.tabLost && ctx.lossQuery) {
+    ctx.lossQuery = false;
+    return;
+  }
+  checkTabCall(w);
+  checkQuery(w);
 }
 
 // Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one

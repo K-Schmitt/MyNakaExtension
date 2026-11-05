@@ -432,7 +432,7 @@ describe("answer-removal: the binding and the tabs", () => {
     expect(lost.state()).toEqual(before);
     expect(outcomeOf(lost)).toMatchObject({
       outcome: "failed",
-      error: "no-naka-tab",
+      error: "naka-tab-changed",
     });
   });
 });

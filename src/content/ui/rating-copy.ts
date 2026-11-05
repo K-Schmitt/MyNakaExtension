@@ -54,6 +54,7 @@ export const RATING_ERROR_LABELS: Record<JobError, string> = {
   "finish-limit":
     "trop de fins de visionnage en une heure, réessayez plus tard",
   "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
+  "naka-tab-changed": "l'onglet Naka a changé de page, réessayez",
 };
 
 export function errorLine(error: JobError): string {

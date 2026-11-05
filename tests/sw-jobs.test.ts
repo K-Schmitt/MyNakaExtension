@@ -624,7 +624,7 @@ describe("sync job: automatic triggers", () => {
 
 describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
   // One Naka tab: with several, a dead one is passed over (see "one Naka tab per job").
-  function closingTab(closeAfter: string | undefined) {
+  function closingTab(closeAfter: string | undefined, tabStaysListed = false) {
     const nk = fakeNaka(catalogueNaka());
     const real = tabRunning(nk.client, () => "77").tabs;
     let closed = closeAfter === undefined;
@@ -633,6 +633,7 @@ describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
     const tabs: TabsPort = {
       query: async (url) => {
         if (failed.length > 0) afterLoss.push("query");
+        if (failed.length > 0 && !tabStaysListed) return [];
         return (await real.query(url)).slice(0, 1);
       },
       send: async (tabId, msg) => {
@@ -656,11 +657,22 @@ describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
     expect(t.failed).toEqual([
       { type: "naka-call", call: "contentById", contentId: 1 },
     ]);
-    expect(t.afterLoss).toEqual([]);
+    // Only the one query that tells a gone tab from a changed one.
+    expect(t.afterLoss).toEqual(["query"]);
     const run = w.settings().lastRun;
     expect(run).toMatchObject({ outcome: "ok", error: "no-naka-tab" });
     expect(run?.report?.unresolved).toBe(2);
     expect(() => w.state()).not.toThrow();
+    expect(w.area.ops).toContain("set:state");
+  });
+
+  it("the same loss with the tab still listed says naka-tab-changed, saving the run", async () => {
+    const t = closingTab("playlistIds", true);
+    const w = world({ tabs: t.tabs });
+    await w.jobs.syncJob("button");
+    expect(t.afterLoss).toEqual(["query"]);
+    const run = w.settings().lastRun;
+    expect(run).toMatchObject({ outcome: "ok", error: "naka-tab-changed" });
     expect(w.area.ops).toContain("set:state");
   });
 
@@ -889,11 +901,12 @@ describe("sync job: one Naka tab per job", () => {
     await w.jobs.syncJob("button");
     expect(w.settings().lastRun).toMatchObject({
       outcome: "ok",
-      error: "no-naka-tab",
+      error: "naka-tab-changed",
     });
     expect(sent.slice(0, 2)).toEqual([10, 11]);
     expect(lostAt).toBeDefined();
-    expect(afterLoss).toEqual([]);
+    // Tab 11 is still listed: one query, no further send.
+    expect(afterLoss).toEqual([0]);
     expect(sent).not.toContain(12);
   });
 

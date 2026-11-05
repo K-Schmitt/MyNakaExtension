@@ -316,7 +316,7 @@ describe("O9 no finish write once the hour's 30 finishes are spent", () => {
 describe("O10 no tabs call once the job lost its tab", () => {
   const ACCOUNT = { type: "naka-account" } as const;
 
-  it("fires on a call after the pinned tab refused a send", async () => {
+  async function pinnedThenRefused() {
     const w = quietWorld();
     const tabs = tabsFor(w, 0);
     w.current = { kind: "sync" };
@@ -324,7 +324,25 @@ describe("O10 no tabs call once the job lost its tab", () => {
     await tabs.send(LIVE_TAB, ACCOUNT);
     w.tabOpen = false;
     await expect(tabs.send(LIVE_TAB, ACCOUNT)).rejects.toThrow();
+    return { w, tabs };
+  }
+
+  it("allows the one query that classifies the loss of a pinned tab", async () => {
+    const { w, tabs } = await pinnedThenRefused();
     await tabs.query("https://naka.cx/*");
+    expect(fired(w)).toEqual([]);
+  });
+
+  it("fires on a second query after the pinned tab refused a send", async () => {
+    const { w, tabs } = await pinnedThenRefused();
+    await tabs.query("https://naka.cx/*");
+    await tabs.query("https://naka.cx/*");
+    expect(fired(w)).toEqual(["O10 lost tab"]);
+  });
+
+  it("fires on a send after the pinned tab refused a send", async () => {
+    const { w, tabs } = await pinnedThenRefused();
+    await expect(tabs.send(LIVE_TAB, ACCOUNT)).rejects.toThrow();
     expect(fired(w)).toEqual(["O10 lost tab"]);
   });
 

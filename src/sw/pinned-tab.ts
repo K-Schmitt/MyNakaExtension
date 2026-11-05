@@ -3,14 +3,17 @@
 // a call tries the tabs found in their query order, and a rejected send moves on to the next one. The first
 // send that resolves, whatever its reply, pins that tab for every later call of the job: the account the job
 // checked is the account its writes go to. When no tab answers, or once the pinned tab's send rejects, the
-// tab is lost for the job (Ruling 17): no later call reaches the tabs, and every call rejects with
-// no-naka-tab. A job that found no tab at all looks again at its next call.
+// tab is lost for the job (Ruling 17): no later call reaches the tabs, and every call rejects with the
+// code of the loss. When the pinned tab's send rejects, one tabs.query tells a tab that changed page or
+// was reloaded (still listed: naka-tab-changed) from a closed one (no-naka-tab; so is a query that
+// throws); nothing is retried on that tab (Ruling 22). A job that found no tab at all looks again at its
+// next call.
 //
 // The proxy's 20 s timeout covers a whole call, its tries included. A try still running when its call timed
 // out may still pin its tab; no job calls Naka again after its first call failed (the binding check and the
 // content read both end the job), so that pin is never used.
 
-import { JobRejected } from "../ext/job-error";
+import { type JobError, JobRejected } from "../ext/job-error";
 import type { ToNakaTab } from "../ext/messages";
 import { NakaUnavailableError } from "../naka/naka-errors";
 
@@ -51,30 +54,42 @@ async function firstAnswer(
   return undefined;
 }
 
+// Why a pinned tab stopped answering: still listed means it changed page or was reloaded.
+async function lossCode(tabs: TabsPort, pinned: number): Promise<JobError> {
+  try {
+    const found = await tabs.query(NAKA_TABS_URL);
+    return found.some((tab) => tab.id === pinned)
+      ? "naka-tab-changed"
+      : "no-naka-tab";
+  } catch {
+    return "no-naka-tab";
+  }
+}
+
 export function pinFirstAnswering(
   tabs: TabsPort,
   onLost: (error: JobRejected) => void = () => undefined,
 ): TabExchange {
   let pinned: number | undefined;
-  let lost = false;
-  const lose = (): never => {
-    lost = true;
-    onLost(new JobRejected("no-naka-tab"));
-    throw new JobRejected("no-naka-tab");
+  let lost: JobError | undefined;
+  const lose = (code: JobError): never => {
+    lost = code;
+    onLost(new JobRejected(code));
+    throw new JobRejected(code);
   };
   const pin = async (msg: ToNakaTab): Promise<unknown> => {
     const answer = await firstAnswer(tabs, await findTabs(tabs), msg);
-    if (answer === undefined) return lose();
+    if (answer === undefined) return lose("no-naka-tab");
     pinned = answer.id;
     return answer.reply;
   };
   return async (msg) => {
-    if (lost) throw new JobRejected("no-naka-tab");
+    if (lost !== undefined) throw new JobRejected(lost);
     if (pinned === undefined) return pin(msg);
     try {
       return await tabs.send(pinned, msg);
     } catch {
-      return lose();
+      return lose(await lossCode(tabs, pinned));
     }
   };
 }

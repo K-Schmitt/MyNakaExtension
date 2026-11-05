@@ -40,7 +40,7 @@ import {
   answering,
   checkBinding,
   checkListWrite,
-  checkQuery,
+  checkQueryCall,
   checkSend,
   checkStatusWrite,
   checkTabCall,
@@ -112,6 +112,8 @@ type TabTrace = {
   tried?: Set<number>;
   pinned?: number;
   tabLost?: boolean;
+  /** The pinned tab refused: the job may make ONE tabs.query to tell a changed tab from a closed one. */
+  lossQuery?: boolean;
 };
 
 type Context = (
@@ -412,7 +414,10 @@ function loseTab(ctx: TabTrace, w: World): void {
 function refuse(w: World, tabId: number): never {
   const ctx = w.current;
   if (ORPHAN_TABS.includes(tabId)) w.stats.orphanTries += 1;
-  if (ctx !== undefined && ctx.pinned === tabId) loseTab(ctx, w);
+  if (ctx !== undefined && ctx.pinned === tabId) {
+    ctx.lossQuery = !ctx.tabLost;
+    loseTab(ctx, w);
+  }
   if (ctx !== undefined && ctx.pinned === undefined) {
     ctx.tried ??= new Set();
     ctx.tried.add(tabId);
@@ -436,8 +441,7 @@ export function tabsFor(w: World, gen: number): TabsPort {
   return {
     query: async () => {
       if (gen !== w.gen) return frozen(w);
-      checkTabCall(w);
-      checkQuery(w);
+      checkQueryCall(w);
       const ids = found(w);
       if (w.current !== undefined) {
         w.current.found = ids;

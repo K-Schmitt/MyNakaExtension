@@ -282,7 +282,7 @@ describe("pinning the first tab that answers", () => {
     expect((lost[0] as JobRejected).code).toBe("no-naka-tab");
   });
 
-  it("a pinned tab whose send rejects is lost: no other tab is tried", async () => {
+  it("a pinned tab whose send rejects while it is still listed changed page: no other tab is tried", async () => {
     let dead = false;
     const t = tabsAnswering(
       (id) => (dead && id === 31 ? DEAD : ok([id])),
@@ -293,11 +293,67 @@ describe("pinning the first tab that answers", () => {
     await proxy.playlistIds();
     dead = true;
     expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
+      "naka-tab-changed",
+    );
+    expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
+      "naka-tab-changed",
+    );
+    expect(t.log).toEqual(["query", "send:31", "send:31", "query"]);
+    expect(lost).toHaveLength(1);
+    expect((lost[0] as JobRejected).code).toBe("naka-tab-changed");
+  });
+
+  it("a pinned tab that left the query is a lost tab: no-naka-tab", async () => {
+    let dead = false;
+    let listed = [31];
+    const t = tabsAnswering(
+      (id) => (dead && id === 31 ? DEAD : ok([id])),
+      () => listed,
+    );
+    const lost: unknown[] = [];
+    const proxy = createNakaProxy(t.port, fakeTimer(), (e) => lost.push(e));
+    await proxy.playlistIds();
+    dead = true;
+    listed = [32];
+    expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
       "no-naka-tab",
     );
-    await failure(proxy.playlistIds());
-    expect(t.log).toEqual(["query", "send:31", "send:31"]);
-    expect(lost).toHaveLength(1);
+    expect(t.log).toEqual(["query", "send:31", "send:31", "query"]);
+    expect((lost[0] as JobRejected).code).toBe("no-naka-tab");
+  });
+
+  it("a query that throws after the loss gives no-naka-tab, without its text", async () => {
+    let queries = 0;
+    const port: TabsPort = {
+      query: async () => {
+        queries += 1;
+        if (queries > 1) throw new Error(MARKER);
+        return [{ id: 31 }];
+      },
+      send: async (_id, _msg) => {
+        if (queries > 0 && sent++ > 0) throw new Error(MARKER);
+        return ok([1]);
+      },
+    };
+    let sent = 0;
+    const proxy = createNakaProxy(port, fakeTimer());
+    await proxy.playlistIds();
+    const error = await failure(proxy.playlistIds());
+    expect((error as JobRejected).code).toBe("no-naka-tab");
+    expect(strings(error).join("|")).not.toContain(MARKER);
+    expect(queries).toBe(2);
+  });
+
+  it("a send that rejects before any pin asks nothing more: no-naka-tab", async () => {
+    const t = tabsAnswering(
+      () => DEAD,
+      () => [31],
+    );
+    const proxy = createNakaProxy(t.port, fakeTimer());
+    expect(((await failure(proxy.playlistIds())) as JobRejected).code).toBe(
+      "no-naka-tab",
+    );
+    expect(t.log).toEqual(["query", "send:31"]);
   });
 
   it("no tab found: no-naka-tab, and the next call looks again", async () => {

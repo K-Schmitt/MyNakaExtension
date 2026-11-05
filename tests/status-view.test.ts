@@ -28,6 +28,7 @@ const LABELS: Record<JobError, string> = {
   unavailable: "Site indisponible, nouvel essai au prochain passage",
   "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessayez plus tard`,
   "naka-list-empty": `Ma liste Naka lue vide${NB}: rien n'a été retiré`,
+  "naka-tab-changed": `L'onglet Naka a changé de page ou a été rechargé${NB}: la suite au prochain passage`,
 };
 const CODES = Object.keys(LABELS) as JobError[];
 
