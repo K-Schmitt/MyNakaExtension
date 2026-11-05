@@ -89,6 +89,8 @@ export function pinFirstAnswering(
     try {
       return await tabs.send(pinned, msg);
     } catch {
+      // Latched at once: a query that never settles must not leave the tab open to later calls.
+      lost = "no-naka-tab";
       return lose(await lossCode(tabs, pinned));
     }
   };
