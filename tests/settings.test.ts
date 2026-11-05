@@ -47,6 +47,36 @@ function rejection(raw: unknown): unknown {
   return undefined;
 }
 
+describe("lastAnswer", () => {
+  const lastAnswer = {
+    seq: 4,
+    at: 1_700_000_002_000,
+    target: "removal:sc:1:101",
+    outcome: "failed",
+    error: "unavailable",
+  };
+
+  it("the exact 4a settings parse with no lastAnswer", () => {
+    expect("lastAnswer" in parseSettings(full())).toBe(false);
+    expect("lastAnswer" in parseSettings({ mode: "live" })).toBe(false);
+  });
+
+  it("a stored lastAnswer round-trips", () => {
+    expect(parseSettings({ mode: "live", lastAnswer })).toEqual({
+      mode: "live",
+      lastAnswer,
+    });
+  });
+
+  it("a bad lastAnswer names its path", () => {
+    for (const bad of [null, { ...lastAnswer, error: undefined }, "x"]) {
+      expect(rejection({ mode: "live", lastAnswer: bad })).toMatchObject({
+        path: expect.stringMatching(/^settings\.lastAnswer/),
+      });
+    }
+  });
+});
+
 describe("parseSettings accepts", () => {
   it("an absent key as simulation", () => {
     expect(parseSettings(undefined)).toEqual({ mode: "simulation" });

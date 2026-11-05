@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerPort } from "../src/content/ui/worker-port";
-import type { RatingMessage } from "../src/ext/rating-messages";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
 const ok = (answer: unknown) => vi.fn(() => Promise.resolve(answer));
@@ -152,7 +151,7 @@ describe("answer bounds and film ids", () => {
   });
 
   it("a film sends no season and no episode key at all", async () => {
-    const send = vi.fn((_msg: RatingMessage) => Promise.resolve(undefined));
+    const send = vi.fn((_msg: object) => Promise.resolve(undefined));
     const port = createWorkerPort(send);
     await port.askCard({ contentId: 9 });
     await port.rate({ contentId: 9 }, "film", 7);
@@ -285,6 +284,84 @@ describe("an answer without a card", () => {
     for (const lastFinish of bad) {
       const got = await asked(cardless({ lastFinish }), FILM);
       expect(got, JSON.stringify(lastFinish)).toBeUndefined();
+    }
+  });
+});
+
+describe("askQuestions and askRemovalOffer", () => {
+  const OFFER = {
+    kind: "removal",
+    key: "removal:sc:1:101",
+    removeFrom: "sc",
+    pair: { nakaId: 1, scId: 101 },
+    title: "",
+  };
+
+  it("send their message and return a valid answer", async () => {
+    const open = ok({ questions: [OFFER], answering: ["removal:sc:1:101"] });
+    expect(await createWorkerPort(open).askQuestions()).toEqual({
+      questions: [OFFER],
+      answering: ["removal:sc:1:101"],
+    });
+    expect(open).toHaveBeenCalledWith({ type: "open-questions" });
+    const removal = ok({ offer: OFFER, answering: true });
+    expect(await createWorkerPort(removal).askRemovalOffer(9)).toEqual({
+      offer: OFFER,
+      answering: true,
+    });
+    expect(removal).toHaveBeenCalledWith({
+      type: "removal-offer",
+      contentId: 9,
+    });
+  });
+
+  it("give undefined for a refused answer or a failed send", async () => {
+    const rejected = vi.fn(() => Promise.reject(new Error("gone")));
+    expect(await createWorkerPort(rejected).askQuestions()).toBeUndefined();
+    expect(await createWorkerPort(rejected).askRemovalOffer(9)).toBeUndefined();
+    for (const raw of [undefined, {}, { questions: [], extra: 1 }]) {
+      expect(await createWorkerPort(ok(raw)).askQuestions()).toBeUndefined();
+    }
+    for (const raw of [undefined, {}, { offer: null, extra: 1 }]) {
+      expect(
+        await createWorkerPort(ok(raw)).askRemovalOffer(9),
+      ).toBeUndefined();
+    }
+  });
+
+  it("askCard reads the question of a title with no card, and only then", async () => {
+    const question = {
+      kind: "ambiguity",
+      key: "ambiguity:naka:5",
+      side: "naka",
+      id: 5,
+      title: "Dune",
+      candidates: [{ id: 50, title: "Dune", year: 1984, type: "film" }],
+    };
+    const lastAnswer = {
+      seq: 1,
+      at: 2,
+      target: "ambiguity:naka:5",
+      outcome: "refused",
+    };
+    const full = {
+      card: null,
+      pauseFromPercent: 0,
+      question,
+      questionSending: true,
+      lastAnswer,
+    };
+    expect(await createWorkerPort(ok(full)).askCard(IDS)).toEqual(full);
+    const withCard = { ...full, card: episodeCard() };
+    expect(await createWorkerPort(ok(withCard)).askCard(IDS)).toBeUndefined();
+    for (const patch of [
+      { question: { ...question, extra: 1 } },
+      { questionSending: false },
+      { lastAnswer: { ...lastAnswer, extra: 1 } },
+    ]) {
+      expect(
+        await createWorkerPort(ok({ ...full, ...patch })).askCard(IDS),
+      ).toBeUndefined();
     }
   });
 });

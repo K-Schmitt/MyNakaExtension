@@ -55,6 +55,9 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     statusSnapshot: async () => ({}),
     ratingCard: async () => ({ card: null, pauseFromPercent: 0 }),
     ratingCards: async () => ({ cards: [] }),
+    openQuestions: async () => ({ questions: [] }),
+    removalOffer: async () => ({ offer: null }),
+    pageLists: async () => ({ questions: [], unlinked: [] }),
     ...over,
   };
 }

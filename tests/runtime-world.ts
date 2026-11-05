@@ -625,6 +625,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
       run("rating", { kind: "other" }, () => jobs.dismissRating(msg)),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),
+    openQuestions: (answering) => jobs.openQuestions(answering),
+    removalOffer: (contentId, answering) =>
+      jobs.removalOffer(contentId, answering),
+    pageLists: (answering) => jobs.pageLists(answering),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)

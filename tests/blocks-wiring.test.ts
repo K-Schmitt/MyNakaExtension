@@ -51,6 +51,8 @@ function wiringWorld() {
       calls.push("askCards");
       return { cards: [] };
     },
+    askQuestions: async () => undefined,
+    askRemovalOffer: async () => undefined,
     rate: async (ids, label, rating) => {
       calls.push(`rate ${keyOf(ids)} ${label} ${rating}`);
       return true;

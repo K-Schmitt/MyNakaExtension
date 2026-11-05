@@ -3,6 +3,7 @@
 // overwriting unreadable settings would drop the binding.
 
 import type { FinishedMessage } from "../content/playback-tracker";
+import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
 import type {
   DismissRatingMessage,
@@ -13,6 +14,14 @@ import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
+import {
+  answerOpenQuestions,
+  answerPageLists,
+  answerRemovalOffer,
+  type OpenQuestionsAnswer,
+  type PageListsAnswer,
+  type RemovalOfferAnswer,
+} from "./question-answers";
 import {
   answerCard,
   answerCards,
@@ -40,6 +49,13 @@ export type Jobs = {
   /** No job either: read-only, rejects when the store cannot be read. */
   ratingCard(msg: RatingCardMessage): Promise<CardAnswer>;
   ratingCards(): Promise<CardsAnswer>;
+  /** The question reads: read-only too, and they reject when the state cannot be read. */
+  openQuestions(answering: QuestionKey[]): Promise<OpenQuestionsAnswer>;
+  removalOffer(
+    contentId: number,
+    answering: QuestionKey[],
+  ): Promise<RemovalOfferAnswer>;
+  pageLists(answering: QuestionKey[]): Promise<PageListsAnswer>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -68,5 +84,9 @@ export function createJobs(deps: JobDeps): Jobs {
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),
     ratingCards: () => answerCards(deps.store),
+    openQuestions: (answering) => answerOpenQuestions(deps.store, answering),
+    removalOffer: (contentId, answering) =>
+      answerRemovalOffer(deps.store, contentId, answering),
+    pageLists: (answering) => answerPageLists(deps.store, answering),
   };
 }

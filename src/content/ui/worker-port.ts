@@ -4,10 +4,17 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingLabel } from "../../core/rating-cards";
+import {
+  parseOpenQuestionsAnswer,
+  parseRemovalOfferAnswer,
+} from "../../ext/question-answer-schema";
+import type { QuestionMessage } from "../../ext/question-messages";
 import type { RatingMessage } from "../../ext/rating-messages";
 import { parseCardAnswer, parseCardsAnswer } from "./worker-answers";
 
-export type SendRating = (msg: RatingMessage) => Promise<unknown>;
+type PortMessage = RatingMessage | QuestionMessage;
+
+export type SendRating = (msg: PortMessage) => Promise<unknown>;
 
 function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
   return {
@@ -20,7 +27,7 @@ function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
 export type WorkerPort = ReturnType<typeof createWorkerPort>;
 
 export function createWorkerPort(send: SendRating) {
-  async function ask(msg: RatingMessage): Promise<unknown> {
+  async function ask(msg: PortMessage): Promise<unknown> {
     try {
       return await send(msg);
     } catch {
@@ -29,7 +36,7 @@ export function createWorkerPort(send: SendRating) {
   }
 
   // True when the send resolved, false when it rejected or threw: the answer itself is not read.
-  async function sent(msg: RatingMessage): Promise<boolean> {
+  async function sent(msg: PortMessage): Promise<boolean> {
     try {
       await send(msg);
       return true;
@@ -39,7 +46,7 @@ export function createWorkerPort(send: SendRating) {
   }
 
   async function askChecked<T>(
-    msg: RatingMessage,
+    msg: PortMessage,
     parse: (raw: unknown) => T,
   ): Promise<T | undefined> {
     const raw = await ask(msg);
@@ -56,6 +63,10 @@ export function createWorkerPort(send: SendRating) {
         parseCardAnswer(raw, ids),
       ),
     askCards: () => askChecked({ type: "rating-cards" }, parseCardsAnswer),
+    askQuestions: () =>
+      askChecked({ type: "open-questions" }, parseOpenQuestionsAnswer),
+    askRemovalOffer: (contentId: number) =>
+      askChecked({ type: "removal-offer", contentId }, parseRemovalOfferAnswer),
     rate: (ids: ContentIds, label: RatingLabel, rating: number) =>
       sent({ type: "rate", ...idsOf(ids), label, rating }),
     dismiss: (ids: ContentIds, label: RatingLabel) =>

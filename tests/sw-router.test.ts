@@ -124,6 +124,18 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push("cards");
       return { cards: [] };
     },
+    openQuestions: async (answering) => {
+      calls.push(`open-questions:${JSON.stringify(answering)}`);
+      return { questions: [] };
+    },
+    removalOffer: async (contentId, answering) => {
+      calls.push(`removal-offer:${contentId}:${JSON.stringify(answering)}`);
+      return { offer: null };
+    },
+    pageLists: async (answering) => {
+      calls.push(`page-lists:${JSON.stringify(answering)}`);
+      return { questions: [], unlinked: [] };
+    },
     ...over,
   };
   return { jobs, calls, snapshot };
@@ -289,6 +301,54 @@ describe("router: trusted messages become jobs", () => {
     ]);
   });
 
+  it("the question reads are answered outside the queue, with the keys being answered", async () => {
+    const r = router({
+      openQuestions: async () => ({ questions: [] }),
+      pageLists: async () => ({ questions: [], unlinked: [] }),
+      removalOffer: async () => ({ offer: null }),
+    });
+    expect(r.send({ type: "open-questions" }, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB)).toBe(
+      true,
+    );
+    expect(r.send({ type: "page-lists" }, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { questions: [] },
+      { offer: null },
+      { questions: [], unlinked: [] },
+    ]);
+  });
+
+  it("the question reads get the answering keys of the queue, empty until an answer is queued", async () => {
+    const r = router();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([
+      "open-questions:[]",
+      "removal-offer:3:[]",
+      "page-lists:[]",
+    ]);
+  });
+
+  it("a question read that rejects is answered undefined at once", async () => {
+    const boom = async () => {
+      throw new Error("store down");
+    };
+    const r = router({
+      openQuestions: boom,
+      removalOffer: boom,
+      pageLists: boom,
+    });
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    r.send({ type: "removal-offer", contentId: 3 }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers).toEqual([undefined, undefined, undefined]);
+  });
+
   it("a rating read that rejects is answered undefined at once, with no unhandled rejection", async () => {
     const r = router({
       ratingCard: async () => {
@@ -393,6 +453,22 @@ describe("router: everything else is ignored, unanswered", () => {
       "a rating-cards from the status page",
       { type: "rating-cards" },
       STATUS_PAGE,
+    ],
+    ["a page-lists from the Naka tab", { type: "page-lists" }, NAKA_TAB],
+    [
+      "an open-questions from the status page",
+      { type: "open-questions" },
+      STATUS_PAGE,
+    ],
+    [
+      "a removal-offer from the status page",
+      { type: "removal-offer", contentId: 3 },
+      STATUS_PAGE,
+    ],
+    [
+      "a removal-offer without a content id",
+      { type: "removal-offer" },
+      NAKA_TAB,
     ],
     ["a rate with a rating of 0", { ...RATE, rating: 0 }, NAKA_TAB],
     ["a rate with a rating of 11", { ...RATE, rating: 11 }, NAKA_TAB],

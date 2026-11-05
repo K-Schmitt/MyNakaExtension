@@ -11,9 +11,11 @@ import {
   type RatingLabel,
 } from "../core/rating-cards";
 import { startValue } from "../core/rating-start";
+import type { LastAnswer } from "../ext/answer-record";
 import type { RatingCardMessage } from "../ext/rating-messages";
 import { type LastFinish, pauseFromOf, type Settings } from "../ext/settings";
 import type { Store } from "../ext/store";
+import { type AmbiguityOffer, cardQuestion } from "./question-answers";
 
 export type CardAnswer = {
   card: RatingCard | null;
@@ -21,6 +23,10 @@ export type CardAnswer = {
   start?: number;
   sending?: RatingLabel[]; // labels of the card whose rate is waiting or running; omitted when none
   lastFinish?: LastFinish; // the last finish recorded, when it is this title's
+  // With no card only: the title's open question with candidates, its sending, and its last outcome.
+  question?: AmbiguityOffer;
+  questionSending?: true; // added by the router, which knows the answers being sent
+  lastAnswer?: LastAnswer;
 };
 export type CardsAnswer = {
   cards: { card: RatingCard; start?: number; sending?: RatingLabel[] }[];
@@ -51,7 +57,10 @@ export function cardlessSendingOf(
 }
 
 /** The store as the answers read it: no save. */
-export type RatingsReader = Pick<Store, "loadSettings" | "loadRatings">;
+export type RatingsReader = Pick<
+  Store,
+  "loadSettings" | "loadRatings" | "loadState"
+>;
 
 const MAX_ANSWERED = 20;
 
@@ -87,6 +96,9 @@ export async function answerCard(
     pauseFromPercent: pauseFromOf(settings),
     ...(card === undefined ? {} : startOf(cards, card)),
     ...lastFinishOf(settings, key),
+    ...(card === undefined
+      ? await cardQuestion(store, settings, msg.contentId)
+      : {}),
   };
 }
 

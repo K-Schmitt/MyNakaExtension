@@ -1,6 +1,7 @@
 import type { FinishOutcome } from "../core/finish-handler";
 import type { SyncReport } from "../core/sync-runner";
 import { DEFAULT_THRESHOLDS, type Thresholds } from "../core/watch-trigger";
+import { type LastAnswer, parseLastAnswer } from "./answer-record";
 import {
   asInt,
   asOneOf,
@@ -52,6 +53,8 @@ export type Settings = {
   thresholds?: Thresholds;
   /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
   pauseFromPercent?: number;
+  /** The outcome of the last answer to a question (D8). */
+  lastAnswer?: LastAnswer;
 };
 
 // A Record, so that a field added to Settings without being added here does not compile.
@@ -64,6 +67,7 @@ const KEYS = valuesOf<keyof Settings>({
   finishWindow: true,
   thresholds: true,
   pauseFromPercent: true,
+  lastAnswer: true,
 });
 const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
@@ -150,6 +154,9 @@ export function parseSettings(raw: unknown): Settings {
     record.pauseFromPercent,
     parsePauseFromPercent,
   );
+  const lastAnswer = whenPresent(record.lastAnswer, (v) =>
+    parseLastAnswer(v, "settings.lastAnswer"),
+  );
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
     ...(binding === undefined ? {} : { binding }),
@@ -159,6 +166,7 @@ export function parseSettings(raw: unknown): Settings {
     ...(finishWindow === undefined ? {} : { finishWindow }),
     ...(thresholds === undefined ? {} : { thresholds }),
     ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
+    ...(lastAnswer === undefined ? {} : { lastAnswer }),
   };
 }
 

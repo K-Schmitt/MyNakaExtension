@@ -16,6 +16,7 @@ import {
 import type { Store } from "../ext/store";
 import type { Running } from "./activity";
 import type { Binding } from "./binding";
+import { pageItems } from "./page-items";
 import { toJobError } from "./to-job-error";
 
 export type Counts = {
@@ -49,12 +50,14 @@ export type StatusSnapshot = {
 /** The store as the status reads it: no save. */
 export type StoreReader = Pick<Store, "loadSettings" | "loadState">;
 
+// The same items as the page lists (pageItems), so that the count line never disagrees with the page.
 function countsOf(state: SyncState): Counts {
-  const kinds = state.pending.map((item) => item.kind);
+  const { questions, unlinked } = pageItems(state);
+  const kinds = questions.map((question) => question.kind);
   return {
     pendingRemovals: kinds.filter((kind) => kind === "removal").length,
-    openQuestions: kinds.filter((kind) => kind === "ambiguity").length,
-    unlinked: state.unlinked.length,
+    openQuestions: kinds.filter((kind) => kind !== "removal").length,
+    unlinked: unlinked.length,
   };
 }
 

@@ -14,6 +14,12 @@ import {
 } from "./field-checks";
 import { playbackContext } from "./playback-context";
 import {
+  isQuestionType,
+  parseQuestionMessage,
+  QUESTION_SENDERS,
+  type QuestionMessage,
+} from "./question-messages";
+import {
   isRatingType,
   parseRatingMessage,
   type RatingMessage,
@@ -42,7 +48,8 @@ export type ToWorker =
       thresholds: Thresholds;
       pauseFromPercent: number;
     }
-  | RatingMessage;
+  | RatingMessage
+  | QuestionMessage;
 
 export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
@@ -100,6 +107,9 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   "rating-cards": true,
   rate: true,
   "dismiss-rating": true,
+  "open-questions": true,
+  "removal-offer": true,
+  "page-lists": true,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
@@ -172,6 +182,7 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
     };
   }
   if (isRatingType(type)) return parseRatingMessage(type, record);
+  if (isQuestionType(type)) return parseQuestionMessage(type, record);
   return { type };
 }
 
@@ -279,6 +290,7 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   "rating-cards": ["naka-tab"],
   rate: ["naka-tab"],
   "dismiss-rating": ["naka-tab"],
+  ...QUESTION_SENDERS,
 };
 
 // A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.

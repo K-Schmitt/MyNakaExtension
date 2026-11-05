@@ -1671,6 +1671,9 @@ describe("status snapshot", () => {
         { kind: "ambiguity", side: "naka", id: 3, candidateIds: [1003, 2003] },
       ],
       unlinked: [{ side: "sc", id: 1009, title: "Film 9", reason: "no-match" }],
+      // The count is the page's list: the unlinked titles still present at the last completed run.
+      run: 1,
+      presence: { naka: [], sc: [{ id: 1009, from: 1, to: 1 }] },
     };
     const settings: Settings = {
       mode: "live",

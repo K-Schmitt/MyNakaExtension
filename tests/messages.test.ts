@@ -774,6 +774,40 @@ describe("isTrustedSender", () => {
   });
 });
 
+describe("the question messages", () => {
+  it("parse to the known keys only", () => {
+    expect(parseToWorker({ type: "open-questions", x: 1 })).toEqual({
+      type: "open-questions",
+    });
+    expect(parseToWorker({ type: "page-lists", x: 1 })).toEqual({
+      type: "page-lists",
+    });
+    expect(
+      parseToWorker({ type: "removal-offer", contentId: 7, x: 1 }),
+    ).toEqual({ type: "removal-offer", contentId: 7 });
+  });
+
+  it("a removal-offer needs a positive integer content id", () => {
+    for (const contentId of [undefined, 0, -1, 1.5, "7", null]) {
+      expect(
+        parseToWorker({ type: "removal-offer", contentId }),
+      ).toBeUndefined();
+    }
+  });
+
+  it("page-lists is the status page's, the other two the Naka tab's", () => {
+    expect(allowedFor("naka-tab", { type: "page-lists" })).toBe(false);
+    expect(allowedFor("status-page", { type: "page-lists" })).toBe(true);
+    for (const msg of [
+      { type: "open-questions" },
+      { type: "removal-offer", contentId: 1 },
+    ] as const) {
+      expect(allowedFor("status-page", msg)).toBe(false);
+      expect(allowedFor("naka-tab", msg)).toBe(true);
+    }
+  });
+});
+
 describe("allowedFor", () => {
   const messages: ToWorker[] = [
     { type: "naka-ready" },
@@ -791,6 +825,9 @@ describe("allowedFor", () => {
     { type: "rating-cards" },
     { type: "rate", contentId: 1, label: "film", rating: 7 },
     { type: "dismiss-rating", contentId: 1, label: "film" },
+    { type: "open-questions" },
+    { type: "removal-offer", contentId: 1 },
+    { type: "page-lists" },
     {
       type: "set-settings",
       thresholds: { film: 0.9, episode: 0.8 },
@@ -806,8 +843,16 @@ describe("allowedFor", () => {
       "rating-cards",
       "rate",
       "dismiss-rating",
+      "open-questions",
+      "removal-offer",
     ],
-    "status-page": ["status", "resync", "set-mode", "set-settings"],
+    "status-page": [
+      "status",
+      "resync",
+      "set-mode",
+      "set-settings",
+      "page-lists",
+    ],
   };
 
   it("allows each type for its role only", () => {
@@ -862,6 +907,6 @@ describe("allowedFor", () => {
     const types = messages.map((m) => m.type).sort();
     const tabbed = Object.values(allowed).flat().sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(11);
+    expect(new Set(types).size).toBe(14);
   });
 });

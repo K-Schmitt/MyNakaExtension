@@ -55,3 +55,12 @@ export function parseCandidates(
   if (candidates.length > MAX_CANDIDATES || !sameIds) return fail(path);
   return candidates;
 }
+
+// The candidates of an offer the worker answered: at most MAX_CANDIDATES, with no ids list to match.
+export function parseOfferCandidates(
+  raw: unknown,
+  path: string,
+): QuestionCandidate[] {
+  const candidates = asList(raw, path, parseCandidate);
+  return candidates.length > MAX_CANDIDATES ? fail(path) : candidates;
+}
