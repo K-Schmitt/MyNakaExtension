@@ -26,6 +26,19 @@ export type SessionPorts = {
   hide(): void;
 };
 
+// The clicked label on the shown card, as it was at the click.
+type Snapshot = {
+  pending: boolean;
+  given: number | undefined;
+  failure: string | undefined;
+};
+
+const snapshotOf = (card: RatingCard, label: RatingLabel): Snapshot => ({
+  pending: card.pending.includes(label),
+  given: card.given[label],
+  failure: failureOf(card, label),
+});
+
 export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
   let current: Session | undefined;
 
@@ -64,27 +77,40 @@ export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
     render(s);
   }
 
+  // Moved on: the answer has a card where the clicked label left `pending`, or its given rating
+  // changed, or its failure changed, all against the card as it was at the click. No card, or a card
+  // unchanged on those three, is "not yet".
   function judge(
     s: Session,
     label: RatingLabel,
-    before: string | undefined,
+    at: Snapshot,
     answer: CardAnswer | undefined,
   ): boolean {
     if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
-    if (answer === undefined) return false;
-    const { card } = answer;
-    const stillPending = card?.pending.includes(label) === true;
-    const fresh = card !== null && failureOf(card, label) !== before;
-    if (stillPending && !fresh) return false;
-    settle(s, answer);
+    const card = answer?.card;
+    if (!answer || !card) return false;
+    const left = at.pending && !card.pending.includes(label);
+    const rated = card.given[label] !== at.given;
+    const failed = failureOf(card, label) !== at.failure;
+    if (!left && !rated && !failed) return false;
+    if (failed && !left && !rated) showFailure(s, card, label);
+    else settle(s, answer);
     return true;
+  }
+
+  // A failure on a label that did not leave `pending`: the block stays, unlocked, with its line.
+  function showFailure(s: Session, card: RatingCard, label: RatingLabel): void {
+    s.card = card;
+    s.label = label;
+    s.locked = false;
+    render(s);
   }
 
   // Locked from the click until the card says the label left `pending`, or a failure that was not
   // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
   function afterAction(s: Session, send: Promise<boolean>): void {
     const { label } = s;
-    const before = failureOf(s.card, label);
+    const at = snapshotOf(s.card, label);
     s.locked = true;
     delete s.error;
     render(s);
@@ -92,7 +118,7 @@ export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
       ports.port,
       ports.timer,
       s.ids,
-      (answer) => judge(s, label, before, answer),
+      (answer) => judge(s, label, at, answer),
       (answered) => (answered ? close(s) : unreachable(s)),
     );
     void send

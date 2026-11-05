@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPauseBlock } from "../src/content/ui/pause-block";
-import { UNREACHABLE_LINE } from "../src/content/ui/rating-copy";
+import { SENDING_LINE, UNREACHABLE_LINE } from "../src/content/ui/rating-copy";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard } from "../src/core/rating-cards";
 import type { CardAnswer } from "../src/sw/rating-answers";
@@ -271,5 +271,82 @@ describe("the pause block lifecycle", () => {
     w.last().handlers.onChoose(8);
     await flush();
     expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+  });
+});
+
+describe("the pause block waits for the card to show the sent rating", () => {
+  const rated = (n: number) =>
+    episodeCard({ pending: [], given: { épisode: n } });
+
+  it("a view-only card stays locked while the card is null, then hides once the rating is given", async () => {
+    const w = world();
+    const none = asked(null);
+    w.script(EP_IDS, none, none, none, none, asked(rated(7)));
+    await w.pauseAt(0.5);
+    const sending = w.last().handlers;
+    w.last().handlers.onChoose(7);
+    await flush();
+    for (const ms of [2000, 3000, 5000]) {
+      await w.clock.advance(ms);
+      expect(w.last().view.notice).toBe(SENDING_LINE);
+      expect(w.hidden()).toBe(0);
+    }
+    sending.onChoose(9);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
+      "rate 5:1:1 épisode 7",
+    ]);
+    await w.clock.advance(10000);
+    expect(w.hidden()).toBe(1);
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(1);
+  });
+
+  it("a rated title moves on when the given rating changes, not before", async () => {
+    const w = world();
+    const before = episodeCard({
+      pending: [],
+      given: { épisode: 6 },
+      targets: episodeCard().targets.map((t) =>
+        t.label === "épisode" ? { ...t, current: 6 } : t,
+      ),
+    });
+    w.script(EP_IDS, asked(before), asked(before), asked(rated(8)));
+    await w.pauseAt(0.5);
+    w.last().handlers.onChoose(8);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.hidden()).toBe(0);
+    await w.clock.advance(3000);
+    expect(w.hidden()).toBe(1);
+  });
+
+  it("a failure for the label that was not there at the click unlocks with its line", async () => {
+    const w = world();
+    const failed = episodeCard({
+      pending: [],
+      failed: { label: "épisode", error: "sc-session", at: 5 },
+    });
+    w.script(EP_IDS, asked(null), asked(failed));
+    await w.pauseAt(0.5);
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.error).toBeDefined();
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(w.hidden()).toBe(0);
+  });
+
+  it("a card that stays null for the whole schedule hides at its end, with no failure line", async () => {
+    const w = world();
+    w.script(EP_IDS, asked(null));
+    await w.pauseAt(0.5);
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(39999);
+    expect(w.hidden()).toBe(0);
+    await w.clock.advance(1);
+    expect(w.hidden()).toBe(1);
+    expect(w.shown.every((e) => e.view.error === undefined)).toBe(true);
   });
 });

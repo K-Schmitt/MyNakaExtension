@@ -330,6 +330,25 @@ describe("the end block lock and manual choice", () => {
   });
 });
 
+describe("the end block waits for a manual choice to show", () => {
+  it("a label that was not pending moves on when its given rating changes", async () => {
+    const w = world();
+    const card = toSaison({ pending: ["saison"] });
+    const given = toSaison({ pending: ["saison"], given: { épisode: 8 } });
+    w.script(EP_IDS, answer(card), answer(card), answer(given));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onOther("épisode");
+    w.last().handlers.onChoose(8);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.choices).toEqual([]);
+    await w.clock.advance(3000);
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(w.last().view.heading).toContain("saison");
+  });
+});
+
 describe("the end block actions", () => {
   it("Plus tard hides and sends no message", async () => {
     const w = world();
