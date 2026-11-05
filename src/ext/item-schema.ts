@@ -18,6 +18,21 @@ const REASONS = valuesOf<UnlinkedItem["reason"]>({
   "not-in-catalogue": true,
 });
 const KINDS = valuesOf<PendingItem["kind"]>({ removal: true, ambiguity: true });
+const REMOVAL_KEYS = valuesOf<keyof Extract<PendingItem, { kind: "removal" }>>({
+  kind: true,
+  removeFrom: true,
+  pair: true,
+  asked: true,
+});
+const AMBIGUITY_KEYS = valuesOf<
+  keyof Extract<PendingItem, { kind: "ambiguity" }>
+>({ kind: true, side: true, id: true, candidateIds: true });
+const UNLINKED_KEYS = valuesOf<keyof UnlinkedItem>({
+  side: true,
+  id: true,
+  title: true,
+  reason: true,
+});
 
 // Movie or episode content key, as the finish handler writes it.
 const CONTENT_KEY = /^(movie:\d+|tv:\d+:S\d+E\d+)$/;
@@ -29,7 +44,7 @@ export function parseContentKey(raw: unknown, path: string): string {
 }
 
 function parseRemoval(record: Record<string, unknown>, path: string) {
-  onlyKeys(record, ["kind", "removeFrom", "pair", "asked"], path);
+  onlyKeys(record, REMOVAL_KEYS, path);
   return {
     kind: "removal" as const,
     removeFrom: asOneOf(record.removeFrom, SIDES, `${path}.removeFrom`),
@@ -39,7 +54,7 @@ function parseRemoval(record: Record<string, unknown>, path: string) {
 }
 
 function parseAmbiguity(record: Record<string, unknown>, path: string) {
-  onlyKeys(record, ["kind", "side", "id", "candidateIds"], path);
+  onlyKeys(record, AMBIGUITY_KEYS, path);
   return {
     kind: "ambiguity" as const,
     side: asOneOf(record.side, SIDES, `${path}.side`),
@@ -58,7 +73,7 @@ export function parsePending(raw: unknown, path: string): PendingItem {
 
 export function parseUnlinked(raw: unknown, path: string): UnlinkedItem {
   const record = asRecord(raw, path);
-  onlyKeys(record, ["side", "id", "title", "reason"], path);
+  onlyKeys(record, UNLINKED_KEYS, path);
   return {
     side: asOneOf(record.side, SIDES, `${path}.side`),
     id: asId(record.id, `${path}.id`),

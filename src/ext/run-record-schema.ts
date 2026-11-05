@@ -12,7 +12,7 @@ import type { JobError } from "./job-error";
 import { parseReport } from "./report-schema";
 import type { Mode, RunRecord } from "./settings";
 
-type Side = NonNullable<RunRecord["preview"]>[number]["side"];
+type PreviewItem = NonNullable<RunRecord["preview"]>[number];
 
 export const MODES = valuesOf<Mode>({ simulation: true, live: true });
 const TRIGGERS = valuesOf<RunRecord["trigger"]>({
@@ -21,7 +21,7 @@ const TRIGGERS = valuesOf<RunRecord["trigger"]>({
   button: true,
 });
 const OUTCOMES = valuesOf<RunRecord["outcome"]>({ ok: true, failed: true });
-const SIDES = valuesOf<Side>({ naka: true, sc: true });
+const SIDES = valuesOf<PreviewItem["side"]>({ naka: true, sc: true });
 export const ERROR_CODES = valuesOf<JobError>({
   "no-naka-tab": true,
   "naka-session": true,
@@ -31,11 +31,20 @@ export const ERROR_CODES = valuesOf<JobError>({
   unavailable: true,
   "finish-limit": true,
 });
-const KEYS = ["at", "trigger", "mode", "outcome", "error", "report", "preview"];
+const KEYS = valuesOf<keyof RunRecord>({
+  at: true,
+  trigger: true,
+  mode: true,
+  outcome: true,
+  error: true,
+  report: true,
+  preview: true,
+});
+const PREVIEW_KEYS = valuesOf<keyof PreviewItem>({ side: true, title: true });
 
 function parsePreviewItem(raw: unknown, path: string) {
   const record = asRecord(raw, path);
-  onlyKeys(record, ["side", "title"], path);
+  onlyKeys(record, PREVIEW_KEYS, path);
   return {
     side: asOneOf(record.side, SIDES, `${path}.side`),
     title: asString(record.title, `${path}.title`),

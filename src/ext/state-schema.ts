@@ -2,24 +2,31 @@
 // holding the field path, never the value.
 
 import type { SyncState } from "../core/state";
-import { asInt, asList, asRecord, fail, onlyKeys } from "./field-checks";
+import {
+  asInt,
+  asList,
+  asRecord,
+  fail,
+  onlyKeys,
+  valuesOf,
+} from "./field-checks";
 import { parseContentKey, parsePending, parseUnlinked } from "./item-schema";
 import { parseMapping, parsePairs } from "./pair-schema";
 import { parsePresence } from "./presence-schema";
 
-const KEYS = [
-  "version",
-  "mapping",
-  "snapshot",
-  "settled",
-  "pending",
-  "handled",
-  "unlinked",
-  "retryLast",
-  "run",
-  "presence",
-  "threshold",
-];
+const KEYS = valuesOf<keyof SyncState>({
+  version: true,
+  mapping: true,
+  snapshot: true,
+  settled: true,
+  pending: true,
+  handled: true,
+  unlinked: true,
+  retryLast: true,
+  run: true,
+  presence: true,
+  threshold: true,
+});
 
 function parseThreshold(raw: unknown): number {
   if (typeof raw !== "number" || !(raw > 0 && raw <= 1))

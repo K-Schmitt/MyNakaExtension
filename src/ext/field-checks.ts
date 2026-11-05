@@ -50,7 +50,7 @@ export function asBoolean(raw: unknown, path: string): boolean {
 // member, the Record no longer compiles, so a list that validates stored or messaged values cannot fall
 // behind its type.
 export function valuesOf<T extends string>(
-  members: Record<T, true>,
+  members: Record<NoInfer<T>, true>,
 ): readonly T[] {
   return Object.keys(members) as T[];
 }
