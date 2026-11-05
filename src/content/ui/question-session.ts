@@ -91,7 +91,10 @@ export function createQuestionSession(
   function settleOwn(s: Shown, last: LastAnswer): void {
     if (last.outcome === "done") close(s, "answered");
     else if (last.outcome === "moot") showMoot(s);
-    else unlock(s, failureLine(last));
+    else {
+      s.seq = last.seq; // a retry waits for a newer answer, not this one again
+      unlock(s, failureLine(last));
+    }
   }
 
   // true when the answer settles the wait.

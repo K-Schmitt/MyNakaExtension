@@ -327,3 +327,42 @@ describe("the question session actions", () => {
     expect(t.top().view.error).toBe(UNREACHABLE_LINE);
   });
 });
+
+describe("the question session retry and absentIsDone", () => {
+  it("judges only a newer answer after a retry, not the refused one again", async () => {
+    const t = setup();
+    const refused = last({ outcome: "refused" });
+    t.script.states = [{ present: true, sending: false, last: refused }];
+    await t.clock.advance(GRACE_MS);
+    t.top().h.onChoose(CHOICE);
+    await t.clock.advance(2000);
+    expect(t.top().view.error).toBe(REFUSED_LINE);
+    await t.clock.advance(GRACE_MS);
+    t.top().h.onChoose(CHOICE);
+    expect(t.ports.send).toHaveBeenCalledTimes(2);
+    await t.clock.advance(2000);
+    expect(t.top().view.sending).toBe(true);
+    expect(t.top().view.error).toBeUndefined();
+    t.script.states = [
+      {
+        present: true,
+        sending: false,
+        last: last({ seq: SEQ + 2, outcome: "done" }),
+      },
+    ];
+    await t.clock.advance(3000);
+    expect(t.closed).toEqual(["answered"]);
+  });
+
+  it("keeps a present-false question as not yet when absentIsDone is false", async () => {
+    const t = setup({ absentIsDone: false });
+    t.script.states = [{ present: false, sending: false }];
+    await t.clock.advance(GRACE_MS);
+    t.top().h.onChoose(CHOICE);
+    await t.clock.advance(20000);
+    expect(t.closed).toEqual([]);
+    expect(t.top().view.sending).toBe(true);
+    await t.clock.advance(20000);
+    expect(t.closed).toEqual(["closed"]);
+  });
+});
