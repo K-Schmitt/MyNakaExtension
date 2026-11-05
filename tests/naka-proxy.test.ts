@@ -105,6 +105,19 @@ describe("round trip through a fake tab (real tab handler, fake fetch)", () => {
     expect(await direct.contentById(8)).toBeUndefined();
   });
 
+  it("availableSeasons equals the direct client's, found or not", async () => {
+    const { direct, proxy } = both();
+    expect(await proxy.availableSeasons(7)).toStrictEqual(
+      await direct.availableSeasons(7),
+    );
+    expect(await proxy.availableSeasons(7)).toEqual({
+      seasons: [1, 2],
+      episodeCounts: { 1: 8, 2: 10 },
+    });
+    expect(await proxy.availableSeasons(8)).toBeUndefined();
+    expect(await direct.availableSeasons(8)).toBeUndefined();
+  });
+
   it("add and remove resolve with no value and reach the API", async () => {
     const api = fakeApi(standardApi);
     const { tabs } = tabRunning(clientOn(api.fetch), () => undefined);
@@ -537,6 +550,19 @@ describe("re-validation of the value", () => {
     expect(Object.keys(result ?? {})).not.toContain("admin");
   });
 
+  it("keeps a valid numberOfSeasons through the tab's reply, drops an invalid one", async () => {
+    const kept = await proxyAnswering(() =>
+      ok({ ...item(7), numberOfSeasons: 7 }),
+    ).proxy.contentById(7);
+    expect(kept?.numberOfSeasons).toBe(7);
+    for (const bad of [0, -1, 1.5, "7", null]) {
+      const result = await proxyAnswering(() =>
+        ok({ ...item(7), numberOfSeasons: bad }),
+      ).proxy.contentById(7);
+      expect(result).toStrictEqual(item(7));
+    }
+  });
+
   it("drops a forged field inside search items", async () => {
     const { proxy } = proxyAnswering(() => ok([{ ...item(1), admin: true }]));
     expect(await proxy.search("a")).toStrictEqual([item(1)]);
@@ -640,6 +666,37 @@ describe("re-validation of the value", () => {
     ).toBeUndefined();
   });
 
+  it("availableSeasons re-validates the tab's value", async () => {
+    for (const value of [
+      null,
+      "x",
+      7,
+      [],
+      {},
+      { seasons: [], episodeCounts: {} },
+      { seasons: [1], episodeCounts: { "0": 5 } },
+      { seasons: [1], episodeCounts: { "1": 1.5 } },
+      { seasons: ["1"], episodeCounts: {} },
+    ]) {
+      const { proxy } = proxyAnswering(() => ok(value));
+      expect(await failure(proxy.availableSeasons(7))).toBeInstanceOf(
+        NakaUnavailableError,
+      );
+    }
+    const good = { seasons: [1, 2], episodeCounts: { "1": 8 } };
+    expect(
+      await proxyAnswering(() => ok(good)).proxy.availableSeasons(7),
+    ).toEqual({ seasons: [1, 2], episodeCounts: { 1: 8 } });
+  });
+
+  it("availableSeasons with no value, or not-found, is undefined", async () => {
+    expect(
+      await proxyAnswering(() => ok()).proxy.availableSeasons(7),
+    ).toBeUndefined();
+    const { proxy } = proxyAnswering(() => ({ ok: false, error: "not-found" }));
+    expect(await proxy.availableSeasons(7)).toBeUndefined();
+  });
+
   it("add and remove reject any value", async () => {
     for (const value of [[1], "x", 0, false, null, {}, item(1)]) {
       const { proxy } = proxyAnswering(() => ({ ok: true, value }));
@@ -690,6 +747,7 @@ describe("messages sent to the tab", () => {
     await proxy.removeFromPlaylist(6);
     await proxy.search("  titre  ");
     await proxy.contentById(7);
+    await proxy.availableSeasons(7);
     await proxy.account();
     expect(port.sent.map((s) => s.msg)).toEqual([
       { type: "naka-call", call: "playlistIds" },
@@ -697,6 +755,7 @@ describe("messages sent to the tab", () => {
       { type: "naka-call", call: "remove", contentId: 6 },
       { type: "naka-call", call: "search", query: "titre" },
       { type: "naka-call", call: "contentById", contentId: 7 },
+      { type: "naka-call", call: "availableSeasons", contentId: 7 },
       { type: "naka-account" },
     ]);
   });
@@ -706,6 +765,7 @@ describe("messages sent to the tab", () => {
     await expect(proxy.addToPlaylist(0)).rejects.toThrow(RangeError);
     await expect(proxy.removeFromPlaylist(1.5)).rejects.toThrow(RangeError);
     await expect(proxy.contentById(-1)).rejects.toThrow(RangeError);
+    await expect(proxy.availableSeasons(0)).rejects.toThrow(RangeError);
     await expect(proxy.search("   ")).rejects.toThrow(RangeError);
     expect(port.sent).toHaveLength(0);
     expect(port.queried).toEqual([]);

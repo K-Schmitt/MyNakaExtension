@@ -1,16 +1,22 @@
-// What the worker is doing now, for the status answer (Ruling 20): the job running, and the mode a queued
-// set-mode will apply. In memory only: a worker restart loses it with the queue it describes.
+// What the worker is doing now, for the status answer (Ruling 20): the job running, the mode a queued
+// set-mode will apply, and whether a set-settings waits or runs. In memory only: a worker restart loses it with the queue it describes.
 
 import type { Mode } from "../ext/settings";
 
 export type Running = { kind: "sync" | "finish"; since: number };
-export type Activity = { running?: Running; pendingMode?: Mode };
+export type Activity = {
+  running?: Running;
+  pendingMode?: Mode;
+  pendingSettings?: true;
+};
 
 export type ActivityTracker = {
   /** The job, marked running from its start to its end. */
   track(kind: Running["kind"], job: () => Promise<void>): () => Promise<void>;
   /** Marks the mode pending now; the job returned applies it, then clears the mark unless a newer one came. */
   queueMode(mode: Mode, apply: () => Promise<void>): () => Promise<void>;
+  /** Marks a settings change pending now; the job returned applies it, then releases the mark (even on a failure). */
+  queueSettings(apply: () => Promise<void>): () => Promise<void>;
   current(): Activity;
 };
 
@@ -18,6 +24,7 @@ export function createActivity(now: () => number): ActivityTracker {
   let running: Running | undefined;
   let pending: { mode: Mode; ticket: number } | undefined;
   let tickets = 0;
+  let settingsWaiting = 0;
   return {
     track: (kind, job) => async () => {
       running = { kind, since: now() };
@@ -39,9 +46,20 @@ export function createActivity(now: () => number): ActivityTracker {
         }
       };
     },
+    queueSettings(apply) {
+      settingsWaiting += 1;
+      return async () => {
+        try {
+          await apply();
+        } finally {
+          settingsWaiting -= 1;
+        }
+      };
+    },
     current: () => ({
       ...(running === undefined ? {} : { running: { ...running } }),
       ...(pending === undefined ? {} : { pendingMode: pending.mode }),
+      ...(settingsWaiting > 0 ? { pendingSettings: true as const } : {}),
     }),
   };
 }
@@ -51,8 +69,10 @@ export function createActivity(now: () => number): ActivityTracker {
 export function overlapping(before: Activity, after: Activity): Activity {
   const running = after.running ?? before.running;
   const pendingMode = after.pendingMode ?? before.pendingMode;
+  const pendingSettings = after.pendingSettings ?? before.pendingSettings;
   return {
     ...(running === undefined ? {} : { running }),
     ...(pendingMode === undefined ? {} : { pendingMode }),
+    ...(pendingSettings === undefined ? {} : { pendingSettings }),
   };
 }

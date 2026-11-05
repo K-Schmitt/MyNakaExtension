@@ -57,6 +57,10 @@ export function standardApi(call: ApiCall): ApiReply {
   }
   if (url.endsWith("/browse/7")) return json(entry(7));
   if (url.endsWith("/browse/8")) return json({}, 404);
+  if (url.endsWith("/browse/7/available-seasons")) {
+    return json({ seasons: [1, 2], episodeCounts: { "1": 8, "2": 10 } });
+  }
+  if (url.endsWith("/browse/8/available-seasons")) return json({}, 404);
   return json({});
 }
 

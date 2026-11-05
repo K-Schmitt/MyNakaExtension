@@ -5,6 +5,7 @@ import {
   type PlaybackTracker,
   PROGRESS_MARKS,
 } from "../src/content/playback-tracker";
+import { THRESHOLD_CHOICES } from "../src/core/watch-trigger";
 import { PAGE_CHANNEL, type PageEvent } from "../src/ext/messages";
 
 const FILM = { contentId: 5, mediaType: "movie" as const };
@@ -35,9 +36,15 @@ function sampleOf(
 }
 
 describe("PROGRESS_MARKS", () => {
-  it("are the four marks, and the floor is 5 minutes", () => {
-    expect([...PROGRESS_MARKS]).toEqual([0.85, 0.9, 0.95, 0.99]);
+  it("are the five marks, and the floor is 5 minutes", () => {
+    expect([...PROGRESS_MARKS]).toEqual([0.8, 0.85, 0.9, 0.95, 0.99]);
     expect(DURATION_FLOOR_S).toBe(300);
+  });
+
+  it("hold every threshold choice: whatever threshold is saved, the tracker offers that mark", () => {
+    for (const choice of THRESHOLD_CHOICES) {
+      expect(PROGRESS_MARKS, String(choice)).toContain(choice);
+    }
   });
 });
 
@@ -87,25 +94,33 @@ describe("sample", () => {
     });
   });
 
-  it("gives nothing just below the first mark, the mark at exactly 0.85", () => {
+  it("gives nothing just below the first mark, the mark at exactly 0.8", () => {
     const t = film();
-    expect(at(t, 0.849)).toBeUndefined();
-    expect(at(t, 0.85)).toEqual({
+    expect(at(t, 0.799)).toBeUndefined();
+    expect(at(t, 0.8)).toEqual({
       type: "finished",
       source: "threshold",
-      progress: 0.85,
+      progress: 0.8,
       contentId: 5,
     });
+    expect(at(t, 0.81)).toBeUndefined();
   });
 
-  it("a run from 0 to the end gives exactly the four marks, in order", () => {
+  it("a seek to 0.86 offers 0.8 and 0.85 once and sends only the highest", () => {
+    const t = film();
+    expect(at(t, 0.86)?.progress).toBe(0.85);
+    expect(at(t, 0.8)).toBeUndefined();
+    expect(at(t, 0.86)).toBeUndefined();
+  });
+
+  it("a run from 0 to the end gives exactly the five marks, in order", () => {
     const t = film();
     const out = [];
     for (let s = 0; s <= TWO_HOURS; s += 5) {
       const m = sampleOf(t, s, TWO_HOURS);
       if (m !== undefined) out.push(m.progress);
     }
-    expect(out).toEqual([0.85, 0.9, 0.95, 0.99]);
+    expect(out).toEqual([0.8, 0.85, 0.9, 0.95, 0.99]);
   });
 
   it("a seek straight to the end gives one message at 0.99, a second seek none", () => {

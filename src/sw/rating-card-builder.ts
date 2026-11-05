@@ -1,0 +1,104 @@
+// The rating card of a finished content, built from what the finish already knows: its `done` outcome, its
+// event and the Naka catalogue entry its ONE content read returned (no second Naka read). The season and
+// series ends come from the one rule of core/season-end. The owner's rating of a saison or a série is read
+// (behind the finish's breaker) only when that label would be asked, so at most two reads.
+
+import { contentKeyOf } from "../core/finish-event";
+import type { FinishEvent, FinishOutcome } from "../core/finish-handler";
+import {
+  type CardTarget,
+  pendingOf,
+  type RatingCard,
+  upsertCard,
+} from "../core/rating-cards";
+import { type SeasonEnd, seasonEnd } from "../core/season-end";
+import { seasonFactsOf } from "../core/season-facts";
+import type { Store } from "../ext/store";
+import type { NakaItem, NakaSeasons } from "../naka/naka-client";
+import type { ProductState } from "../sc/sc-client";
+
+export type DoneOutcome = Extract<FinishOutcome, { kind: "done" }>;
+
+export type CardInput = {
+  outcome: DoneOutcome;
+  event: FinishEvent;
+  item: NakaItem;
+  /** Naka's season list, when it answered: it decides the end of the season and of the series. */
+  seasons?: NakaSeasons;
+  productState(productId: number): Promise<ProductState>;
+  at: number;
+};
+
+const FILM_END: SeasonEnd = { lastOfSeason: false, seriesFinished: false };
+
+function endOf({ outcome, event, item, seasons }: CardInput): SeasonEnd {
+  const { season, episode } = event.naka;
+  if (season === undefined || episode === undefined) return FILM_END;
+  return seasonEnd(
+    { season, episode },
+    seasonFactsOf(seasons, season, item.numberOfSeasons),
+    outcome.lastOfSeason === true,
+  );
+}
+
+function isAsked(label: CardTarget["label"], end: SeasonEnd): boolean {
+  if (label === "saison") return end.lastOfSeason;
+  return label === "série" && end.seriesFinished;
+}
+
+type Read = { target: CardTarget; unread: boolean };
+
+// A read that fails leaves the target as it was (manual choice stays possible) and marks it unread.
+async function withCurrent(
+  target: CardTarget,
+  end: SeasonEnd,
+  productState: CardInput["productState"],
+): Promise<Read> {
+  if (!isAsked(target.label, end)) return { target, unread: false };
+  try {
+    const { rating } = await productState(target.productId);
+    return { target: { ...target, current: rating }, unread: false };
+  } catch {
+    return { target, unread: true };
+  }
+}
+
+async function readTargets(input: CardInput, end: SeasonEnd): Promise<Read[]> {
+  const reads: Read[] = [];
+  for (const target of input.outcome.ratingTargets) {
+    reads.push(await withCurrent(target, end, input.productState));
+  }
+  return reads;
+}
+
+// Only the label whose read failed is dropped from `pending`: the épisode, or any other, stays asked.
+export async function buildCard(input: CardInput): Promise<RatingCard> {
+  const { event, item, at } = input;
+  const end = endOf(input);
+  const reads = await readTargets(input, end);
+  const targets = reads.map((read) => read.target);
+  const unread = reads.filter((r) => r.unread).map((r) => r.target.label);
+  const pending = pendingOf(targets, end.lastOfSeason, end.seriesFinished);
+  const { season, episode } = event.naka;
+  return {
+    key: contentKeyOf(event.naka),
+    contentId: event.naka.contentId,
+    title: item.title,
+    ...(season === undefined || episode === undefined
+      ? {}
+      : { season, episode }),
+    at,
+    targets,
+    pending: pending.filter((label) => !unread.includes(label)),
+    given: {},
+    seriesFinished: end.seriesFinished,
+  };
+}
+
+/** Puts the card first in the stored ratings. A store that cannot be read or written rejects. */
+export async function storeCard(
+  store: Pick<Store, "loadRatings" | "saveRatings">,
+  card: RatingCard,
+): Promise<void> {
+  await store.saveRatings(upsertCard(await store.loadRatings(), card));
+}

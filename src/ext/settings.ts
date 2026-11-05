@@ -1,5 +1,6 @@
 import type { FinishOutcome } from "../core/finish-handler";
 import type { SyncReport } from "../core/sync-runner";
+import { DEFAULT_THRESHOLDS, type Thresholds } from "../core/watch-trigger";
 import {
   asInt,
   asOneOf,
@@ -14,6 +15,7 @@ import { type FinishWindow, MAX_FINISHES_PER_WINDOW } from "./finish-window";
 import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
 import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
+import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
 
 export type Mode = "simulation" | "live";
 
@@ -35,6 +37,9 @@ export type FinishRecord = {
   error?: JobError;
 };
 
+/** A finish without its date and key: what a rating-card answer tells the tab. */
+export type LastFinish = Pick<FinishRecord, "outcome" | "error">;
+
 export type Settings = {
   mode: Mode;
   binding?: { scUsername: string; nakaAccount?: string };
@@ -43,16 +48,23 @@ export type Settings = {
   lastFinish?: FinishRecord;
   /** The hour's budget of finishes (Ruling 15). */
   finishWindow?: FinishWindow;
+  /** The end of a viewing, per kind (each on the grid of THRESHOLD_CHOICES). Absent: the defaults. */
+  thresholds?: Thresholds;
+  /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
+  pauseFromPercent?: number;
 };
 
-const KEYS = [
-  "mode",
-  "binding",
-  "lastAutoRunAt",
-  "lastRun",
-  "lastFinish",
-  "finishWindow",
-];
+// A Record, so that a field added to Settings without being added here does not compile.
+const KEYS = valuesOf<keyof Settings>({
+  mode: true,
+  binding: true,
+  lastAutoRunAt: true,
+  lastRun: true,
+  lastFinish: true,
+  finishWindow: true,
+  thresholds: true,
+  pauseFromPercent: true,
+});
 const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
   "needs-choice": true,
@@ -86,18 +98,26 @@ function finishError(
   return raw === undefined ? undefined : fail(path);
 }
 
+// Shared with the tab, which reads a finish's outcome from a rating-card answer.
+export function parseOutcome(
+  record: Record<string, unknown>,
+  path: string,
+): LastFinish {
+  const outcome = asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`);
+  const error = finishError(record.error, outcome, `${path}.error`);
+  return error === undefined ? { outcome } : { outcome, error };
+}
+
 // Shared with the status page, which reads the last finish from the worker's answer.
 export function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
   onlyKeys(record, ["at", "key", "outcome", "error"], path);
-  const outcome = asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`);
-  const error = finishError(record.error, outcome, `${path}.error`);
+  const done = parseOutcome(record, path);
   return {
     at: asInt(record.at, 0, `${path}.at`),
     key: parseContentKey(record.key, `${path}.key`),
-    outcome,
-    ...(error === undefined ? {} : { error }),
+    ...done,
   };
 }
 
@@ -125,6 +145,11 @@ export function parseSettings(raw: unknown): Settings {
   );
   const lastFinish = whenPresent(record.lastFinish, parseFinish);
   const finishWindow = whenPresent(record.finishWindow, parseFinishWindow);
+  const thresholds = whenPresent(record.thresholds, parseThresholds);
+  const pauseFromPercent = whenPresent(
+    record.pauseFromPercent,
+    parsePauseFromPercent,
+  );
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
     ...(binding === undefined ? {} : { binding }),
@@ -132,5 +157,16 @@ export function parseSettings(raw: unknown): Settings {
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(finishWindow === undefined ? {} : { finishWindow }),
+    ...(thresholds === undefined ? {} : { thresholds }),
+    ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
   };
+}
+
+export function thresholdsOf(s: Settings): Thresholds {
+  return s.thresholds ?? DEFAULT_THRESHOLDS;
+}
+
+// 0 means "at any time".
+export function pauseFromOf(s: Settings): number {
+  return s.pauseFromPercent ?? 0;
 }

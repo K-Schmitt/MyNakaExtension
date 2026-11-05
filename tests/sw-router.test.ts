@@ -6,6 +6,7 @@ import { type Mode, parseSettings } from "../src/ext/settings";
 import { createStore } from "../src/ext/store";
 import { createNakaClient } from "../src/naka/naka-client";
 import type { Fetch } from "../src/sc/sc-client";
+import { toSettingsView } from "../src/status/settings-view";
 import { localFormat } from "../src/status/status-format";
 import { toStatusView } from "../src/status/status-view";
 import { MAX_QUEUED_FINISHES } from "../src/sw/finish-queue";
@@ -37,6 +38,27 @@ const EVIL = {
 };
 const IFRAME = { ...NAKA_TAB, frameId: 3 };
 const OTHER_EXTENSION = { ...NAKA_TAB, id: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" };
+
+const RATE = {
+  type: "rate",
+  contentId: 3,
+  label: "film",
+  rating: 7,
+};
+const DISMISS = { type: "dismiss-rating", contentId: 3, label: "film" };
+const CARD = { type: "rating-card", contentId: 3 };
+const SETTINGS = {
+  type: "set-settings",
+  thresholds: { film: 0.95, episode: 0.85 },
+  pauseFromPercent: 30,
+};
+const RATING_MESSAGES: [string, unknown][] = [
+  ["a set-settings", SETTINGS],
+  ["a rate", RATE],
+  ["a dismiss-rating", DISMISS],
+  ["a rating-card", CARD],
+  ["a rating-cards", { type: "rating-cards" }],
+];
 
 const FINISHED = {
   type: "finished",
@@ -79,9 +101,28 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     setMode: async (mode: Mode) => {
       calls.push(`mode:${mode}`);
     },
+    setSettings: async (thresholds, pauseFromPercent) => {
+      calls.push(
+        `settings:${JSON.stringify({ thresholds, pauseFromPercent })}`,
+      );
+    },
+    rate: async (msg) => {
+      calls.push(`rate:${JSON.stringify(msg)}`);
+    },
+    dismissRating: async (msg) => {
+      calls.push(`dismiss:${JSON.stringify(msg)}`);
+    },
     statusSnapshot: async () => {
       calls.push("status");
       return snapshot;
+    },
+    ratingCard: async (msg) => {
+      calls.push(`card:${JSON.stringify(msg)}`);
+      return { card: null, pauseFromPercent: 0 };
+    },
+    ratingCards: async () => {
+      calls.push("cards");
+      return { cards: [] };
     },
     ...over,
   };
@@ -158,6 +199,142 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls).toEqual(["mode:live"]);
   });
 
+  it("set-settings from the status page becomes a settings job with the parsed values, unanswered", async () => {
+    const r = router();
+    expect(r.send({ ...SETTINGS, mode: "live", x: 1 }, STATUS_PAGE)).toBe(
+      false,
+    );
+    await settle();
+    expect(r.calls).toEqual([
+      `settings:${JSON.stringify({
+        thresholds: SETTINGS.thresholds,
+        pauseFromPercent: 30,
+      })}`,
+    ]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("set-settings is queued behind the running job, like set-mode", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(SETTINGS, STATUS_PAGE);
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("settings:"))).toBe(false);
+    blocker.open();
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("settings:"))).toBe(true);
+  });
+
+  it("rate from the Naka tab becomes a rate job with the parsed message, answered at once", async () => {
+    const r = router();
+    expect(r.send({ ...RATE, productId: 99, token: "x" }, NAKA_TAB)).toBe(
+      false,
+    );
+    expect(r.answers).toEqual([{ ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([`rate:${JSON.stringify(RATE)}`]);
+    expect(r.answers).toEqual([{ ok: true }]);
+  });
+
+  it("dismiss-rating from the Naka tab becomes a dismiss job, answered at once", async () => {
+    const r = router();
+    expect(r.send(DISMISS, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([`dismiss:${JSON.stringify(DISMISS)}`]);
+    expect(r.answers).toEqual([{ ok: true }]);
+  });
+
+  it("a responder that throws on rate or dismiss-rating stops neither job", async () => {
+    const recorded = recordingJobs();
+    const r = createRouter({
+      extensionId: EXT,
+      queue: createJobQueue(),
+      jobs: recorded.jobs,
+      timer: fakeTimer().timer,
+      now: () => ROUTER_NOW,
+    });
+    const answered: unknown[] = [];
+    const respond = (answer: unknown) => {
+      answered.push(answer);
+      throw new Error("The message port closed.");
+    };
+    expect(r.handle(RATE, NAKA_TAB, respond)).toBe(false);
+    expect(r.handle(DISMISS, NAKA_TAB, respond)).toBe(false);
+    await settle();
+    expect(answered).toEqual([{ ok: true }, { ok: true }]);
+    expect(recorded.calls).toEqual([
+      `rate:${JSON.stringify(RATE)}`,
+      `dismiss:${JSON.stringify(DISMISS)}`,
+    ]);
+  });
+
+  it("rating-card and rating-cards from the Naka tab are answered, and run no job", async () => {
+    const r = router({
+      ratingCard: async () => ({ card: null, pauseFromPercent: 40 }),
+      ratingCards: async () => ({ cards: [] }),
+    });
+    expect(r.send(CARD, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "rating-cards" }, NAKA_TAB)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { card: null, pauseFromPercent: 40 },
+      { cards: [] },
+    ]);
+  });
+
+  it("a rating read that rejects is answered undefined at once, with no unhandled rejection", async () => {
+    const r = router({
+      ratingCard: async () => {
+        throw new Error("store down");
+      },
+      ratingCards: async () => {
+        throw new Error("store down");
+      },
+    });
+    expect(r.send(CARD, NAKA_TAB)).toBe(true);
+    expect(r.send({ type: "rating-cards" }, NAKA_TAB)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([undefined, undefined]);
+  });
+
+  it("a rejected read whose responder throws becomes no unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const listener = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listener);
+    try {
+      const r = createRouter({
+        extensionId: EXT,
+        queue: createJobQueue(),
+        jobs: recordingJobs({
+          ratingCard: async () => {
+            throw new Error("store down");
+          },
+        }).jobs,
+        timer: fakeTimer().timer,
+        now: () => ROUTER_NOW,
+      });
+      const answered: unknown[] = [];
+      const respond = (answer: unknown) => {
+        answered.push(answer);
+        throw new Error("The message port closed.");
+      };
+      expect(r.handle(CARD, NAKA_TAB, respond)).toBe(true);
+      await settle();
+      await settle();
+      expect(answered).toEqual([undefined]);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+  });
+
   it("status from the status page is answered with the snapshot", async () => {
     const r = router();
     expect(r.send({ type: "status" }, STATUS_PAGE)).toBe(true);
@@ -198,6 +375,40 @@ describe("router: everything else is ignored, unanswered", () => {
       { type: "playlist-changed" },
       STATUS_PAGE,
     ],
+    ["a set-settings from the Naka tab", SETTINGS, NAKA_TAB],
+    [
+      "a set-settings with an off-grid threshold",
+      { ...SETTINGS, thresholds: { film: 0.5, episode: 0.8 } },
+      STATUS_PAGE,
+    ],
+    [
+      "a set-settings with a percent of 100",
+      { ...SETTINGS, pauseFromPercent: 100 },
+      STATUS_PAGE,
+    ],
+    ["a rate from the status page", RATE, STATUS_PAGE],
+    ["a dismiss-rating from the status page", DISMISS, STATUS_PAGE],
+    ["a rating-card from the status page", CARD, STATUS_PAGE],
+    [
+      "a rating-cards from the status page",
+      { type: "rating-cards" },
+      STATUS_PAGE,
+    ],
+    ["a rate with a rating of 0", { ...RATE, rating: 0 }, NAKA_TAB],
+    ["a rate with a rating of 11", { ...RATE, rating: 11 }, NAKA_TAB],
+    ["a rate with an unknown label", { ...RATE, label: "season" }, NAKA_TAB],
+    ...RATING_MESSAGES.flatMap(([name, msg]) =>
+      [
+        ["https://naka.cx.evil.com/", EVIL],
+        ["an iframe", IFRAME],
+        ["another extension", OTHER_EXTENSION],
+        ["a sender with no id", { url: PLAYER, frameId: 0 }],
+      ].map(([from, sender]): [string, unknown, object] => [
+        `${name} from ${from as string}`,
+        msg,
+        sender as object,
+      ]),
+    ),
   ];
 
   it.each(ignored)("%s", async (_name, msg, sender) => {
@@ -222,6 +433,114 @@ describe("router: everything else is ignored, unanswered", () => {
     expect(read).toEqual([]);
     r.send({ type: "naka-ready" }, sender);
     expect(read).toContain("id");
+  });
+});
+
+describe("router: one waiting rate per title and label", () => {
+  const rateOf = (rating: number, over: object = {}) => ({
+    ...RATE,
+    rating,
+    ...over,
+  });
+  const rates = (calls: string[]) => calls.filter((c) => c.startsWith("rate:"));
+
+  it("three rates for the same key and label sent while a sync runs give one job, with the third rating", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    for (const rating of [5, 6, 9]) r.send(rateOf(rating), NAKA_TAB);
+    blocker.open();
+    await settle();
+    expect(rates(r.calls)).toEqual([`rate:${JSON.stringify(rateOf(9))}`]);
+  });
+
+  it("different labels or different keys are different jobs", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(rateOf(5), NAKA_TAB);
+    r.send(rateOf(6, { label: "série" }), NAKA_TAB);
+    r.send(rateOf(7, { contentId: 4 }), NAKA_TAB);
+    blocker.open();
+    await settle();
+    expect(rates(r.calls)).toHaveLength(3);
+  });
+
+  it("a rate for a running job queues behind it", async () => {
+    const running = latch();
+    const ratings: number[] = [];
+    const r = router({
+      rate: async (msg) => {
+        ratings.push(msg.rating);
+        if (ratings.length === 1) await running.opened;
+      },
+    });
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    r.send(rateOf(8), NAKA_TAB);
+    running.open();
+    await settle();
+    expect(ratings).toEqual([5, 8]);
+  });
+
+  it("a rate sent again after its job ended runs again", async () => {
+    const r = router();
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    r.send(rateOf(5), NAKA_TAB);
+    await settle();
+    expect(rates(r.calls)).toHaveLength(2);
+  });
+});
+
+describe("router: rating reads are answered outside the queue", () => {
+  it("a rating-card is answered while a sync still runs, then the sync ends", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(CARD, NAKA_TAB);
+    r.send({ type: "rating-cards" }, NAKA_TAB);
+    await settle();
+    expect(r.answers).toHaveLength(2);
+    blocker.open();
+    await settle();
+  });
+
+  it("a rate job is queued behind the running job, a read is not", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(RATE, NAKA_TAB);
+    r.send(CARD, NAKA_TAB);
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(false);
+    expect(r.answers).toEqual([
+      { ok: true },
+      { card: null, pauseFromPercent: 0, sending: ["film"] },
+    ]);
+    blocker.open();
+    await settle();
+    expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(true);
   });
 });
 
@@ -312,9 +631,9 @@ describe("router: finishes are bounded", () => {
 });
 
 // The router on the REAL jobs, with fake sites that know every content id.
-function floodWorld(threshold = 0.9) {
+function floodWorld() {
   const area = memoryArea();
-  area.data.set("state", { ...emptyState(), threshold });
+  area.data.set("state", emptyState());
   const naka = fakeNaka({
     playlistIds: async () => [],
     contentById: async (id) => ({
@@ -400,8 +719,8 @@ describe("router and jobs: a forged flood", () => {
     );
   });
 
-  it("a 0.85 mark queued behind a sync, then the 0.9 mark, under a 0.9 threshold: the finish completes", async () => {
-    const w = floodWorld(0.9);
+  it("a 0.85 mark queued behind a sync, then the 0.9 mark, under the film threshold of 0.9: the finish completes", async () => {
+    const w = floodWorld();
     w.send({ type: "resync" }, STATUS_PAGE);
     w.send(finishedFor(3, 0.85), NAKA_TAB);
     w.send(finishedFor(3, 0.9), NAKA_TAB);
@@ -631,6 +950,56 @@ describe("router: the status answer waits for no job", () => {
     expect(await pending()).toBeUndefined();
   });
 
+  const SETTINGS_MESSAGE = {
+    type: "set-settings",
+    thresholds: { film: 0.95, episode: 0.8 },
+    pauseFromPercent: 50,
+  } as const;
+
+  it("a set-settings queued behind a sync shows pendingSettings until it is applied", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({ pendingSettings: true });
+    g.sync.open();
+    await settle();
+    expect(await g.status()).not.toHaveProperty("pendingSettings");
+  });
+
+  it("a set-settings that is running shows pendingSettings", async () => {
+    const gate = latch();
+    const r = router({
+      setSettings: async () => {
+        await gate.opened;
+      },
+    });
+    const pending = async () => {
+      r.send({ type: "status" }, STATUS_PAGE);
+      await settle();
+      return (r.answers.at(-1) as StatusSnapshot).pendingSettings;
+    };
+    r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    expect(await pending()).toBe(true);
+    gate.open();
+    await settle();
+    expect(await pending()).toBeUndefined();
+  });
+
+  it("a rejected set-settings releases the mark", async () => {
+    const r = router({
+      setSettings: async () => {
+        throw new Error("storage");
+      },
+    });
+    r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).not.toHaveProperty("pendingSettings");
+  });
+
   it("an idle worker answers the snapshot alone", async () => {
     const g = gated();
     expect(await g.status()).toEqual({ mode: "simulation" });
@@ -743,6 +1112,7 @@ function apollo(body: {
             productId: id,
             isDone: false,
             isWished: id === 1002,
+            rating: null,
           },
         },
       },
@@ -1103,6 +1473,97 @@ describe("worker end to end: the tokens stay where they belong", () => {
   });
 });
 
+// The strings of a value that contain one of the markers.
+const leaksOf = (values: unknown, markers: string[]): string[] =>
+  strings(values).filter((text) => markers.some((m) => text.includes(m)));
+
+const operationsOf = (calls: Call[]): string[] =>
+  calls.map((c) => JSON.parse(c.init.body ?? "{}").operationName);
+
+async function settleAll(): Promise<void> {
+  for (let i = 0; i < 20; i += 1) await settle();
+}
+
+describe("worker end to end: ratings", () => {
+  async function ratedFilm() {
+    const w = worker();
+    w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-card", contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rate", contentId: 3, label: "film", rating: 7 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-card", contentId: 3 }, NAKA_TAB);
+    await settleAll();
+    w.send({ type: "rating-cards" }, NAKA_TAB);
+    await settleAll();
+    return w;
+  }
+
+  it("a finish makes the card, one rate sends one ProductRate, and the answers follow the card", async () => {
+    const w = await ratedFilm();
+    const ops = operationsOf(w.sc.calls);
+    expect(ops.filter((op) => op === "ProductRate")).toHaveLength(1);
+    expect(ops).not.toContain("ProductUnwish");
+    const [before, answeredRate, after, cards] = w.answers as {
+      card?: { pending: string[]; given: object };
+      cards?: unknown[];
+    }[];
+    expect(answeredRate).toEqual({ ok: true });
+    expect(before?.card?.pending).toEqual(["film"]);
+    expect(after?.card?.pending).toEqual([]);
+    expect(after?.card?.given).toEqual({ film: 7 });
+    expect(cards?.cards).toEqual([]);
+    const rated = w.sc.calls.find((c) =>
+      (c.init.body ?? "").includes('"ProductRate"'),
+    );
+    expect(JSON.parse(rated?.init.body ?? "{}").variables).toMatchObject({
+      rating: 7,
+    });
+  });
+
+  it("neither token reaches the stored ratings, the answers, or what crossed to the tab", async () => {
+    const w = await ratedFilm();
+    const markers = [SC_TOKEN, NAKA_TOKEN];
+    expect(w.storage.data.has("ratings")).toBe(true);
+    expect(leaksOf([...w.storage.data.values()], markers)).toEqual([]);
+    expect(leaksOf(w.answers, markers)).toEqual([]);
+    expect(leaksOf([w.traffic.sent, w.traffic.returned], markers)).toEqual([]);
+  });
+
+  it("the scan fires on a planted marker (positive control)", async () => {
+    const w = await ratedFilm();
+    const planted = [...w.answers, { card: { title: `x ${SC_TOKEN}` } }];
+    expect(leaksOf(planted, [SC_TOKEN])).toHaveLength(1);
+    expect(leaksOf({ ratings: [`y${NAKA_TOKEN}`] }, [NAKA_TOKEN])).toHaveLength(
+      1,
+    );
+  });
+
+  it("the SensCritique token goes only to Apollo for the rating, as the raw authorization header", async () => {
+    const w = await ratedFilm();
+    const rating = w.sc.calls.filter((c) =>
+      (c.init.body ?? "").includes('"ProductRate"'),
+    );
+    expect(rating).toHaveLength(1);
+    expect(rating[0]?.url).toBe("https://apollo.senscritique.com/");
+    expect(rating[0]?.init.headers.authorization).toBe(SC_TOKEN);
+    expect(rating[0]?.init.body ?? "").not.toContain(SC_TOKEN);
+  });
+
+  it("a rate from the status page, and one from a forged sender, send nothing", async () => {
+    const w = worker();
+    const rate = { type: "rate", contentId: 3, label: "film", rating: 7 };
+    w.send(rate, STATUS_PAGE);
+    w.send(rate, EVIL);
+    w.send(rate, IFRAME);
+    await settleAll();
+    expect(w.sc.calls).toEqual([]);
+    expect(w.naka.calls).toEqual([]);
+    expect(w.storage.data.has("ratings")).toBe(false);
+  });
+});
+
 describe("worker end to end: the shared limiters", () => {
   const spacing = (calls: Call[]) =>
     calls.slice(1).map((call, i) => call.at - (calls[i] as Call).at);
@@ -1264,6 +1725,8 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         `Envies SensCritique${NB}: Film 1`,
         `Ma liste Naka${NB}: Film 2`,
       ],
+      settingsPending: false,
+      settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),
     });
   });
 });

@@ -15,6 +15,7 @@ import {
 } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { DEFAULT_THRESHOLDS } from "../src/core/watch-trigger";
 import { UNIVERSE } from "../src/sc/sc-queries";
 
 // Model-based fuzz of the finish handler and the REAL runSync on one world. The
@@ -172,6 +173,7 @@ async function simulate(seed: number): Promise<string[]> {
         isDone: done.has(id),
         isWished: lists.sc.has(id),
         universe: universeOf(id),
+        rating: null,
       };
     },
     unwish: async (id) => {
@@ -270,7 +272,7 @@ async function simulate(seed: number): Promise<string[]> {
       }
     };
     try {
-      const outcome = await handleFinish(event, tracked);
+      const outcome = await handleFinish(event, tracked, DEFAULT_THRESHOLDS);
       log.push(`${name} ${outcome.kind}`);
       if (outcome.kind === "done" && filmSc !== undefined) {
         guarded.set(filmSc, `${name} done`);

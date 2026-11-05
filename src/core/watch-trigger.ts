@@ -1,4 +1,9 @@
+// The legacy single threshold: kept for emptyState() and the stored state, no longer read for a decision.
 export const DEFAULT_THRESHOLD = 0.9;
+
+export type Thresholds = { film: number; episode: number };
+export const THRESHOLD_CHOICES = [0.8, 0.85, 0.9, 0.95, 0.99] as const;
+export const DEFAULT_THRESHOLDS: Thresholds = { film: 0.9, episode: 0.8 };
 
 export type WatchSignal = {
   progress: number;

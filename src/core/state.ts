@@ -28,6 +28,7 @@ export type SyncState = {
   run: number;
   /** Per side, the latest contiguous interval of completed runs whose final list held each id. */
   presence: Presence;
+  /** Legacy: kept so stored states still parse; nothing reads it for a decision (see Settings.thresholds). */
   threshold: number;
 };
 

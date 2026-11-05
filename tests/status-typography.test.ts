@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { JobError } from "../src/ext/job-error";
 import type { RunRecord } from "../src/ext/settings";
 import { JOB_ERROR_LABELS } from "../src/status/job-error-labels";
+import { SETTINGS_COPY, toSettingsView } from "../src/status/settings-view";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
 import { type StatusView, toStatusView } from "../src/status/status-view";
@@ -16,7 +17,7 @@ const NB = "\u202F";
 // punctuation, the punctuation glued to a word, or a guillemet without its narrow space.
 function typographyFaults(text: string): string[] {
   const faults = [
-    ...text.matchAll(/(?<![\u202F\d]):|(?<!\u202F)[;?!]/g),
+    ...text.matchAll(/(?<![\u202F\d]):|(?<!\u202F)[;?!%]/g),
     ...text.matchAll(/«(?!\u202F)|(?<!\u202F)»/g),
   ];
   return faults.map((m) => text.slice(Math.max(0, m.index - 12), m.index + 2));
@@ -89,6 +90,10 @@ describe("French typography on the status page", () => {
   it("the check finds a plain space, a glued sign and a bare guillemet (control)", () => {
     expect(typographyFaults("Prévus : 2")).toHaveLength(1);
     expect(typographyFaults("Prévus\u00A0: 2")).toHaveLength(1);
+    expect(typographyFaults("80 %")).toHaveLength(1);
+    expect(typographyFaults("80%")).toHaveLength(1);
+    expect(typographyFaults("80\u00A0%")).toHaveLength(1);
+    expect(typographyFaults(`80${NB}%`)).toEqual([]);
     expect(typographyFaults("Activer ?")).toHaveLength(1);
     expect(typographyFaults("Prévus: 2")).toHaveLength(1);
     expect(typographyFaults("« Resynchroniser »")).toHaveLength(2);
@@ -114,9 +119,29 @@ describe("French typography on the status page", () => {
     expect(all.flatMap(typographyFaults)).toEqual([]);
   });
 
+  it("every label of the settings follows it, and the percentages use U+202F", () => {
+    const view = toSettingsView({ film: 0.9, episode: 0.8 }, 0);
+    const all = [
+      ...Object.values(SETTINGS_COPY),
+      ...view.options.map((o) => o.label),
+    ];
+    expect(all.flatMap(typographyFaults)).toEqual([]);
+    for (const option of view.options) {
+      expect([...option.label].map((c) => c.codePointAt(0))).toEqual([
+        option.label.codePointAt(0),
+        option.label.codePointAt(1),
+        0x202f,
+        0x25,
+      ]);
+    }
+  });
+
   it("the page's own text follows it", () => {
     const html = readFileSync("src/status/status.html", "utf8");
-    const shown = html.replace(/<[^>]*>/g, " ");
+    // A browser reads the numeric reference as the character; the check reads it the same way.
+    const shown = html
+      .replace(/<[^>]*>/g, " ")
+      .replaceAll("&#8239;", String.fromCodePoint(0x202f));
     expect(typographyFaults(shown)).toEqual([]);
   });
 });

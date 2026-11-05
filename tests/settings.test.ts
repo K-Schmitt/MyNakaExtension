@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseSettings, type Settings } from "../src/ext/settings";
+import {
+  parseSettings,
+  pauseFromOf,
+  type Settings,
+  thresholdsOf,
+} from "../src/ext/settings";
 import { StoredStateError } from "../src/ext/stored-error";
 
 const MARK = "SECRET-MARKER";
@@ -451,4 +456,60 @@ describe("parseSettings rejects", () => {
     expect((error as Error).message).toBe(`stored state: ${path}`);
     expect((error as Error).message).not.toContain(MARK);
   });
+});
+
+describe("thresholds and pauseFromPercent", () => {
+  const plan3 = {
+    mode: "live",
+    binding: { scUsername: "x", nakaAccount: "1" },
+    lastAutoRunAt: 1,
+    lastRun: { at: 1, trigger: "button", mode: "live", outcome: "ok" },
+    lastFinish: { at: 2, key: "movie:3", outcome: "done" },
+    finishWindow: { from: 0, count: 1 },
+  };
+
+  it("the exact Plan 3 shape parses and takes the defaults", () => {
+    const parsed = parseSettings(plan3);
+    expect(parsed).toEqual(plan3);
+    expect(thresholdsOf(parsed)).toEqual({ film: 0.9, episode: 0.8 });
+    expect(pauseFromOf(parsed)).toBe(0);
+  });
+
+  it("stored thresholds on the grid parse and are read back", () => {
+    const parsed = parseSettings({
+      mode: "live",
+      thresholds: { film: 0.95, episode: 0.85 },
+      pauseFromPercent: 40,
+    });
+    expect(thresholdsOf(parsed)).toEqual({ film: 0.95, episode: 0.85 });
+    expect(pauseFromOf(parsed)).toBe(40);
+  });
+
+  it.each([
+    [{ film: 0.92, episode: 0.8 }],
+    [{ film: 0.9, episode: 0.75 }],
+    [{ film: 0.9 }],
+    [{ film: 0.9, episode: 0.8, extra: 1 }],
+    ["0.9"],
+  ])("thresholds %j fail", (thresholds) => {
+    expect(rejection({ mode: "live", thresholds })).toBeInstanceOf(
+      StoredStateError,
+    );
+  });
+
+  it.each([0, 99])("pauseFromPercent %s parses", (pauseFromPercent) => {
+    expect(parseSettings({ mode: "live", pauseFromPercent })).toEqual({
+      mode: "live",
+      pauseFromPercent,
+    });
+  });
+
+  it.each([100, 12.5, -1, "5", Number.NaN])(
+    "pauseFromPercent %s fails",
+    (pauseFromPercent) => {
+      expect(rejection({ mode: "live", pauseFromPercent })).toBeInstanceOf(
+        StoredStateError,
+      );
+    },
+  );
 });

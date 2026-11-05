@@ -1,8 +1,11 @@
 // Every chrome.runtime message is untrusted. Ruling 8: the router parses it, then checks who sent it,
 // then whether that sender may send that type, and ignores (never answers) anything that fails a step.
-// Every job of the worker then runs on ONE queue, one at a time. `status`, the only message answered, is
-// no job (Ruling 20): it is answered at once, outside the queue, from a read-only snapshot and the
-// activity kept here. `set-mode` stays queued: a sync saves the settings it loaded.
+// Every job of the worker then runs on ONE queue, one at a time. `status` is no job (Ruling 20): it is
+// answered at once, outside the queue, from a read-only snapshot and the
+// activity kept here. `set-mode` and `set-settings` stay queued: a sync saves the settings it loaded. `rating-card` and
+// `rating-cards` are answered the same way (read-only). `rate` and `dismiss-rating` are queued jobs, answered
+// `{ ok: true }` at once: the tab reads a resolved send as "sent", and a listener that neither answers nor
+// keeps the channel may make Chrome reject the send.
 
 import {
   allowedFor,
@@ -11,12 +14,16 @@ import {
   type Sender,
   type ToWorker,
 } from "../ext/messages";
+import type { RatingCardMessage } from "../ext/rating-messages";
 import { createActivity, overlapping } from "./activity";
 import { createDebounce } from "./debounce";
 import { createFinishQueue } from "./finish-queue";
 import type { JobQueue } from "./job-queue";
 import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
+import { createRateQueue } from "./rate-queue";
+import type { CardAnswer, CardsAnswer } from "./rating-answers";
+import { cardlessSendingOf, sendingOf } from "./rating-answers";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
 export type Respond = (answer: unknown) => void;
@@ -48,10 +55,29 @@ export function createRouter(deps: RouterDeps): Router {
   };
   const sync = (trigger: Trigger) =>
     enqueue(activity.track("sync", () => jobs.syncJob(trigger)));
+  const rate = createRateQueue(enqueue, (msg) => jobs.rate(msg));
   const finish = createFinishQueue(
     (job) => enqueue(activity.track("finish", job)),
     (msg) => jobs.finishJob(msg),
   );
+
+  // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
+  // ids say which label a rate of the title can have.
+  const withSending = async (
+    msg: RatingCardMessage,
+    cardAnswer: Promise<CardAnswer>,
+  ) => {
+    const answer = await cardAnswer;
+    return answer.card
+      ? { ...answer, ...sendingOf(answer.card, rate.sending) }
+      : { ...answer, ...cardlessSendingOf(msg, rate.sending) };
+  };
+  const withSendingAll = async (cardsAnswer: Promise<CardsAnswer>) => ({
+    cards: (await cardsAnswer).cards.map((entry) => ({
+      ...entry,
+      ...sendingOf(entry.card, rate.sending),
+    })),
+  });
 
   // Chrome's responder may throw (its port already closed): that is no error of the worker.
   function answerStatus(respond: Respond): void {
@@ -62,6 +88,28 @@ export function createRouter(deps: RouterDeps): Router {
         respond({ ...snapshot, ...overlapping(before, activity.current()) }),
       )
       .catch(ignore);
+  }
+
+  // A read of the stored ratings: outside the queue, never saving. An unreadable store is answered
+  // `undefined` (an invented answer would be worse), so that the tab's ask resolves at once.
+  function answerRead(read: () => Promise<unknown>, respond: Respond): void {
+    read()
+      .then(
+        (answer) => respond(answer),
+        () => respond(undefined),
+      )
+      .catch(ignore);
+  }
+
+  // The job is queued first: a responder that throws does not stop it.
+  function queued(queue: () => void, respond: Respond): false {
+    queue();
+    try {
+      respond({ ok: true });
+    } catch {
+      // Chrome's port already closed: the job runs all the same.
+    }
+    return false;
   }
 
   function dispatch(msg: ToWorker, respond: Respond): boolean {
@@ -81,9 +129,26 @@ export function createRouter(deps: RouterDeps): Router {
       case "set-mode":
         enqueue(activity.queueMode(msg.mode, () => jobs.setMode(msg.mode)));
         return false;
+      case "set-settings":
+        enqueue(
+          activity.queueSettings(() =>
+            jobs.setSettings(msg.thresholds, msg.pauseFromPercent),
+          ),
+        );
+        return false;
       case "status":
         answerStatus(respond);
         return true;
+      case "rating-card":
+        answerRead(() => withSending(msg, jobs.ratingCard(msg)), respond);
+        return true;
+      case "rating-cards":
+        answerRead(() => withSendingAll(jobs.ratingCards()), respond);
+        return true;
+      case "rate":
+        return queued(() => rate(msg), respond);
+      case "dismiss-rating":
+        return queued(() => enqueue(() => jobs.dismissRating(msg)), respond);
     }
   }
 

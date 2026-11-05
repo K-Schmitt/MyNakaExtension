@@ -1,5 +1,6 @@
-// Naka tab, ISOLATED world: binds chrome.*, the window and the DOM, nothing else. The page's token is read
-// here, inside the client's token function, and goes only into the client's requests to the Naka API.
+// Naka tab, ISOLATED world: binds chrome.*, the window, the DOM and the timers, nothing else (the rating
+// blocks and their rules are wired in ui/blocks-wiring). The page's token is read here, inside the client's
+// token function, and goes only into the client's requests to the Naka API.
 
 import type { ToWorker } from "../ext/messages";
 import { createNakaClient } from "../naka/naka-client";
@@ -8,6 +9,12 @@ import { readAccount } from "./naka-bridge";
 import { startNakaTab } from "./naka-tab";
 import { createTabListener } from "./naka-tab-listener";
 import { readNakaToken } from "./naka-token";
+import { listenToPauses } from "./pause-events";
+import { createTitleLookup } from "./title-lookup";
+import { wireBlocks } from "./ui/blocks-wiring";
+import { createEndUi } from "./ui/end-ui";
+import { createHomeUi } from "./ui/home-ui";
+import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
 
 function ignore(): void {}
@@ -33,6 +40,24 @@ chrome.runtime.onMessage.addListener(
   createTabListener(chrome.runtime.id, client, () => readAccount(localStorage)),
 );
 
+const blocks = wireBlocks({
+  port: createWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
+  timer: {
+    set: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    clear: (handle: unknown) =>
+      clearTimeout(handle as ReturnType<typeof setTimeout>),
+  },
+  playerUi: createEndUi(document),
+  homeUi: createHomeUi(document),
+  now: () => Date.now(),
+  titleOf: createTitleLookup((contentId) => client.contentById(contentId)),
+});
+
+listenToPauses(document, {
+  paused: blocks.paused,
+  resumed: blocks.resumed,
+});
+
 startNakaTab({
   self: window,
   href: () => location.href,
@@ -44,4 +69,7 @@ startNakaTab({
     window.addEventListener("message", fn);
   },
   send: sendToWorker,
+  finished: blocks.finished,
+  urlChanged: blocks.urlChanged,
+  pathChanged: blocks.pathChanged,
 });

@@ -4,6 +4,7 @@ import { emptyState } from "../src/core/state";
 import type { Settings } from "../src/ext/settings";
 import { createStore, type StorageArea } from "../src/ext/store";
 import { StoredStateError } from "../src/ext/stored-error";
+import { episodeCard, filmCard } from "./rating-fixtures";
 
 function fakeArea(initial: Record<string, unknown> = {}) {
   const data = new Map<string, unknown>(Object.entries(initial));
@@ -125,5 +126,57 @@ describe("settings store", () => {
     await store.saveSettings(settings);
     expect(await store.loadState()).toEqual(sample());
     expect(await store.loadSettings()).toEqual(settings);
+  });
+});
+
+describe("ratings store", () => {
+  const cards = [filmCard(), episodeCard({ given: { épisode: 7 } })];
+
+  it("round-trips the cards", async () => {
+    const store = createStore(fakeArea().area);
+    await store.saveRatings(cards);
+    expect(await store.loadRatings()).toEqual(cards);
+  });
+
+  it("stores the cards under the key ratings", async () => {
+    const { area, data } = fakeArea();
+    await createStore(area).saveRatings(cards);
+    expect(data.get("ratings")).toEqual(cards);
+  });
+
+  it("gives an empty list when the key is absent", async () => {
+    const store = createStore(fakeArea().area);
+    expect(await store.loadRatings()).toEqual([]);
+  });
+
+  it("does not give an empty list for a stored null", async () => {
+    const store = createStore(fakeArea({ ratings: null }).area);
+    await expect(store.loadRatings()).rejects.toBeInstanceOf(StoredStateError);
+  });
+
+  it("rejects an invalid stored card and leaves the store untouched", async () => {
+    const stored = [{ ...filmCard(), title: "" }];
+    const { area, data } = fakeArea({ ratings: stored });
+    await expect(createStore(area).loadRatings()).rejects.toThrow(
+      "stored state: ratings[0].title",
+    );
+    expect(data.get("ratings")).toBe(stored);
+  });
+
+  it("rejects when the write rejects", async () => {
+    const area: StorageArea = {
+      get: () => Promise.resolve({}),
+      set: () => Promise.reject(new Error("quota")),
+    };
+    await expect(createStore(area).saveRatings(cards)).rejects.toThrow("quota");
+  });
+
+  it("keeps ratings apart from state and settings", async () => {
+    const { area } = fakeArea();
+    const store = createStore(area);
+    await store.saveState(sample());
+    await store.saveRatings(cards);
+    expect(await store.loadState()).toEqual(sample());
+    expect(await store.loadRatings()).toEqual(cards);
   });
 });

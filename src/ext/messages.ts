@@ -2,6 +2,7 @@
 // Every message from another context is untrusted: a parser takes `unknown`, never throws, and returns a
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
+import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
   asId,
@@ -10,9 +11,15 @@ import {
   asString,
   fail,
   valuesOf,
-  whenPresent,
 } from "./field-checks";
+import { playbackContext } from "./playback-context";
+import {
+  isRatingType,
+  parseRatingMessage,
+  type RatingMessage,
+} from "./rating-messages";
 import type { Mode } from "./settings";
+import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
 
 export const PAGE_CHANNEL = "mynaka/1";
 
@@ -29,13 +36,19 @@ export type ToWorker =
     }
   | { type: "status" }
   | { type: "resync" }
-  | { type: "set-mode"; mode: Mode };
+  | { type: "set-mode"; mode: Mode }
+  | {
+      type: "set-settings";
+      thresholds: Thresholds;
+      pauseFromPercent: number;
+    }
+  | RatingMessage;
 
 export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
   | {
       type: "naka-call";
-      call: "add" | "remove" | "contentById";
+      call: "add" | "remove" | "contentById" | "availableSeasons";
       contentId: number;
     }
   | { type: "naka-call"; call: "search"; query: string }
@@ -82,6 +95,11 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   status: true,
   resync: true,
   "set-mode": true,
+  "set-settings": true,
+  "rating-card": true,
+  "rating-cards": true,
+  rate: true,
+  "dismiss-rating": true,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
@@ -95,6 +113,7 @@ const CALLS = valuesOf<NakaCall>({
   add: true,
   remove: true,
   contentById: true,
+  availableSeasons: true,
 });
 const REPLY_ERRORS = valuesOf<NakaReplyError>({
   "no-token": true,
@@ -129,18 +148,6 @@ function asSearchQuery(raw: unknown): string {
   return checkQuery(asString(raw, "query"));
 }
 
-// Season and episode come as a pair: both present or both absent.
-function playbackContext(record: Record<string, unknown>): {
-  season?: number;
-  episode?: number;
-} {
-  const season = whenPresent(record.season, (v) => asId(v, "season"));
-  const episode = whenPresent(record.episode, (v) => asId(v, "episode"));
-  if (season === undefined && episode === undefined) return {};
-  if (season === undefined || episode === undefined) return fail("episode");
-  return { season, episode };
-}
-
 function parseFinished(record: Record<string, unknown>): ToWorker {
   return {
     type: "finished",
@@ -157,6 +164,14 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
   if (type === "set-mode") {
     return { type, mode: asOneOf(record.mode, MODE_VALUES, "mode") };
   }
+  if (type === "set-settings") {
+    return {
+      type,
+      thresholds: parseThresholds(record.thresholds),
+      pauseFromPercent: parsePauseFromPercent(record.pauseFromPercent),
+    };
+  }
+  if (isRatingType(type)) return parseRatingMessage(type, record);
   return { type };
 }
 
@@ -259,6 +274,11 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   status: ["status-page"],
   resync: ["status-page"],
   "set-mode": ["status-page"],
+  "set-settings": ["status-page"],
+  "rating-card": ["naka-tab"],
+  "rating-cards": ["naka-tab"],
+  rate: ["naka-tab"],
+  "dismiss-rating": ["naka-tab"],
 };
 
 // A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.

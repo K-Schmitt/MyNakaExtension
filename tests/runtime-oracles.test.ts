@@ -12,7 +12,7 @@ import {
   ownerEdit,
   scFor,
   sentFinish,
-  setThreshold,
+  setThresholds,
   storageFor,
   tabsFor,
   type World,
@@ -49,7 +49,12 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     syncJob: async () => undefined,
     finishJob: async () => undefined,
     setMode: async () => undefined,
+    setSettings: async () => undefined,
+    rate: async () => undefined,
+    dismissRating: async () => undefined,
     statusSnapshot: async () => ({}),
+    ratingCard: async () => ({ card: null, pauseFromPercent: 0 }),
+    ratingCards: async () => ({ cards: [] }),
     ...over,
   };
 }
@@ -61,6 +66,20 @@ const film = (
   source: FinishedMessage["source"],
   progress: number,
 ): FinishedMessage => ({ type: "finished", source, progress, contentId: 1 });
+
+const episode = (
+  source: FinishedMessage["source"],
+  progress: number,
+): FinishedMessage => ({
+  type: "finished",
+  source,
+  progress,
+  contentId: 1,
+  season: 1,
+  episode: 2,
+});
+
+const same = (threshold: number) => ({ film: threshold, episode: threshold });
 
 // A finish job running for `msg`, which a Naka tab sent.
 function finishing(w: World, msg: FinishedMessage): void {
@@ -382,26 +401,50 @@ describe("O13 a finish write needs a complete viewing", () => {
 
   it("fires below the stored threshold", async () => {
     const w = quietWorld();
-    setThreshold(w, 0.9);
+    setThresholds(w, same(0.9));
     finishing(w, film("threshold", 0.85));
     expect(await markDone(w)).toEqual(["O13 threshold rule"]);
   });
 
-  it("judges the threshold stored at the write: 0.95 fails under 0.99", async () => {
+  it("fires for an episode at 0.85 under an episode threshold of 0.9", async () => {
     const w = quietWorld();
-    setThreshold(w, 0.85);
-    finishing(w, film("threshold", 0.95));
-    setThreshold(w, 0.99);
+    setThresholds(w, { film: 0.8, episode: 0.9 });
+    finishing(w, episode("threshold", 0.85));
     expect(await markDone(w)).toEqual(["O13 threshold rule"]);
   });
 
-  it("with no stored state, judges the spec's 90 %", async () => {
+  it("judges an episode by the episode threshold, a film by the film's", async () => {
+    const ep = quietWorld();
+    setThresholds(ep, { film: 0.99, episode: 0.8 });
+    finishing(ep, episode("threshold", 0.8));
+    expect(await markDone(ep)).toEqual([]);
+    const fm = quietWorld();
+    setThresholds(fm, { film: 0.99, episode: 0.8 });
+    finishing(fm, film("threshold", 0.95));
+    expect(await markDone(fm)).toEqual(["O13 threshold rule"]);
+  });
+
+  it("judges the threshold stored at the write: 0.95 fails under 0.99", async () => {
+    const w = quietWorld();
+    setThresholds(w, same(0.85));
+    finishing(w, film("threshold", 0.95));
+    setThresholds(w, same(0.99));
+    expect(await markDone(w)).toEqual(["O13 threshold rule"]);
+  });
+
+  it("with nothing stored, judges the spec's defaults: 90 % for a film, 80 % for an episode", async () => {
     const low = quietWorld();
     finishing(low, film("threshold", 0.89));
     expect(await markDone(low)).toEqual(["O13 threshold rule"]);
     const high = quietWorld();
     finishing(high, film("threshold", 0.9));
     expect(await markDone(high)).toEqual([]);
+    const lowEpisode = quietWorld();
+    finishing(lowEpisode, episode("threshold", 0.79));
+    expect(await markDone(lowEpisode)).toEqual(["O13 threshold rule"]);
+    const highEpisode = quietWorld();
+    finishing(highEpisode, episode("threshold", 0.8));
+    expect(await markDone(highEpisode)).toEqual([]);
   });
 
   it("fires on a message no Naka tab sent, and outside a finish job", async () => {
@@ -416,11 +459,11 @@ describe("O13 a finish write needs a complete viewing", () => {
 
   it("stays silent for an explicit vu at any progress, and at the threshold", async () => {
     const explicit = quietWorld();
-    setThreshold(explicit, 0.99);
+    setThresholds(explicit, same(0.99));
     finishing(explicit, film("explicit", 0.1));
     expect(await markDone(explicit)).toEqual([]);
     const reached = quietWorld();
-    setThreshold(reached, 0.95);
+    setThresholds(reached, same(0.95));
     finishing(reached, film("threshold", 0.95));
     expect(await markDone(reached)).toEqual([]);
   });

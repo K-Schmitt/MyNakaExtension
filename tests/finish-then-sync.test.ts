@@ -8,6 +8,7 @@ import type { Pair } from "../src/core/list-diff";
 import { emptyState, type SyncState, upsertMapping } from "../src/core/state";
 import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { DEFAULT_THRESHOLDS } from "../src/core/watch-trigger";
 import { UNIVERSE } from "../src/sc/sc-queries";
 
 // One in-memory world shared by the finish handler and the REAL sync runner.
@@ -117,6 +118,7 @@ function world(o: Opts) {
       isDone: w.done.has(id),
       isWished: w.sc.has(id),
       universe: universeOf(id),
+      rating: null,
     }),
     unwish: async (id) => {
       w.writes.push(`unwish:${id}`);
@@ -184,7 +186,9 @@ describe("a film finish, then the sync", () => {
       sc: [FILM_SC],
       state: { mapping: [FILM_PAIR], snapshot: [FILM_PAIR] },
     });
-    expect((await handleFinish(film(), ports)).kind).toBe("done");
+    expect((await handleFinish(film(), ports, DEFAULT_THRESHOLDS)).kind).toBe(
+      "done",
+    );
     expect([...w.sc]).toEqual([]);
     for (const _run of [1, 2]) {
       const report = await runSync(ports);
@@ -198,7 +202,9 @@ describe("a film finish, then the sync", () => {
 
   it("a film found by search: no write, no question, and the resolver never reads it", async () => {
     const { w, ports } = world({ naka: [FILM], sc: [FILM_SC] });
-    expect((await handleFinish(film(), ports)).kind).toBe("done");
+    expect((await handleFinish(film(), ports, DEFAULT_THRESHOLDS)).kind).toBe(
+      "done",
+    );
     const readsAfterFinish = w.reads.length;
     await runSync(ports);
     await runSync(ports);
@@ -213,9 +219,9 @@ describe("a film finish, then the sync", () => {
       sc: [FILM_SC],
       failMarkDone: 1,
     });
-    await expect(handleFinish(film(), ports)).rejects.toThrow(
-      "markDone failed",
-    );
+    await expect(
+      handleFinish(film(), ports, DEFAULT_THRESHOLDS),
+    ).rejects.toThrow("markDone failed");
     expect(w.writes).toEqual(["unwish:1042", "markDone:1042"]);
     const state1 = {
       ...emptyState(),
@@ -229,10 +235,11 @@ describe("a film finish, then the sync", () => {
     const retry = await handleFinish(
       film({ source: "explicit", progress: 0.2 }),
       ports,
+      DEFAULT_THRESHOLDS,
     );
     expect(retry).toEqual({
       kind: "done",
-      ratingTargets: [{ label: "film", productId: FILM_SC }],
+      ratingTargets: [{ label: "film", productId: FILM_SC, current: null }],
     });
     expect(w.writes).toEqual(["unwish:1042", "markDone:1042", "markDone:1042"]);
     expect(w.state.handled).toEqual(["movie:42"]);
@@ -252,7 +259,7 @@ describe("a film finish, then the sync", () => {
         state: { mapping: [FILM_PAIR] },
         failMarkDone,
       });
-      await settle(handleFinish(film(), ports));
+      await settle(handleFinish(film(), ports, DEFAULT_THRESHOLDS));
       expect(w.writes.slice(0, 1)).toEqual(["unwish:1042"]);
       expect(w.sc.has(FILM_SC)).toBe(false);
       await runSync(ports);
@@ -281,16 +288,20 @@ describe("the owner's open question, the finish, the answer and the replay", () 
         },
       });
       await runSync(ports);
-      expect(await handleFinish(film(), ports)).toEqual({
+      expect(await handleFinish(film(), ports, DEFAULT_THRESHOLDS)).toEqual({
         kind: "needs-choice",
         candidateIds: [FILM_SC, 2042],
       });
       expect(w.writes).toEqual([]);
       await ports.save(answer(w.state, { nakaId: FILM, scId: chosen }));
-      const replay = await handleFinish(film({ source: "explicit" }), ports);
+      const replay = await handleFinish(
+        film({ source: "explicit" }),
+        ports,
+        DEFAULT_THRESHOLDS,
+      );
       expect(replay).toEqual({
         kind: "done",
-        ratingTargets: [{ label: "film", productId: chosen }],
+        ratingTargets: [{ label: "film", productId: chosen, current: null }],
       });
       await runSync(ports);
       await runSync(ports);
@@ -313,7 +324,9 @@ describe("episode finishes, then the sync", () => {
       state: { mapping: [SERIES_PAIR], snapshot: [SERIES_PAIR] },
     });
     for (const number of [1, 2, 3]) {
-      expect((await handleFinish(episode(number), ports)).kind).toBe("done");
+      expect(
+        (await handleFinish(episode(number), ports, DEFAULT_THRESHOLDS)).kind,
+      ).toBe("done");
     }
     expect(w.writes).toEqual([
       "markDone:10071",
@@ -349,7 +362,7 @@ describe("episode finishes, then the sync", () => {
       candidateIds: [SERIES_SC, 2007],
     };
     expect(w.state.pending).toEqual([asked]);
-    expect(await handleFinish(episode(1), ports)).toEqual({
+    expect(await handleFinish(episode(1), ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [SERIES_SC, 2007],
     });
@@ -413,7 +426,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     await runSync(ports);
     expect(w.state.pending).toEqual([asked("naka", FILM, [FILM_SC])]);
     w.state = noneOfThese(w.state, "naka", FILM);
-    expect(await handleFinish(film(), ports)).toEqual({
+    expect(await handleFinish(film(), ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [],
     });
@@ -427,7 +440,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     await runSync(ports);
     w.state = noneOfThese(w.state, "naka", FILM);
     const replay = film({ source: "explicit", progress: 0.1 });
-    expect(await handleFinish(replay, ports)).toEqual({
+    expect(await handleFinish(replay, ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [],
     });
@@ -486,7 +499,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     ]);
     w.state = answerByContract(w.state, { nakaId: 43, scId: FILM_SC });
     expect(w.state.pending).toEqual([asked("naka", FILM, [])]);
-    expect(await handleFinish(film(), ports)).toEqual({
+    expect(await handleFinish(film(), ports, DEFAULT_THRESHOLDS)).toEqual({
       kind: "needs-choice",
       candidateIds: [],
     });
