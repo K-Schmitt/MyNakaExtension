@@ -453,6 +453,67 @@ describe("saveSettings", () => {
     },
   );
 
+  describe("while the worker still holds the change", () => {
+    const WAITING = "Réglages en attente d'enregistrement";
+    const SAVED_TEXT = "Réglages enregistrés";
+    const OLD_RUNNING = {
+      ...SETTINGS,
+      running: { kind: "sync", since: 1 },
+      pendingSettings: true,
+    };
+    const OLD_WAITING = { ...SETTINGS, pendingSettings: true };
+
+    it("a save during a running sync says waiting, polls every 5 s, then says saved", async () => {
+      const t = setup([SETTINGS, OLD_RUNNING, SAVED]);
+      await t.controller.load();
+      await t.controller.saveSettings(DRAFT);
+      expect(t.notes).toEqual([WAITING]);
+      expect(t.clock.delays).toEqual([5000]);
+      t.clock.fire();
+      await settle();
+      expect(t.notes).toEqual([WAITING, SAVED_TEXT]);
+      expect(t.clock.armed.size).toBe(0);
+    });
+
+    it("an idle save whose first answer still holds the marker does the same", async () => {
+      const t = setup([SETTINGS, OLD_WAITING, SAVED]);
+      await t.controller.load();
+      await t.controller.saveSettings(DRAFT);
+      expect(t.notes).toEqual([WAITING]);
+      expect(t.clock.delays).toEqual([5000]);
+      t.clock.fire();
+      await settle();
+      expect(t.notes).toEqual([WAITING, SAVED_TEXT]);
+    });
+
+    it("a marker that goes while the values differ never says saved", async () => {
+      const t = setup([SETTINGS, OLD_WAITING, SETTINGS]);
+      await t.controller.load();
+      await t.controller.saveSettings(DRAFT);
+      t.clock.fire();
+      await settle();
+      expect(t.notes).toEqual([WAITING, ""]);
+    });
+
+    it("says waiting for a marker found on load, and nothing is claimed saved", async () => {
+      const t = setup([OLD_WAITING, SAVED]);
+      await t.controller.load();
+      expect(t.notes).toEqual([WAITING]);
+      t.clock.fire();
+      await settle();
+      expect(t.notes).toEqual([WAITING]);
+    });
+
+    it("clears the note when the settings are no longer readable", async () => {
+      const t = setup([SETTINGS, OLD_WAITING, { error: "stored-state" }]);
+      await t.controller.load();
+      await t.controller.saveSettings(DRAFT);
+      t.clock.fire();
+      await settle();
+      expect(t.notes).toEqual([WAITING, ""]);
+    });
+  });
+
   it("claims nothing when the engine stays silent", async () => {
     const t = setup([SETTINGS, new Error("port closed")]);
     await t.controller.load();

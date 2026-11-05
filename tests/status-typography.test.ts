@@ -17,7 +17,7 @@ const NB = "\u202F";
 // punctuation, the punctuation glued to a word, or a guillemet without its narrow space.
 function typographyFaults(text: string): string[] {
   const faults = [
-    ...text.matchAll(/(?<![\u202F\d]):|(?<!\u202F)[;?!]/g),
+    ...text.matchAll(/(?<![\u202F\d]):|(?<!\u202F)[;?!%]/g),
     ...text.matchAll(/«(?!\u202F)|(?<!\u202F)»/g),
   ];
   return faults.map((m) => text.slice(Math.max(0, m.index - 12), m.index + 2));
@@ -90,6 +90,10 @@ describe("French typography on the status page", () => {
   it("the check finds a plain space, a glued sign and a bare guillemet (control)", () => {
     expect(typographyFaults("Prévus : 2")).toHaveLength(1);
     expect(typographyFaults("Prévus\u00A0: 2")).toHaveLength(1);
+    expect(typographyFaults("80 %")).toHaveLength(1);
+    expect(typographyFaults("80%")).toHaveLength(1);
+    expect(typographyFaults("80\u00A0%")).toHaveLength(1);
+    expect(typographyFaults(`80${NB}%`)).toEqual([]);
     expect(typographyFaults("Activer ?")).toHaveLength(1);
     expect(typographyFaults("Prévus: 2")).toHaveLength(1);
     expect(typographyFaults("« Resynchroniser »")).toHaveLength(2);

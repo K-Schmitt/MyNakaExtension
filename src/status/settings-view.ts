@@ -1,5 +1,5 @@
 // The « Réglages » section without the DOM: what the answer selects, what a draft allows, and what a save
-// sends. The labels are written in status.html; these two sentences are shown from the code.
+// sends. The labels are written in status.html; these three sentences are shown from the code.
 // French typography: U+202F before « % ».
 
 import { THRESHOLD_CHOICES, type Thresholds } from "../core/watch-trigger";
@@ -8,6 +8,7 @@ import type { ToWorker } from "../ext/messages";
 export const SETTINGS_COPY = {
   pauseFromError: "Un nombre entier de 1 à 99",
   saved: "Réglages enregistrés",
+  waiting: "Réglages en attente d'enregistrement",
 } as const;
 
 // U+202F, written as a code point so that it stays visible in the source.

@@ -45,6 +45,18 @@ describe("toSettingsView", () => {
     expect(view.pauseText).toBe("40");
   });
 
+  it("a waiting change is in progress, so the page polls", () => {
+    const format = localFormat("UTC");
+    const base = { mode: "live" as const };
+    expect(
+      toStatusView({ ...base, pendingSettings: true }, format),
+    ).toMatchObject({ settingsPending: true, inProgress: true });
+    expect(toStatusView(base, format)).toMatchObject({
+      settingsPending: false,
+      inProgress: false,
+    });
+  });
+
   it("the status view carries it, and hides it without the thresholds", () => {
     const format = localFormat("UTC");
     const shown = toStatusView(

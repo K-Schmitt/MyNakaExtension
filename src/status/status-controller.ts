@@ -6,6 +6,7 @@ import type { Mode } from "../ext/settings";
 import {
   SETTINGS_COPY,
   type SettingsDraft,
+  type SettingsValues,
   sameValues,
   settingsMessage,
 } from "./settings-view";
@@ -73,6 +74,8 @@ export function createController(ports: Ports): Controller {
   let current: StatusView = LOADING_VIEW;
   let asked = 0;
   let poll: unknown;
+  // The values of the last save, until an answer settles them (saved or not).
+  let awaiting: SettingsValues | undefined;
 
   // One poll armed at most, and only while the engine works.
   function schedule(view: StatusView): void {
@@ -85,6 +88,24 @@ export function createController(ports: Ports): Controller {
     }, POLL_MS);
   }
 
+  // The line under the settings follows the answers. While the worker holds the change the values shown may
+  // be the old ones: it is « saved » only once the marker is gone and the answer carries the saved values.
+  function announce(view: StatusView): void {
+    if (view.kind !== "ready" || view.settings === undefined) {
+      awaiting = undefined;
+      ports.note("");
+      return;
+    }
+    if (view.settingsPending) {
+      ports.note(SETTINGS_COPY.waiting);
+      return;
+    }
+    if (awaiting === undefined) return;
+    const kept = sameValues(view.settings.values, awaiting);
+    awaiting = undefined;
+    ports.note(kept ? SETTINGS_COPY.saved : "");
+  }
+
   // Only the answer to the latest question is shown: an older one arriving late is dropped.
   // It returns the view it showed, or nothing when a newer question took over.
   async function refresh(): Promise<StatusView | undefined> {
@@ -94,6 +115,7 @@ export function createController(ports: Ports): Controller {
     if (question !== asked) return undefined;
     current = view;
     ports.show(view);
+    announce(view);
     schedule(view);
     return view;
   }
@@ -134,21 +156,16 @@ export function createController(ports: Ports): Controller {
     return switchTo("live");
   }
 
-  // The answer to one new question tells whether the worker kept the values: only then is it « saved ».
+  // One question after the send shows the marker and arms the poll; the answers that follow settle the note.
   async function save(draft: SettingsDraft): Promise<void> {
     const message = settingsMessage(draft);
     if (message?.type !== "set-settings") return;
-    await sendQuietly(ports, message);
-    const view = await refresh();
-    const sent = {
+    awaiting = {
       ...message.thresholds,
       pauseFromPercent: message.pauseFromPercent,
     };
-    const kept =
-      view?.kind === "ready" &&
-      view.settings !== undefined &&
-      sameValues(view.settings.values, sent);
-    ports.note(kept ? SETTINGS_COPY.saved : "");
+    await sendQuietly(ports, message);
+    await refresh();
   }
 
   return {

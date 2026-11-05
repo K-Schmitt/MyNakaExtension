@@ -27,6 +27,8 @@ export type StatusView =
       switchLabel?: string;
       /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
       inProgress: boolean;
+      /** A settings change waits or runs in the worker: the values shown may be the old ones. */
+      settingsPending: boolean;
       previewCount: number;
       lines: string[];
       preview: string[];
@@ -102,7 +104,10 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
     ...settingsOf(snapshot),
     kind: "ready" as const,
     inProgress:
-      snapshot.running !== undefined || snapshot.pendingMode !== undefined,
+      snapshot.running !== undefined ||
+      snapshot.pendingMode !== undefined ||
+      snapshot.pendingSettings !== undefined,
+    settingsPending: snapshot.pendingSettings !== undefined,
     previewCount: preview.length,
     lines: viewLines(snapshot, format),
     preview,

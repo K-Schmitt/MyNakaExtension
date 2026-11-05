@@ -1660,6 +1660,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         `Envies SensCritique${NB}: Film 1`,
         `Ma liste Naka${NB}: Film 2`,
       ],
+      settingsPending: false,
       settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),
     });
   });
