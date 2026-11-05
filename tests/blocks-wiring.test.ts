@@ -3,6 +3,7 @@ import { wireBlocks } from "../src/content/ui/blocks-wiring";
 import type { HomeHandlers } from "../src/content/ui/home-block";
 import type { HomeView } from "../src/content/ui/home-view";
 import type { RatingHandlers } from "../src/content/ui/rating-render";
+import { GRACE_MS } from "../src/content/ui/rating-session";
 import type { RatingView } from "../src/content/ui/rating-view";
 import type { WorkerPort } from "../src/content/ui/worker-port";
 import type { ContentIds } from "../src/core/finish-event";
@@ -109,6 +110,8 @@ function wiringWorld() {
       blocks.paused({ currentTime: progress * 1000, duration: 1000, src: "" });
       await flush();
     },
+    /** Steps past the grace of a label just drawn, so that a click on it counts. */
+    ready: () => clock.advance(GRACE_MS),
     // On the player for these ids, past the pause block's wait after a URL change.
     async play(ids: ContentIds): Promise<void> {
       blocks.urlChanged(ids);
@@ -126,7 +129,8 @@ describe("one owner for the overlay over the player", () => {
     await w.clock.advance(1000);
     await w.pause(0.81);
     expect(w.drawn().view.heading).toContain("épisode 10");
-    // 2. A 7 on the pause block's view-only card: it asks at +3, +6, +11 s.
+    // 2. A 7 on the pause block's view-only card: it asks at +3.4, +6.4, +11.4 s.
+    await w.ready();
     w.drawn().handlers.onChoose(7);
     w.set(LAST, null, ["épisode"]);
     await w.clock.advance(3500);
@@ -136,7 +140,7 @@ describe("one owner for the overlay over the player", () => {
     ]);
     await w.clock.advance(1000);
     expect(w.drawn().view.heading).toContain("épisode 10");
-    // The rate went through: the end block moves on at +7 s; the pause block's own wait ends at +11 s.
+    // The rate went through: the end block moves on at +7 s; the pause block's own wait ends at +11.4 s.
     await w.clock.advance(500);
     w.set(
       LAST,
@@ -144,7 +148,8 @@ describe("one owner for the overlay over the player", () => {
     );
     await w.clock.advance(5000);
     expect(w.drawn().view.heading).toContain("saison 1");
-    // 4. The saison is rated on what is drawn.
+    // 4. The saison is rated on what is drawn, once its buttons have settled.
+    await w.ready();
     w.drawn().handlers.onChoose(8);
     w.set(
       LAST,
@@ -172,6 +177,7 @@ describe("one owner for the overlay over the player", () => {
     w.blocks.finished(LAST);
     await w.clock.advance(1000);
     await w.pause(0.81);
+    await w.ready();
     w.drawn().handlers.onChoose(7);
     w.set(LAST, null, ["épisode"]);
     await w.clock.advance(1000);
@@ -183,6 +189,7 @@ describe("one owner for the overlay over the player", () => {
     );
     await w.clock.advance(3000);
     expect(w.drawn().view.heading).toContain("saison 1");
+    await w.ready();
     w.drawn().handlers.onAction("plus-tard");
     expect(w.player.drawn).toBeUndefined();
     w.set(

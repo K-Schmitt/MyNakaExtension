@@ -136,6 +136,7 @@ describe("the end block chain", () => {
     expect(w.last().view.heading).toContain("épisode 1");
 
     w.script(EP_IDS, answer(toSaison(), 8));
+    await w.ready();
     w.last().handlers.onChoose(9);
     await flush();
     expect(w.calls).toContain("rate 5:1:1 épisode 9");
@@ -147,6 +148,7 @@ describe("the end block chain", () => {
     ]);
 
     w.script(EP_IDS, answer(toSerie(), 7));
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     await w.clock.advance(2000);
@@ -161,6 +163,7 @@ describe("the end block chain", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.script(FILM_IDS, answer(filmCard({ pending: [] })));
+    await w.ready();
     w.last().handlers.onChoose(10);
     await flush();
     expect(w.hidden()).toBe(0);
@@ -179,12 +182,14 @@ describe("the end block chain", () => {
       failed: { label: "film", error: "sc-session", at: 5 },
     });
     w.script(FILM_IDS, answer(failed));
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     await w.clock.advance(2000);
     expect(w.last().view.error).toBeDefined();
     expect(w.block.isShown()).toBe(true);
     // Unlocked again: the next choice goes out.
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(2);
@@ -196,6 +201,7 @@ describe("the end block chain", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.script(FILM_IDS, undefined);
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     await w.clock.advance(39999);
@@ -214,12 +220,14 @@ describe("the end block chain", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.fail.send = true;
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.last().view.error).toBe(UNREACHABLE_LINE);
     expect(w.last().view.choices).toHaveLength(10);
     expect(w.hidden()).toBe(0);
     w.fail.send = false;
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(2);
@@ -232,6 +240,7 @@ describe("the end block série confirmation", () => {
     w.script(EP_IDS, answer(toSerie(), 7));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     return w;
   }
 
@@ -277,6 +286,7 @@ describe("the end block série confirmation", () => {
     w.script(EP_IDS, answer(toSerie({ seriesFinished: true })));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onChoose(9);
     await flush();
     expect(w.calls).toContain("rate 5:1:1 série 9");
@@ -289,6 +299,7 @@ describe("the end block lock and manual choice", () => {
     w.script(FILM_IDS, answer(filmCard()));
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     const { handlers } = w.last();
     handlers.onChoose(8);
     handlers.onChoose(8);
@@ -323,6 +334,7 @@ describe("the end block lock and manual choice", () => {
     w.script(EP_IDS, answer(toSaison(), 8));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onOther("série");
     w.last().handlers.onChoose(5);
     await flush();
@@ -339,6 +351,7 @@ describe("the end block waits for a manual choice to show", () => {
     w.script(EP_IDS, answer(card), answer(card), answer(given));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onOther("épisode");
     w.last().handlers.onChoose(8);
     await flush();
@@ -356,6 +369,7 @@ describe("the end block actions", () => {
     w.script(FILM_IDS, answer(filmCard()));
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     const before = [...w.calls];
     w.last().handlers.onAction("plus-tard");
     await flush();
@@ -371,6 +385,7 @@ describe("the end block actions", () => {
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
     w.script(EP_IDS, answer(episodeCard({ pending: ["saison"] }), 8));
+    await w.ready();
     w.last().handlers.onAction("ignorer");
     await flush();
     expect(w.calls).toContain("dismiss 5:1:1 épisode");
@@ -383,6 +398,7 @@ describe("the end block actions", () => {
     w.script(EP_IDS, answer(episodeCard()));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onAction("ignorer");
     await flush();
     expect(w.last().view.notice).toBe(WAIT_LINE);
@@ -399,9 +415,11 @@ describe("the end block actions", () => {
     w.script(EP_IDS, answer(episodeCard()), answer(failed));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onAction("ignorer");
     await w.clock.advance(2000);
     expect(w.last().view.choices).toHaveLength(10);
+    await w.ready();
     w.last().handlers.onChoose(5);
     await flush();
     expect(w.last().view.notice).toBe(SENDING_LINE);
@@ -425,6 +443,7 @@ describe("the end block actions", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.script(FILM_IDS, answer(filmCard({ pending: [] })));
+    await w.ready();
     w.last().handlers.onAction("ignorer");
     await flush();
     await w.clock.advance(2000);
@@ -456,6 +475,7 @@ describe("the end block with several contents", () => {
     w.script(FILM_IDS, answer(filmCard()));
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     const { handlers } = w.last();
     handlers.onAction("fermer");
     await flush();
@@ -528,6 +548,7 @@ describe("the end block waits for the rating to be sent", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.script(FILM_IDS, ...after.map((card) => answer(card)));
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     return w;
@@ -542,6 +563,7 @@ describe("the end block waits for the rating to be sent", () => {
     await w.clock.advance(2000);
     const same = answer(episodeCard());
     w.script(EP_IDS, same, same, answer(toSaison(), 8));
+    await w.ready();
     const { handlers } = w.last();
     handlers.onChoose(7);
     await flush();
@@ -625,6 +647,7 @@ describe("the end block waits for the rating to be sent", () => {
     w.script(FILM_IDS, answer(old));
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     await w.clock.advance(2000);
@@ -640,6 +663,7 @@ describe("the end block confirmation line and failing ports", () => {
     w.script(EP_IDS, answer(toSerie(), 7));
     w.block.finished(EP_IDS);
     await w.clock.advance(2000);
+    await w.ready();
     w.last().handlers.onChoose(9);
     expect(w.last().view.notice).toBe(chosenLine(9));
     expect(w.last().view.confirm).toBe(true);
@@ -651,6 +675,7 @@ describe("the end block confirmation line and failing ports", () => {
     w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
     w.fail.ask = true;
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     await w.clock.advance(40000);
@@ -667,6 +692,7 @@ describe("the end block confirmation line and failing ports", () => {
     w.ports.port.rate = async () => {
       throw new Error("port bug");
     };
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.last().view.error).toBe(UNREACHABLE_LINE);
@@ -690,5 +716,158 @@ describe("the end block confirmation line and failing ports", () => {
     w.script(FILM_IDS, answer(filmCard()));
     await w.clock.advance(2000);
     expect(w.block.isShown()).toBe(true);
+  });
+});
+
+describe("the end block ignores a click right after a label appears", () => {
+  const rates = (calls: string[]) => calls.filter((c) => c.startsWith("rate"));
+
+  it("a new block: a choice at 399 ms is ignored, at 400 ms taken", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    await w.clock.advance(399);
+    w.last().handlers.onChoose(7);
+    await flush();
+    expect(rates(w.calls)).toEqual([]);
+    expect(w.last().view.choices).toHaveLength(10);
+    await w.clock.advance(1);
+    w.last().handlers.onChoose(7);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 9:: film 7"]);
+  });
+
+  it("a new block: an action at 399 ms is ignored, at 400 ms taken", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2399);
+    w.last().handlers.onAction("plus-tard");
+    w.last().handlers.onAction("ignorer");
+    await flush();
+    expect(w.block.isShown()).toBe(true);
+    expect(w.calls.filter((c) => c.startsWith("dismiss"))).toEqual([]);
+    await w.clock.advance(1);
+    w.last().handlers.onAction("plus-tard");
+    expect(w.block.isShown()).toBe(false);
+  });
+
+  it("the next label of the chain: ignored at 399 ms, taken at 400 ms", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2400);
+    w.script(EP_IDS, answer(toSaison({ given: { épisode: 9 } })));
+    w.last().handlers.onChoose(9);
+    await w.clock.advance(2000);
+    expect(w.last().view.heading).toContain("saison 1");
+    await w.clock.advance(399);
+    w.last().handlers.onChoose(4);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 5:1:1 épisode 9"]);
+    await w.clock.advance(1);
+    w.last().handlers.onChoose(4);
+    await flush();
+    expect(rates(w.calls)).toEqual([
+      "rate 5:1:1 épisode 9",
+      "rate 5:1:1 saison 4",
+    ]);
+  });
+
+  it("an unlock after a failure: ignored at 399 ms, taken at 400 ms", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2400);
+    const failed = filmCard({
+      failed: { label: "film", error: "sc-session", at: 5 },
+    });
+    w.script(FILM_IDS, answer(failed));
+    w.last().handlers.onChoose(6);
+    await w.clock.advance(2000);
+    expect(w.last().view.error).toBe(errorLine("sc-session"));
+    await w.clock.advance(399);
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toHaveLength(1);
+    await w.clock.advance(1);
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toHaveLength(2);
+  });
+
+  it("an unlock after an unreachable send: ignored at 399 ms, taken at 400 ms", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2400);
+    w.fail.send = true;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    w.fail.send = false;
+    await w.clock.advance(399);
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toHaveLength(1);
+    await w.clock.advance(1);
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(rates(w.calls)).toHaveLength(2);
+  });
+
+  it("a confirmation drawn again by a late unlock: ignored at 399 ms, taken at 400 ms", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    await w.ready();
+    // The first send hangs, then fails after the card already showed its failure.
+    let fail: (error: Error) => void = () => undefined;
+    const sends: string[] = [];
+    w.ports.port.rate = (_ids, label, rating) => {
+      sends.push(`${label} ${rating}`);
+      return sends.length === 1
+        ? new Promise<boolean>((_ok, ko) => {
+            fail = ko;
+          })
+        : Promise.resolve(true);
+    };
+    w.last().handlers.onChoose(7);
+    w.last().handlers.onConfirm(true);
+    w.script(
+      EP_IDS,
+      answer(
+        toSerie({ failed: { label: "série", error: "unavailable", at: 4 } }),
+      ),
+    );
+    await w.clock.advance(2000);
+    await w.ready();
+    w.last().handlers.onChoose(5);
+    expect(w.last().view.confirm).toBe(true);
+    fail(new Error("gone"));
+    await flush();
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    expect(w.last().view.confirm).toBe(true);
+    await w.clock.advance(399);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(sends).toEqual(["série 7"]);
+    await w.clock.advance(1);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(sends).toEqual(["série 7", "série 5"]);
+  });
+
+  it("a manual choice of another label does not start the grace again", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSaison()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2400);
+    w.last().handlers.onOther("épisode");
+    w.last().handlers.onChoose(5);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 5:1:1 épisode 5"]);
   });
 });

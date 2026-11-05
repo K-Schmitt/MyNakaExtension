@@ -32,13 +32,13 @@ function world(
   ],
 ) {
   const w = fakePorts();
-  let now = 100_000;
+  let origin = 100_000; // the block's clock is the fake timer's, from here
   let endShown = false;
   const titleCalls: number[] = [];
   const known = new Map(titles);
   const block = createPauseBlock({
     ...w.ports,
-    now: () => now,
+    now: () => origin + w.clock.now(),
     endShown: () => endShown,
     titleOf: async (contentId) => {
       titleCalls.push(contentId);
@@ -50,7 +50,7 @@ function world(
     block,
     titleCalls,
     setNow: (ms: number) => {
-      now = ms;
+      origin = ms - w.clock.now();
     },
     setEndShown: (shown: boolean) => {
       endShown = shown;
@@ -177,6 +177,7 @@ describe("the pause block card", () => {
     await w.pauseAt(0.5);
     expect(w.last().view.heading).toContain("épisode 1");
     expect(w.last().view.start).toBeUndefined();
+    await w.ready();
     w.last().handlers.onChoose(8);
     expect(w.calls).toContain("rate 5:1:1 épisode 8");
   });
@@ -187,6 +188,7 @@ describe("the pause block card", () => {
     await w.pauseAt(0.5);
     expect(w.last().view.heading).toContain("Une série");
     expect(w.last().view.heading).toContain("épisode 1");
+    await w.ready();
     w.last().handlers.onChoose(9);
     await flush();
     expect(w.calls).toContain("rate 5:1:1 épisode 9");
@@ -198,6 +200,7 @@ describe("the pause block card", () => {
     w.script(FILM_IDS, asked(null));
     await w.pauseAt(0.5, FILM_IDS);
     expect(w.last().view.heading).toContain("Un film");
+    await w.ready();
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.calls).toContain("rate 9:: film 6");
@@ -222,6 +225,7 @@ describe("the pause block card", () => {
     const w = world();
     w.script(FILM_IDS, asked(filmCard()));
     await w.pauseAt(0.5, FILM_IDS);
+    await w.ready();
     w.last().handlers.onAction("ignorer");
     await flush();
     expect(w.calls).toContain("dismiss 9:: film");
@@ -275,6 +279,7 @@ describe("the pause block lifecycle", () => {
     const w = world();
     w.script(EP_IDS, asked(episodeCard()));
     await w.pauseAt(0.5);
+    await w.ready();
     w.last().handlers.onAction("fermer");
     expect(w.hidden()).toBe(1);
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
@@ -287,6 +292,7 @@ describe("the pause block lifecycle", () => {
     const w = world();
     w.script(EP_IDS, asked(episodeCard({ pending: ["épisode", "saison"] })));
     await w.pauseAt(0.5);
+    await w.ready();
     w.last().handlers.onChoose(8);
     w.block.resumed();
     w.script(EP_IDS, asked(episodeCard({ pending: ["saison"] })));
@@ -299,6 +305,7 @@ describe("the pause block lifecycle", () => {
     const w = world();
     w.script(EP_IDS, asked(episodeCard()));
     await w.pauseAt(0.5);
+    await w.ready();
     w.fail.send = true;
     w.last().handlers.onChoose(8);
     await flush();
@@ -316,6 +323,7 @@ describe("the pause block waits for the card to show the sent rating", () => {
     const sent: CardAnswer = { ...none, sending: ["épisode"] };
     w.script(EP_IDS, none, sent, sent, sent, asked(rated(7)));
     await w.pauseAt(0.5);
+    await w.ready();
     const sending = w.last().handlers;
     w.last().handlers.onChoose(7);
     await flush();
@@ -345,6 +353,7 @@ describe("the pause block waits for the card to show the sent rating", () => {
     });
     w.script(EP_IDS, asked(before), asked(before), asked(rated(8)));
     await w.pauseAt(0.5);
+    await w.ready();
     w.last().handlers.onChoose(8);
     await flush();
     await w.clock.advance(2000);
@@ -362,6 +371,7 @@ describe("the pause block waits for the card to show the sent rating", () => {
     });
     w.script(EP_IDS, asked(null), asked(failed));
     await w.pauseAt(0.5);
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     await w.clock.advance(2000);
@@ -374,6 +384,7 @@ describe("the pause block waits for the card to show the sent rating", () => {
     const w = world();
     w.script(EP_IDS, asked(null), { ...asked(null), sending: ["épisode"] });
     await w.pauseAt(0.5);
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     await w.clock.advance(39999);
@@ -397,6 +408,7 @@ describe("a card-less pause rating that could not go", () => {
     const w = world();
     w.script(FILM_IDS, none(), none({ sending: ["film"] }), after);
     await w.pauseAt(0.5, FILM_IDS);
+    await w.ready();
     w.last().handlers.onChoose(7);
     await flush();
     await w.clock.advance(2000);
@@ -414,6 +426,7 @@ describe("a card-less pause rating that could not go", () => {
     expect(w.last().view.notice).toBeUndefined();
     expect(w.last().view.choices).toHaveLength(10);
     expect(w.hidden()).toBe(0);
+    await w.ready();
     w.last().handlers.onChoose(8);
     await flush();
     expect(rates(w.calls)).toEqual(["rate 9:: film 7", "rate 9:: film 8"]);
@@ -449,11 +462,13 @@ describe("a card-less pause rating that could not go", () => {
       const w = world();
       w.script(EP_IDS, none(), asked(real));
       await w.pauseAt(0.5);
+      await w.ready();
       w.last().handlers.onChoose(7);
       await flush();
       await w.clock.advance(2000);
       expect(w.last().view.choices).toHaveLength(10);
       w.script(EP_IDS, none());
+      await w.ready();
       w.last().handlers.onChoose(6);
       await flush();
       await w.clock.advance(2000);

@@ -1,7 +1,8 @@
 // One shown rating card and its send, shared by the end block and the pause block: the lock after a
 // choice, the sending cue, the re-ask schedule counted from the click, the move-on rule and the
 // unreachable rule. A rating goes out only from a trusted click (the render guarantees it), once per
-// answer: the block locks after a choice until the worker's next answer.
+// answer: the block locks after a choice until the worker's next answer. A click that lands within
+// GRACE_MS of the label's buttons appearing under the cursor is taken for one meant for the page: ignored.
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
@@ -23,9 +24,12 @@ import {
 } from "./session-views";
 import type { WorkerPort } from "./worker-port";
 
+export const GRACE_MS = 400;
+
 export type SessionPorts = {
   port: Pick<WorkerPort, "askCard" | "rate" | "dismiss">;
   timer: EndTimer;
+  now(): number;
   show(view: RatingView, handlers: RatingHandlers): void;
   hide(): void;
 };
@@ -74,6 +78,13 @@ export function createRatingSession(
     onClosed();
   }
 
+  // The label's buttons appear again: the grace counts from now.
+  function unlock(s: Session): void {
+    s.locked = false;
+    s.shownAt = ports.now();
+    render(s);
+  }
+
   // The card after an action: the next label, or a failure line; the block unlocks.
   function settle(s: Session, answer: CardAnswer): void {
     const card = answer.card;
@@ -91,16 +102,14 @@ export function createRatingSession(
       watch(s);
       return;
     }
-    s.locked = false;
-    render(s);
+    unlock(s);
   }
 
   // The worker cannot be reached: the block stays, with the line, and the choices work again.
   function unreachable(s: Session): void {
     if (current !== s) return;
-    s.locked = false;
     s.error = UNREACHABLE_LINE;
-    render(s);
+    unlock(s);
   }
 
   // An answer with no card, the label no longer being sent. For a list, the card has nothing left to
@@ -112,9 +121,8 @@ export function createRatingSession(
       return true;
     }
     if (!at.cardless) return false;
-    s.locked = false;
     s.error = notSentLine(answer.lastFinish);
-    render(s);
+    unlock(s);
     return true;
   }
 
@@ -146,8 +154,7 @@ export function createRatingSession(
     s.card = card;
     s.label = label;
     delete s.viewOnly;
-    s.locked = false;
-    render(s);
+    unlock(s);
   }
 
   // Locked from the click until the card says the label left `pending`, or a failure that was not
@@ -210,15 +217,17 @@ export function createRatingSession(
 
   function handlersOf(s: Session): RatingHandlers {
     const live = (): boolean => current === s && !s.locked;
+    const settled = (): boolean =>
+      live() && ports.now() - s.shownAt >= GRACE_MS;
     return {
-      onChoose: (value) => live() && choose(s, value),
-      onAction: (action) => live() && act(s, action),
+      onChoose: (value) => settled() && choose(s, value),
+      onAction: (action) => settled() && act(s, action),
       onOther: (label) => {
         if (!live()) return;
         s.label = label;
         render(s);
       },
-      onConfirm: (send) => live() && confirm(s, send),
+      onConfirm: (send) => settled() && confirm(s, send),
     };
   }
 
@@ -234,6 +243,7 @@ export function createRatingSession(
         card,
         label,
         locked: false,
+        shownAt: ports.now(),
         ...(start === undefined ? {} : { start }),
         ...(viewOnly ? { viewOnly: true } : {}),
       };

@@ -24,6 +24,7 @@ export type HomeHandlers = {
 export type HomePorts = {
   port: Pick<WorkerPort, "askCards" | "rate" | "dismiss">;
   timer: EndTimer;
+  now(): number;
   show(view: HomeView, handlers: HomeHandlers): void;
   hide(): void;
 };
@@ -95,6 +96,7 @@ export function createHomeBlock(ports: HomePorts) {
             dismiss: (ids, label) => ports.port.dismiss(ids, label),
           },
           timer: ports.timer,
+          now: ports.now,
           show: (view, handlers) => {
             slot.entry = { ...slot.entry, view };
             slot.handlers = handlers;

@@ -65,6 +65,7 @@ describe("the home block's arrival", () => {
 
   it("after leaving, a choice from the old panel sends nothing", async () => {
     const w = await arrived(A);
+    await w.ready();
     const handlers = w.handlersOf("movie:1");
     w.block.route("/player");
     handlers.onChoose(5);
@@ -119,6 +120,7 @@ describe("the home block's arrival", () => {
 describe("a choice in the panel", () => {
   it("sends one rate for that entry's first pending label and locks it", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.handlersOf("movie:2").onChoose(8);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
@@ -128,6 +130,7 @@ describe("a choice in the panel", () => {
 
   it("a second click on the locked entry sends nothing, a click on another entry does", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     const locked = w.handlersOf("movie:2");
     locked.onChoose(8);
     locked.onChoose(9);
@@ -141,6 +144,7 @@ describe("a choice in the panel", () => {
 
   it("asks again 2 s after the click, and drops the entry the worker no longer lists", async () => {
     const w = await arrived(A, B, C);
+    await w.ready();
     await w.clock.advance(500);
     w.handlersOf("movie:2").onChoose(8);
     await w.clock.advance(1999);
@@ -153,6 +157,7 @@ describe("a choice in the panel", () => {
 
   it("keeps the entry locked while the card is unchanged", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.handlersOf("movie:2").onChoose(8);
     await w.clock.advance(2000);
     expect(w.viewOf("movie:2")?.notice).toBe(SENDING_LINE);
@@ -162,6 +167,7 @@ describe("a choice in the panel", () => {
 
   it("a card absent from the answer counts as moved on", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.handlersOf("movie:1").onChoose(8);
     w.state.answer = answerOf(B);
     await w.clock.advance(2000);
@@ -170,6 +176,7 @@ describe("a choice in the panel", () => {
 
   it("hides the panel when its last entry is gone", async () => {
     const w = await arrived(A);
+    await w.ready();
     w.handlersOf("movie:1").onChoose(8);
     w.state.answer = answerOf();
     const before = w.hidden();
@@ -180,6 +187,7 @@ describe("a choice in the panel", () => {
   it("moves an entry on to its next label, unlocked", async () => {
     const ep = episodeCard({ pending: ["épisode", "saison"], at: 500 });
     const w = await arrived(ep);
+    await w.ready();
     w.handlersOf(ep.key).onChoose(8);
     w.state.answer = {
       cards: [
@@ -200,6 +208,7 @@ describe("a choice in the panel", () => {
 
   it("drops the entry when the schedule is spent with answers and no change", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.handlersOf("movie:2").onChoose(8);
     await w.clock.advance(60000);
     expect(w.keys()).toEqual(["movie:1"]);
@@ -209,6 +218,7 @@ describe("a choice in the panel", () => {
 describe("the unreachable worker", () => {
   it("a send that fails says so on that entry only, and unlocks it", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.state.sendOk = false;
     w.handlersOf("movie:2").onChoose(8);
     await flush();
@@ -219,6 +229,7 @@ describe("the unreachable worker", () => {
 
   it("an entry whose every ask goes unanswered says so, and unlocks", async () => {
     const w = await arrived(A, B);
+    await w.ready();
     w.handlersOf("movie:2").onChoose(8);
     w.state.answer = undefined;
     await w.clock.advance(60000);
@@ -231,6 +242,7 @@ describe("the unreachable worker", () => {
 describe("the série confirmation in an entry", () => {
   it("asks first, sends nothing, and Annuler sends nothing", async () => {
     const w = await arrived(SERIE);
+    await w.ready();
     w.handlersOf(SERIE.key).onChoose(7);
     expect(w.viewOf(SERIE.key)?.confirm).toBe(true);
     expect(w.viewOf(SERIE.key)?.notice).toBe(chosenLine(7));
@@ -243,6 +255,7 @@ describe("the série confirmation in an entry", () => {
 
   it("Envoyer sends the chosen rating", async () => {
     const w = await arrived(SERIE);
+    await w.ready();
     w.handlersOf(SERIE.key).onChoose(7);
     w.handlersOf(SERIE.key).onConfirm(true);
     await flush();
@@ -255,6 +268,7 @@ describe("Ignorer and Réduire", () => {
   it("Ignorer dismisses the first pending label, locks, then drops the entry", async () => {
     const ep = episodeCard({ pending: ["saison", "série"], at: 500 });
     const w = await arrived(ep, A);
+    await w.ready();
     w.handlersOf(ep.key).onAction("ignorer");
     await flush();
     expect(sendsOf(w.calls)).toEqual(["dismiss 5:1:1 saison"]);
@@ -266,10 +280,53 @@ describe("Ignorer and Réduire", () => {
 
   it("Réduire folds the panel to its heading and sends nothing, again unfolds", async () => {
     const w = await arrived(A);
+    await w.ready();
     w.last().handlers.onFold();
     expect(w.last().view.folded).toBe(true);
     w.last().handlers.onFold();
     expect(w.last().view.folded).toBe(false);
     expect(sendsOf(w.calls)).toEqual([]);
+  });
+});
+
+describe("a home entry ignores a click right after it appears", () => {
+  it("a choice at 399 ms is ignored, at 400 ms taken", async () => {
+    const w = await arrived(A);
+    await w.clock.advance(399);
+    w.handlersOf("movie:1").onChoose(8);
+    w.handlersOf("movie:1").onAction("ignorer");
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    await w.clock.advance(1);
+    w.handlersOf("movie:1").onChoose(8);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 8"]);
+  });
+
+  it("the next label of an entry: ignored at 399 ms, taken at 400 ms", async () => {
+    const ep = episodeCard({ pending: ["épisode", "saison"], at: 500 });
+    const w = await arrived(ep);
+    await w.clock.advance(400);
+    w.handlersOf(ep.key).onChoose(8);
+    w.state.answer = {
+      cards: [
+        entryOf(
+          episodeCard({ pending: ["saison"], given: { épisode: 8 }, at: 500 }),
+        ),
+      ],
+    };
+    await w.clock.advance(2000);
+    expect(w.viewOf(ep.key)?.heading).toContain("saison 1");
+    await w.clock.advance(399);
+    w.handlersOf(ep.key).onChoose(6);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 5:1:1 épisode 8"]);
+    await w.clock.advance(1);
+    w.handlersOf(ep.key).onChoose(6);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([
+      "rate 5:1:1 épisode 8",
+      "rate 5:1:1 saison 6",
+    ]);
   });
 });

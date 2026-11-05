@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type { HomeHandlers, HomePorts } from "../src/content/ui/home-block";
 import type { HomeView } from "../src/content/ui/home-view";
 import type { RatingHandlers } from "../src/content/ui/rating-render";
+import { GRACE_MS } from "../src/content/ui/rating-session";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard, RatingLabel } from "../src/core/rating-cards";
 import type { CardsAnswer } from "../src/sw/rating-answers";
@@ -32,6 +33,7 @@ export function homeWorld() {
   };
   const ports: HomePorts = {
     timer: clock.timer,
+    now: clock.now,
     port: {
       askCards: vi.fn(async () => {
         calls.push("askCards");
@@ -67,6 +69,8 @@ export function homeWorld() {
     shown,
     state,
     hidden: () => hidden,
+    /** Steps past the grace of an entry just drawn, so that a click on it counts. */
+    ready: () => clock.advance(GRACE_MS),
     last,
     handlersOf: (key: string): RatingHandlers => last().handlers.entry(key),
     viewOf: (key: string) =>

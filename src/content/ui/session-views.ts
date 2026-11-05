@@ -13,6 +13,7 @@ export type Session = {
   label: RatingLabel;
   start?: number;
   locked: boolean;
+  shownAt: number; // when the label was last drawn with its buttons: a new card, a next label, an unlock
   confirming?: number;
   error?: string; // a line of the block's own: the worker did not answer, or no card came
   viewOnly?: true; // the card exists only in the view: the worker has none for the title

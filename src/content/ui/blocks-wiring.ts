@@ -33,6 +33,7 @@ export function wireBlocks(ports: WiringPorts) {
   const endBlock = createEndBlock({
     port,
     timer,
+    now: ports.now,
     show: playerUi.show,
     hide: playerUi.hide,
     opening: () => pauseBlock.close(),
@@ -53,6 +54,7 @@ export function wireBlocks(ports: WiringPorts) {
   const homeBlock = createHomeBlock({
     port,
     timer,
+    now: ports.now,
     show: homeUi.show,
     hide: homeUi.hide,
   });

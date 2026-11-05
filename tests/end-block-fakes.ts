@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type { EndPorts } from "../src/content/ui/end-block";
 import type { RatingHandlers } from "../src/content/ui/rating-render";
+import { GRACE_MS } from "../src/content/ui/rating-session";
 import type { RatingView } from "../src/content/ui/rating-view";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard, RatingLabel } from "../src/core/rating-cards";
@@ -72,6 +73,7 @@ export function fakePorts() {
   const ports: EndPorts = {
     opening: () => {},
     timer: clock.timer,
+    now: clock.now,
     port: {
       askCard: vi.fn(async (ids: ContentIds) => {
         calls.push(`ask ${keyOf(ids)}`);
@@ -104,6 +106,8 @@ export function fakePorts() {
     calls,
     shown,
     hidden: () => hidden,
+    /** Steps past the grace of a label just drawn, so that a click on it counts. */
+    ready: () => clock.advance(GRACE_MS),
     last() {
       const entry = shown[shown.length - 1];
       if (entry === undefined) throw new Error("nothing shown");

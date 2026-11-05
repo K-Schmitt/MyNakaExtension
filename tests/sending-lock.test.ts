@@ -27,6 +27,7 @@ describe("the end block with a rating still being sent", () => {
     await w.clock.advance(2000);
     expect(w.last().view.notice).toBe(SENDING_LINE);
     expect(w.last().view.choices).toEqual([]);
+    await w.ready();
     w.last().handlers.onChoose(5);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
@@ -138,6 +139,7 @@ describe("the home panel with a rating still being sent", () => {
     };
     block.route("/");
     await flush();
+    await w.ready();
     w.handlersOf(FILM.key).onChoose(6);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 9:: film 6"]);
