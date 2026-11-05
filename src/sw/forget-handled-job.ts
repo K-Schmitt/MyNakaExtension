@@ -36,13 +36,21 @@ export async function forgetHandledJob(
   await dropCard(store, key);
 }
 
+// Something is kept under the key: handled, a question's finish, or a card. A forged id holds nothing.
+async function heldBy(store: ForgetStore, key: string): Promise<boolean> {
+  if (holdsKey(await store.loadState(), key)) return true;
+  return cardFor(await store.loadRatings(), key) !== undefined;
+}
+
 // A forget a Naka tab asked for takes a slot of the hour's budget first (a naka.cx script can forge the
 // event), reserved before the forget so that a restart cannot give it back. Over budget: nothing changes.
+// A key nothing holds spends no slot, so forged ids cannot use up the owner's budget.
 export async function forgetFromTabJob(
   store: ForgetStore & Pick<Store, "loadSettings" | "saveSettings">,
   now: () => number,
   msg: ForgetHandledMessage,
 ): Promise<void> {
+  if (!(await heldBy(store, contentKeyOf(msg)))) return;
   const settings = await store.loadSettings();
   const window = windowAt(settings.forgetWindow, now());
   if (isForgetFull(window)) return;

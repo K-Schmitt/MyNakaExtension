@@ -11,6 +11,7 @@ import { createJobs, type JobDeps, type Jobs } from "../src/sw/jobs";
 import { createRouter } from "../src/sw/router";
 import { answerWorld, NOW, PAIR } from "./answer-world";
 import { ambiguity } from "./question-fixtures";
+import { filmCard } from "./rating-fixtures";
 
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
 const PLAYER = "https://naka.cx/player?id=3&type=movie";
@@ -93,8 +94,31 @@ describe("forgets asked by a Naka tab are budgeted", () => {
 
   it("the orphan-card drop counts against the budget", async () => {
     const w = answerWorld({ state: many(1) });
+    w.area.data.set("ratings", [filmCard({ key: keyOf(77), contentId: 77 })]);
     await w.jobs.forgetHandledFromTab(forget(77));
+    expect(w.cards()).toEqual([]);
     expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("11 forged forgets for never-handled ids spend no slot; a real one still does", async () => {
+    const w = answerWorld({ state: many(2) });
+    for (let n = 101; n <= 111; n += 1) {
+      await w.jobs.forgetHandledFromTab(forget(n));
+    }
+    expect(w.settings().forgetWindow).toBeUndefined();
+    expect(w.stateSaves()).toBe(0);
+    await w.jobs.forgetHandledFromTab(forget(1));
+    expect(w.state().handled).toEqual([keyOf(2)]);
+    expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 1 });
+  });
+
+  it("a key held by nothing leaves a full window as it was", async () => {
+    const w = answerWorld({
+      state: many(1),
+      settings: { mode: "simulation", forgetWindow: { from: NOW, count: 9 } },
+    });
+    await w.jobs.forgetHandledFromTab(forget(500));
+    expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 9 });
   });
 
   it("15 « Oublier » from the status page: 15 forgets, none counted", async () => {
