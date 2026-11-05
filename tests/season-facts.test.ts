@@ -25,6 +25,15 @@ describe("seasonFactsOf", () => {
     expect(seasonFactsOf(shuffled, 1, undefined).lastSeason).toBe(7);
   });
 
+  it("takes the highest season of a list too long to spread", () => {
+    const seasons = Array.from({ length: 300_000 }, (_, i) => i + 1);
+    const long = { seasons, episodeCounts: { 1: 10 } };
+    expect(seasonFactsOf(long, 1, undefined)).toEqual({
+      episodesInSeason: 10,
+      lastSeason: 300_000,
+    });
+  });
+
   it("leaves the count out when the played season has none", () => {
     const facts = seasonFactsOf(GAP, 3, undefined);
     expect(facts.episodesInSeason).toBeUndefined();
