@@ -945,9 +945,66 @@ describe("finish job", () => {
       at: NOW,
       key: "movie:3",
       outcome: "done",
+      title: "Film 3",
     });
     expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
     expect(w.state().handled).toEqual(["movie:3"]);
+  });
+
+  it("the finish record names the Naka title of a film and of a series", async () => {
+    const w = world({ settings: { mode: "simulation" } });
+    await w.jobs.finishJob(finished());
+    expect(w.settings().lastFinish).toMatchObject({ title: "Film 3" });
+    await w.jobs.finishJob(finished({ contentId: 7, season: 1, episode: 2 }));
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "tv:7:S1E2",
+      title: "Serie 7",
+    });
+  });
+
+  it("a finish that needs a choice, or fails, still names its title", async () => {
+    const twin = { ...sc(2003), title: "Film 3", year: 2003 };
+    const ambiguous = world({
+      sc: catalogueSc({
+        search: async (q, universe) =>
+          universe === "movie" && q === "Film 3" ? [sc(1003), twin] : [],
+      }),
+    });
+    await ambiguous.jobs.finishJob(finished());
+    expect(ambiguous.settings().lastFinish).toMatchObject({
+      outcome: "needs-choice",
+      title: "Film 3",
+    });
+    const failing = world({
+      sc: catalogueSc({
+        search: async () => {
+          throw new ScUnavailableError("down");
+        },
+      }),
+    });
+    await failing.jobs.finishJob(finished());
+    expect(failing.settings().lastFinish).toMatchObject({
+      outcome: "failed",
+      error: "unavailable",
+      title: "Film 3",
+    });
+  });
+
+  it("a finish refused before any read has no title", async () => {
+    const w = world({
+      settings: {
+        mode: "live",
+        binding: BOUND,
+        finishWindow: { from: NOW, count: MAX_FINISHES_PER_WINDOW },
+      },
+    });
+    await w.jobs.finishJob(finished());
+    expect(w.settings().lastFinish).toEqual({
+      at: NOW,
+      key: "movie:3",
+      outcome: "failed",
+      error: "finish-limit",
+    });
   });
 
   it("the finish record keeps the rest of the settings", async () => {
@@ -962,7 +1019,7 @@ describe("finish job", () => {
     expect(w.settings()).toEqual({
       ...before,
       finishWindow: { from: NOW, count: 1 },
-      lastFinish: { at: NOW, key: "movie:3", outcome: "done" },
+      lastFinish: { at: NOW, key: "movie:3", outcome: "done", title: "Film 3" },
     });
   });
 
@@ -1093,6 +1150,7 @@ describe("finish job", () => {
       at: NOW,
       key: "movie:3",
       outcome: "done",
+      title: "Film 3",
     });
   });
 
@@ -1104,6 +1162,7 @@ describe("finish job", () => {
       at: NOW,
       key: "movie:3",
       outcome: "done",
+      title: "Film 3",
     });
   });
 
@@ -1170,6 +1229,7 @@ describe("finish job", () => {
         key: "movie:3",
         outcome: "failed",
         error,
+        title: "Film 3",
       });
     },
   );
@@ -1188,6 +1248,7 @@ describe("finish job", () => {
       key: "movie:3",
       outcome: "failed",
       error: "sc-session",
+      title: "Film 3",
     });
   });
 

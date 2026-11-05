@@ -46,6 +46,8 @@ export type FinishRecord = {
   outcome: FinishOutcome["kind"] | "failed";
   /** Present if and only if the outcome is "failed" (Ruling 13). */
   error?: JobError;
+  /** The Naka title of the film or the series, when the finish got as far as reading it. */
+  title?: string;
 };
 
 /** A finish without its date and key: what a rating-card answer tells the tab. */
@@ -126,12 +128,14 @@ export function parseOutcome(
 export function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
-  onlyKeys(record, ["at", "key", "outcome", "error"], path);
+  onlyKeys(record, ["at", "key", "outcome", "error", "title"], path);
   const done = parseOutcome(record, path);
+  const title = whenPresent(record.title, (v) => asString(v, `${path}.title`));
   return {
     at: asInt(record.at, 0, `${path}.at`),
     key: parseContentKey(record.key, `${path}.key`),
     ...done,
+    ...(title === undefined ? {} : { title }),
   };
 }
 

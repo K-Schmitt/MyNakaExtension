@@ -148,6 +148,29 @@ describe("parseSettings accepts", () => {
     });
   });
 
+  it("a finish with its title parses, and one without (4a) still does", () => {
+    const withTitle = {
+      at: 1,
+      key: "movie:1",
+      outcome: "done",
+      title: "Enemy",
+    };
+    expect(parseSettings({ mode: "live", lastFinish: withTitle })).toEqual({
+      mode: "live",
+      lastFinish: withTitle,
+    });
+    const earlier = { at: 1, key: "tv:7:S1E2", outcome: "needs-choice" };
+    expect(parseSettings({ mode: "live", lastFinish: earlier })).toEqual({
+      mode: "live",
+      lastFinish: earlier,
+    });
+  });
+
+  it.each([42, null, {}, ["x"]])("a finish title %j is refused", (title) => {
+    const lastFinish = { at: 1, key: "movie:1", outcome: "done", title };
+    expect(() => parseSettings({ mode: "live", lastFinish })).toThrow();
+  });
+
   it.each(["ignored", "needs-choice", "not-found", "done"])(
     "a finish outcome %s",
     (outcome) => {
