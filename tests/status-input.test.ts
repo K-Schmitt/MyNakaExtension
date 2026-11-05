@@ -16,6 +16,18 @@ describe("readSnapshot: the thresholds and the pause setting", () => {
     });
   });
 
+  it("keeps pendingSettings when it is true, and refuses anything else", () => {
+    expect(readSnapshot({ mode: "live", pendingSettings: true })).toEqual({
+      mode: "live",
+      pendingSettings: true,
+    });
+    for (const bad of [false, 1, "true", null]) {
+      expect(
+        readSnapshot({ mode: "live", pendingSettings: bad }),
+      ).toBeUndefined();
+    }
+  });
+
   it("an older answer without them still reads", () => {
     expect(readSnapshot({ mode: "live" })).toEqual({ mode: "live" });
   });

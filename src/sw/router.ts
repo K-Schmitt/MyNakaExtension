@@ -108,7 +108,11 @@ export function createRouter(deps: RouterDeps): Router {
         enqueue(activity.queueMode(msg.mode, () => jobs.setMode(msg.mode)));
         return false;
       case "set-settings":
-        enqueue(() => jobs.setSettings(msg.thresholds, msg.pauseFromPercent));
+        enqueue(
+          activity.queueSettings(() =>
+            jobs.setSettings(msg.thresholds, msg.pauseFromPercent),
+          ),
+        );
         return false;
       case "status":
         answerStatus(respond);

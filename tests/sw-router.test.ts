@@ -886,6 +886,56 @@ describe("router: the status answer waits for no job", () => {
     expect(await pending()).toBeUndefined();
   });
 
+  const SETTINGS_MESSAGE = {
+    type: "set-settings",
+    thresholds: { film: 0.95, episode: 0.8 },
+    pauseFromPercent: 50,
+  } as const;
+
+  it("a set-settings queued behind a sync shows pendingSettings until it is applied", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({ pendingSettings: true });
+    g.sync.open();
+    await settle();
+    expect(await g.status()).not.toHaveProperty("pendingSettings");
+  });
+
+  it("a set-settings that is running shows pendingSettings", async () => {
+    const gate = latch();
+    const r = router({
+      setSettings: async () => {
+        await gate.opened;
+      },
+    });
+    const pending = async () => {
+      r.send({ type: "status" }, STATUS_PAGE);
+      await settle();
+      return (r.answers.at(-1) as StatusSnapshot).pendingSettings;
+    };
+    r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    expect(await pending()).toBe(true);
+    gate.open();
+    await settle();
+    expect(await pending()).toBeUndefined();
+  });
+
+  it("a rejected set-settings releases the mark", async () => {
+    const r = router({
+      setSettings: async () => {
+        throw new Error("storage");
+      },
+    });
+    r.send(SETTINGS_MESSAGE, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).not.toHaveProperty("pendingSettings");
+  });
+
   it("an idle worker answers the snapshot alone", async () => {
     const g = gated();
     expect(await g.status()).toEqual({ mode: "simulation" });

@@ -42,6 +42,8 @@ export type StatusSnapshot = {
   running?: Running;
   /** The mode a queued set-mode will apply (in memory, from the router). */
   pendingMode?: Mode;
+  /** A set-settings waits or runs (in memory, from the router): the values above may be the old ones. */
+  pendingSettings?: true;
 };
 
 /** The store as the status reads it: no save. */
