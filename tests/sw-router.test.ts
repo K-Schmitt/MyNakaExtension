@@ -72,6 +72,10 @@ const HIDE = { type: "hide-question", key: "ambiguity:naka:5" };
 const SEARCH = { type: "search-titles", side: "naka", query: "cowboy bebop" };
 const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
 const REQUEUE = { type: "requeue-question", side: "naka", id: 5 };
+const PAGE_MESSAGES: [string, unknown][] = [
+  ["a forget-binding", { type: "forget-binding" }],
+  ["a reset", { type: "reset" }],
+];
 // Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
 const QUESTION_MESSAGES: [string, unknown][] = [
   ["an open-questions", { type: "open-questions" }],
@@ -175,6 +179,12 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     requeueQuestion: async (msg) => {
       calls.push(`requeue:${JSON.stringify(msg)}`);
+    },
+    forget: async () => {
+      calls.push("forget");
+    },
+    reset: async () => {
+      calls.push("reset");
     },
     searchTitles: async (msg) => {
       calls.push(`search:${JSON.stringify(msg)}`);
@@ -462,7 +472,7 @@ describe("router: everything else is ignored, unanswered", () => {
     ["a message from an iframe", FINISHED, IFRAME],
     ["a message from another extension", FINISHED, OTHER_EXTENSION],
     ["a sender with no id", { type: "status" }, { url: STATUS_URL }],
-    ["an unknown type", { type: "reset" }, STATUS_PAGE],
+    ["an unknown type", { type: "wipe-everything" }, STATUS_PAGE],
     ["a malformed finished", { ...FINISHED, progress: 2 }, NAKA_TAB],
     ["not an object", "naka-ready", NAKA_TAB],
     [
@@ -541,17 +551,18 @@ describe("router: everything else is ignored, unanswered", () => {
       NAKA_TAB,
     ],
     ["a hide-question with a bad key", { ...HIDE, key: "hide:x" }, NAKA_TAB],
-    ...[...RATING_MESSAGES, ...QUESTION_MESSAGES].flatMap(([name, msg]) =>
-      [
-        ["https://naka.cx.evil.com/", EVIL],
-        ["an iframe", IFRAME],
-        ["another extension", OTHER_EXTENSION],
-        ["a sender with no id", { url: PLAYER, frameId: 0 }],
-      ].map(([from, sender]): [string, unknown, object] => [
-        `${name} from ${from as string}`,
-        msg,
-        sender as object,
-      ]),
+    ...[...RATING_MESSAGES, ...QUESTION_MESSAGES, ...PAGE_MESSAGES].flatMap(
+      ([name, msg]) =>
+        [
+          ["https://naka.cx.evil.com/", EVIL],
+          ["an iframe", IFRAME],
+          ["another extension", OTHER_EXTENSION],
+          ["a sender with no id", { url: PLAYER, frameId: 0 }],
+        ].map(([from, sender]): [string, unknown, object] => [
+          `${name} from ${from as string}`,
+          msg,
+          sender as object,
+        ]),
     ),
   ];
 
@@ -1299,6 +1310,53 @@ describe("router: the status answer waits for no job", () => {
     r.send({ type: "status" }, STATUS_PAGE);
     await settle();
     expect(r.answers.at(-1)).not.toHaveProperty("pendingSettings");
+  });
+
+  it("forget-binding and reset from the status page run their job, answered at once", async () => {
+    const r = router();
+    expect(r.send({ type: "forget-binding", x: 1 }, STATUS_PAGE)).toBe(false);
+    expect(r.send({ type: "reset" }, STATUS_PAGE)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual(["forget", "reset"]);
+  });
+
+  it("forget-binding and reset from a Naka tab are ignored", async () => {
+    const r = router();
+    expect(r.send({ type: "forget-binding" }, NAKA_TAB)).toBe(false);
+    expect(r.send({ type: "reset" }, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("a reset queued behind a sync shows pendingActions until it is applied, then nothing", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send({ type: "reset" }, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({ pendingActions: ["reset"] });
+    g.r.send({ type: "forget-binding" }, STATUS_PAGE);
+    await settle();
+    expect(await g.status()).toMatchObject({
+      pendingActions: ["forget", "reset"],
+    });
+    g.sync.open();
+    await settle();
+    expect(await g.status()).not.toHaveProperty("pendingActions");
+  });
+
+  it("a rejected reset releases the mark", async () => {
+    const r = router({
+      reset: async () => {
+        throw new Error("storage");
+      },
+    });
+    r.send({ type: "reset" }, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).not.toHaveProperty("pendingActions");
   });
 
   it("an idle worker answers the snapshot alone", async () => {

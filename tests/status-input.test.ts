@@ -28,6 +28,25 @@ describe("readSnapshot: the thresholds and the pause setting", () => {
     }
   });
 
+  it("keeps pendingActions when it lists known actions once, and refuses anything else", () => {
+    expect(
+      readSnapshot({ mode: "live", pendingActions: ["forget", "reset"] }),
+    ).toEqual({ mode: "live", pendingActions: ["forget", "reset"] });
+    for (const bad of [
+      [],
+      ["wipe"],
+      ["reset", "reset"],
+      "reset",
+      true,
+      null,
+      [1],
+    ]) {
+      expect(
+        readSnapshot({ mode: "live", pendingActions: bad }),
+      ).toBeUndefined();
+    }
+  });
+
   it("an older answer without them still reads", () => {
     expect(readSnapshot({ mode: "live" })).toEqual({ mode: "live" });
   });

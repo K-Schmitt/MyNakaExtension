@@ -716,6 +716,8 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
     linkTitle: (msg) => jobs.linkTitle(msg),
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
+    forget: () => jobs.forget(),
+    reset: () => jobs.reset(),
     searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),

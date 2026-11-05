@@ -40,6 +40,7 @@ import {
 } from "./rating-answers";
 import { dismissJob, rateJob } from "./rating-jobs";
 import { answerRemovalJob } from "./removal-job";
+import { forgetJob, resetJob } from "./reset-jobs";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
@@ -63,6 +64,9 @@ export type Jobs = {
   /** B6: the link by hand, and the question asked again. */
   linkTitle(msg: LinkTitleMessage): Promise<void>;
   requeueQuestion(msg: RequeueQuestionMessage): Promise<void>;
+  /** The page's local actions: storage only, never a site. */
+  forget(): Promise<void>;
+  reset(): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
@@ -107,6 +111,8 @@ export function createJobs(deps: JobDeps): Jobs {
     hideQuestion: (msg) => quietly(() => hideQuestionJob(deps.store, msg)),
     linkTitle: (msg) => quietly(() => linkTitleJob(deps, msg)),
     requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
+    forget: () => quietly(() => forgetJob(deps.store)),
+    reset: () => quietly(() => resetJob(deps.store)),
     searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),

@@ -14,7 +14,7 @@ import {
   thresholdsOf,
 } from "../ext/settings";
 import type { Store } from "../ext/store";
-import type { Running } from "./activity";
+import type { LocalAction, Running } from "./activity";
 import type { Binding } from "./binding";
 import { pageItems } from "./page-items";
 import { toJobError } from "./to-job-error";
@@ -45,6 +45,8 @@ export type StatusSnapshot = {
   pendingMode?: Mode;
   /** A set-settings waits or runs (in memory, from the router): the values above may be the old ones. */
   pendingSettings?: true;
+  /** The local actions (forget, reset) waiting or running (in memory, from the router). */
+  pendingActions?: LocalAction[];
 };
 
 /** The store as the status reads it: no save. */

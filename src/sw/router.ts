@@ -143,6 +143,16 @@ export function createRouter(deps: RouterDeps): Router {
         return queued(() => rate(msg), respond);
       case "dismiss-rating":
         return queued(() => enqueue(() => jobs.dismissRating(msg)), respond);
+      case "forget-binding":
+        return queued(
+          () => enqueue(activity.queueLocal("forget", () => jobs.forget())),
+          respond,
+        );
+      case "reset":
+        return queued(
+          () => enqueue(activity.queueLocal("reset", () => jobs.reset())),
+          respond,
+        );
       case "open-questions":
       case "removal-offer":
       case "page-lists":

@@ -12,6 +12,11 @@ import {
   fail,
   valuesOf,
 } from "./field-checks";
+import {
+  PAGE_SENDERS,
+  PAGE_TYPE_FLAGS,
+  type PageMessage,
+} from "./page-messages";
 import { playbackContext } from "./playback-context";
 import {
   isQuestionType,
@@ -50,7 +55,8 @@ export type ToWorker =
       pauseFromPercent: number;
     }
   | RatingMessage
-  | QuestionMessage;
+  | QuestionMessage
+  | PageMessage;
 
 export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
@@ -109,6 +115,7 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   rate: true,
   "dismiss-rating": true,
   ...QUESTION_TYPE_FLAGS,
+  ...PAGE_TYPE_FLAGS,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
@@ -290,6 +297,7 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   rate: ["naka-tab"],
   "dismiss-rating": ["naka-tab"],
   ...QUESTION_SENDERS,
+  ...PAGE_SENDERS,
 };
 
 // A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.
