@@ -36,13 +36,13 @@ export async function askOrNothing(
 
 /**
  * Asks on the schedule. `judge` returns true when the answer settles the wait (the poll then stops);
- * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all.
+ * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all. An ask
+ * that rejects is an unanswered one. Shared by the rating blocks (cards) and the question blocks.
  */
-export function pollUntil(
-  asker: CardAsker,
+export function pollSchedule<A>(
+  ask: () => Promise<A | undefined>,
   timer: EndTimer,
-  ids: ContentIds,
-  judge: (answer: CardAnswer | undefined) => boolean,
+  judge: (answer: A | undefined) => boolean,
   onEnd: (answered: boolean) => void,
 ): () => void {
   let done = false;
@@ -56,7 +56,7 @@ export function pollUntil(
 
   async function poll(): Promise<void> {
     if (done) return;
-    const answer = await askOrNothing(asker, ids);
+    const answer = await ask().catch(() => undefined);
     if (done) return;
     if (answer !== undefined) answered = true;
     if (judge(answer)) {
@@ -78,6 +78,16 @@ export function pollUntil(
     );
   }
   return stop;
+}
+
+export function pollUntil(
+  asker: CardAsker,
+  timer: EndTimer,
+  ids: ContentIds,
+  judge: (answer: CardAnswer | undefined) => boolean,
+  onEnd: (answered: boolean) => void,
+): () => void {
+  return pollSchedule(() => askOrNothing(asker, ids), timer, judge, onEnd);
 }
 
 /** Returns the stop of the poll: a stopped poll calls neither `onFound` nor `onMissed`. */
