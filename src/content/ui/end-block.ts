@@ -231,8 +231,13 @@ export function createEndBlock(ports: EndPorts) {
       const key = contentKeyOf(ids);
       if (seen.has(key)) return;
       seen.add(key);
-      startEndPoll(ports.port, ports.timer, ids, (card, start) =>
-        offer(ids, card, start),
+      // A window that found no card to rate is not final: a later finished for the key polls again.
+      startEndPoll(
+        ports.port,
+        ports.timer,
+        ids,
+        (card, start) => offer(ids, card, start),
+        () => seen.delete(key),
       );
     },
     isShown: (): boolean => current !== undefined,

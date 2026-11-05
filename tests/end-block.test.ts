@@ -90,6 +90,30 @@ describe("the end block poll", () => {
     expect(asks(w.calls)).toHaveLength(2);
   });
 
+  it("after five empty asks a later finished for the key polls again", async () => {
+    const w = world();
+    w.script(EP_IDS, NOTHING);
+    w.block.finished(EP_IDS);
+    await w.clock.advance(40000);
+    expect(asks(w.calls)).toHaveLength(5);
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(asks(w.calls)).toHaveLength(6);
+    expect(w.shown).toHaveLength(1);
+  });
+
+  it("a key whose card was shown stays seen: no second poll", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    w.block.finished(EP_IDS);
+    await w.clock.advance(100000);
+    expect(asks(w.calls)).toHaveLength(1);
+  });
+
   it("a second finished for the same key adds no poll", async () => {
     const w = world();
     w.script(EP_IDS, NOTHING);

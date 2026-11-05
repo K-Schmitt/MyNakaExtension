@@ -69,6 +69,7 @@ export function startEndPoll(
   timer: EndTimer,
   ids: ContentIds,
   onFound: Found,
+  onMissed: () => void,
 ): void {
   pollUntil(
     asker,
@@ -82,6 +83,6 @@ export function startEndPoll(
       onFound(card, answer?.start);
       return true;
     },
-    () => {},
+    onMissed,
   );
 }
