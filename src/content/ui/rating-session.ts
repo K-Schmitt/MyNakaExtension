@@ -70,6 +70,7 @@ export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
     before: string | undefined,
     answer: CardAnswer | undefined,
   ): boolean {
+    if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
     if (answer === undefined) return false;
     const { card } = answer;
     const stillPending = card?.pending.includes(label) === true;
@@ -160,6 +161,9 @@ export function createRatingSession(ports: SessionPorts, onClosed: () => void) {
         ...(start === undefined ? {} : { start }),
       };
       render(current);
+    },
+    closeShown(): void {
+      if (current !== undefined) close(current);
     },
     isOpen: (): boolean => current !== undefined,
   };

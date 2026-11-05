@@ -124,6 +124,7 @@ const SELF = { name: "the tab's window" };
 function tab(start = PLAYER(3)) {
   const sent: ToWorker[] = [];
   const ended: ContentIds[] = [];
+  const urls: (ContentIds | undefined)[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -152,6 +153,9 @@ function tab(start = PLAYER(3)) {
     finished: (ids) => {
       ended.push(ids);
     },
+    urlChanged: (ids) => {
+      urls.push(ids);
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -164,8 +168,34 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, ended, timers, page, tick, post };
+  return { sent, ended, urls, timers, page, tick, post };
 }
+
+describe("the Naka tab URL changes", () => {
+  it("tells the ids at the first poll, and again only when they change", () => {
+    const t = tab(PLAYER(3));
+    expect(t.urls).toEqual([]);
+    t.tick(1000);
+    t.tick(1000);
+    expect(t.urls).toEqual([{ contentId: 3 }]);
+    t.page.href = PLAYER(4);
+    t.tick(1000);
+    t.tick(1000);
+    expect(t.urls).toEqual([{ contentId: 3 }, { contentId: 4 }]);
+  });
+
+  it("tells an episode's ids, and tells when the player page is left", () => {
+    const t = tab("https://naka.cx/player?id=5&type=tv&season=2&episode=3");
+    t.tick(1000);
+    t.page.href = "https://naka.cx/";
+    t.tick(1000);
+    t.tick(1000);
+    expect(t.urls).toEqual([
+      { contentId: 5, season: 2, episode: 3 },
+      undefined,
+    ]);
+  });
+});
 
 describe("the Naka tab", () => {
   it("says naka-ready once, when the page loads", () => {

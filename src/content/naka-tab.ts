@@ -2,9 +2,13 @@
 // URL, samples the <video>, and relays what the MAIN world saw. Everything it sends is rebuilt by the
 // tracker or the parsers: ids and marks only, never page text.
 
-import type { ContentIds } from "../core/finish-event";
+import { type ContentIds, contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
-import { acceptPageEvent, parsePlayerUrl } from "./page-events";
+import {
+  acceptPageEvent,
+  type PlayerContext,
+  parsePlayerUrl,
+} from "./page-events";
 import {
   createPlaybackTracker,
   type PlaybackTracker,
@@ -31,6 +35,8 @@ export type TabEnv = {
   send(msg: ToWorker): void;
   /** The viewing of these ids just ended: the end block starts waiting for its card. */
   finished(ids: ContentIds): void;
+  /** The player URL now holds these ids (none off a player page): the pause block counts from here. */
+  urlChanged(ids: ContentIds | undefined): void;
 };
 
 type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
@@ -58,10 +64,31 @@ function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (finished) sendFinished(env, finished);
 }
 
+function idsOfContext(ctx: PlayerContext | undefined): ContentIds | undefined {
+  if (ctx === undefined) return undefined;
+  const { contentId, season, episode } = ctx;
+  return {
+    contentId,
+    ...(season === undefined ? {} : { season }),
+    ...(episode === undefined ? {} : { episode }),
+  };
+}
+
+const keyOfIds = (ids: ContentIds | undefined): string =>
+  ids === undefined ? "" : contentKeyOf(ids);
+
 export function startNakaTab(env: TabEnv): void {
   const tracker = createPlaybackTracker();
+  let lastKey = "";
   // The tracker ignores a context it already follows, so the URL is handed over at every poll.
-  const follow = (): void => tracker.context(parsePlayerUrl(env.href()));
+  const follow = (): void => {
+    const ctx = parsePlayerUrl(env.href());
+    tracker.context(ctx);
+    const ids = idsOfContext(ctx);
+    if (keyOfIds(ids) === lastKey) return;
+    lastKey = keyOfIds(ids);
+    env.urlChanged(ids);
+  };
   // A URL change reaches the tracker before the sample, so that a sample never counts for the content
   // the page just left.
   const sample = (): void => {
