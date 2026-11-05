@@ -88,6 +88,17 @@ describe("createRateLimiter scheduling", () => {
     expect(clock.sleeps).toEqual([1]);
   });
 
+  it("waits one window at most when the clock was set back", async () => {
+    const clock = fakeClock(10_000_000);
+    const limiter = createRateLimiter(clock, 1, 2000);
+    await limiter.run(async () => 1);
+    clock.time = 0; // the system clock stepped back by almost three hours
+    const started: number[] = [];
+    await limiter.run(async () => started.push(clock.now()));
+    expect(clock.sleeps).toEqual([2000]);
+    expect(started).toEqual([2000]);
+  });
+
   it("measures the window from the start of the task, not its end", async () => {
     const clock = fakeClock(0);
     const limiter = createRateLimiter(clock, 1, 1000);
