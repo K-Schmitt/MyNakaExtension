@@ -28,7 +28,11 @@ function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   const sent: unknown[][] = [];
   const asked: number[] = [];
   const script = { answer: first as RemovalOfferAnswer | undefined };
-  const state = { free: true, title: "Titre de Naka" as string | undefined };
+  const state = {
+    free: true,
+    hang: false,
+    title: "Titre de Naka" as string | undefined,
+  };
   const port: Pick<WorkerPort, "askRemovalOffer" | "answerRemoval"> = {
     askRemovalOffer: async (id) => {
       asked.push(id);
@@ -45,7 +49,10 @@ function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
     now: clock.now,
     show: ui.showQuestion,
     hide: ui.hide,
-    titleOf: async () => state.title,
+    titleOf: () =>
+      state.hang
+        ? new Promise<string | undefined>(() => {})
+        : Promise.resolve(state.title),
     ownerFree: () => state.free,
   });
   const all = (): FakeElement[] => {
@@ -99,6 +106,20 @@ describe("the removal block", () => {
     t.state.title = undefined;
     t.block.removed(21391);
     await flush();
+    expect(t.texts()).toContain(
+      `«${NB}(titre inconnu)${NB}» a quitté Ma liste Naka.`,
+    );
+  });
+
+  it("waits 2 s at most for the title, then shows (titre inconnu)", async () => {
+    const t = setup({ offer: { ...OFFER, title: "" } });
+    t.state.hang = true;
+    t.block.removed(21391);
+    await flush();
+    await t.clock.advance(1999);
+    expect(t.block.isShown()).toBe(false);
+    await t.clock.advance(1);
+    expect(t.block.isShown()).toBe(true);
     expect(t.texts()).toContain(
       `«${NB}(titre inconnu)${NB}» a quitté Ma liste Naka.`,
     );

@@ -5,6 +5,7 @@
 // verifies again against « Ma liste » before its one write. The block only shows when the overlay is free.
 
 import type { RemovalOffer } from "../../sw/question-offers";
+import { titleOrNothing } from "./offer-title";
 import { createQuestionSession, type QuestionPorts } from "./question-session";
 import type { QuestionChoice } from "./question-view";
 import type { WorkerPort } from "./worker-port";
@@ -20,17 +21,6 @@ export type RemovalPorts = Pick<
 };
 
 type Open = { contentId: number; pair: RemovalOffer["pair"] };
-
-async function titleOrNothing(
-  ports: RemovalPorts,
-  id: number,
-): Promise<string> {
-  try {
-    return (await ports.titleOf(id)) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 export function createRemovalBlock(ports: RemovalPorts) {
   let open: Open | undefined;
@@ -83,7 +73,9 @@ export function createRemovalBlock(ports: RemovalPorts) {
     if (answer.answering === true) return;
     const { offer } = answer;
     const title =
-      offer.title === "" ? await titleOrNothing(ports, contentId) : offer.title;
+      offer.title === ""
+        ? await titleOrNothing(ports.titleOf, ports.timer, contentId)
+        : offer.title;
     if (mine !== epoch || session.isOpen() || !ports.ownerFree()) return;
     open = { contentId, pair: offer.pair };
     session.open(

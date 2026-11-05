@@ -16,7 +16,7 @@ function nakaIdOf(offer: QuestionOffer): number | undefined {
   return offer.side === "naka" ? offer.id : undefined;
 }
 
-function titleOrNothing(
+export function titleOrNothing(
   titleOf: TitleOf,
   timer: EndTimer,
   id: number,
