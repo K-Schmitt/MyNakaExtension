@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPauseBlock } from "../src/content/ui/pause-block";
+import { SENDING_LINE as QUESTION_SENDING_LINE } from "../src/content/ui/question-copy";
 import {
   errorLine,
   NEEDS_CHOICE_LINE,
@@ -588,6 +589,46 @@ describe("the pause block question", () => {
     expect(w.lastQuestion().view.heading).toContain(QUESTION.title);
     expect(w.last().view.error).toBeUndefined();
     expect(w.hidden()).toBe(1);
+  });
+
+  it("a stale last answer on the handed-over question is not the click's outcome", async () => {
+    const w = world();
+    const stale = {
+      seq: 3,
+      at: 1,
+      target: QUESTION.key,
+      outcome: "failed",
+      error: "sc-session",
+    } as const;
+    const staleQ = questionAnswer({ lastAnswer: stale });
+    w.script(
+      EP_IDS,
+      none(),
+      none({ sending: ["épisode"] }),
+      staleQ,
+      staleQ,
+      staleQ,
+      none({ lastAnswer: { ...stale, seq: 4, outcome: "done" } }),
+      asked(null),
+    );
+    await w.pauseAt(0.5);
+    await w.ready();
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(5000);
+    expect(w.questions).toHaveLength(1);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    for (const ms of [2000, 3000]) {
+      await w.clock.advance(ms);
+      expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+      expect(w.lastQuestion().view.error).toBeUndefined();
+    }
+    const rated = w.shown.length;
+    await w.clock.advance(5000); // seq 4, done: asks again and offers the rating
+    expect(w.shown.length).toBeGreaterThan(rated);
+    expect(w.last().view.heading).toContain("Une série");
   });
 
   it("a view-only rating with no question still says why it did not go", async () => {

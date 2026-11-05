@@ -957,6 +957,41 @@ describe("the end block asks a question before the rating", () => {
     expect(answers(w.calls)).toEqual(["answer naka 9 2005"]);
   });
 
+  it("a stale last answer on the opening answer is not the click's outcome", async () => {
+    const w = world();
+    const stale = {
+      seq: 3,
+      at: 1,
+      target: FILM_QUESTION.key,
+      outcome: "failed",
+      error: "sc-session",
+    } as const;
+    w.script(
+      FILM_IDS,
+      filmQuestion({ lastAnswer: stale }),
+      filmQuestion({ lastAnswer: stale }),
+      filmQuestion({ lastAnswer: stale }),
+      { card: null, pauseFromPercent: 0, lastAnswer: done(4) },
+      answer(filmCard({ pending: ["film"] })),
+    );
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    await w.ready();
+    w.lastQuestion().handlers.onChoose({ kind: "candidate", id: 2005 });
+    await flush();
+    for (const ms of [2000, 3000]) {
+      await w.clock.advance(ms);
+      expect(w.lastQuestion().view.notice).toBe(QUESTION_SENDING_LINE);
+      expect(w.lastQuestion().view.error).toBeUndefined();
+      expect(w.lastQuestion().view.choices).toEqual([]);
+    }
+    await w.clock.advance(5000); // seq 4, done
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("Un film");
+  });
+
   it("« Aucun de ceux-là » sends a null choice, then the block hides and no card is awaited", async () => {
     const w = world();
     w.script(
