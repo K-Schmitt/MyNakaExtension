@@ -142,6 +142,14 @@ describe("the rating block", () => {
     expect(handlers.onConfirm.mock.calls).toEqual([[true], [false]]);
   });
 
+  it("the rating block keeps its choices on a wrapping row", () => {
+    const { block, button } = setup();
+    block.show(ratingView(episodeCard(), "saison", 8));
+    const row = button("1").parent as { style: { cssText: string } } | null;
+    expect(row?.style.cssText).toContain("display: flex;");
+    expect(row?.style.cssText).toContain("flex-wrap: wrap;");
+  });
+
   it("a view with a notice and no buttons draws the notice and no row", () => {
     const { block, buttons, root } = setup();
     block.show({

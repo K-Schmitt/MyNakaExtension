@@ -22,9 +22,15 @@ export type RatingHandlers = {
 
 export type Maker = Pick<DocLike, "createElement">;
 
-const BLOCK_CSS =
-  "font: 14px/1.4 system-ui, sans-serif; color: #fff; background: rgba(20, 20, 24, 0.92); padding: 12px; margin: 12px; border-radius: 8px; display: block;";
+// The text of a block, and of whatever the home panel draws around its blocks: buttons inherit it.
+export const BLOCK_TEXT_CSS =
+  "font: 14px/1.4 system-ui, sans-serif; color: #fff;";
+const BLOCK_CSS = `${BLOCK_TEXT_CSS} background: rgba(20, 20, 24, 0.92); padding: 12px; margin: 12px; border-radius: 8px; display: block;`;
 const ROW_CSS = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;";
+
+/** How the choices sit: on a wrapping row by default; a narrow panel can ask for a grid. */
+export type BlockLayout = { choicesRow: string };
+const ROW_LAYOUT: BlockLayout = { choicesRow: ROW_CSS };
 export const BUTTON_CSS =
   "font: inherit; color: #fff; background: #3a3a44; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; cursor: pointer;";
 const MARKED_CSS = `${BUTTON_CSS} background: #2f6fdb; border-color: #9cc0ff; font-weight: 700;`;
@@ -52,9 +58,13 @@ export function button(
   return el;
 }
 
-function row(doc: Maker, buttons: ElementLike[]): ElementLike {
+function row(
+  doc: Maker,
+  buttons: ElementLike[],
+  css: string = ROW_CSS,
+): ElementLike {
   const el = doc.createElement("div");
-  el.style.cssText = ROW_CSS;
+  el.style.cssText = css;
   for (const b of buttons) el.appendChild(b);
   return el;
 }
@@ -98,6 +108,7 @@ function buttonRows(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
+  layout: BlockLayout,
 ): ElementLike[] {
   if (view.confirm === true) return [confirmRow(doc, handlers)];
   const others = view.others.map((label) =>
@@ -109,21 +120,24 @@ function buttonRows(
     ),
   );
   const choices = view.choices.map((c) => choiceButton(doc, c, handlers));
-  return [choices, others, actions]
-    .filter((buttons) => buttons.length > 0)
-    .map((buttons) => row(doc, buttons));
+  return [
+    ...(choices.length > 0 ? [row(doc, choices, layout.choicesRow)] : []),
+    ...[others, actions]
+      .filter((buttons) => buttons.length > 0)
+      .map((buttons) => row(doc, buttons)),
+  ];
 }
 
 export function buildBlock(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
+  layout: BlockLayout = ROW_LAYOUT,
 ): ElementLike {
   const block = doc.createElement("div");
   block.style.cssText = BLOCK_CSS;
-  for (const el of [...lines(doc, view), ...buttonRows(doc, view, handlers)]) {
-    block.appendChild(el);
-  }
+  const rows = buttonRows(doc, view, handlers, layout);
+  for (const el of [...lines(doc, view), ...rows]) block.appendChild(el);
   return block;
 }
 

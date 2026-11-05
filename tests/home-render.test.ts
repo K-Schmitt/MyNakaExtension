@@ -95,6 +95,44 @@ describe("the home panel's drawing", () => {
     expect(buttons(doc, "8")).toHaveLength(0);
   });
 
+  it("the fold button looks like the other buttons: same declarations, and the block's font to inherit", () => {
+    const doc = new FakeDoc();
+    const { handlers } = handlersOf();
+    createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
+    const [fold] = buttons(doc, "Réduire");
+    const [ignore] = buttons(doc, "Ignorer");
+    expect(fold?.style.cssText).toBe(ignore?.style.cssText);
+    expect(fold?.style.cssText).toContain("font: inherit;");
+    // `font: inherit` takes the nearest declared font: the panel's, for the fold button; the block's, for
+    // the entry's buttons. Both must declare the same one.
+    const fontOf = (el: FakeElement | undefined): string | undefined => {
+      for (let node = el?.parent; node instanceof Object; node = node.parent) {
+        const css = (node as FakeElement).style?.cssText ?? "";
+        const font = css.match(/font: [^;]+;/)?.[0];
+        if (font !== undefined) return font;
+      }
+      return undefined;
+    };
+    expect(fontOf(fold)).toBe("font: 14px/1.4 system-ui, sans-serif;");
+    expect(fontOf(ignore)).toBe(fontOf(fold));
+  });
+
+  it("the ten choices sit in a 5-column grid: two equal rows, never a lone 10", () => {
+    const doc = new FakeDoc();
+    const { handlers } = handlersOf();
+    createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
+    const choices = Array.from(
+      { length: 10 },
+      (_, i) => buttons(doc, String(i + 1))[0],
+    );
+    const row = choices[0]?.parent as FakeElement | null;
+    expect(choices.every((b) => b?.parent === row)).toBe(true);
+    const css = row?.style.cssText ?? "";
+    expect(css).toContain("display: grid;");
+    expect(css).toContain("grid-template-columns: repeat(5, 1fr);");
+    expect(css).not.toContain("flex");
+  });
+
   it("hide empties the panel", () => {
     const doc = new FakeDoc();
     const { handlers } = handlersOf();
