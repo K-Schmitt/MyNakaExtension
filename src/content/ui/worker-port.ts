@@ -88,6 +88,16 @@ export function createWorkerPort(send: SendRating) {
     }
   }
 
+  // True when the send resolved, false when it rejected or threw: the answer itself is not read.
+  async function sent(msg: RatingMessage): Promise<boolean> {
+    try {
+      await send(msg);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function askChecked<T>(
     msg: RatingMessage,
     parse: (raw: unknown) => T,
@@ -104,15 +114,9 @@ export function createWorkerPort(send: SendRating) {
     askCard: (ids: ContentIds) =>
       askChecked({ type: "rating-card", ...idsOf(ids) }, parseCardAnswer),
     askCards: () => askChecked({ type: "rating-cards" }, parseCardsAnswer),
-    async rate(
-      ids: ContentIds,
-      label: RatingLabel,
-      rating: number,
-    ): Promise<void> {
-      await ask({ type: "rate", ...idsOf(ids), label, rating });
-    },
-    async dismiss(ids: ContentIds, label: RatingLabel): Promise<void> {
-      await ask({ type: "dismiss-rating", ...idsOf(ids), label });
-    },
+    rate: (ids: ContentIds, label: RatingLabel, rating: number) =>
+      sent({ type: "rate", ...idsOf(ids), label, rating }),
+    dismiss: (ids: ContentIds, label: RatingLabel) =>
+      sent({ type: "dismiss-rating", ...idsOf(ids), label }),
   };
 }

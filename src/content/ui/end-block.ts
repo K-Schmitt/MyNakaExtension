@@ -5,15 +5,17 @@
 import { type ContentIds, contentKeyOf } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
-import { type EndTimer, startEndPoll } from "./end-poll";
-import type { RatingAction } from "./rating-copy";
+import { type EndTimer, pollUntil, startEndPoll } from "./end-poll";
+import {
+  type RatingAction,
+  SENDING_LINE,
+  UNREACHABLE_LINE,
+} from "./rating-copy";
 import type { RatingHandlers } from "./rating-render";
 import { type RatingView, ratingView } from "./rating-view";
 import type { WorkerPort } from "./worker-port";
 
 export type { EndTimer } from "./end-poll";
-
-export const SETTLE_MS = 2000;
 
 export type EndPorts = {
   port: Pick<WorkerPort, "askCard" | "rate" | "dismiss">;
@@ -30,18 +32,36 @@ type Session = {
   start?: number;
   locked: boolean;
   confirming?: number;
+  error?: string; // a line of the block's own: the worker did not answer
 };
 
 const needsConfirm = ({ card, label }: Session): boolean =>
   label === "série" && !card.seriesFinished;
 
 function viewOf(s: Session): RatingView {
-  return ratingView(
+  const view = ratingView(
     s.card,
     s.label,
     s.label === s.card.pending[0] ? s.start : undefined,
   );
+  return s.error === undefined ? view : { ...view, error: s.error };
 }
+
+// While a rating travels: no button, a cue, until the worker's card says where it went.
+function sendingView(s: Session): RatingView {
+  return {
+    ...viewOf(s),
+    choices: [],
+    others: [],
+    actions: [],
+    notice: SENDING_LINE,
+  };
+}
+
+const failureOf = (card: RatingCard, label: RatingLabel): string | undefined =>
+  card.failed?.label === label
+    ? `${card.failed.error}@${card.failed.at}`
+    : undefined;
 
 function confirmView(s: Session): RatingView {
   return { ...viewOf(s), choices: [], others: [], actions: [], confirm: true };
@@ -59,16 +79,13 @@ export function createEndBlock(ports: EndPorts) {
   const queue: ContentIds[] = [];
   let current: Session | undefined;
 
-  const wait = (ms: number): Promise<void> =>
-    new Promise((resolve) => {
-      ports.timer.set(resolve, ms);
-    });
+  function viewFor(s: Session): RatingView {
+    if (s.locked) return sendingView(s);
+    return s.confirming === undefined ? viewOf(s) : confirmView(s);
+  }
 
   function render(s: Session): void {
-    ports.show(
-      s.confirming === undefined ? viewOf(s) : confirmView(s),
-      handlersOf(s),
-    );
+    ports.show(viewFor(s), handlersOf(s));
   }
 
   function display(ids: ContentIds, card: RatingCard, start?: number): void {
@@ -106,9 +123,9 @@ export function createEndBlock(ports: EndPorts) {
     void openNext();
   }
 
-  // The worker's answer after an action: the next label, a failure line, or the end of this card.
-  function settle(s: Session, answer: CardAnswer | undefined): void {
-    const card = answer?.card;
+  // The card after an action: the next label, or a failure line; the block unlocks.
+  function settle(s: Session, answer: CardAnswer): void {
+    const card = answer.card;
     const label = card ? labelOf(card) : undefined;
     if (!card || label === undefined) {
       close(s);
@@ -122,11 +139,49 @@ export function createEndBlock(ports: EndPorts) {
     render(s);
   }
 
-  async function afterAction(s: Session, send: Promise<void>): Promise<void> {
+  // The worker cannot be reached: the block stays, with the line, and the choices work again.
+  function unreachable(s: Session): void {
+    if (current !== s) return;
+    s.locked = false;
+    s.error = UNREACHABLE_LINE;
+    render(s);
+  }
+
+  // Locked from the click until the card says the label left `pending`, or a failure that was not
+  // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
+  function afterAction(s: Session, send: Promise<boolean>): void {
+    const { label } = s;
+    const before = failureOf(s.card, label);
     s.locked = true;
-    await send;
-    await wait(SETTLE_MS);
-    settle(s, await ports.port.askCard(s.ids));
+    delete s.error;
+    render(s);
+    const stop = pollUntil(
+      ports.port,
+      ports.timer,
+      s.ids,
+      (answer) => judge(s, label, before, answer),
+      (answered) => (answered ? close(s) : unreachable(s)),
+    );
+    void send.then((sent) => {
+      if (sent) return;
+      stop();
+      unreachable(s);
+    });
+  }
+
+  function judge(
+    s: Session,
+    label: RatingLabel,
+    before: string | undefined,
+    answer: CardAnswer | undefined,
+  ): boolean {
+    if (answer === undefined) return false;
+    const { card } = answer;
+    const stillPending = card?.pending.includes(label) === true;
+    const fresh = card !== null && failureOf(card, label) !== before;
+    if (stillPending && !fresh) return false;
+    settle(s, answer);
+    return true;
   }
 
   function choose(s: Session, value: number): void {
@@ -136,7 +191,7 @@ export function createEndBlock(ports: EndPorts) {
       render(s);
       return;
     }
-    void afterAction(s, ports.port.rate(s.ids, s.label, value));
+    afterAction(s, ports.port.rate(s.ids, s.label, value));
   }
 
   function confirm(s: Session, send: boolean): void {
@@ -146,12 +201,12 @@ export function createEndBlock(ports: EndPorts) {
       render(s);
       return;
     }
-    void afterAction(s, ports.port.rate(s.ids, s.label, value));
+    afterAction(s, ports.port.rate(s.ids, s.label, value));
   }
 
   function act(s: Session, action: RatingAction): void {
     if (action === "ignorer") {
-      void afterAction(s, ports.port.dismiss(s.ids, s.label));
+      afterAction(s, ports.port.dismiss(s.ids, s.label));
       return;
     }
     close(s);

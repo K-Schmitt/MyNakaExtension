@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createEndBlock } from "../src/content/ui/end-block";
-import { SERIES_WARNING } from "../src/content/ui/rating-copy";
+import {
+  errorLine,
+  SENDING_LINE,
+  SERIES_WARNING,
+  UNREACHABLE_LINE,
+} from "../src/content/ui/rating-copy";
 import type { RatingCard } from "../src/core/rating-cards";
 import {
   answer,
@@ -159,7 +164,7 @@ describe("the end block chain", () => {
     expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(2);
   });
 
-  it("hides when the worker gives no answer after a rate", async () => {
+  it("never hides for an unreachable worker: every ask unanswered gives the line, choices unlocked", async () => {
     const w = world();
     w.script(FILM_IDS, answer(filmCard()));
     w.block.finished(FILM_IDS);
@@ -167,8 +172,31 @@ describe("the end block chain", () => {
     w.script(FILM_IDS, undefined);
     w.last().handlers.onChoose(6);
     await flush();
+    await w.clock.advance(39999);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    await w.clock.advance(1);
+    expect(w.hidden()).toBe(0);
+    expect(w.block.isShown()).toBe(true);
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(w.last().view.notice).toBeUndefined();
+  });
+
+  it("a send that failed shows the line at once and unlocks the choices", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
     await w.clock.advance(2000);
-    expect(w.hidden()).toBe(1);
+    w.fail.send = true;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(w.hidden()).toBe(0);
+    w.fail.send = false;
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(2);
   });
 });
 
@@ -348,5 +376,109 @@ describe("the end block with several contents", () => {
     handlers.onChoose(5);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
+  });
+});
+
+describe("the end block waits for the rating to be sent", () => {
+  async function filmSent(...after: Parameters<typeof answer>[0][]) {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.script(FILM_IDS, ...after.map((card) => answer(card)));
+    w.last().handlers.onChoose(7);
+    await flush();
+    return w;
+  }
+  const pending = () => filmCard();
+  const done = () => filmCard({ pending: [] });
+
+  it("stays locked with the sending line while the label is still pending, then moves on", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    const same = answer(episodeCard());
+    w.script(EP_IDS, same, same, answer(toSaison(), 8));
+    const { handlers } = w.last();
+    handlers.onChoose(7);
+    await flush();
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.last().view.choices).toEqual([]);
+    handlers.onChoose(3);
+    await w.clock.advance(1000);
+    handlers.onChoose(4);
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    await w.clock.advance(5000);
+    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.notice).toBeUndefined();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
+      "rate 5:1:1 épisode 7",
+    ]);
+  });
+
+  it("asks again at 2, 5, 10, 20 and 40 seconds from the click", async () => {
+    const w = await filmSent(pending());
+    const before = asks(w.calls).length;
+    for (const [ms, count] of [
+      [1999, 0],
+      [1, 1],
+      [3000, 2],
+      [5000, 3],
+      [10000, 4],
+      [20000, 5],
+    ] as const) {
+      await w.clock.advance(ms);
+      expect(asks(w.calls).length - before, `+${ms}`).toBe(count);
+    }
+  });
+
+  it("hides when the schedule ends with the label still pending", async () => {
+    const w = await filmSent(pending());
+    await w.clock.advance(39999);
+    expect(w.hidden()).toBe(0);
+    await w.clock.advance(1);
+    expect(w.hidden()).toBe(1);
+    expect(w.block.isShown()).toBe(false);
+  });
+
+  it("hides as soon as nothing is pending", async () => {
+    const w = await filmSent(pending(), done());
+    await w.clock.advance(2000);
+    expect(w.hidden()).toBe(0);
+    await w.clock.advance(3000);
+    expect(w.hidden()).toBe(1);
+  });
+
+  it("a new failure at 5 s shows the failure line and unlocks", async () => {
+    const failed = filmCard({
+      failed: { label: "film", error: "sc-session", at: 9 },
+    });
+    const w = await filmSent(pending(), failed);
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    await w.clock.advance(3000);
+    expect(w.last().view.error).toBe(errorLine("sc-session"));
+    expect(w.last().view.notice).toBeUndefined();
+    expect(w.last().view.choices).toHaveLength(10);
+  });
+
+  it("a failure already on the card at the click is not a new one", async () => {
+    const w = world();
+    const old = filmCard({
+      failed: { label: "film", error: "sc-session", at: 1 },
+    });
+    w.script(FILM_IDS, answer(old));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.last().view.choices).toEqual([]);
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(1);
   });
 });

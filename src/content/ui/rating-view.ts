@@ -23,6 +23,7 @@ export type RatingView = {
   choices: { value: number; marked: boolean }[]; // 1..10, marked = start or current
   actions: RatingAction[];
   others: RatingLabel[]; // the card's other target labels: the manual choice
+  notice?: string; // a neutral line: the chosen rating, or the sending cue
   error?: string;
   confirm?: boolean; // only the warning and the Envoyer / Annuler buttons are drawn
 };

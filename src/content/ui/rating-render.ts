@@ -79,6 +79,7 @@ function lines(doc: Maker, view: RatingView): ElementLike[] {
     textLine(doc, view.heading, "font-weight: 700;"),
     ...(view.current === undefined ? [] : [textLine(doc, view.current)]),
     ...(view.start === undefined ? [] : [textLine(doc, view.start)]),
+    ...(view.notice === undefined ? [] : [textLine(doc, view.notice)]),
     ...(view.error === undefined ? [] : [textLine(doc, view.error, ERROR_CSS)]),
     ...(view.warning === undefined
       ? []
@@ -107,14 +108,10 @@ function buttonRows(
       handlers.onAction(action),
     ),
   );
-  return [
-    row(
-      doc,
-      view.choices.map((c) => choiceButton(doc, c, handlers)),
-    ),
-    ...(others.length === 0 ? [] : [row(doc, others)]),
-    row(doc, actions),
-  ];
+  const choices = view.choices.map((c) => choiceButton(doc, c, handlers));
+  return [choices, others, actions]
+    .filter((buttons) => buttons.length > 0)
+    .map((buttons) => row(doc, buttons));
 }
 
 function buildBlock(

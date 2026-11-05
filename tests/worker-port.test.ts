@@ -114,11 +114,23 @@ describe("rate and dismiss", () => {
     });
   });
 
-  it("never throw when the send fails", async () => {
-    const send = vi.fn(() => Promise.reject(new Error("gone")));
-    const port = createWorkerPort(send);
-    await expect(port.rate(IDS, "film", 5)).resolves.toBeUndefined();
-    await expect(port.dismiss(IDS, "film")).resolves.toBeUndefined();
+  it("say true when the send resolved, whatever the answer", async () => {
+    const port = createWorkerPort(ok(undefined));
+    await expect(port.rate(IDS, "film", 5)).resolves.toBe(true);
+    await expect(port.dismiss(IDS, "film")).resolves.toBe(true);
+  });
+
+  it("say false, never throw, when the send rejects or throws", async () => {
+    const rejecting = createWorkerPort(
+      vi.fn(() => Promise.reject(new Error("gone"))),
+    );
+    await expect(rejecting.rate(IDS, "film", 5)).resolves.toBe(false);
+    await expect(rejecting.dismiss(IDS, "film")).resolves.toBe(false);
+    const throwing = createWorkerPort(() => {
+      throw new Error("Extension context invalidated.");
+    });
+    await expect(throwing.rate(IDS, "film", 5)).resolves.toBe(false);
+    await expect(throwing.dismiss(IDS, "film")).resolves.toBe(false);
   });
 });
 

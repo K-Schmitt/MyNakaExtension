@@ -4,6 +4,7 @@ import {
   CANCEL_LABEL,
   OTHER_LABELS,
   SEND_LABEL,
+  SENDING_LINE,
   SERIES_WARNING,
 } from "../src/content/ui/rating-copy";
 import { createRatingBlock } from "../src/content/ui/rating-render";
@@ -142,5 +143,23 @@ describe("the rating block", () => {
     button(SEND_LABEL).click(true);
     button(CANCEL_LABEL).click(true);
     expect(handlers.onConfirm.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("a view with a notice and no buttons draws the notice and no row", () => {
+    const { block, buttons, root } = setup();
+    block.show({
+      ...ratingView(episodeCard(), "épisode"),
+      choices: [],
+      others: [],
+      actions: [],
+      notice: SENDING_LINE,
+    });
+    expect(buttons()).toEqual([]);
+    expect(
+      descendants(root).some((el) => el.textContent === SENDING_LINE),
+    ).toBe(true);
+    expect(
+      descendants(root).filter((el) => el.style.cssText.includes("flex")),
+    ).toEqual([]);
   });
 });

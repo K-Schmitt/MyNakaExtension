@@ -47,6 +47,10 @@ export function errorLine(error: JobError): string {
   return `La note n'est pas partie${NB}: ${JOB_ERROR_LABELS[error]}`;
 }
 
+export const SENDING_LINE = "Envoi de la note\u2026";
+
+export const UNREACHABLE_LINE = `La note n'est pas partie${NB}: l'extension ne répond pas.`;
+
 export const ACTION_LABELS: Record<RatingAction, string> = {
   "plus-tard": "Plus tard",
   ignorer: "Ignorer",

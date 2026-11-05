@@ -8,11 +8,13 @@ import {
   filmHeading,
   OTHER_LABELS,
   SEND_LABEL,
+  SENDING_LINE,
   SERIES_WARNING,
   seasonHeading,
   seasonStartLine,
   seriesHeading,
   seriesStartLine,
+  UNREACHABLE_LINE,
 } from "../src/content/ui/rating-copy";
 import type { JobError } from "../src/ext/job-error";
 import { JOB_ERROR_LABELS } from "../src/status/job-error-labels";
@@ -63,6 +65,13 @@ describe("the rating copy, code point by code point", () => {
     expect(OTHER_LABELS.série).toBe("Noter la série");
   });
 
+  it("the sending and unreachable lines", () => {
+    expect(SENDING_LINE).toBe("Envoi de la note\u2026");
+    expect(UNREACHABLE_LINE).toBe(
+      `La note n'est pas partie${NB}: l'extension ne répond pas.`,
+    );
+  });
+
   it("the error line reuses the job error labels", () => {
     for (const code of CODES) {
       expect(errorLine(code)).toBe(
@@ -91,6 +100,8 @@ describe("the rating copy, code point by code point", () => {
       ...Object.values(OTHER_LABELS),
       SEND_LABEL,
       CANCEL_LABEL,
+      SENDING_LINE,
+      UNREACHABLE_LINE,
       ...CODES.map(errorLine),
     ];
     expect(all.flatMap(typographyFaults)).toEqual([]);

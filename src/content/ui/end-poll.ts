@@ -1,5 +1,5 @@
-// The wait for a card after a viewing ended. The worker needs a moment to make the card, so the tab asks
-// at fixed times counted from the end, and stops at the first card that still has something to rate.
+// The waits for a card. The worker needs a moment to make or change a card, so the tab asks at fixed
+// times counted from the event (the end of a viewing, a click), and stops when the answer says enough.
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard } from "../../core/rating-cards";
@@ -18,24 +18,40 @@ export type CardAsker = {
 
 export type Found = (card: RatingCard, start?: number) => void;
 
-export function startEndPoll(
+/**
+ * Asks on the schedule. `judge` returns true when the answer settles the wait (the poll then stops);
+ * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all.
+ */
+export function pollUntil(
   asker: CardAsker,
   timer: EndTimer,
   ids: ContentIds,
-  onFound: Found,
-): void {
+  judge: (answer: CardAnswer | undefined) => boolean,
+  onEnd: (answered: boolean) => void,
+): () => void {
   let done = false;
+  let left = END_POLL_MS.length;
+  let answered = false;
   const handles: unknown[] = [];
+  const stop = (): void => {
+    done = true;
+    for (const handle of handles) timer.clear(handle);
+  };
 
   async function poll(): Promise<void> {
     if (done) return;
     const answer = await asker.askCard(ids);
-    const card = answer?.card;
-    if (done || card === undefined || card === null) return;
-    if (card.pending.length === 0) return;
-    done = true;
-    for (const handle of handles) timer.clear(handle);
-    onFound(card, answer?.start);
+    if (done) return;
+    if (answer !== undefined) answered = true;
+    if (judge(answer)) {
+      stop();
+      return;
+    }
+    left -= 1;
+    if (left === 0) {
+      done = true;
+      onEnd(answered);
+    }
   }
 
   for (const ms of END_POLL_MS) {
@@ -45,4 +61,27 @@ export function startEndPoll(
       }, ms),
     );
   }
+  return stop;
+}
+
+export function startEndPoll(
+  asker: CardAsker,
+  timer: EndTimer,
+  ids: ContentIds,
+  onFound: Found,
+): void {
+  pollUntil(
+    asker,
+    timer,
+    ids,
+    (answer) => {
+      const card = answer?.card;
+      if (card === undefined || card === null || card.pending.length === 0) {
+        return false;
+      }
+      onFound(card, answer?.start);
+      return true;
+    },
+    () => {},
+  );
 }

@@ -67,21 +67,25 @@ export function fakePorts() {
   const calls: string[] = [];
   const shown: { view: RatingView; handlers: RatingHandlers }[] = [];
   let hidden = 0;
+  const fail = { send: false, ask: false };
   const ports: EndPorts = {
     timer: clock.timer,
     port: {
       askCard: vi.fn(async (ids: ContentIds) => {
         calls.push(`ask ${keyOf(ids)}`);
+        if (fail.ask) throw new Error("ask rejected");
         const list = scripted.get(keyOf(ids)) ?? [];
         return list.length > 1 ? list.shift() : list[0];
       }),
       rate: vi.fn(
         async (ids: ContentIds, label: RatingLabel, rating: number) => {
           calls.push(`rate ${keyOf(ids)} ${label} ${rating}`);
+          return !fail.send;
         },
       ),
       dismiss: vi.fn(async (ids: ContentIds, label: RatingLabel) => {
         calls.push(`dismiss ${keyOf(ids)} ${label}`);
+        return !fail.send;
       }),
     },
     show: (view, handlers) => {
@@ -94,6 +98,7 @@ export function fakePorts() {
   return {
     ports,
     clock,
+    fail,
     calls,
     shown,
     hidden: () => hidden,
