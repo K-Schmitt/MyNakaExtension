@@ -11,6 +11,10 @@ export class FakeNode implements NodeLike {
   parent: FakeNode | null = null;
   children: FakeNode[] = [];
 
+  get parentNode(): FakeNode | null {
+    return this.parent;
+  }
+
   appendChild(child: NodeLike): void {
     const node = child as FakeNode;
     node.parent?.drop(node);

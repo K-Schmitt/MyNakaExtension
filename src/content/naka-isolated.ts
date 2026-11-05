@@ -8,6 +8,9 @@ import { readAccount } from "./naka-bridge";
 import { startNakaTab } from "./naka-tab";
 import { createTabListener } from "./naka-tab-listener";
 import { readNakaToken } from "./naka-token";
+import { createEndBlock } from "./ui/end-block";
+import { createEndUi } from "./ui/end-ui";
+import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
 
 function ignore(): void {}
@@ -33,6 +36,17 @@ chrome.runtime.onMessage.addListener(
   createTabListener(chrome.runtime.id, client, () => readAccount(localStorage)),
 );
 
+const ui = createEndUi(document);
+const endBlock = createEndBlock({
+  port: createWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
+  timer: {
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  },
+  show: ui.show,
+  hide: ui.hide,
+});
+
 startNakaTab({
   self: window,
   href: () => location.href,
@@ -44,4 +58,5 @@ startNakaTab({
     window.addEventListener("message", fn);
   },
   send: sendToWorker,
+  finished: (ids) => endBlock.finished(ids),
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { startNakaTab, type TabEnv } from "../src/content/naka-tab";
 import { createTabListener } from "../src/content/naka-tab-listener";
 import { readVideo } from "../src/content/video-sample";
+import type { ContentIds } from "../src/core/finish-event";
 import { PAGE_CHANNEL, type ToWorker } from "../src/ext/messages";
 import { createNakaClient } from "../src/naka/naka-client";
 import { entry, fakeApi, json, MARKER, strings } from "./naka-bridge-fakes";
@@ -122,6 +123,7 @@ const SELF = { name: "the tab's window" };
 
 function tab(start = PLAYER(3)) {
   const sent: ToWorker[] = [];
+  const ended: ContentIds[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -147,6 +149,9 @@ function tab(start = PLAYER(3)) {
     send: (msg) => {
       sent.push(msg);
     },
+    finished: (ids) => {
+      ended.push(ids);
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -159,7 +164,7 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, timers, page, tick, post };
+  return { sent, ended, timers, page, tick, post };
 }
 
 describe("the Naka tab", () => {
@@ -185,6 +190,31 @@ describe("the Naka tab", () => {
     expect(t.sent.slice(1)).toEqual([
       { type: "finished", source: "threshold", progress: 0.99, contentId: 3 },
     ]);
+  });
+
+  it("the threshold finished send calls the end block with the same ids", () => {
+    const t = tab();
+    t.page.video = { currentTime: 5990, duration: 6000, src: "blob:a" };
+    t.tick(5000);
+    expect(t.ended).toEqual([{ contentId: 3 }]);
+  });
+
+  it("the explicit finished send calls the end block with the same ids", () => {
+    const t = tab();
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "watched",
+      contentId: 7,
+      season: 1,
+      episode: 2,
+    });
+    expect(t.ended).toEqual([{ contentId: 7, season: 1, episode: 2 }]);
+  });
+
+  it("a send that is not a finished never calls the end block", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "playlist" });
+    expect(t.ended).toEqual([]);
   });
 
   it("a film left after 30 seconds gives nothing", () => {

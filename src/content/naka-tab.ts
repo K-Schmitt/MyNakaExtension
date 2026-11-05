@@ -2,6 +2,7 @@
 // URL, samples the <video>, and relays what the MAIN world saw. Everything it sends is rebuilt by the
 // tracker or the parsers: ids and marks only, never page text.
 
+import type { ContentIds } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import { acceptPageEvent, parsePlayerUrl } from "./page-events";
 import {
@@ -28,7 +29,25 @@ export type TabEnv = {
   every(ms: number, fn: () => void): void;
   onPageMessage(fn: (ev: PageMessage) => void): void;
   send(msg: ToWorker): void;
+  /** The viewing of these ids just ended: the end block starts waiting for its card. */
+  finished(ids: ContentIds): void;
 };
+
+type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
+
+function idsOf({ contentId, season, episode }: FinishedMessage): ContentIds {
+  return {
+    contentId,
+    ...(season === undefined ? {} : { season }),
+    ...(episode === undefined ? {} : { episode }),
+  };
+}
+
+// Each finished the tab sends, threshold or explicit, is also told to the end block.
+function sendFinished(env: TabEnv, msg: FinishedMessage): void {
+  env.send(msg);
+  env.finished(idsOf(msg));
+}
 
 function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "playlist") {
@@ -36,7 +55,7 @@ function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
     return;
   }
   const finished = tracker.watched(event);
-  if (finished) env.send(finished);
+  if (finished) sendFinished(env, finished);
 }
 
 export function startNakaTab(env: TabEnv): void {
@@ -49,7 +68,7 @@ export function startNakaTab(env: TabEnv): void {
     follow();
     const video = env.video();
     const finished = video === undefined ? undefined : tracker.sample(video);
-    if (finished) env.send(finished);
+    if (finished) sendFinished(env, finished);
   };
   env.send({ type: "naka-ready" });
   env.every(URL_POLL_MS, follow);

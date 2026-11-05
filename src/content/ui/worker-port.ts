@@ -77,6 +77,8 @@ function parseCardsAnswer(raw: unknown): CardsAnswer {
   return { cards: list.map(parseEntry) };
 }
 
+export type WorkerPort = ReturnType<typeof createWorkerPort>;
+
 export function createWorkerPort(send: SendRating) {
   async function ask(msg: RatingMessage): Promise<unknown> {
     try {

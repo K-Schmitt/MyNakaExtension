@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ACTION_LABELS, OTHER_LABELS } from "../src/content/ui/rating-copy";
+import {
+  ACTION_LABELS,
+  CANCEL_LABEL,
+  OTHER_LABELS,
+  SEND_LABEL,
+  SERIES_WARNING,
+} from "../src/content/ui/rating-copy";
 import { createRatingBlock } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
@@ -8,7 +14,12 @@ import { descendants, FakeDoc, FakeShadow } from "./ui-fakes";
 function setup() {
   const doc = new FakeDoc();
   const root = new FakeShadow();
-  const handlers = { onChoose: vi.fn(), onAction: vi.fn(), onOther: vi.fn() };
+  const handlers = {
+    onChoose: vi.fn(),
+    onAction: vi.fn(),
+    onOther: vi.fn(),
+    onConfirm: vi.fn(),
+  };
   const block = createRatingBlock(doc, root, handlers);
   const buttons = () => descendants(root).filter((el) => el.tag === "button");
   const button = (text: string) => {
@@ -108,5 +119,28 @@ describe("the rating block", () => {
     block.hide();
     expect(root.children).toEqual([]);
     expect(block.current()).toBeUndefined();
+  });
+
+  it("a confirm view draws the warning and Envoyer / Annuler only, on trusted clicks", () => {
+    const { block, buttons, button, handlers, root } = setup();
+    block.show({
+      ...ratingView(episodeCard({ seriesFinished: false }), "série"),
+      choices: [],
+      others: [],
+      actions: [],
+      confirm: true,
+    });
+    expect(buttons().map((b) => b.textContent)).toEqual([
+      SEND_LABEL,
+      CANCEL_LABEL,
+    ]);
+    expect(
+      descendants(root).some((el) => el.textContent === SERIES_WARNING),
+    ).toBe(true);
+    button(SEND_LABEL).click(false);
+    expect(handlers.onConfirm).not.toHaveBeenCalled();
+    button(SEND_LABEL).click(true);
+    button(CANCEL_LABEL).click(true);
+    expect(handlers.onConfirm.mock.calls).toEqual([[true], [false]]);
   });
 });

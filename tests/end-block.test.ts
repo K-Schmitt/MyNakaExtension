@@ -1,0 +1,352 @@
+import { describe, expect, it } from "vitest";
+import { createEndBlock } from "../src/content/ui/end-block";
+import { SERIES_WARNING } from "../src/content/ui/rating-copy";
+import type { RatingCard } from "../src/core/rating-cards";
+import {
+  answer,
+  asks,
+  EP_IDS,
+  FILM_IDS,
+  fakePorts,
+  flush,
+  OTHER_IDS,
+} from "./end-block-fakes";
+import { episodeCard, filmCard } from "./rating-fixtures";
+
+const NOTHING = answer(episodeCard({ pending: [] }));
+
+function world() {
+  const w = fakePorts();
+  const block = createEndBlock(w.ports);
+  return { ...w, block };
+}
+
+const toSaison = (over: Partial<RatingCard> = {}) =>
+  episodeCard({ pending: ["saison", "série"], ...over });
+const toSerie = (over: Partial<RatingCard> = {}) =>
+  episodeCard({ pending: ["série"], ...over });
+
+describe("the end block poll", () => {
+  it("asks at exactly 2, 5, 10, 20 and 40 seconds, then stops", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard({ pending: [] })));
+    w.block.finished(EP_IDS);
+    const expected = [
+      [1999, 0],
+      [1, 1],
+      [2999, 1],
+      [1, 2],
+      [4999, 2],
+      [1, 3],
+      [9999, 3],
+      [1, 4],
+      [19999, 4],
+      [1, 5],
+      [60000, 5],
+    ] as const;
+    for (const [ms, count] of expected) {
+      await w.clock.advance(ms);
+      expect(asks(w.calls), `after +${ms}`).toHaveLength(count);
+    }
+    expect(w.shown).toEqual([]);
+  });
+
+  it("stops at the first card with a pending label and shows its first", async () => {
+    const w = world();
+    w.script(EP_IDS, NOTHING, NOTHING, answer(episodeCard(), 6));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(10000);
+    expect(asks(w.calls)).toHaveLength(3);
+    await w.clock.advance(60000);
+    expect(asks(w.calls)).toHaveLength(3);
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("épisode 1");
+    expect(w.block.isShown()).toBe(true);
+  });
+
+  it("a card without pending at 2 s, pending at 5 s: shown at 5 s", async () => {
+    const w = world();
+    w.script(EP_IDS, NOTHING, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(2999);
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(1);
+    expect(w.shown).toHaveLength(1);
+  });
+
+  it("an unknown card or a failed ask counts as nothing yet", async () => {
+    const w = world();
+    w.script(EP_IDS, undefined, { card: null, pauseFromPercent: 0 });
+    w.block.finished(EP_IDS);
+    await w.clock.advance(5000);
+    expect(w.shown).toEqual([]);
+    expect(asks(w.calls)).toHaveLength(2);
+  });
+
+  it("a second finished for the same key adds no poll", async () => {
+    const w = world();
+    w.script(EP_IDS, NOTHING);
+    w.block.finished(EP_IDS);
+    await w.clock.advance(3000);
+    w.block.finished(EP_IDS);
+    await w.clock.advance(100000);
+    expect(asks(w.calls)).toHaveLength(5);
+  });
+});
+
+describe("the end block chain", () => {
+  it("épisode rated, saison shown with its start, rated, série shown with the warning", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(w.last().view.heading).toContain("épisode 1");
+
+    w.script(EP_IDS, answer(toSaison(), 8));
+    w.last().handlers.onChoose(9);
+    await flush();
+    expect(w.calls).toContain("rate 5:1:1 épisode 9");
+    await w.clock.advance(2000);
+    expect(w.last().view.heading).toContain("saison 1");
+    expect(w.last().view.start).toContain("8");
+    expect(w.last().view.choices.filter((c) => c.marked)).toEqual([
+      { value: 8, marked: true },
+    ]);
+
+    w.script(EP_IDS, answer(toSerie(), 7));
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.calls).toContain("rate 5:1:1 saison 7");
+    expect(w.last().view.heading).toContain("la série");
+    expect(w.last().view.warning).toBe(SERIES_WARNING);
+  });
+
+  it("hides when nothing is pending after a rate, and never rates twice", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.script(FILM_IDS, answer(filmCard({ pending: [] })));
+    w.last().handlers.onChoose(10);
+    await flush();
+    expect(w.hidden()).toBe(0);
+    await w.clock.advance(2000);
+    expect(w.hidden()).toBe(1);
+    expect(w.block.isShown()).toBe(false);
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(1);
+  });
+
+  it("shows a failure line when the card says the rate failed", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    const failed = filmCard({
+      failed: { label: "film", error: "sc-session", at: 5 },
+    });
+    w.script(FILM_IDS, answer(failed));
+    w.last().handlers.onChoose(6);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.error).toBeDefined();
+    expect(w.block.isShown()).toBe(true);
+    // Unlocked again: the next choice goes out.
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(2);
+  });
+
+  it("hides when the worker gives no answer after a rate", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.script(FILM_IDS, undefined);
+    w.last().handlers.onChoose(6);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.hidden()).toBe(1);
+  });
+});
+
+describe("the end block série confirmation", () => {
+  async function serieShown() {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie(), 7));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    return w;
+  }
+
+  it("a choice on an unfinished série asks first, in the block, and sends nothing yet", async () => {
+    const w = await serieShown();
+    const shownBefore = w.shown.length;
+    w.last().handlers.onChoose(9);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
+    expect(w.shown).toHaveLength(shownBefore + 1);
+    expect(w.last().view.confirm).toBe(true);
+    expect(w.last().view.warning).toBe(SERIES_WARNING);
+  });
+
+  it("Envoyer sends the chosen rating", async () => {
+    const w = await serieShown();
+    w.last().handlers.onChoose(9);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
+      "rate 5:1:1 série 9",
+    ]);
+  });
+
+  it("Annuler sends nothing and goes back to the choices", async () => {
+    const w = await serieShown();
+    w.last().handlers.onChoose(9);
+    w.last().handlers.onConfirm(false);
+    await flush();
+    await w.clock.advance(10000);
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
+    expect(w.last().view.confirm).toBeUndefined();
+    expect(w.last().view.choices).toHaveLength(10);
+    // The choices work again.
+    w.last().handlers.onChoose(4);
+    w.last().handlers.onConfirm(true);
+    await flush();
+    expect(w.calls).toContain("rate 5:1:1 série 4");
+  });
+
+  it("a finished série asks nothing more", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie({ seriesFinished: true })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onChoose(9);
+    await flush();
+    expect(w.calls).toContain("rate 5:1:1 série 9");
+  });
+});
+
+describe("the end block lock and manual choice", () => {
+  it("locks after the first choice: a double click sends one rate", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    const { handlers } = w.last();
+    handlers.onChoose(8);
+    handlers.onChoose(8);
+    await flush();
+    await w.clock.advance(1000);
+    handlers.onChoose(3);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
+      "rate 9:: film 8",
+    ]);
+  });
+
+  it("a manual choice shows that label's view, without the start", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSaison(), 8));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(w.last().view.choices.some((c) => c.value === 8 && c.marked)).toBe(
+      true,
+    );
+    expect(w.last().view.start).toBeDefined();
+    w.last().handlers.onOther("série");
+    expect(w.last().view.heading).toContain("la série");
+    expect(w.last().view.start).toBeUndefined();
+    expect(w.last().view.choices.some((c) => c.marked)).toBe(false);
+    w.last().handlers.onOther("saison");
+    expect(w.last().view.start).toBeDefined();
+  });
+
+  it("a manual choice on the série needs the confirmation too", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSaison(), 8));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onOther("série");
+    w.last().handlers.onChoose(5);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
+    expect(w.last().view.confirm).toBe(true);
+  });
+});
+
+describe("the end block actions", () => {
+  it("Plus tard hides and sends no message", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    const before = [...w.calls];
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    await w.clock.advance(60000);
+    expect(w.hidden()).toBe(1);
+    expect(w.calls).toEqual(before);
+    expect(w.block.isShown()).toBe(false);
+  });
+
+  it("Ignorer dismisses that label, then shows the next pending one", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.script(EP_IDS, answer(episodeCard({ pending: ["saison"] }), 8));
+    w.last().handlers.onAction("ignorer");
+    await flush();
+    expect(w.calls).toContain("dismiss 5:1:1 épisode");
+    await w.clock.advance(2000);
+    expect(w.last().view.heading).toContain("saison 1");
+  });
+
+  it("Ignorer on the last pending label hides", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.script(FILM_IDS, answer(filmCard({ pending: [] })));
+    w.last().handlers.onAction("ignorer");
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.hidden()).toBe(1);
+  });
+});
+
+describe("the end block with several contents", () => {
+  it("a URL change (autoplay) keeps the shown card; the new one waits behind it", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7, title: "Suivant" })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    expect(w.last().view.heading).toContain("Une série");
+    expect(w.block.isShown()).toBe(true);
+
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    expect(w.last().view.heading).toContain("Suivant");
+    expect(w.block.isShown()).toBe(true);
+  });
+
+  it("a stale handler of a closed block does nothing", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    const { handlers } = w.last();
+    handlers.onAction("fermer");
+    await flush();
+    handlers.onChoose(5);
+    await flush();
+    expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
+  });
+});

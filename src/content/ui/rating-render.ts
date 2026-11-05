@@ -3,7 +3,13 @@
 
 import type { RatingLabel } from "../../core/rating-cards";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
-import { ACTION_LABELS, OTHER_LABELS, type RatingAction } from "./rating-copy";
+import {
+  ACTION_LABELS,
+  CANCEL_LABEL,
+  OTHER_LABELS,
+  type RatingAction,
+  SEND_LABEL,
+} from "./rating-copy";
 import type { RatingView } from "./rating-view";
 import { onTrustedClick } from "./trusted";
 
@@ -11,6 +17,7 @@ export type RatingHandlers = {
   onChoose(value: number): void;
   onAction(action: RatingAction): void;
   onOther(label: RatingLabel): void;
+  onConfirm(send: boolean): void;
 };
 
 type Maker = Pick<DocLike, "createElement">;
@@ -79,11 +86,19 @@ function lines(doc: Maker, view: RatingView): ElementLike[] {
   ];
 }
 
+function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
+  return row(doc, [
+    button(doc, SEND_LABEL, MARKED_CSS, () => handlers.onConfirm(true)),
+    button(doc, CANCEL_LABEL, BUTTON_CSS, () => handlers.onConfirm(false)),
+  ]);
+}
+
 function buttonRows(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
 ): ElementLike[] {
+  if (view.confirm === true) return [confirmRow(doc, handlers)];
   const others = view.others.map((label) =>
     button(doc, OTHER_LABELS[label], BUTTON_CSS, () => handlers.onOther(label)),
   );

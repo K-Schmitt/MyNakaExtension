@@ -103,6 +103,7 @@ describe("createOverlayRoot", () => {
       onChoose,
       onAction: vi.fn(),
       onOther: vi.fn(),
+      onConfirm: vi.fn(),
     });
     block.show(ratingView(episodeCard(), "saison", 8));
     const eight = descendants(hostOf(doc).shadow).find(
@@ -111,6 +112,17 @@ describe("createOverlayRoot", () => {
     expect(eight?.dispatch("click", true)).toBe(false);
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(onChoose).toHaveBeenCalledWith(8);
+  });
+
+  it("attach puts the host back when the page removed it, and leaves it alone otherwise", () => {
+    const doc = new FakeDoc();
+    const overlay = createOverlayRoot(doc);
+    const added = vi.spyOn(doc.body, "appendChild");
+    overlay.attach();
+    expect(added).not.toHaveBeenCalled();
+    hostOf(doc).remove();
+    overlay.attach();
+    expect(hostOf(doc).parent).toBe(doc.body);
   });
 
   it("every declaration of the host style is important", () => {

@@ -58,6 +58,8 @@ function targetOf(doc: DocLike): NodeLike {
 
 export function createOverlayRoot(doc: DocLike): {
   root: ShadowRootLike;
+  /** Puts the host back under its target when the page removed it; does nothing when it is there. */
+  attach(): void;
   detach(): void;
 } {
   const host = doc.createElement("div");
@@ -70,9 +72,13 @@ export function createOverlayRoot(doc: DocLike): {
     targetOf(doc).appendChild(host);
   };
   place();
+  const attach = (): void => {
+    if (host.parentNode !== targetOf(doc)) place();
+  };
   doc.addEventListener("fullscreenchange", place);
   return {
     root,
+    attach,
     detach() {
       doc.removeEventListener("fullscreenchange", place);
       host.remove();

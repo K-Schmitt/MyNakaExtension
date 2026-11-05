@@ -10,6 +10,7 @@ export interface NodeLike {
 
 export interface ElementLike extends NodeLike {
   textContent: string | null;
+  readonly parentNode: NodeLike | null;
   style: { cssText: string };
   setAttribute(name: string, value: string): void;
   addEventListener(type: string, listener: (event: EventLike) => void): void;

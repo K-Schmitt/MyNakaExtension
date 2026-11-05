@@ -24,6 +24,7 @@ export type RatingView = {
   actions: RatingAction[];
   others: RatingLabel[]; // the card's other target labels: the manual choice
   error?: string;
+  confirm?: boolean; // only the warning and the Envoyer / Annuler buttons are drawn
 };
 
 const CHOICES = 10;
