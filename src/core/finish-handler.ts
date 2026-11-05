@@ -19,10 +19,9 @@ import {
   parseEvent,
 } from "./finish-event";
 import { matchOnSc } from "./finish-match";
+import { askOwner, remindOwner } from "./finish-question";
 import type { Pair } from "./list-diff";
-import { openAmbiguity, toCandidates, withFinish } from "./questions";
 import {
-  addPending,
   isHandled,
   markHandled,
   type SyncState,
@@ -74,43 +73,6 @@ export function isComplete(
     markedWatched: event.source === "explicit",
   };
   return isWatchComplete(signal, thresholds[event.kind]);
-}
-
-// The question keeps the asked title, what the search listed (capped, so its ids are the stored
-// candidates') and the key of this finish, which runs when the owner answers.
-async function askOwner(
-  state: SyncState,
-  event: CheckedEvent,
-  match: { candidateIds: number[]; candidates: Candidate[] },
-  ports: FinishPorts,
-): Promise<FinishOutcome> {
-  const candidates = toCandidates(match.candidates, match.candidateIds);
-  await ports.save(
-    addPending(state, {
-      kind: "ambiguity",
-      side: "naka",
-      id: event.contentId,
-      candidateIds: candidates.map((c) => c.id),
-      title: event.titled.title,
-      candidates,
-      finish: contentKey(event),
-    }),
-  );
-  return { kind: "needs-choice", candidateIds: candidates.map((c) => c.id) };
-}
-
-// The owner is already asked: the latest finish waits on the question, and nothing else changes.
-async function remindOwner(
-  state: SyncState,
-  event: CheckedEvent,
-  key: string,
-  match: { candidateIds: number[] },
-  ports: FinishPorts,
-): Promise<FinishOutcome> {
-  if (openAmbiguity(state, "naka", event.contentId)) {
-    await ports.save(withFinish(state, event.contentId, key));
-  }
-  return { kind: "needs-choice", candidateIds: match.candidateIds };
 }
 
 async function finishFilm(
