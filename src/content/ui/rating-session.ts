@@ -7,7 +7,11 @@ import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
 import { type EndTimer, pollUntil } from "./end-poll";
-import { type RatingAction, UNREACHABLE_LINE } from "./rating-copy";
+import {
+  notSentLine,
+  type RatingAction,
+  UNREACHABLE_LINE,
+} from "./rating-copy";
 import type { RatingHandlers } from "./rating-render";
 import type { RatingView } from "./rating-view";
 import {
@@ -28,12 +32,14 @@ export type SessionPorts = {
 
 // The clicked label on the shown card, as it was at the click.
 type Snapshot = {
+  cardless: boolean;
   pending: boolean;
   given: number | undefined;
   failure: string | undefined;
 };
 
-const snapshotOf = (card: RatingCard, label: RatingLabel): Snapshot => ({
+const snapshotOf = ({ card, label, viewOnly }: Session): Snapshot => ({
+  cardless: viewOnly === true,
   pending: card.pending.includes(label),
   given: card.given[label],
   failure: failureOf(card, label),
@@ -42,6 +48,13 @@ const snapshotOf = (card: RatingCard, label: RatingLabel): Snapshot => ({
 // `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card
 // missing from the answer has nothing left to ask. For one shown card, a missing card is "not yet".
 export type SessionOptions = { absentIsDone?: boolean };
+
+/** What the opener knows of the card: the answer's start and sending, and whether it is view-only. */
+export type Opened = {
+  start?: number;
+  sending?: RatingLabel[];
+  viewOnly?: boolean;
+};
 
 export function createRatingSession(
   ports: SessionPorts,
@@ -71,6 +84,7 @@ export function createRatingSession(
     }
     s.card = card;
     s.label = label;
+    delete s.viewOnly;
     delete s.start;
     if (answer.start !== undefined) s.start = answer.start;
     if (answer.sending?.includes(label)) {
@@ -89,9 +103,24 @@ export function createRatingSession(
     render(s);
   }
 
+  // An answer with no card, the label no longer being sent. For a list, the card has nothing left to
+  // ask. For a view-only card, the rate job ran without making one: the line says why, the choices work
+  // again. For a shown real card, it is "not yet".
+  function absent(s: Session, at: Snapshot, answer: CardAnswer): boolean {
+    if (options.absentIsDone === true) {
+      close(s);
+      return true;
+    }
+    if (!at.cardless) return false;
+    s.locked = false;
+    s.error = notSentLine(answer.lastFinish);
+    render(s);
+    return true;
+  }
+
   // Moved on: the answer has a card where the clicked label left `pending`, or its given rating
-  // changed, or its failure changed, all against the card as it was at the click. No card, or a card
-  // unchanged on those three, is "not yet".
+  // changed, or its failure changed, all against the card as it was at the click. A card unchanged on
+  // those three is "not yet"; no card is `absent`.
   function judge(
     s: Session,
     label: RatingLabel,
@@ -99,13 +128,10 @@ export function createRatingSession(
     answer: CardAnswer | undefined,
   ): boolean {
     if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
-    if (answer?.sending?.includes(label)) return false; // the worker still has the rating to send
-    const card = answer?.card;
-    if (answer && !card && options.absentIsDone === true) {
-      close(s);
-      return true;
-    }
-    if (!answer || !card) return false;
+    if (answer === undefined) return false;
+    if (answer.sending?.includes(label)) return false; // the worker still has the rating to send
+    const card = answer.card;
+    if (!card) return absent(s, at, answer);
     const left = at.pending && !card.pending.includes(label);
     const rated = card.given[label] !== at.given;
     const failed = failureOf(card, label) !== at.failure;
@@ -119,6 +145,7 @@ export function createRatingSession(
   function showFailure(s: Session, card: RatingCard, label: RatingLabel): void {
     s.card = card;
     s.label = label;
+    delete s.viewOnly;
     s.locked = false;
     render(s);
   }
@@ -127,7 +154,7 @@ export function createRatingSession(
   // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
   function watch(s: Session, send?: Promise<boolean>): void {
     const { label } = s;
-    const at = snapshotOf(s.card, label);
+    const at = snapshotOf(s);
     s.locked = true;
     delete s.error;
     render(s);
@@ -194,8 +221,7 @@ export function createRatingSession(
       ids: ContentIds,
       card: RatingCard,
       label: RatingLabel,
-      start?: number,
-      sending: RatingLabel[] = [],
+      { start, sending = [], viewOnly = false }: Opened = {},
     ): void {
       current = {
         ids,
@@ -203,6 +229,7 @@ export function createRatingSession(
         label,
         locked: false,
         ...(start === undefined ? {} : { start }),
+        ...(viewOnly ? { viewOnly: true } : {}),
       };
       if (sending.includes(label)) watch(current);
       else render(current);

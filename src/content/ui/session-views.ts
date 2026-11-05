@@ -14,7 +14,8 @@ export type Session = {
   start?: number;
   locked: boolean;
   confirming?: number;
-  error?: string; // a line of the block's own: the worker did not answer
+  error?: string; // a line of the block's own: the worker did not answer, or no card came
+  viewOnly?: true; // the card exists only in the view: the worker has none for the title
 };
 
 export const needsConfirm = ({ card, label }: Session): boolean =>

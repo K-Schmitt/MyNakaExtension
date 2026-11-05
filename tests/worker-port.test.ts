@@ -202,10 +202,89 @@ describe("the sending labels of an answer", () => {
     expect(cards).toBeUndefined();
   });
 
-  it("refuses sending on an answer without a card", async () => {
+  it("refuses sending on an answer without a card, for a label the ids cannot have", async () => {
     const got = await createWorkerPort(
       ok({ card: null, pauseFromPercent: 0, sending: ["film"] }),
     ).askCard(IDS);
     expect(got).toBeUndefined();
+  });
+});
+
+describe("an answer without a card", () => {
+  const FILM = { contentId: 9 };
+  const cardless = (extra: object) => ({
+    card: null,
+    pauseFromPercent: 0,
+    ...extra,
+  });
+  const asked = (answer: unknown, ids: typeof FILM | typeof IDS) =>
+    createWorkerPort(ok(answer)).askCard(ids);
+
+  it("keeps sending the film of film ids, or the épisode of episode ids", async () => {
+    const film = await asked(cardless({ sending: ["film"] }), FILM);
+    expect(film).toEqual(cardless({ sending: ["film"] }));
+    const episode = await asked(cardless({ sending: ["épisode"] }), IDS);
+    expect(episode).toEqual(cardless({ sending: ["épisode"] }));
+  });
+
+  it("refuses any other sending label, or two", async () => {
+    const bad: [unknown, typeof FILM | typeof IDS][] = [
+      [["saison"], IDS],
+      [["série"], IDS],
+      [["film"], IDS],
+      [["épisode"], FILM],
+      [["saison"], FILM],
+      [["film", "film"], FILM],
+      [["épisode", "saison"], IDS],
+    ];
+    for (const [sending, ids] of bad) {
+      const got = await asked(cardless({ sending }), ids);
+      expect(got, `${JSON.stringify(sending)} for ${JSON.stringify(ids)}`).toBe(
+        undefined,
+      );
+    }
+  });
+
+  it("keeps the last finish of the title: a failure with its code, or another outcome alone", async () => {
+    const kept = [
+      { outcome: "failed", error: "sc-session" },
+      { outcome: "failed", error: "finish-limit" },
+      { outcome: "needs-choice" },
+      { outcome: "not-found" },
+      { outcome: "done" },
+      { outcome: "ignored" },
+    ];
+    for (const lastFinish of kept) {
+      const got = await asked(cardless({ lastFinish }), FILM);
+      expect(got, JSON.stringify(lastFinish)).toEqual(cardless({ lastFinish }));
+    }
+    const withCard = await asked(
+      {
+        card: filmCard(),
+        pauseFromPercent: 0,
+        lastFinish: { outcome: "done" },
+      },
+      FILM,
+    );
+    expect(withCard?.lastFinish).toEqual({ outcome: "done" });
+  });
+
+  it("refuses a last finish that is malformed", async () => {
+    const bad: unknown[] = [
+      null,
+      "failed",
+      {},
+      { outcome: "failed" },
+      { outcome: "failed", error: "boom" },
+      { outcome: "done", error: "sc-session" },
+      { outcome: "needs-choice", error: "sc-session" },
+      { outcome: "lost" },
+      { outcome: "failed", error: "sc-session", at: 5 },
+      { outcome: "done", key: "movie:9" },
+    ];
+    for (const lastFinish of bad) {
+      const got = await asked(cardless({ lastFinish }), FILM);
+      expect(got, JSON.stringify(lastFinish)).toBeUndefined();
+    }
   });
 });

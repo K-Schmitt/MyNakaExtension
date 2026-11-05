@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createPauseBlock } from "../src/content/ui/pause-block";
-import { SENDING_LINE, UNREACHABLE_LINE } from "../src/content/ui/rating-copy";
+import {
+  errorLine,
+  NEEDS_CHOICE_LINE,
+  NOT_RATED_LINE,
+  SENDING_LINE,
+  UNREACHABLE_LINE,
+} from "../src/content/ui/rating-copy";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard } from "../src/core/rating-cards";
 import type { CardAnswer } from "../src/sw/rating-answers";
@@ -278,10 +284,11 @@ describe("the pause block waits for the card to show the sent rating", () => {
   const rated = (n: number) =>
     episodeCard({ pending: [], given: { épisode: n } });
 
-  it("a view-only card stays locked while the card is null, then hides once the rating is given", async () => {
+  it("a view-only card stays locked while the card is null and the rating is sent, then hides once it is given", async () => {
     const w = world();
     const none = asked(null);
-    w.script(EP_IDS, none, none, none, none, asked(rated(7)));
+    const sent: CardAnswer = { ...none, sending: ["épisode"] };
+    w.script(EP_IDS, none, sent, sent, sent, asked(rated(7)));
     await w.pauseAt(0.5);
     const sending = w.last().handlers;
     w.last().handlers.onChoose(7);
@@ -337,9 +344,9 @@ describe("the pause block waits for the card to show the sent rating", () => {
     expect(w.hidden()).toBe(0);
   });
 
-  it("a card that stays null for the whole schedule hides at its end, with no failure line", async () => {
+  it("a card that stays null with the rating sent for the whole schedule hides at its end, with no line", async () => {
     const w = world();
-    w.script(EP_IDS, asked(null));
+    w.script(EP_IDS, asked(null), { ...asked(null), sending: ["épisode"] });
     await w.pauseAt(0.5);
     w.last().handlers.onChoose(7);
     await flush();
@@ -348,5 +355,85 @@ describe("the pause block waits for the card to show the sent rating", () => {
     await w.clock.advance(1);
     expect(w.hidden()).toBe(1);
     expect(w.shown.every((e) => e.view.error === undefined)).toBe(true);
+  });
+});
+
+describe("a card-less pause rating that could not go", () => {
+  const none = (extra: Partial<CardAnswer> = {}): CardAnswer => ({
+    card: null,
+    pauseFromPercent: 0,
+    ...extra,
+  });
+  const rates = (calls: string[]) => calls.filter((c) => c.startsWith("rate"));
+
+  // A 7 on a view-only film: sent at 2 s, then at 5 s no card and nothing sent.
+  async function filmClicked(after: CardAnswer) {
+    const w = world();
+    w.script(FILM_IDS, none(), none({ sending: ["film"] }), after);
+    await w.pauseAt(0.5, FILM_IDS);
+    w.last().handlers.onChoose(7);
+    await flush();
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.last().view.choices).toEqual([]);
+    await w.clock.advance(3000);
+    return w;
+  }
+
+  it("a failed finish gives its reason, and the choices work again", async () => {
+    const w = await filmClicked(
+      none({ lastFinish: { outcome: "failed", error: "sc-session" } }),
+    );
+    expect(w.last().view.error).toBe(errorLine("sc-session"));
+    expect(w.last().view.notice).toBeUndefined();
+    expect(w.last().view.choices).toHaveLength(10);
+    expect(w.hidden()).toBe(0);
+    w.last().handlers.onChoose(8);
+    await flush();
+    expect(rates(w.calls)).toEqual(["rate 9:: film 7", "rate 9:: film 8"]);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.last().view.error).toBeUndefined();
+  });
+
+  it("a finish that needs a choice says several titles match", async () => {
+    const w = await filmClicked(
+      none({ lastFinish: { outcome: "needs-choice" } }),
+    );
+    expect(w.last().view.error).toBe(NEEDS_CHOICE_LINE);
+    expect(w.last().view.choices).toHaveLength(10);
+  });
+
+  it("no last finish, or another outcome, says the title could not be rated", async () => {
+    for (const after of [none(), none({ lastFinish: { outcome: "done" } })]) {
+      const w = await filmClicked(after);
+      expect(w.last().view.error, JSON.stringify(after)).toBe(NOT_RATED_LINE);
+      expect(w.last().view.choices).toHaveLength(10);
+      expect(w.hidden()).toBe(0);
+    }
+  });
+
+  it("once the real card came, an answer without it is not yet", async () => {
+    for (const real of [
+      episodeCard({ pending: ["saison"], given: { épisode: 7 } }),
+      episodeCard({
+        pending: [],
+        failed: { label: "épisode", error: "unavailable", at: 5 },
+      }),
+    ]) {
+      const w = world();
+      w.script(EP_IDS, none(), asked(real));
+      await w.pauseAt(0.5);
+      w.last().handlers.onChoose(7);
+      await flush();
+      await w.clock.advance(2000);
+      expect(w.last().view.choices).toHaveLength(10);
+      w.script(EP_IDS, none());
+      w.last().handlers.onChoose(6);
+      await flush();
+      await w.clock.advance(2000);
+      expect(w.last().view.notice, real.pending.join()).toBe(SENDING_LINE);
+      expect(w.last().view.choices).toEqual([]);
+      expect(w.last().view.error).not.toBe(NOT_RATED_LINE);
+    }
   });
 });

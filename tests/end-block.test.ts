@@ -510,6 +510,15 @@ describe("the end block waits for the rating to be sent", () => {
     expect(w.last().view.choices).toHaveLength(10);
   });
 
+  it("an answer without the card is not yet, even with nothing sent: the shown card was real", async () => {
+    const w = await filmSent(pending());
+    w.script(FILM_IDS, { card: null, pauseFromPercent: 0 });
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+    expect(w.last().view.error).toBeUndefined();
+    expect(w.last().view.choices).toEqual([]);
+  });
+
   it("a failure already on the card at the click is not a new one", async () => {
     const w = world();
     const old = filmCard({

@@ -4,6 +4,7 @@
 // checked before the write, as the finish does. A failure is stored on the card as a code, never as text.
 
 import type { FinishedMessage } from "../content/playback-tracker";
+import { cardlessLabel } from "../core/cardless-label";
 import { type ContentIds, contentKeyOf } from "../core/finish-event";
 import {
   applyDismiss,
@@ -32,12 +33,6 @@ function foundIn(
   return target === undefined ? undefined : { cards, target };
 }
 
-// The pause case asks for the finish of ONE content: a film has no season, an épisode has both.
-function fitsIds(label: RatingLabel, { season, episode }: ContentIds): boolean {
-  if (label === "film") return season === undefined && episode === undefined;
-  return label === "épisode" && season !== undefined && episode !== undefined;
-}
-
 function explicitFinish({
   contentId,
   season,
@@ -62,7 +57,7 @@ async function targetFor(
 ): Promise<Found | undefined> {
   const key = contentKeyOf(msg);
   const known = foundIn(await deps.store.loadRatings(), key, msg.label);
-  if (known !== undefined || !fitsIds(msg.label, msg)) return known;
+  if (known !== undefined || cardlessLabel(msg) !== msg.label) return known;
   await finishJob(deps, explicitFinish(msg));
   return foundIn(await deps.store.loadRatings(), key, msg.label);
 }

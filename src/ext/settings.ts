@@ -37,6 +37,9 @@ export type FinishRecord = {
   error?: JobError;
 };
 
+/** A finish without its date and key: what a rating-card answer tells the tab. */
+export type LastFinish = Pick<FinishRecord, "outcome" | "error">;
+
 export type Settings = {
   mode: Mode;
   binding?: { scUsername: string; nakaAccount?: string };
@@ -95,18 +98,26 @@ function finishError(
   return raw === undefined ? undefined : fail(path);
 }
 
+// Shared with the tab, which reads a finish's outcome from a rating-card answer.
+export function parseOutcome(
+  record: Record<string, unknown>,
+  path: string,
+): LastFinish {
+  const outcome = asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`);
+  const error = finishError(record.error, outcome, `${path}.error`);
+  return error === undefined ? { outcome } : { outcome, error };
+}
+
 // Shared with the status page, which reads the last finish from the worker's answer.
 export function parseFinish(raw: unknown): FinishRecord {
   const path = "settings.lastFinish";
   const record = asRecord(raw, path);
   onlyKeys(record, ["at", "key", "outcome", "error"], path);
-  const outcome = asOneOf(record.outcome, FINISH_OUTCOMES, `${path}.outcome`);
-  const error = finishError(record.error, outcome, `${path}.error`);
+  const done = parseOutcome(record, path);
   return {
     at: asInt(record.at, 0, `${path}.at`),
     key: parseContentKey(record.key, `${path}.key`),
-    outcome,
-    ...(error === undefined ? {} : { error }),
+    ...done,
   };
 }
 

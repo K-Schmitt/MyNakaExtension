@@ -783,6 +783,42 @@ describe("rating-card and rating-cards", () => {
     ).toEqual({ card: null, pauseFromPercent: 0 });
   });
 
+  it("rating-card adds the outcome of the last finish when it is the key's, and only then", async () => {
+    const lastFinish = {
+      at: 5,
+      key: "movie:9",
+      outcome: "failed" as const,
+      error: "sc-session" as const,
+    };
+    const w = world({ settings: { mode: "simulation", lastFinish } });
+    expect(
+      await w.jobs.ratingCard({ type: "rating-card", contentId: 9 }),
+    ).toEqual({
+      card: null,
+      pauseFromPercent: 0,
+      lastFinish: { outcome: "failed", error: "sc-session" },
+    });
+    const other = await w.jobs.ratingCard({
+      type: "rating-card",
+      contentId: 8,
+    });
+    expect(other).not.toHaveProperty("lastFinish");
+    const choice = world({
+      ratings: [filmCard()],
+      settings: {
+        mode: "simulation",
+        lastFinish: { at: 5, key: "movie:9", outcome: "needs-choice" },
+      },
+    });
+    expect(
+      await choice.jobs.ratingCard({ type: "rating-card", contentId: 9 }),
+    ).toEqual({
+      card: filmCard(),
+      pauseFromPercent: 0,
+      lastFinish: { outcome: "needs-choice" },
+    });
+  });
+
   it("rating-card matches the key exactly: another episode is another card", async () => {
     const w = world({ ratings: [episodeCard()] });
     const other = await w.jobs.ratingCard({

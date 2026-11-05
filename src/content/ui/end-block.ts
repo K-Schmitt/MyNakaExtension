@@ -38,7 +38,7 @@ export function createEndBlock(ports: EndPorts) {
       return;
     }
     const label = labelOf(card);
-    if (label !== undefined) session.open(ids, card, label, start, sending);
+    if (label !== undefined) session.open(ids, card, label, { start, sending });
   }
 
   async function openNext(): Promise<void> {

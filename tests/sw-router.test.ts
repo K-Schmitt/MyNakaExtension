@@ -536,7 +536,7 @@ describe("router: rating reads are answered outside the queue", () => {
     expect(r.calls.some((c) => c.startsWith("rate:"))).toBe(false);
     expect(r.answers).toEqual([
       { ok: true },
-      { card: null, pauseFromPercent: 0 },
+      { card: null, pauseFromPercent: 0, sending: ["film"] },
     ]);
     blocker.open();
     await settle();

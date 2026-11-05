@@ -7,6 +7,8 @@ import {
   episodeHeading,
   errorLine,
   filmHeading,
+  NEEDS_CHOICE_LINE,
+  NOT_RATED_LINE,
   OTHER_LABELS,
   SEND_LABEL,
   SENDING_LINE,
@@ -73,6 +75,15 @@ describe("the rating copy, code point by code point", () => {
     );
   });
 
+  it("the lines of a card-less rating that did not go", () => {
+    expect(NEEDS_CHOICE_LINE).toBe(
+      `La note n'est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`,
+    );
+    expect(NOT_RATED_LINE).toBe(
+      `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`,
+    );
+  });
+
   it("the chosen line", () => {
     expect(chosenLine(7)).toBe(`Note choisie${NB}: 7`);
   });
@@ -107,6 +118,8 @@ describe("the rating copy, code point by code point", () => {
       CANCEL_LABEL,
       SENDING_LINE,
       UNREACHABLE_LINE,
+      NEEDS_CHOICE_LINE,
+      NOT_RATED_LINE,
       chosenLine(7),
       ...CODES.map(errorLine),
     ];

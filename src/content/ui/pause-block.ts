@@ -24,7 +24,7 @@ export type PausePorts = EndPorts & {
 };
 
 type Position = Pick<VideoSample, "currentTime" | "duration">;
-type Offer = { card: RatingCard; label: RatingLabel };
+type Offer = { card: RatingCard; label: RatingLabel; viewOnly?: boolean };
 
 function progressOf({ currentTime, duration }: Position): number | undefined {
   if (!Number.isFinite(duration) || duration <= 0) return undefined;
@@ -65,6 +65,7 @@ export function createPauseBlock(ports: PausePorts) {
     return {
       card: viewOnlyCard(ids, title, ports.now()),
       label: viewOnlyLabel(ids),
+      viewOnly: true,
     };
   }
 
@@ -77,8 +78,9 @@ export function createPauseBlock(ports: PausePorts) {
     if (progress < answer.pauseFromPercent / 100) return;
     const chosen = await offerOf(ids, answer);
     if (chosen === undefined || epoch !== mine || ports.endShown()) return;
-    const { card, label } = chosen;
-    session.open(ids, card, label, answer.start, answer.sending);
+    const { card, label, viewOnly } = chosen;
+    const { start, sending } = answer;
+    session.open(ids, card, label, { start, sending, viewOnly });
   }
 
   return {

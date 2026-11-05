@@ -118,7 +118,7 @@ export function createHomeBlock(ports: HomePorts) {
     slots = shown.map(slotOf);
     shown.forEach(({ card, start, sending }, i) => {
       const session = slots[i]?.session;
-      session?.open(idsOf(card), card, firstPending(card), start, sending);
+      session?.open(idsOf(card), card, firstPending(card), { start, sending });
     });
     opening = false;
     draw();

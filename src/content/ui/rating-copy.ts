@@ -2,6 +2,7 @@
 
 import type { RatingLabel } from "../../core/rating-cards";
 import type { JobError } from "../../ext/job-error";
+import type { LastFinish } from "../../ext/settings";
 import { JOB_ERROR_LABELS } from "../../status/job-error-labels";
 
 export type RatingAction = "plus-tard" | "ignorer" | "fermer";
@@ -50,6 +51,18 @@ export function errorLine(error: JobError): string {
 export const SENDING_LINE = "Envoi de la note\u2026";
 
 export const UNREACHABLE_LINE = `La note n'est pas partie${NB}: l'extension ne répond pas.`;
+
+export const NEEDS_CHOICE_LINE = `La note n'est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`;
+
+export const NOT_RATED_LINE = `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`;
+
+/** A rate on a title with no card ran without making one: the title's last finish says why. */
+export function notSentLine(last: LastFinish | undefined): string {
+  if (last?.outcome === "failed" && last.error !== undefined) {
+    return errorLine(last.error);
+  }
+  return last?.outcome === "needs-choice" ? NEEDS_CHOICE_LINE : NOT_RATED_LINE;
+}
 
 export function chosenLine(rating: number): string {
   return `Note choisie${NB}: ${rating}`;

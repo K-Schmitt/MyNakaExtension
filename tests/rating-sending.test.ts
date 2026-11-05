@@ -49,8 +49,8 @@ function latch() {
 
 type Answer = { sending?: string[]; cards?: { sending?: string[] }[] };
 
-// A router whose reads return fixed cards; a sync holds the queue until `sync.open()`.
-async function world(rate?: Jobs["rate"]) {
+// A router whose reads return fixed cards (or no card); a sync holds the queue until `sync.open()`.
+async function world(rate?: Jobs["rate"], cardless = false) {
   const sync = latch();
   const answers: unknown[] = [];
   const jobs = {
@@ -59,7 +59,7 @@ async function world(rate?: Jobs["rate"]) {
     },
     rate: rate ?? (async () => undefined),
     ratingCard: async () => ({
-      card: structuredClone(filmCard),
+      card: cardless ? null : structuredClone(filmCard),
       pauseFromPercent: 0,
     }),
     ratingCards: async () => ({
@@ -150,6 +150,37 @@ describe("router: the ratings still being sent are reported", () => {
         (await w.ask({ type: "rating-cards" })).cards?.[0]?.sending,
       ).toEqual(["film"]);
     }
+    w.sync.open();
+    await settle();
+  });
+});
+
+describe("router: the ratings being sent for a title with no card", () => {
+  it("lists the film of film ids, and only it", async () => {
+    const w = await world(undefined, true);
+    w.send({ ...RATE, label: "série" });
+    w.send(RATE);
+    w.send({ ...RATE, contentId: 4 });
+    expect((await w.ask(CARD)).sending).toEqual(["film"]);
+    w.sync.open();
+    await settle();
+  });
+
+  it("lists the épisode of episode ids, and only it", async () => {
+    const w = await world(undefined, true);
+    w.send({ ...RATE, ...SERIE_IDS, label: "saison" });
+    w.send({ ...RATE, ...SERIE_IDS, label: "épisode" });
+    w.send({ ...RATE, ...SERIE_IDS, episode: 2, label: "épisode" });
+    const answer = await w.ask({ type: "rating-card", ...SERIE_IDS });
+    expect(answer.sending).toEqual(["épisode"]);
+    w.sync.open();
+    await settle();
+  });
+
+  it("omits the field when its label is not being sent", async () => {
+    const w = await world(undefined, true);
+    w.send({ ...RATE, label: "série" });
+    expect("sending" in (await w.ask(CARD))).toBe(false);
     w.sync.open();
     await settle();
   });

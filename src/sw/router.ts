@@ -14,6 +14,7 @@ import {
   type Sender,
   type ToWorker,
 } from "../ext/messages";
+import type { RatingCardMessage } from "../ext/rating-messages";
 import { createActivity, overlapping } from "./activity";
 import { createDebounce } from "./debounce";
 import { createFinishQueue } from "./finish-queue";
@@ -22,7 +23,7 @@ import type { Jobs, Trigger } from "./jobs";
 import type { Timer } from "./naka-proxy";
 import { createRateQueue } from "./rate-queue";
 import type { CardAnswer, CardsAnswer } from "./rating-answers";
-import { sendingOf } from "./rating-answers";
+import { cardlessSendingOf, sendingOf } from "./rating-answers";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
 export type Respond = (answer: unknown) => void;
@@ -60,12 +61,16 @@ export function createRouter(deps: RouterDeps): Router {
     (msg) => jobs.finishJob(msg),
   );
 
-  // The answers add what the queue alone knows: the ratings still being sent.
-  const withSending = async (cardAnswer: Promise<CardAnswer>) => {
+  // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
+  // ids say which label a rate of the title can have.
+  const withSending = async (
+    msg: RatingCardMessage,
+    cardAnswer: Promise<CardAnswer>,
+  ) => {
     const answer = await cardAnswer;
     return answer.card
       ? { ...answer, ...sendingOf(answer.card, rate.sending) }
-      : answer;
+      : { ...answer, ...cardlessSendingOf(msg, rate.sending) };
   };
   const withSendingAll = async (cardsAnswer: Promise<CardsAnswer>) => ({
     cards: (await cardsAnswer).cards.map((entry) => ({
@@ -135,7 +140,7 @@ export function createRouter(deps: RouterDeps): Router {
         answerStatus(respond);
         return true;
       case "rating-card":
-        answerRead(() => withSending(jobs.ratingCard(msg)), respond);
+        answerRead(() => withSending(msg, jobs.ratingCard(msg)), respond);
         return true;
       case "rating-cards":
         answerRead(() => withSendingAll(jobs.ratingCards()), respond);
