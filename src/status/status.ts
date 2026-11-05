@@ -3,6 +3,8 @@
 
 import { createHandledController } from "./handled-controller";
 import { showHandled } from "./handled-dom";
+import { createListsController } from "./lists-controller";
+import { showLists } from "./lists-dom";
 import { readDraft, showNote, showSettings, syncForm } from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
@@ -60,6 +62,12 @@ function setBusy(busy: boolean): void {
   element("status").setAttribute("aria-busy", String(busy));
 }
 
+const timer = {
+  set: (fn: () => void, ms: number) => setTimeout(fn, ms),
+  clear: (handle: unknown) =>
+    clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+
 const controller = createController({
   send: (message) => chrome.runtime.sendMessage(message),
   confirm: (text) => window.confirm(text),
@@ -68,10 +76,7 @@ const controller = createController({
   focus,
   note: showNote,
   format: localFormat(),
-  timer: {
-    set: (fn, ms) => setTimeout(fn, ms),
-    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-  },
+  timer,
 });
 
 const handled = createHandledController({
@@ -79,10 +84,35 @@ const handled = createHandledController({
   show: (view) => showHandled(view, (key) => void handled.forget(key)),
 });
 
-// A sync that ended may have changed what is handled: the list is asked again after it.
+// The search field of a row just opened takes the focus on the next draw.
+let focusKey: string | undefined;
+
+const lists = createListsController({
+  send: (message) => chrome.runtime.sendMessage(message),
+  timer,
+  show: (view) => {
+    showLists(
+      view,
+      {
+        onAction: (key, action) => {
+          if (action.kind === "open-search") focusKey = key;
+          void lists.act(key, action);
+        },
+        onType: (key, text) => lists.type(key, text),
+      },
+      focusKey,
+    );
+    focusKey = undefined;
+  },
+});
+
+// A sync that ended may have changed what is handled and asked: both lists are asked again after it.
 element("resync").addEventListener(
   "click",
-  () => void controller.resync().then(() => handled.load()),
+  () =>
+    void controller
+      .resync()
+      .then(() => Promise.all([handled.load(), lists.load()])),
 );
 element("switch").addEventListener("click", () => void controller.toggleMode());
 function onFormEdit(): void {
@@ -105,3 +135,4 @@ element("save-settings").addEventListener(
 );
 void controller.load();
 void handled.load();
+void lists.load();

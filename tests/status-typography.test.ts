@@ -3,11 +3,20 @@ import { describe, expect, it } from "vitest";
 import type { JobError } from "../src/ext/job-error";
 import type { RunRecord } from "../src/ext/settings";
 import { JOB_ERROR_LABELS } from "../src/status/job-error-labels";
+import { LISTS_COPY } from "../src/status/lists-copy";
+import {
+  EMPTY_STATE,
+  type ListRow,
+  type ListsState,
+  type SearchPhase,
+  toListsView,
+} from "../src/status/lists-view";
 import { SETTINGS_COPY, toSettingsView } from "../src/status/settings-view";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
 import { type StatusView, toStatusView } from "../src/status/status-view";
 import type { StatusSnapshot } from "../src/sw/status-snapshot";
+import { AMBIGUITY, LISTS, REMOVAL, UNLINKED_NAKA } from "./lists-fixtures";
 
 // French typography (Ruling 19): U+202F NARROW NO-BREAK SPACE before « : », « ; », « ? » and « ! », and
 // inside « ». A colon between digits (a time, 14:05) takes none.
@@ -143,5 +152,68 @@ describe("French typography on the status page", () => {
       .replace(/<[^>]*>/g, " ")
       .replaceAll("&#8239;", String.fromCodePoint(0x202f));
     expect(typographyFaults(shown)).toEqual([]);
+  });
+
+  it("every sentence of the question and unlinked rows follows it", () => {
+    const searching = (phase: SearchPhase): ListsState => ({
+      ...EMPTY_STATE,
+      search: { key: UNLINKED_NAKA.key, query: "Dune", phase },
+    });
+    const phases: SearchPhase[] = [
+      { kind: "idle" },
+      { kind: "empty-query" },
+      { kind: "searching" },
+      { kind: "results", candidates: [] },
+      {
+        kind: "results",
+        candidates: [{ id: 1, title: "Dune", year: 2021, type: "film" }],
+      },
+      ...CODES.map((error) => ({ kind: "error" as const, error })),
+    ];
+    const outcomes = CODES.map((error) => ({
+      seq: 1,
+      at: 1,
+      target: AMBIGUITY.key,
+      outcome: "failed" as const,
+      error,
+    }));
+    const plain = ["refused", "mismatch", "moot"].map((outcome) => ({
+      seq: 1,
+      at: 1,
+      target: AMBIGUITY.key,
+      outcome: outcome as "refused",
+    }));
+    const rowTexts = (row: ListRow): string[] => [
+      row.heading,
+      row.question ?? "",
+      ...row.lines,
+      ...row.buttons.flatMap((b) => [b.label, b.aria ?? ""]),
+      row.search?.fieldError ?? "",
+      row.search?.message ?? "",
+      ...(row.search?.results.flatMap((r) => [
+        r.label,
+        r.relier.label,
+        r.relier.aria ?? "",
+      ]) ?? []),
+    ];
+    const views = [
+      ...phases.map((p) => toListsView(LISTS, searching(p))),
+      ...[...outcomes, ...plain].map((lastAnswer) =>
+        toListsView({ ...LISTS, lastAnswer }, { ...EMPTY_STATE, seenSeq: 0 }),
+      ),
+      toListsView({ ...LISTS, answering: [REMOVAL.key] }, EMPTY_STATE),
+      toListsView(LISTS, { ...EMPTY_STATE, unsent: [AMBIGUITY.key] }),
+    ];
+    const all = [
+      ...Object.values(LISTS_COPY),
+      ...views.flatMap((v) => [
+        v.note,
+        ...[...v.questions, ...v.unlinked].flatMap(rowTexts),
+      ]),
+    ];
+    expect(
+      all.filter((text) => text.includes("\u202F")).length,
+    ).toBeGreaterThan(20);
+    expect(all.flatMap(typographyFaults)).toEqual([]);
   });
 });
