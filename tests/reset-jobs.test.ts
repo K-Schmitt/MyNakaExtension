@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { emptyState } from "../src/core/state";
 import type { Settings } from "../src/ext/settings";
+import { createStore } from "../src/ext/store";
+import { recordAnswer } from "../src/sw/answer-log";
 import type { ResetRules } from "../src/sw/reset-jobs";
 import { answerWorld, BOUND, NOW } from "./answer-world";
 import { stateWith } from "./question-fixtures";
@@ -63,7 +65,7 @@ describe("reset", () => {
     expect(w.state()).toEqual(emptyState());
   });
 
-  it("switches to simulation and keeps only the binding, thresholds, pause, auto-run date and finish window", async () => {
+  it("switches to simulation and keeps only the binding, thresholds, pause, auto-run date, finish window and answer counter", async () => {
     const w = answerWorld({ settings: FULL });
     await w.jobs.reset();
     expect(w.area.data.get("settings")).toEqual({
@@ -73,7 +75,17 @@ describe("reset", () => {
       pauseFromPercent: 50,
       lastAutoRunAt: 1,
       finishWindow: FINISH_WINDOW,
+      lastAnswer: FULL.lastAnswer,
     });
+  });
+
+  it("keeps the answer counter: the next answer after a reset is numbered after the last one", async () => {
+    const lastAnswer = { ...(FULL.lastAnswer as object), seq: 7 };
+    const w = answerWorld({ settings: { ...FULL, lastAnswer } as Settings });
+    await w.jobs.reset();
+    expect(w.settings().lastAnswer?.seq).toBe(7);
+    await recordAnswer(createStore(w.area), "removal:sc:21:1021", "done", NOW);
+    expect(w.settings().lastAnswer?.seq).toBe(8);
   });
 
   it("writes the default settings in simulation when the settings are unreadable", async () => {

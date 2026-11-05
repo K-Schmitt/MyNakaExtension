@@ -29,10 +29,11 @@ export const RESET_RULES: ResetRules = {
   lastAutoRunAt: "keep",
   finishWindow: "keep",
   forgetWindow: "keep",
+  // The seq counter never restarts: open blocks and the page hold older baselines.
+  lastAnswer: "keep",
   // These describe the erased state.
   lastRun: "drop",
   lastFinish: "drop",
-  lastAnswer: "drop",
 };
 
 function keptOf(settings: Settings): Settings {
