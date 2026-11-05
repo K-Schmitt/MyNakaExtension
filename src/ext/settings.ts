@@ -18,6 +18,7 @@ import { parseContentKey } from "./item-schema";
 import type { JobError } from "./job-error";
 import { ERROR_CODES, MODES, parseRunRecord } from "./run-record-schema";
 import { parsePauseFromPercent, parseThresholds } from "./thresholds-schema";
+import { parseWindow } from "./window-schema";
 
 export type Mode = "simulation" | "live";
 
@@ -140,13 +141,7 @@ export function parseFinish(raw: unknown): FinishRecord {
 }
 
 function parseFinishWindow(raw: unknown): FinishWindow {
-  const path = "settings.finishWindow";
-  const record = asRecord(raw, path);
-  onlyKeys(record, ["from", "count"], path);
-  const from = asInt(record.from, 0, `${path}.from`);
-  const count = asInt(record.count, 0, `${path}.count`);
-  if (count > MAX_FINISHES_PER_WINDOW) return fail(`${path}.count`);
-  return { from, count };
+  return parseWindow(raw, "settings.finishWindow", MAX_FINISHES_PER_WINDOW);
 }
 
 // The settings read from storage. An absent key (undefined) is a first install: simulation, nothing else.
