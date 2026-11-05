@@ -272,6 +272,27 @@ dans une liste « À noter » sur l'accueil. La page de l'extension gagne des r�
 - Écarté pour l'instant : un seuil bloquant dans le gate. Il faut d'abord voir comment la mesure
   bouge au fil des plans. Un seuil fixé trop tôt bloquerait sans rien apprendre.
 
+## 2026-11-05 — Recette du Plan 4a
+
+La recette dans Brave a validé les notes depuis Naka :
+- le bloc de fin d'un film et d'un épisode, et la note qui part sur SensCritique ;
+- la saison proposée après le dernier épisode, avec la moyenne des épisodes ;
+- « Plus tard » et la liste « À noter » de l'accueil ;
+- le bloc de pause et son réglage « À partir de 50 % » ;
+- l'avertissement avant de noter une série pas finie.
+
+Un défaut corrigé après la recette : en haut à droite, le bloc cachait trois boutons du lecteur
+(« Voir la fiche », « Créer un clip », « Signaler un problème »). Le lecteur a une barre de
+commandes en haut (1 à 5 % de la hauteur) et une en bas (95 à 99 %). Le bloc commence donc à 7 % et
+s'arrête au plus à 87 %.
+
+Faits appris pendant la recette :
+- noter un épisode ou une saison laisse la série dans les envies ; noter la série l'en retire ;
+- Naka sert une adresse vidéo neuve (`blob:`) à chaque chargement, même pour le même film ;
+- cocher et décocher « vu » sur Naka passent par le même appel, `PUT /api/v1/history/watched`, avec
+  `watched: true` ou `false`. Décocher ne change rien sur SensCritique, et l'extension garde le titre
+  comme traité : le Plan 4b le lui fera oublier.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
