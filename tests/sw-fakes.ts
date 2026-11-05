@@ -110,6 +110,7 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     removeFromPlaylist: async () => undefined,
     search: async () => [],
     contentById: async () => undefined,
+    availableSeasons: async () => undefined,
     ...over,
   };
   const client: NakaClient = {
@@ -132,6 +133,10 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     contentById: (id) => {
       calls.push(`contentById:${id}`);
       return base.contentById(id);
+    },
+    availableSeasons: (id) => {
+      calls.push(`availableSeasons:${id}`);
+      return base.availableSeasons(id);
     },
   };
   return { client, calls };

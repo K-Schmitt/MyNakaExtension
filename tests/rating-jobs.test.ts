@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import type { RatingCard } from "../src/core/rating-cards";
+import { JobRejected } from "../src/ext/job-error";
 import type { Settings } from "../src/ext/settings";
-import type { NakaClient, NakaItem } from "../src/naka/naka-client";
+import {
+  type NakaClient,
+  type NakaItem,
+  NakaUnavailableError,
+} from "../src/naka/naka-client";
 import type { ScClient } from "../src/sc/sc-client";
 import {
   ScUnauthenticatedError,
@@ -129,6 +134,7 @@ function world(o: Opts = {}) {
     nk,
     sk,
     username,
+    slots,
     cards: (): RatingCard[] =>
       (area.data.get("ratings") as RatingCard[] | undefined) ?? [],
     settings: () => area.data.get("settings") as Settings,
@@ -197,7 +203,7 @@ describe("the finish creates the rating card", () => {
       ["saison", 5007],
       ["série", 1007],
     ]);
-    expect(w.nk.calls).toEqual(["contentById:7"]);
+    expect(w.nk.calls).toEqual(["contentById:7", "availableSeasons:7"]);
   });
 
   it("with no season count from Naka the series is not finished: épisode and saison only, and the série is never read", async () => {
@@ -306,6 +312,134 @@ describe("the finish creates the rating card", () => {
     await w.jobs.finishJob(episode(3, 3));
     expect(w.cards()[0]?.pending).toEqual(["épisode"]);
     expect(w.cards()[0]?.targets).toHaveLength(3);
+  });
+});
+
+describe("the season list of Naka decides the ends", () => {
+  const seasons = (
+    list: number[],
+    counts: Record<number, number>,
+  ): Partial<NakaClient> => ({
+    availableSeasons: async () => ({ seasons: list, episodeCounts: counts }),
+  });
+
+  it("E16 of season 1 with {1: 16} ends the season even when SensCritique lists an E17", async () => {
+    const w = world({
+      episodesPerSeason: 17,
+      naka: seasons([1, 2], { 1: 16, 2: 10 }),
+    });
+    await w.jobs.finishJob(episode(1, 16));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: false,
+      pending: ["épisode", "saison"],
+    });
+    expect(w.sk.calls).toContain("productState:5007");
+  });
+
+  it("E22 of season 7 with seasons up to 7 finishes the series, with no numberOfSeasons from the catalogue", async () => {
+    const w = world({
+      episodesPerSeason: 22,
+      naka: seasons([1, 2, 3, 4, 5, 6, 7], { 7: 22 }),
+    });
+    await w.jobs.finishJob(episode(7, 22));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: true,
+      pending: ["épisode", "saison", "série"],
+    });
+  });
+
+  it("the list beats a stale numberOfSeasons: season 2 of 3 is not the end of the series", async () => {
+    const w = world({
+      numberOfSeasons: 2,
+      naka: seasons([1, 2, 3], { 2: 3 }),
+    });
+    await w.jobs.finishJob(episode(2, 3));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: false,
+      pending: ["épisode", "saison"],
+    });
+  });
+
+  it("a gap in the list: the last season is the highest, not the count", async () => {
+    const w = world({ naka: seasons([1, 2, 4], { 4: 3 }) });
+    await w.jobs.finishJob(episode(4, 3));
+    expect(w.cards()[0]?.seriesFinished).toBe(true);
+    const gap = world({ naka: seasons([1, 2, 4], { 2: 3 }) });
+    await gap.jobs.finishJob(episode(2, 3));
+    expect(gap.cards()[0]?.seriesFinished).toBe(false);
+  });
+
+  it("an episode before the count of its season is not the end of the season", async () => {
+    const w = world({
+      episodesPerSeason: 3,
+      naka: seasons([1], { 1: 16 }),
+    });
+    await w.jobs.finishJob(episode(1, 3));
+    expect(w.cards()[0]?.pending).toEqual(["épisode"]);
+  });
+
+  it("a list that has no count for the season falls back to SensCritique's last episode", async () => {
+    const w = world({ naka: seasons([1, 2], { 1: 16 }) });
+    await w.jobs.finishJob(episode(2, 3));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: true,
+      pending: ["épisode", "saison", "série"],
+    });
+  });
+
+  it("the call goes through the Naka limiter, after the content read", async () => {
+    const w = world({ naka: seasons([1], { 1: 3 }) });
+    await w.jobs.finishJob(episode(1, 3));
+    expect(w.nk.calls).toEqual(["contentById:7", "availableSeasons:7"]);
+    expect(w.slots.filter((s) => s === "limit:naka")).toHaveLength(2);
+  });
+
+  it("a call that fails keeps the card, the record and Naka's numberOfSeasons", async () => {
+    const w = world({
+      numberOfSeasons: 3,
+      naka: {
+        availableSeasons: async () => {
+          throw new NakaUnavailableError("Naka seasons: HTTP 500", 500);
+        },
+      },
+    });
+    await w.jobs.finishJob(episode(3, 3));
+    expect(w.settings().lastFinish).toMatchObject({ outcome: "done" });
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: true,
+      pending: ["épisode", "saison", "série"],
+    });
+  });
+
+  it("an unreachable tab for that call keeps the card too", async () => {
+    const w = world({
+      numberOfSeasons: 3,
+      naka: {
+        availableSeasons: async () => {
+          throw new JobRejected("naka-session");
+        },
+      },
+    });
+    await w.jobs.finishJob(episode(2, 3));
+    expect(w.settings().lastFinish).toMatchObject({ outcome: "done" });
+    expect(w.cards()[0]?.pending).toEqual(["épisode", "saison"]);
+  });
+
+  it("no call for a film", async () => {
+    const w = world({ naka: seasons([1], { 1: 3 }) });
+    await w.jobs.finishJob(finished());
+    expect(w.nk.calls).toEqual(["contentById:3"]);
+    expect(w.cards()).toHaveLength(1);
+  });
+
+  it("no call when the finish does not end done", async () => {
+    const w = world({
+      sc: { search: async () => [] },
+      naka: seasons([1], { 1: 3 }),
+    });
+    await w.jobs.finishJob(episode(1, 3));
+    expect(w.nk.calls).toEqual(["contentById:7"]);
+    expect(w.area.ops).not.toContain("set:ratings");
   });
 });
 

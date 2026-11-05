@@ -4,6 +4,7 @@
 import { NakaUnavailableError } from "../naka/naka-errors";
 import { isPositiveId } from "../naka/naka-input";
 import { type NakaItem, toItem } from "../naka/naka-items";
+import { type NakaSeasons, toSeasons } from "../naka/naka-seasons";
 import { isRecord } from "../naka/naka-transport";
 
 const ACCOUNT_ID = /^[1-9]\d*$/;
@@ -41,6 +42,11 @@ export function asItem(value: unknown): NakaItem {
 // One doubtful entry fails the whole list: an honest tab never sends one.
 export function asItems(value: unknown): NakaItem[] {
   return toList(value).map(asItem);
+}
+
+// The same rules as the client's parser, applied to what crossed `chrome.runtime`.
+export function asSeasons(value: unknown): NakaSeasons {
+  return toSeasons(value) ?? unexpected();
 }
 
 export function asAccount(value: unknown): string | undefined {

@@ -26,11 +26,16 @@ import { preCheck } from "./finish-precheck";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { buildCard, type CardInput, storeCard } from "./rating-card-builder";
 import { readNakaItem } from "./read-ports";
+import { readSeasons, type SeasonsRead } from "./season-read";
 import { toJobError } from "./to-job-error";
 
 type Done = { outcome: FinishRecord["outcome"]; error?: JobError };
 /** A finish that ended `done` also hands over what its rating card is built from. */
-type Attempted = Done & { card?: Omit<CardInput, "at"> };
+type Attempted = Done & {
+  card?: Omit<CardInput, "at" | "seasons">;
+  /** Reads Naka's season list through the job's pinned tab; run only once the finish is recorded. */
+  seasons?: SeasonsRead;
+};
 
 async function attempt(
   deps: JobDeps,
@@ -54,7 +59,11 @@ async function attempt(
     const outcome = await handleFinish(event, ports, thresholds);
     if (outcome.kind !== "done") return { outcome: outcome.kind };
     const { productState } = ports;
-    return { outcome: "done", card: { outcome, event, item, productState } };
+    return {
+      outcome: "done",
+      card: { outcome, event, item, productState },
+      seasons: () => readSeasons(naka, deps.limiters.naka, event),
+    };
   } catch (error) {
     return { outcome: "failed", error: toJobError(error) };
   }
@@ -92,17 +101,22 @@ async function counted(
   await deps.store.saveSettings(reserved);
   const attempted = await attempt(deps, settings, msg);
   if (attempted === undefined) return;
-  const { card, ...done } = attempted;
+  const { card, seasons, ...done } = attempted;
   await record(deps, reserved, { at, key, ...done });
-  if (card !== undefined) await keepCard(deps, { ...card, at });
+  if (card !== undefined) await keepCard(deps, { ...card, at }, seasons);
 }
 
 // After the finish record: the finish is a fact on SensCritique, the card only a way to rate it. Whatever
 // fails here (a read of the saison or the série, the ratings unreadable or unwritable) leaves the record
 // as saved and the ratings as they were.
-async function keepCard(deps: JobDeps, input: CardInput): Promise<void> {
+async function keepCard(
+  deps: JobDeps,
+  input: CardInput,
+  readSeasons?: SeasonsRead,
+): Promise<void> {
   try {
-    await storeCard(deps.store, await buildCard(input));
+    const seasons = await readSeasons?.();
+    await storeCard(deps.store, await buildCard({ ...input, seasons }));
   } catch {
     // Nothing more can be recorded.
   }

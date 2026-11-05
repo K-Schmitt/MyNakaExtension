@@ -12,8 +12,9 @@ import {
   upsertCard,
 } from "../core/rating-cards";
 import { type SeasonEnd, seasonEnd } from "../core/season-end";
+import { seasonFactsOf } from "../core/season-facts";
 import type { Store } from "../ext/store";
-import type { NakaItem } from "../naka/naka-client";
+import type { NakaItem, NakaSeasons } from "../naka/naka-client";
 import type { ProductState } from "../sc/sc-client";
 
 export type DoneOutcome = Extract<FinishOutcome, { kind: "done" }>;
@@ -22,18 +23,20 @@ export type CardInput = {
   outcome: DoneOutcome;
   event: FinishEvent;
   item: NakaItem;
+  /** Naka's season list, when it answered: it decides the end of the season and of the series. */
+  seasons?: NakaSeasons;
   productState(productId: number): Promise<ProductState>;
   at: number;
 };
 
 const FILM_END: SeasonEnd = { lastOfSeason: false, seriesFinished: false };
 
-function endOf({ outcome, event, item }: CardInput): SeasonEnd {
+function endOf({ outcome, event, item, seasons }: CardInput): SeasonEnd {
   const { season, episode } = event.naka;
   if (season === undefined || episode === undefined) return FILM_END;
   return seasonEnd(
     { season, episode },
-    { lastSeason: item.numberOfSeasons },
+    seasonFactsOf(seasons, season, item.numberOfSeasons),
     outcome.lastOfSeason === true,
   );
 }

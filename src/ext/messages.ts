@@ -48,7 +48,7 @@ export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
   | {
       type: "naka-call";
-      call: "add" | "remove" | "contentById";
+      call: "add" | "remove" | "contentById" | "availableSeasons";
       contentId: number;
     }
   | { type: "naka-call"; call: "search"; query: string }
@@ -113,6 +113,7 @@ const CALLS = valuesOf<NakaCall>({
   add: true,
   remove: true,
   contentById: true,
+  availableSeasons: true,
 });
 const REPLY_ERRORS = valuesOf<NakaReplyError>({
   "no-token": true,

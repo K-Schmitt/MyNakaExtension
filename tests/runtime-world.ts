@@ -417,6 +417,10 @@ function nakaClient(w: World): NakaClient {
       nakaGate(w, "content");
       return TITLES.includes(id) ? nakaItem(id) : undefined;
     },
+    availableSeasons: async () => {
+      nakaGate(w, "seasons");
+      return undefined;
+    },
   };
 }
 

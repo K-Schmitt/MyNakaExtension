@@ -54,6 +54,8 @@ async function run(
       return client.search(msg.query);
     case "contentById":
       return client.contentById(msg.contentId);
+    case "availableSeasons":
+      return client.availableSeasons(msg.contentId);
     case "add":
       return client.addToPlaylist(msg.contentId);
     case "remove":

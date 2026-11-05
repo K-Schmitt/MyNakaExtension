@@ -13,6 +13,7 @@ import {
   asItem,
   asItems,
   asNothing,
+  asSeasons,
   unexpected,
 } from "./naka-values";
 import {
@@ -97,6 +98,18 @@ async function contentById(read: () => Promise<unknown>, contentId: number) {
   return item.contentId === contentId ? item : unexpected();
 }
 
+// 404 means "no season list", like contentById's "not in the catalogue".
+async function availableSeasons(read: () => Promise<unknown>) {
+  let value: unknown;
+  try {
+    value = await read();
+  } catch (error) {
+    if (isNotFound(error)) return undefined;
+    throw error;
+  }
+  return value === undefined ? undefined : asSeasons(value);
+}
+
 // One proxy per job: its calls go to the tab it pins (see pinned-tab.ts); `onLost` hears that tab is gone.
 export function createNakaProxy(
   tabs: TabsPort,
@@ -127,6 +140,12 @@ export function createNakaProxy(
       return contentById(
         () => call({ type: "naka-call", call: "contentById", contentId }),
         contentId,
+      );
+    },
+    availableSeasons: async (contentId) => {
+      checkContentId(contentId);
+      return availableSeasons(() =>
+        call({ type: "naka-call", call: "availableSeasons", contentId }),
       );
     },
     account: async () => asAccount(await call({ type: "naka-account" })),

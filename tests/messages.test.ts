@@ -334,7 +334,7 @@ describe("parseToNakaTab", () => {
   });
 
   it("accepts the id calls", () => {
-    for (const call of ["add", "remove", "contentById"]) {
+    for (const call of ["add", "remove", "contentById", "availableSeasons"]) {
       expect(parseToNakaTab({ type: "naka-call", call, contentId: 9 })).toEqual(
         {
           type: "naka-call",
@@ -381,6 +381,7 @@ describe("parseToNakaTab", () => {
     for (const v of [0, -1, 1.5, 2 ** 53, "3", null, undefined, Number.NaN]) {
       expect(idCall(v)).toBeUndefined();
       expect(idCall(v, "contentById")).toBeUndefined();
+      expect(idCall(v, "availableSeasons")).toBeUndefined();
       expect(idCall(v, "remove")).toBeUndefined();
     }
   });

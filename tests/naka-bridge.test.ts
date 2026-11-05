@@ -15,8 +15,10 @@ import {
 } from "./naka-bridge-fakes";
 
 const noAccount = () => undefined;
-const call = (c: "add" | "remove" | "contentById", contentId: number) =>
-  ({ type: "naka-call", call: c, contentId }) as ToNakaTab;
+const call = (
+  c: "add" | "remove" | "contentById" | "availableSeasons",
+  contentId: number,
+) => ({ type: "naka-call", call: c, contentId }) as ToNakaTab;
 
 function failing(error: unknown): NakaClient {
   const boom = async () => {
@@ -28,6 +30,7 @@ function failing(error: unknown): NakaClient {
     removeFromPlaylist: boom,
     search: boom,
     contentById: boom,
+    availableSeasons: boom,
   };
 }
 
@@ -81,6 +84,24 @@ describe("handleNakaCall: results", () => {
     expect(found).toMatchObject({ ok: true, value: { contentId: 7 } });
     const missing = await handleNakaCall(
       call("contentById", 8),
+      client,
+      noAccount,
+    );
+    expect(missing).toStrictEqual({ ok: true });
+  });
+
+  it("returns the season list, or no value on 404", async () => {
+    const found = await handleNakaCall(
+      call("availableSeasons", 7),
+      client,
+      noAccount,
+    );
+    expect(found).toStrictEqual({
+      ok: true,
+      value: { seasons: [1, 2], episodeCounts: { 1: 8, 2: 10 } },
+    });
+    const missing = await handleNakaCall(
+      call("availableSeasons", 8),
       client,
       noAccount,
     );
