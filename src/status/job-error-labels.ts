@@ -12,4 +12,5 @@ export const JOB_ERROR_LABELS: Record<JobError, string> = {
   unavailable: "Site indisponible, nouvel essai au prochain passage",
   "finish-limit":
     "Trop de fins de visionnage en une heure\u202F: réessayez plus tard",
+  "naka-list-empty": "Ma liste Naka lue vide\u202F: rien n'a été retiré",
 };

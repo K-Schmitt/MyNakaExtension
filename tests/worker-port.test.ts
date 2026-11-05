@@ -133,6 +133,64 @@ describe("rate and dismiss", () => {
   });
 });
 
+describe("the answers", () => {
+  it("send one message each, with exactly the given values", async () => {
+    const send = ok(undefined);
+    const port = createWorkerPort(send);
+    await port.answerQuestion("naka", 5, 2005);
+    await port.answerQuestion("sc", 1021, null);
+    await port.answerRemoval("sc", 21, 1021, true);
+    await port.answerRemoval("naka", 21, 1021, false);
+    await port.hideQuestion("removal:sc:21:1021");
+    expect(send.mock.calls).toEqual([
+      [{ type: "answer-question", side: "naka", id: 5, choice: 2005 }],
+      [{ type: "answer-question", side: "sc", id: 1021, choice: null }],
+      [
+        {
+          type: "answer-removal",
+          removeFrom: "sc",
+          nakaId: 21,
+          scId: 1021,
+          remove: true,
+        },
+      ],
+      [
+        {
+          type: "answer-removal",
+          removeFrom: "naka",
+          nakaId: 21,
+          scId: 1021,
+          remove: false,
+        },
+      ],
+      [{ type: "hide-question", key: "removal:sc:21:1021" }],
+    ]);
+  });
+
+  it("say true when the send resolved, whatever the answer", async () => {
+    const port = createWorkerPort(ok(undefined));
+    await expect(port.answerQuestion("naka", 5, 2005)).resolves.toBe(true);
+    await expect(port.answerRemoval("sc", 21, 1021, true)).resolves.toBe(true);
+    await expect(port.hideQuestion("ambiguity:naka:5")).resolves.toBe(true);
+  });
+
+  it("say false, never throw, when the send rejects or throws (4a Ruling 24)", async () => {
+    for (const send of [
+      vi.fn(() => Promise.reject(new Error("gone"))),
+      () => {
+        throw new Error("Extension context invalidated.");
+      },
+    ]) {
+      const port = createWorkerPort(send);
+      await expect(port.answerQuestion("naka", 5, null)).resolves.toBe(false);
+      await expect(port.answerRemoval("naka", 21, 1021, false)).resolves.toBe(
+        false,
+      );
+      await expect(port.hideQuestion("ambiguity:naka:5")).resolves.toBe(false);
+    }
+  });
+});
+
 describe("answer bounds and film ids", () => {
   it("accepts pauseFromPercent 0 and 99, start 1 and 10", async () => {
     for (const [pauseFromPercent, start] of [

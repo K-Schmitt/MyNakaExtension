@@ -3,9 +3,8 @@
 // here (a film or an épisode only: a saison or a série is never rated without its card). The binding is
 // checked before the write, as the finish does. A failure is stored on the card as a code, never as text.
 
-import type { FinishedMessage } from "../content/playback-tracker";
 import { cardlessLabel } from "../core/cardless-label";
-import { type ContentIds, contentKeyOf } from "../core/finish-event";
+import { contentKeyOf } from "../core/finish-event";
 import {
   applyDismiss,
   applyFailure,
@@ -18,6 +17,7 @@ import {
 import type { DismissRatingMessage, RateMessage } from "../ext/rating-messages";
 import type { Store } from "../ext/store";
 import { checkBinding } from "./binding";
+import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
@@ -31,22 +31,6 @@ function foundIn(
 ): Found | undefined {
   const target = cardFor(cards, key)?.targets.find((t) => t.label === label);
   return target === undefined ? undefined : { cards, target };
-}
-
-function explicitFinish({
-  contentId,
-  season,
-  episode,
-}: ContentIds): FinishedMessage {
-  return {
-    type: "finished",
-    source: "explicit",
-    progress: 1,
-    contentId,
-    ...(season === undefined || episode === undefined
-      ? {}
-      : { season, episode }),
-  };
 }
 
 // The card's target, or none. With no card, a film or an épisode runs its explicit finish first (the

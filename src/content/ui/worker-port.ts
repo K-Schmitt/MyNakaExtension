@@ -3,7 +3,9 @@
 // validated field by field (worker-answers) before the block uses it.
 
 import type { ContentIds } from "../../core/finish-event";
+import type { QuestionKey } from "../../core/questions";
 import type { RatingLabel } from "../../core/rating-cards";
+import type { Side } from "../../core/state";
 import {
   parseOpenQuestionsAnswer,
   parseRemovalOfferAnswer,
@@ -71,5 +73,14 @@ export function createWorkerPort(send: SendRating) {
       sent({ type: "rate", ...idsOf(ids), label, rating }),
     dismiss: (ids: ContentIds, label: RatingLabel) =>
       sent({ type: "dismiss-rating", ...idsOf(ids), label }),
+    answerQuestion: (side: Side, id: number, choice: number | null) =>
+      sent({ type: "answer-question", side, id, choice }),
+    answerRemoval: (
+      removeFrom: Side,
+      nakaId: number,
+      scId: number,
+      remove: boolean,
+    ) => sent({ type: "answer-removal", removeFrom, nakaId, scId, remove }),
+    hideQuestion: (key: QuestionKey) => sent({ type: "hide-question", key }),
   };
 }

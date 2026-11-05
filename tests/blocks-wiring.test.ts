@@ -61,6 +61,9 @@ function wiringWorld() {
       calls.push(`dismiss ${keyOf(ids)} ${label}`);
       return true;
     },
+    answerQuestion: async () => true,
+    answerRemoval: async () => true,
+    hideQuestion: async () => true,
   };
   const blocks = wireBlocks({
     port,

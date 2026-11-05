@@ -17,6 +17,7 @@ import {
   isQuestionType,
   parseQuestionMessage,
   QUESTION_SENDERS,
+  QUESTION_TYPE_FLAGS,
   type QuestionMessage,
 } from "./question-messages";
 import {
@@ -107,9 +108,7 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   "rating-cards": true,
   rate: true,
   "dismiss-rating": true,
-  "open-questions": true,
-  "removal-offer": true,
-  "page-lists": true,
+  ...QUESTION_TYPE_FLAGS,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });

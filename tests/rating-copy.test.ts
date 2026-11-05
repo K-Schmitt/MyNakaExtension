@@ -100,6 +100,7 @@ describe("the rating copy, code point by code point", () => {
       unavailable: "le site ne répond pas, réessayez plus tard",
       "finish-limit":
         "trop de fins de visionnage en une heure, réessayez plus tard",
+      "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
     });
   });
 

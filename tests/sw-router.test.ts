@@ -60,6 +60,25 @@ const RATING_MESSAGES: [string, unknown][] = [
   ["a rating-cards", { type: "rating-cards" }],
 ];
 
+const ANSWER = { type: "answer-question", side: "naka", id: 5, choice: 2005 };
+const REMOVAL = {
+  type: "answer-removal",
+  removeFrom: "sc",
+  nakaId: 21,
+  scId: 1021,
+  remove: true,
+};
+const HIDE = { type: "hide-question", key: "ambiguity:naka:5" };
+// Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
+const QUESTION_MESSAGES: [string, unknown][] = [
+  ["an open-questions", { type: "open-questions" }],
+  ["a removal-offer", { type: "removal-offer", contentId: 3 }],
+  ["a page-lists", { type: "page-lists" }],
+  ["an answer-question", ANSWER],
+  ["an answer-removal", REMOVAL],
+  ["a hide-question", HIDE],
+];
+
 const FINISHED = {
   type: "finished",
   source: "threshold",
@@ -111,6 +130,15 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     dismissRating: async (msg) => {
       calls.push(`dismiss:${JSON.stringify(msg)}`);
+    },
+    answerQuestion: async (msg) => {
+      calls.push(`answer:${JSON.stringify(msg)}`);
+    },
+    answerRemoval: async (msg) => {
+      calls.push(`removal:${JSON.stringify(msg)}`);
+    },
+    hideQuestion: async (msg) => {
+      calls.push(`hide:${JSON.stringify(msg)}`);
     },
     statusSnapshot: async () => {
       calls.push("status");
@@ -473,7 +501,31 @@ describe("router: everything else is ignored, unanswered", () => {
     ["a rate with a rating of 0", { ...RATE, rating: 0 }, NAKA_TAB],
     ["a rate with a rating of 11", { ...RATE, rating: 11 }, NAKA_TAB],
     ["a rate with an unknown label", { ...RATE, label: "season" }, NAKA_TAB],
-    ...RATING_MESSAGES.flatMap(([name, msg]) =>
+    ["a hide-question from the status page", HIDE, STATUS_PAGE],
+    [
+      "an answer-question without a choice",
+      { type: "answer-question", side: "naka", id: 5 },
+      NAKA_TAB,
+    ],
+    [
+      "an answer-question with a text choice",
+      { ...ANSWER, choice: "2005" },
+      NAKA_TAB,
+    ],
+    ["an answer-question with choice 0", { ...ANSWER, choice: 0 }, NAKA_TAB],
+    [
+      "an answer-question with an unknown side",
+      { ...ANSWER, side: "x" },
+      NAKA_TAB,
+    ],
+    ["an answer-removal with remove 1", { ...REMOVAL, remove: 1 }, NAKA_TAB],
+    [
+      "an answer-removal without a SensCritique id",
+      { ...REMOVAL, scId: undefined },
+      NAKA_TAB,
+    ],
+    ["a hide-question with a bad key", { ...HIDE, key: "hide:x" }, NAKA_TAB],
+    ...[...RATING_MESSAGES, ...QUESTION_MESSAGES].flatMap(([name, msg]) =>
       [
         ["https://naka.cx.evil.com/", EVIL],
         ["an iframe", IFRAME],
@@ -576,6 +628,163 @@ describe("router: one waiting rate per title and label", () => {
     r.send(rateOf(5), NAKA_TAB);
     await settle();
     expect(rates(r.calls)).toHaveLength(2);
+  });
+});
+
+describe("router: the owner's answers are queued, one waiting per question", () => {
+  const blockedRouter = (over: Partial<Jobs> = {}) => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+      ...over,
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    return { ...r, blocker };
+  };
+  const answered = (calls: string[]) =>
+    calls.filter((c) => /^(answer|removal|hide):/.test(c));
+
+  it("each answer is queued and answered { ok: true } at once, from the Naka tab and from the page", async () => {
+    const r = router();
+    expect(r.send(ANSWER, NAKA_TAB)).toBe(false);
+    expect(r.send({ ...ANSWER, id: 6 }, STATUS_PAGE)).toBe(false);
+    expect(r.send(REMOVAL, NAKA_TAB)).toBe(false);
+    expect(r.send({ ...REMOVAL, nakaId: 22 }, STATUS_PAGE)).toBe(false);
+    expect(r.send(HIDE, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([
+      { ok: true },
+      { ok: true },
+      { ok: true },
+      { ok: true },
+      { ok: true },
+    ]);
+    await settle();
+    expect(r.calls).toEqual([
+      `answer:${JSON.stringify(ANSWER)}`,
+      `answer:${JSON.stringify({ ...ANSWER, id: 6 })}`,
+      `removal:${JSON.stringify(REMOVAL)}`,
+      `removal:${JSON.stringify({ ...REMOVAL, nakaId: 22 })}`,
+      `hide:${JSON.stringify(HIDE)}`,
+    ]);
+  });
+
+  it("a « none » answer keeps its null choice", async () => {
+    const r = router();
+    r.send({ ...ANSWER, choice: null, extra: 1 }, NAKA_TAB);
+    await settle();
+    expect(r.calls).toEqual([
+      `answer:${JSON.stringify({ ...ANSWER, choice: null })}`,
+    ]);
+  });
+
+  it("an answer-removal from an untrusted sender does nothing", async () => {
+    const r = router();
+    for (const sender of [EVIL, IFRAME, OTHER_EXTENSION, {}]) {
+      expect(r.send(REMOVAL, sender)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("answering lists a waiting key, then the running key, then nothing: open-questions carries it", async () => {
+    const running = latch();
+    const r = blockedRouter({
+      answerRemoval: async () => {
+        await running.opened;
+      },
+    });
+    await settle();
+    r.send(REMOVAL, NAKA_TAB);
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    r.blocker.open();
+    await settle();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    running.open();
+    await settle();
+    r.send({ type: "open-questions" }, NAKA_TAB);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("open-questions"))).toEqual([
+      'open-questions:["removal:sc:21:1021"]',
+      'open-questions:["removal:sc:21:1021"]',
+      "open-questions:[]",
+    ]);
+  });
+
+  it("the keys of the brief: ambiguity:<side>:<id> and removal:<removeFrom>:<nakaId>:<scId>; a hide is never answering", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, side: "sc", id: 1021, choice: 21 }, STATUS_PAGE);
+    r.send({ ...REMOVAL, removeFrom: "naka" }, STATUS_PAGE);
+    r.send({ ...HIDE, key: "removal:sc:21:1021" }, NAKA_TAB);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("page-lists"))).toEqual([
+      'page-lists:["ambiguity:sc:1021","removal:naka:21:1021"]',
+    ]);
+    r.blocker.open();
+    await settle();
+  });
+
+  it("two answer-removal for one key while it waits: one job, with the latest message", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...REMOVAL, remove: true }, NAKA_TAB);
+    r.send({ ...REMOVAL, remove: false }, STATUS_PAGE);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([
+      `removal:${JSON.stringify({ ...REMOVAL, remove: false })}`,
+    ]);
+  });
+
+  it("two answers for one question while it waits: one job, the latest choice", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, choice: 1005 }, NAKA_TAB);
+    r.send(ANSWER, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([`answer:${JSON.stringify(ANSWER)}`]);
+  });
+
+  it("a hide-question for a question whose answer-question waits: both jobs run (separate keys)", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send(ANSWER, NAKA_TAB);
+    r.send(HIDE, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toEqual([
+      `answer:${JSON.stringify(ANSWER)}`,
+      `hide:${JSON.stringify(HIDE)}`,
+    ]);
+  });
+
+  it("an answer and a removal of the same ids are different keys", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send(REMOVAL, NAKA_TAB);
+    r.send({ ...REMOVAL, removeFrom: "naka" }, NAKA_TAB);
+    r.send({ ...ANSWER, id: 21 }, NAKA_TAB);
+    r.blocker.open();
+    await settle();
+    expect(answered(r.calls)).toHaveLength(3);
+  });
+
+  it("a title with no card shows its question sending while its answer waits", async () => {
+    const r = blockedRouter();
+    await settle();
+    r.send({ ...ANSWER, id: 3 }, NAKA_TAB);
+    r.send(CARD, NAKA_TAB);
+    await settle();
+    expect(r.answers.at(-1)).toMatchObject({ questionSending: true });
+    r.blocker.open();
+    await settle();
   });
 });
 

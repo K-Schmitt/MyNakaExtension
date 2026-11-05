@@ -6,12 +6,18 @@ import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
 import type {
+  AnswerQuestionMessage,
+  AnswerRemovalMessage,
+  HideQuestionMessage,
+} from "../ext/question-messages";
+import type {
   DismissRatingMessage,
   RateMessage,
   RatingCardMessage,
 } from "../ext/rating-messages";
 import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
+import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
 import {
@@ -29,6 +35,7 @@ import {
   type CardsAnswer,
 } from "./rating-answers";
 import { dismissJob, rateJob } from "./rating-jobs";
+import { answerRemovalJob } from "./removal-job";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
@@ -44,6 +51,10 @@ export type Jobs = {
   setSettings(thresholds: Thresholds, pauseFromPercent: number): Promise<void>;
   rate(msg: RateMessage): Promise<void>;
   dismissRating(msg: DismissRatingMessage): Promise<void>;
+  /** The owner's answers: each verifies against the stored state, then records its outcome. */
+  answerQuestion(msg: AnswerQuestionMessage): Promise<void>;
+  answerRemoval(msg: AnswerRemovalMessage): Promise<void>;
+  hideQuestion(msg: HideQuestionMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
@@ -81,6 +92,9 @@ export function createJobs(deps: JobDeps): Jobs {
       quietly(() => settingsJob(deps.store, thresholds, pause)),
     rate: (msg) => quietly(() => rateJob(deps, msg)),
     dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
+    answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
+    answerRemoval: (msg) => quietly(() => answerRemovalJob(deps, msg)),
+    hideQuestion: (msg) => quietly(() => hideQuestionJob(deps.store, msg)),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),
     ratingCards: () => answerCards(deps.store),

@@ -93,6 +93,7 @@ export type JobKey =
   | "finish"
   | "mode"
   | "rating"
+  | "answer"
   | "settings"
   | "status";
 
@@ -623,6 +624,13 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     rate: (msg) => run("rating", { kind: "other" }, () => jobs.rate(msg)),
     dismissRating: (msg) =>
       run("rating", { kind: "other" }, () => jobs.dismissRating(msg)),
+    // The fuzz sends no answer: any answer job is O1's "ran without a message from its sender".
+    answerQuestion: (msg) =>
+      run("answer", { kind: "other" }, () => jobs.answerQuestion(msg)),
+    answerRemoval: (msg) =>
+      run("answer", { kind: "other" }, () => jobs.answerRemoval(msg)),
+    hideQuestion: (msg) =>
+      run("answer", { kind: "other" }, () => jobs.hideQuestion(msg)),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),
     openQuestions: (answering) => jobs.openQuestions(answering),

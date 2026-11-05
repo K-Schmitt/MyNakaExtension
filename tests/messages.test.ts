@@ -808,6 +808,86 @@ describe("the question messages", () => {
   });
 });
 
+describe("the answer messages", () => {
+  const ANSWER = { type: "answer-question", side: "naka", id: 5, choice: 2005 };
+  const REMOVAL = {
+    type: "answer-removal",
+    removeFrom: "sc",
+    nakaId: 21,
+    scId: 1021,
+    remove: true,
+  };
+
+  it("parse to the known keys only", () => {
+    expect(parseToWorker({ ...ANSWER, token: "T", x: 1 })).toEqual(ANSWER);
+    expect(parseToWorker({ ...REMOVAL, x: 1 })).toEqual(REMOVAL);
+    expect(
+      parseToWorker({ type: "hide-question", key: "removal:sc:21:1021", x: 1 }),
+    ).toEqual({ type: "hide-question", key: "removal:sc:21:1021" });
+  });
+
+  it("a null choice is « Aucun de ceux-là »; an absent one is no message", () => {
+    expect(parseToWorker({ ...ANSWER, choice: null })).toEqual({
+      ...ANSWER,
+      choice: null,
+    });
+    const { choice: _dropped, ...noChoice } = ANSWER;
+    expect(parseToWorker(noChoice)).toBeUndefined();
+  });
+
+  it("refuses a bad side, id, choice or flag", () => {
+    for (const bad of [
+      { ...ANSWER, side: "both" },
+      { ...ANSWER, id: 0 },
+      { ...ANSWER, id: "5" },
+      { ...ANSWER, choice: 1.5 },
+      { ...ANSWER, choice: -1 },
+      { ...ANSWER, choice: "2005" },
+      { ...ANSWER, choice: false },
+      { ...REMOVAL, removeFrom: "x" },
+      { ...REMOVAL, nakaId: 2 ** 53 },
+      { ...REMOVAL, scId: null },
+      { ...REMOVAL, remove: "true" },
+      { ...REMOVAL, remove: undefined },
+    ]) {
+      expect(parseToWorker(bad)).toBeUndefined();
+    }
+  });
+
+  it("a hide-question needs a question key", () => {
+    for (const key of [
+      undefined,
+      "",
+      "hide:ambiguity:naka:5",
+      "ambiguity:naka:0",
+      "removal:sc:21",
+      "ambiguity:naka:5 ",
+      7,
+    ]) {
+      expect(parseToWorker({ type: "hide-question", key })).toBeUndefined();
+    }
+    for (const key of ["ambiguity:sc:3", "link:naka:9", "removal:naka:1:2"]) {
+      expect(parseToWorker({ type: "hide-question", key })).toEqual({
+        type: "hide-question",
+        key,
+      });
+    }
+  });
+
+  it("the answers come from the Naka tab or the page; a hide from the Naka tab only", () => {
+    const answer = parseToWorker(ANSWER);
+    const removal = parseToWorker(REMOVAL);
+    if (answer === undefined || removal === undefined) throw new Error("x");
+    for (const role of ["naka-tab", "status-page"] as const) {
+      expect(allowedFor(role, answer)).toBe(true);
+      expect(allowedFor(role, removal)).toBe(true);
+    }
+    const hide = { type: "hide-question", key: "ambiguity:naka:5" } as const;
+    expect(allowedFor("naka-tab", hide)).toBe(true);
+    expect(allowedFor("status-page", hide)).toBe(false);
+  });
+});
+
 describe("allowedFor", () => {
   const messages: ToWorker[] = [
     { type: "naka-ready" },
@@ -828,6 +908,15 @@ describe("allowedFor", () => {
     { type: "open-questions" },
     { type: "removal-offer", contentId: 1 },
     { type: "page-lists" },
+    { type: "answer-question", side: "naka", id: 1, choice: 2 },
+    {
+      type: "answer-removal",
+      removeFrom: "sc",
+      nakaId: 1,
+      scId: 2,
+      remove: true,
+    },
+    { type: "hide-question", key: "ambiguity:naka:1" },
     {
       type: "set-settings",
       thresholds: { film: 0.9, episode: 0.8 },
@@ -845,6 +934,9 @@ describe("allowedFor", () => {
       "dismiss-rating",
       "open-questions",
       "removal-offer",
+      "answer-question",
+      "answer-removal",
+      "hide-question",
     ],
     "status-page": [
       "status",
@@ -852,6 +944,8 @@ describe("allowedFor", () => {
       "set-mode",
       "set-settings",
       "page-lists",
+      "answer-question",
+      "answer-removal",
     ],
   };
 
@@ -905,8 +999,8 @@ describe("allowedFor", () => {
 
   it("covers every ToWorker type exactly once", () => {
     const types = messages.map((m) => m.type).sort();
-    const tabbed = Object.values(allowed).flat().sort();
+    const tabbed = [...new Set(Object.values(allowed).flat())].sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(14);
+    expect(new Set(types).size).toBe(17);
   });
 });

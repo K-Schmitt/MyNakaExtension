@@ -30,6 +30,7 @@ export const ERROR_CODES = valuesOf<JobError>({
   "stored-state": true,
   unavailable: true,
   "finish-limit": true,
+  "naka-list-empty": true,
 });
 const KEYS = valuesOf<keyof RunRecord>({
   at: true,

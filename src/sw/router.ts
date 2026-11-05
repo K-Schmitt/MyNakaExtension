@@ -146,6 +146,9 @@ export function createRouter(deps: RouterDeps): Router {
       case "open-questions":
       case "removal-offer":
       case "page-lists":
+      case "answer-question":
+      case "answer-removal":
+      case "hide-question":
         return questions.route(msg, respond);
     }
   }

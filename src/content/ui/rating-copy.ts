@@ -53,6 +53,7 @@ export const RATING_ERROR_LABELS: Record<JobError, string> = {
   unavailable: "le site ne répond pas, réessayez plus tard",
   "finish-limit":
     "trop de fins de visionnage en une heure, réessayez plus tard",
+  "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
 };
 
 export function errorLine(error: JobError): string {
