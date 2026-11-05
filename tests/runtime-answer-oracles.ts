@@ -69,6 +69,8 @@ export type AnswerContext = {
   finish?: string;
   /** The pair was a stored removal when the job started. */
   removal: boolean;
+  /** State saves made so far by this job. */
+  saves: number;
   spent?: boolean;
 };
 
@@ -77,6 +79,7 @@ export function beginAnswer(w: World, msg: AnswerMessage): AnswerContext {
     kind: "answer",
     msg,
     writes: 0,
+    saves: 0,
     before: JSON.stringify(w.storage.get("state")),
     removal:
       msg.type === "answer-removal" &&
@@ -169,11 +172,17 @@ export function checkAnswerFinish(w: World, what: string): void {
   }
 }
 
-// An answer that only edits the stored questions (« Non », a choice, a dismissal) saves the state without
-// a binding check, by design (D10): the stored titles are the bound accounts' own, and nothing is sent to
-// a site. O4 still judges the state save of « Retirer aussi… », whose job checks the binding first.
+// A state save the binding check does not judge: the answer only edits the stored questions (D10), with
+// no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
+// and a choice's own save, the first of its job; the saves after it are those of the finish the choice
+// runs, which checks the binding itself. The block « Non » (no stored item) rests on a Naka read, and
+// « Retirer aussi… » on its job's binding check: O4 judges both.
 export function isLocalAnswer(w: World): boolean {
   const ctx = w.current;
   if (ctx?.kind !== "answer") return false;
-  return !(ctx.msg.type === "answer-removal" && ctx.msg.remove);
+  const { msg } = ctx;
+  ctx.saves += 1;
+  if (msg.type === "answer-removal") return !msg.remove && ctx.removal;
+  if (msg.type === "answer-question") return ctx.saves === 1;
+  return true;
 }

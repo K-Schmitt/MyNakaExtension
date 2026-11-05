@@ -746,18 +746,55 @@ describe("O16 a choice outside the stored candidates changes nothing", () => {
 });
 
 describe("O4 on the state saves of answers", () => {
-  it("fires on the state save of a remove answer under another account, not on a local one", async () => {
-    const remove = quietWorld();
-    live(remove, { binding: { scUsername: "owner" } });
-    remove.scAccount = "other";
-    answeringWith(remove, REMOVE);
-    await storageFor(remove, 0).set({ state: emptyState() });
-    expect(fired(remove)).toEqual(["O4 binding"]);
-    const keep = quietWorld();
-    live(keep, { binding: { scUsername: "owner" } });
-    keep.scAccount = "other";
-    answeringWith(keep, { ...REMOVE, remove: false });
-    await storageFor(keep, 0).set({ state: emptyState() });
-    expect(keep.violations).toEqual([]);
+  const mismatched = (): World => {
+    const w = quietWorld();
+    live(w, { binding: { scUsername: "owner" } });
+    w.scAccount = "other";
+    return w;
+  };
+  const save = (w: World) => storageFor(w, 0).set({ state: emptyState() });
+  const ASK = {
+    kind: "ambiguity" as const,
+    side: "naka" as const,
+    id: 1,
+    candidateIds: [1001],
+  };
+  const CHOOSE: AnswerQuestionMessage = {
+    type: "answer-question",
+    side: "naka",
+    id: 1,
+    choice: 1001,
+  };
+
+  it("fires on the state save of a remove answer", async () => {
+    const w = mismatched();
+    answeringWith(w, REMOVE);
+    await save(w);
+    expect(fired(w)).toEqual(["O4 binding"]);
+  });
+
+  it("fires on the block « Non » (no stored item): it rests on a Naka read", async () => {
+    const w = mismatched();
+    answeringWith(w, { ...REMOVE, remove: false });
+    await save(w);
+    expect(fired(w)).toEqual(["O4 binding"]);
+  });
+
+  it("stays silent on the « Non » of a stored removal: nothing is read", async () => {
+    const w = mismatched();
+    stored(w, { pending: [removalItem("sc")] });
+    answeringWith(w, { ...REMOVE, remove: false });
+    await save(w);
+    expect(w.violations).toEqual([]);
+  });
+
+  it("stays silent on the choice's own save, and fires on the save of the finish it runs", async () => {
+    const w = mismatched();
+    stored(w, { pending: [{ ...ASK, finish: "movie:1" }] });
+    answeringWith(w, CHOOSE);
+    await save(w);
+    expect(w.violations).toEqual([]);
+    await save(w);
+    expect(fired(w)).toEqual(["O4 binding"]);
   });
 });
