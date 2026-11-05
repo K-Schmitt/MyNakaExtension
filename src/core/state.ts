@@ -51,6 +51,8 @@ export type SyncState = {
   settled: Pair[];
   pending: PendingItem[];
   handled: string[];
+  /** The title of each handled key, written at finish time; absent for keys handled before B8b. */
+  handledTitles?: Record<string, string>;
   unlinked: UnlinkedItem[];
   retryLast: Pair[];
   /** Completed sync runs, counted from 0. */
@@ -147,9 +149,30 @@ export function markAsked(state: SyncState, pair: Pair): SyncState {
   return { ...state, pending };
 }
 
-export function markHandled(state: SyncState, key: string): SyncState {
+// The title, when known, is stored with the key; a key already handled keeps what it has.
+export function markHandled(
+  state: SyncState,
+  key: string,
+  title?: string,
+): SyncState {
   if (state.handled.includes(key)) return { ...state };
-  return { ...state, handled: [...state.handled, key] };
+  const handled = [...state.handled, key];
+  if (title === undefined) return { ...state, handled };
+  return {
+    ...state,
+    handled,
+    handledTitles: { ...state.handledTitles, [key]: title },
+  };
+}
+
+/** The title is no longer handled: its key and its stored title go, nothing else changes. */
+export function forgetHandled(state: SyncState, key: string): SyncState {
+  if (!isHandled(state, key)) return { ...state };
+  const { handledTitles, ...rest } = state;
+  const handled = state.handled.filter((k) => k !== key);
+  if (handledTitles === undefined) return { ...rest, handled };
+  const { [key]: _forgotten, ...titles } = handledTitles;
+  return { ...rest, handled, handledTitles: titles };
 }
 
 export function isHandled(state: SyncState, key: string): boolean {

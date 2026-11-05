@@ -42,12 +42,14 @@ function orAbsent(value: unknown): unknown {
   return value === null ? undefined : value;
 }
 
+// Ticking and unticking « vu » are the same call: `watched` is true or false, nothing else counts.
 function readWatched(body: unknown): PageEvent | undefined {
   const record = bodyRecord(body);
-  if (record === undefined || record.watched !== true) return undefined;
+  if (record === undefined) return undefined;
+  if (record.watched !== true && record.watched !== false) return undefined;
   return parsePageEvent({
     channel: PAGE_CHANNEL,
-    kind: "watched",
+    kind: record.watched ? "watched" : "unwatched",
     contentId: record.contentId,
     season: orAbsent(record.seasonNumber),
     episode: orAbsent(record.episodeNumber),

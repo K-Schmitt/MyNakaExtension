@@ -1049,3 +1049,59 @@ describe("the manual link messages (B6)", () => {
     }
   });
 });
+
+describe("unwatched page event", () => {
+  const u = { channel: CH, kind: "unwatched", contentId: 4 };
+
+  it("is accepted with and without season and episode", () => {
+    expect(parsePageEvent(u)).toEqual(u);
+    expect(parsePageEvent({ ...u, season: 1, episode: 2 })).toEqual({
+      ...u,
+      season: 1,
+      episode: 2,
+    });
+  });
+
+  it("rejects a missing content id and a partial pair", () => {
+    expect(parsePageEvent({ channel: CH, kind: "unwatched" })).toBeUndefined();
+    expect(parsePageEvent({ ...u, season: 1 })).toBeUndefined();
+  });
+});
+
+describe("forget-handled and handled-titles messages", () => {
+  const forget = { type: "forget-handled", contentId: 21391 };
+
+  it("forget-handled keeps its ids and drops any other key", () => {
+    expect(parseToWorker({ ...forget, token: "x" })).toEqual(forget);
+    expect(
+      parseToWorker({ ...forget, season: 1, episode: 2, title: "forged" }),
+    ).toEqual({ ...forget, season: 1, episode: 2 });
+  });
+
+  it.each([
+    ["no content id", { type: "forget-handled" }],
+    ["content id 0", { ...forget, contentId: 0 }],
+    ["content id as text", { ...forget, contentId: "7" }],
+    ["a season alone", { ...forget, season: 1 }],
+  ])("forget-handled with %s is refused", (_name, raw) => {
+    expect(parseToWorker(raw)).toBeUndefined();
+  });
+
+  it("handled-titles is a bare message", () => {
+    expect(parseToWorker({ type: "handled-titles", x: 1 })).toEqual({
+      type: "handled-titles",
+    });
+  });
+
+  it("forget-handled is allowed for the Naka tab and the status page", () => {
+    const msg = parseToWorker(forget) as ToWorker;
+    expect(allowedFor("naka-tab", msg)).toBe(true);
+    expect(allowedFor("status-page", msg)).toBe(true);
+  });
+
+  it("handled-titles is allowed for the status page only", () => {
+    const msg: ToWorker = { type: "handled-titles" };
+    expect(allowedFor("status-page", msg)).toBe(true);
+    expect(allowedFor("naka-tab", msg)).toBe(false);
+  });
+});

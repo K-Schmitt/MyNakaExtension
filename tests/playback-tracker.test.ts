@@ -340,6 +340,37 @@ describe("keys", () => {
   });
 });
 
+describe("unwatched", () => {
+  const ev: Watched = { channel: CH, kind: "watched", contentId: 5 };
+  const off: PageEvent = { channel: CH, kind: "unwatched", contentId: 5 };
+
+  it("lets the next explicit vu of that key through again", () => {
+    const t = film();
+    t.watched(ev);
+    expect(t.watched(ev)).toBeUndefined();
+    t.unwatched(off);
+    expect(t.watched(ev)?.source).toBe("explicit");
+  });
+
+  it("leaves the other keys alone", () => {
+    const t = film();
+    t.watched({ ...ev, contentId: 6 });
+    t.unwatched(off);
+    expect(t.watched({ ...ev, contentId: 6 })).toBeUndefined();
+  });
+
+  it("is ignored for any other event kind", () => {
+    const t = film();
+    t.watched(ev);
+    t.unwatched(ev);
+    expect(t.watched(ev)).toBeUndefined();
+  });
+
+  it("never sends anything by itself", () => {
+    expect(film().unwatched(off)).toBeUndefined();
+  });
+});
+
 describe("watched", () => {
   const ev: Watched = { channel: CH, kind: "watched", contentId: 5 };
 

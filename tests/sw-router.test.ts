@@ -75,6 +75,8 @@ const REQUEUE = { type: "requeue-question", side: "naka", id: 5 };
 const PAGE_MESSAGES: [string, unknown][] = [
   ["a forget-binding", { type: "forget-binding" }],
   ["a reset", { type: "reset" }],
+  ["a forget-handled", { type: "forget-handled", contentId: 3 }],
+  ["a handled-titles", { type: "handled-titles" }],
 ];
 // Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
 const QUESTION_MESSAGES: [string, unknown][] = [
@@ -185,6 +187,13 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     reset: async () => {
       calls.push("reset");
+    },
+    forgetHandled: async (msg) => {
+      calls.push(`forget-handled:${JSON.stringify(msg)}`);
+    },
+    handledTitles: async () => {
+      calls.push("handled-titles");
+      return { titles: [{ key: "movie:3", label: "Trois" }] };
     },
     searchTitles: async (msg) => {
       calls.push(`search:${JSON.stringify(msg)}`);
@@ -1319,6 +1328,52 @@ describe("router: the status answer waits for no job", () => {
     expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
     await settle();
     expect(r.calls).toEqual(["forget", "reset"]);
+  });
+
+  it("forget-handled from the status page and from a Naka tab each queue one job, answered at once", async () => {
+    const r = router();
+    const msg = { type: "forget-handled", contentId: 3, season: 1, episode: 2 };
+    expect(r.send({ ...msg, title: "forged" }, STATUS_PAGE)).toBe(false);
+    expect(r.send(msg, NAKA_TAB)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([
+      `forget-handled:${JSON.stringify(msg)}`,
+      `forget-handled:${JSON.stringify(msg)}`,
+    ]);
+  });
+
+  it("forget-handled runs on the queue, behind a running sync", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    g.r.send({ type: "forget-handled", contentId: 3 }, NAKA_TAB);
+    await settle();
+    expect(g.r.calls.filter((c) => c.startsWith("forget-handled"))).toEqual([]);
+    g.sync.open();
+    await settle();
+    expect(
+      g.r.calls.filter((c) => c.startsWith("forget-handled")),
+    ).toHaveLength(1);
+  });
+
+  it("handled-titles from the status page is answered from the read, outside the queue", async () => {
+    const g = gated();
+    g.r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(g.r.send({ type: "handled-titles" }, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(g.r.answers.at(-1)).toEqual({
+      titles: [{ key: "movie:3", label: "Trois" }],
+    });
+    g.sync.open();
+  });
+
+  it("handled-titles from a Naka tab is ignored", async () => {
+    const r = router();
+    expect(r.send({ type: "handled-titles" }, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
   });
 
   it("forget-binding and reset from a Naka tab are ignored", async () => {

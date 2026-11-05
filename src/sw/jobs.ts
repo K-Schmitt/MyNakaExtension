@@ -5,6 +5,7 @@
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
+import type { ForgetHandledMessage } from "../ext/page-messages";
 import type {
   AnswerQuestionMessage,
   AnswerRemovalMessage,
@@ -22,6 +23,11 @@ import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { finishJob } from "./finish-job";
+import { forgetHandledJob } from "./forget-handled-job";
+import {
+  answerHandledTitles,
+  type HandledTitlesAnswer,
+} from "./handled-titles-answer";
 import type { JobDeps } from "./job-deps";
 import { linkTitleJob, requeueJob } from "./link-job";
 import {
@@ -67,6 +73,10 @@ export type Jobs = {
   /** The page's local actions: storage only, never a site. */
   forget(): Promise<void>;
   reset(): Promise<void>;
+  /** B8b: a handled title forgotten (an unticked « vu », or the page's « Oublier »): storage only. */
+  forgetHandled(msg: ForgetHandledMessage): Promise<void>;
+  /** The handled titles for the page: read-only, answered outside the queue. */
+  handledTitles(): Promise<HandledTitlesAnswer>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
@@ -113,6 +123,8 @@ export function createJobs(deps: JobDeps): Jobs {
     requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
     forget: () => quietly(() => forgetJob(deps.store)),
     reset: () => quietly(() => resetJob(deps.store)),
+    forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
+    handledTitles: () => answerHandledTitles(deps.store),
     searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),

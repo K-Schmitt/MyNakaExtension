@@ -65,7 +65,12 @@ describe("episode", () => {
       "save",
     ]);
     expect(w.saved).toStrictEqual([
-      { ...emptyState(), mapping: [SERIES_PAIR], handled: ["tv:7:S1E2"] },
+      {
+        ...emptyState(),
+        mapping: [SERIES_PAIR],
+        handled: ["tv:7:S1E2"],
+        handledTitles: { "tv:7:S1E2": "La Série" },
+      },
     ]);
   });
 
@@ -220,6 +225,9 @@ describe("episode", () => {
         "tv:7:S1E4",
         "tv:7:S1E5",
       ],
+      handledTitles: Object.fromEntries(
+        [1, 2, 3, 4, 5].map((n) => [`tv:7:S1E${n}`, "La Série"]),
+      ),
     });
   });
 
@@ -271,5 +279,23 @@ describe("episode threshold", () => {
     );
     expect(outcome).toEqual({ kind: "ignored", reason: "below-threshold" });
     expect(w.calls).toEqual(["load"]);
+  });
+});
+
+describe("the handled title of an episode", () => {
+  it("is the series' title, stored under the episode's key", async () => {
+    const w = world();
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handledTitles).toEqual({ "tv:7:S1E2": "La Série" });
+  });
+
+  it("keeps the titles of the earlier episodes", async () => {
+    const w = world();
+    await handleFinish(episode(1, 2), w.ports, DEFAULT_THRESHOLDS);
+    await handleFinish(episode(1, 3), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handledTitles).toEqual({
+      "tv:7:S1E2": "La Série",
+      "tv:7:S1E3": "La Série",
+    });
   });
 });

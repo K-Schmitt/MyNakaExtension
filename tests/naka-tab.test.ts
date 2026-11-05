@@ -338,6 +338,48 @@ describe("the Naka tab", () => {
     ]);
   });
 
+  it("an unticked vu asks the worker to forget that title, with its ids only", () => {
+    const t = tab();
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "unwatched",
+      contentId: 7,
+      season: 1,
+      episode: 2,
+    });
+    expect(t.sent.slice(1)).toEqual([
+      { type: "forget-handled", contentId: 7, season: 1, episode: 2 },
+    ]);
+    expect(t.ended).toEqual([]);
+  });
+
+  it("an unticked film asks for the film", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
+  });
+
+  it("after an unticked vu, the next tick of that title gives a finished again", () => {
+    const t = tab();
+    const on = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
+    t.post(on);
+    t.post({ ...on, kind: "unwatched" });
+    t.post(on);
+    expect(t.sent.slice(1).map((m) => m.type)).toEqual([
+      "finished",
+      "forget-handled",
+      "finished",
+    ]);
+  });
+
+  it("an unwatched event from another origin or window sends nothing", () => {
+    const t = tab();
+    const off = { channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 };
+    t.post(off, {}, "https://naka.cx");
+    t.post(off, SELF, "https://naka.cx.evil.com");
+    expect(t.sent).toEqual([{ type: "naka-ready" }]);
+  });
+
   it.each([
     [
       "another window",

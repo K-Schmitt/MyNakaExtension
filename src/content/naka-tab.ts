@@ -43,7 +43,7 @@ export type TabEnv = {
 
 type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
 
-function idsOf({ contentId, season, episode }: FinishedMessage): ContentIds {
+function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
   return {
     contentId,
     ...(season === undefined ? {} : { season }),
@@ -60,6 +60,11 @@ function sendFinished(env: TabEnv, msg: FinishedMessage): void {
 function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "playlist") {
     env.send({ type: "playlist-changed" });
+    return;
+  }
+  if (event.kind === "unwatched") {
+    tracker.unwatched(event);
+    env.send({ type: "forget-handled", ...idsOf(event) });
     return;
   }
   const finished = tracker.watched(event);

@@ -153,6 +153,11 @@ export function createRouter(deps: RouterDeps): Router {
           () => enqueue(activity.queueLocal("reset", () => jobs.reset())),
           respond,
         );
+      case "forget-handled":
+        return queued(() => enqueue(() => jobs.forgetHandled(msg)), respond);
+      case "handled-titles":
+        answerRead(() => jobs.handledTitles(), respond);
+        return true;
       case "open-questions":
       case "removal-offer":
       case "page-lists":

@@ -50,7 +50,11 @@ describe("film", () => {
       ]);
       expect(w.saved).toStrictEqual([
         state1,
-        { ...state1, handled: ["movie:42"] },
+        {
+          ...state1,
+          handled: ["movie:42"],
+          handledTitles: { "movie:42": "Le Film" },
+        },
       ]);
     },
   );
@@ -283,5 +287,21 @@ describe("film threshold", () => {
       DEFAULT_THRESHOLDS,
     );
     expect(outcome.kind).toBe("done");
+  });
+});
+
+describe("the handled title", () => {
+  it("a film finish stores its title with the handled key, in the same last save", async () => {
+    const w = world();
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handled).toEqual(["movie:42"]);
+    expect(w.state.handledTitles).toEqual({ "movie:42": "Le Film" });
+    expect(w.saved[0]?.handledTitles).toBeUndefined();
+  });
+
+  it("a finish that ends in a question stores no title", async () => {
+    const w = world({ search: { "Le Film": [] } });
+    await handleFinish(film(), w.ports, DEFAULT_THRESHOLDS);
+    expect(w.state.handledTitles).toBeUndefined();
   });
 });

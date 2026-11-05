@@ -518,3 +518,28 @@ describe("parseState and the titles of a question", () => {
     expect(messageOf(state)).toBe("stored state: pending[0].title");
   });
 });
+
+describe("parseState handledTitles", () => {
+  const titled = { ...valid(), handledTitles: { "movie:5": "Un film" } };
+
+  it("is optional: the owner's state without it parses unchanged", () => {
+    expect(parseState(valid())).not.toHaveProperty("handledTitles");
+  });
+
+  it("is kept when valid", () => {
+    expect(parseState(titled)).toEqual(titled);
+    expect(parseState(JSON.parse(JSON.stringify(titled)))).toEqual(titled);
+  });
+
+  it.each([
+    ["not an object", "x"],
+    ["a list", ["movie:5"]],
+    ["a bad key", { "film 5": "x" }],
+    ["a title that is not text", { "movie:5": 3 }],
+    ["a null title", { "movie:5": null }],
+  ])("rejects %s, naming the field and not the value", (_name, raw) => {
+    const error = rejection({ ...valid(), handledTitles: raw });
+    expect(error).toBeInstanceOf(StoredStateError);
+    expect((error as Error).message).toMatch(/^stored state: handledTitles/);
+  });
+});
