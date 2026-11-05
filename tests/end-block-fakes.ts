@@ -27,6 +27,7 @@ export function fakeClock() {
       },
     },
     count: () => pending.size,
+    now: () => now,
     async advance(ms: number): Promise<void> {
       const target = now + ms;
       for (;;) {
@@ -69,6 +70,7 @@ export function fakePorts() {
   let hidden = 0;
   const fail = { send: false, ask: false };
   const ports: EndPorts = {
+    opening: () => {},
     timer: clock.timer,
     port: {
       askCard: vi.fn(async (ids: ContentIds) => {

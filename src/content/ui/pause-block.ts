@@ -6,9 +6,8 @@ import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
 import type { VideoSample } from "../naka-tab";
-import type { EndPorts } from "./end-block";
 import { askOrNothing } from "./end-poll";
-import { createRatingSession } from "./rating-session";
+import { createRatingSession, type SessionPorts } from "./rating-session";
 import { viewOnlyCard, viewOnlyLabel } from "./view-only-card";
 
 // Naka's next-episode zone: from here a pause is the end of the viewing, not a moment to rate.
@@ -17,7 +16,7 @@ export const PAUSE_AFTER_URL_MS = 3000;
 // Naka's page makes each pause reach a capture listener twice.
 export const DOUBLE_PAUSE_MS = 1000;
 
-export type PausePorts = EndPorts & {
+export type PausePorts = SessionPorts & {
   now(): number;
   endShown(): boolean;
   titleOf(contentId: number): Promise<string | undefined>;
@@ -41,7 +40,7 @@ export function createPauseBlock(ports: PausePorts) {
   const session = createRatingSession(ports, () => {});
   let lastUrlAt: number | undefined;
   let lastPauseAt: number | undefined;
-  let epoch = 0; // each pause and each play starts a new one: an answer of an older one is dropped
+  let epoch = 0; // each pause, play, URL change and close starts a new one: an older answer is dropped
 
   const isDouble = (at: number): boolean =>
     lastPauseAt !== undefined && at - lastPauseAt < DOUBLE_PAUSE_MS;
@@ -83,6 +82,12 @@ export function createPauseBlock(ports: PausePorts) {
     session.open(ids, card, label, { start, sending, viewOnly });
   }
 
+  // The shown card closes, and an offer still on its way is dropped.
+  function close(): void {
+    epoch += 1;
+    session.closeShown();
+  }
+
   return {
     paused(sample: Position, ids: ContentIds | undefined): void {
       const at = ports.now();
@@ -96,12 +101,14 @@ export function createPauseBlock(ports: PausePorts) {
       offer(ids, progress, epoch).catch(() => {});
     },
     resumed(): void {
-      epoch += 1;
       lastPauseAt = undefined;
-      session.closeShown();
+      close();
     },
+    /** Every URL change, an episode change included: the pause block was for what played before. */
     urlChanged(at: number): void {
       lastUrlAt = at;
+      close();
     },
+    close,
   };
 }

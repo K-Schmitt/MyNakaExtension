@@ -80,14 +80,15 @@ export function pollUntil(
   return stop;
 }
 
+/** Returns the stop of the poll: a stopped poll calls neither `onFound` nor `onMissed`. */
 export function startEndPoll(
   asker: CardAsker,
   timer: EndTimer,
   ids: ContentIds,
   onFound: Found,
   onMissed: () => void,
-): void {
-  pollUntil(
+): () => void {
+  return pollUntil(
     asker,
     timer,
     ids,

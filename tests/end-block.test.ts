@@ -423,6 +423,62 @@ describe("the end block with several contents", () => {
   });
 });
 
+describe("the end block and the overlay's other users", () => {
+  it("says so just before each card opens, the queued one included", async () => {
+    const w = world();
+    const drawnAtOpening: number[] = [];
+    w.ports.opening = () => {
+      drawnAtOpening.push(w.shown.length);
+    };
+    w.script(EP_IDS, answer(episodeCard()));
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7, title: "Suivant" })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(drawnAtOpening).toEqual([0]);
+    expect(w.shown).toHaveLength(1);
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    expect(drawnAtOpening).toEqual([0]);
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    expect(drawnAtOpening).toEqual([0, 1]);
+    expect(w.last().view.heading).toContain("Suivant");
+  });
+
+  it("leave closes the shown card, drops the queue and the waits, and sends nothing", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7 })));
+    w.script(FILM_IDS, NOTHING);
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.block.leave();
+    expect(w.block.isShown()).toBe(false);
+    expect(w.hidden()).toBe(1);
+    const asked = asks(w.calls).length;
+    w.script(FILM_IDS, answer(filmCard()));
+    await w.clock.advance(60000);
+    expect(asks(w.calls)).toHaveLength(asked);
+    expect(w.shown).toHaveLength(1);
+    expect(w.calls.filter((c) => !c.startsWith("ask"))).toEqual([]);
+  });
+
+  it("after leave, a later finished for a key that was still waiting polls again", async () => {
+    const w = world();
+    w.script(FILM_IDS, NOTHING);
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(1000);
+    w.block.leave();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.block.isShown()).toBe(true);
+  });
+});
+
 describe("the end block waits for the rating to be sent", () => {
   async function filmSent(...after: Parameters<typeof answer>[0][]) {
     const w = world();
