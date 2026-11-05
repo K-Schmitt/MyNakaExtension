@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHomeBlock, HOME_PATHS } from "../src/content/ui/home-block";
 import {
   chosenLine,
+  errorLine,
   SENDING_LINE,
   SERIES_WARNING,
   UNREACHABLE_LINE,
@@ -111,6 +112,21 @@ describe("the home block's arrival", () => {
     expect(w.viewOf("movie:2")?.heading).toContain("Film 2");
   });
 
+  it("an entry opens on its failed label first, the second pending one here", async () => {
+    const ep = episodeCard({
+      pending: ["épisode", "saison"],
+      failed: { label: "saison", error: "sc-session", at: 7 },
+      at: 500,
+    });
+    const w = await arrived(ep);
+    expect(w.viewOf(ep.key)?.heading).toContain("Noter la saison 1");
+    expect(w.viewOf(ep.key)?.error).toBe(errorLine("sc-session"));
+    await w.ready();
+    w.handlersOf(ep.key).onChoose(6);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 5:1:1 saison 6"]);
+  });
+
   it("an entry's série shows the warning", async () => {
     const w = await arrived(SERIE);
     expect(w.viewOf("tv:5:S1E1")?.warning).toBe(SERIES_WARNING);
@@ -198,7 +214,7 @@ describe("a choice in the panel", () => {
       ],
     };
     await w.clock.advance(2000);
-    expect(w.viewOf(ep.key)?.heading).toContain("saison 1");
+    expect(w.viewOf(ep.key)?.heading).toContain("Noter la saison 1");
     expect(w.viewOf(ep.key)?.choices).toHaveLength(10);
     expect(w.viewOf(ep.key)?.notice).toBeUndefined();
     expect(w.viewOf(ep.key)?.choices.find((c) => c.value === 7)?.marked).toBe(
@@ -316,7 +332,7 @@ describe("a home entry ignores a click right after it appears", () => {
       ],
     };
     await w.clock.advance(2000);
-    expect(w.viewOf(ep.key)?.heading).toContain("saison 1");
+    expect(w.viewOf(ep.key)?.heading).toContain("Noter la saison 1");
     await w.clock.advance(399);
     w.handlersOf(ep.key).onChoose(6);
     await flush();

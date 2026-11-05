@@ -54,6 +54,16 @@ describe("homeView", () => {
     expect(entry?.view.choices.find((c) => c.value === 8)?.marked).toBe(true);
   });
 
+  it("an entry with no view yet shows its failed label first", () => {
+    const card = episodeCard({
+      pending: ["épisode", "saison"],
+      failed: { label: "saison", error: "unavailable", at: 3 },
+    });
+    const [entry] = homeView([{ card }]).entries;
+    expect(entry?.view.heading).toBe(ratingView(card, "saison").heading);
+    expect(entry?.view.error).toBe(ratingView(card, "saison").error);
+  });
+
   it("a série whose series is not finished shows the warning", () => {
     const card = episodeCard({ pending: ["série"], seriesFinished: false });
     const [entry] = homeView([{ card }]).entries;

@@ -4,6 +4,7 @@
 import type { RatingCard } from "../../core/rating-cards";
 import { HOME_HEADING } from "./home-copy";
 import { type RatingView, ratingView } from "./rating-view";
+import { labelOf } from "./session-views";
 
 // `view` is what the entry's send is showing now (sending, confirming, a failure); absent, the idle view.
 export type HomeEntry = { card: RatingCard; start?: number; view?: RatingView };
@@ -22,7 +23,7 @@ export const panelView = (view: RatingView): RatingView => ({
 
 function viewOfEntry({ card, start, view }: HomeEntry): RatingView | undefined {
   if (view !== undefined) return panelView(view);
-  const label = card.pending[0];
+  const label = labelOf(card);
   return label === undefined
     ? undefined
     : panelView(ratingView(card, label, start));

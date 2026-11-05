@@ -4,13 +4,14 @@
 // arrival on a home path, and takes itself down on leaving it.
 
 import type { ContentIds } from "../../core/finish-event";
-import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { RatingCard } from "../../core/rating-cards";
 import type { CardsAnswer } from "../../sw/rating-answers";
 import type { EndTimer } from "./end-poll";
 import { entryAsker } from "./home-asker";
 import { type HomeEntry, type HomeView, homeView } from "./home-view";
 import type { RatingHandlers } from "./rating-render";
 import { createRatingSession } from "./rating-session";
+import { labelOf } from "./session-views";
 import type { WorkerPort } from "./worker-port";
 
 // The owner's probe (2026-11-05): the pathname is "/" after login and after the Naka logo.
@@ -49,10 +50,6 @@ function idsOf({ contentId, season, episode }: RatingCard): ContentIds {
     ...(episode === undefined ? {} : { episode }),
   };
 }
-
-// The panel asks for the first pending label; the answer lists only cards that have one.
-const firstPending = (card: RatingCard): RatingLabel =>
-  card.pending[0] as RatingLabel;
 
 export function createHomeBlock(ports: HomePorts) {
   let onHome = false;
@@ -118,9 +115,13 @@ export function createHomeBlock(ports: HomePorts) {
     opening = true;
     const shown = cards.filter(({ card }) => card.pending.length > 0);
     slots = shown.map(slotOf);
+    // Each entry opens on its failed label, else its first pending one (the list holds only cards with one).
     shown.forEach(({ card, start, sending }, i) => {
       const session = slots[i]?.session;
-      session?.open(idsOf(card), card, firstPending(card), { start, sending });
+      const label = labelOf(card);
+      if (label !== undefined) {
+        session?.open(idsOf(card), card, label, { start, sending });
+      }
     });
     opening = false;
     draw();
