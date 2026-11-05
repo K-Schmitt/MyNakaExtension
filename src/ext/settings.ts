@@ -50,7 +50,7 @@ export type Settings = {
   finishWindow?: FinishWindow;
   /** The end of a viewing, per kind (each on the grid of THRESHOLD_CHOICES). Absent: the defaults. */
   thresholds?: Thresholds;
-  /** An integer 0 to 99: the progress from which the end block appears. 0 means "at any time". */
+  /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
   pauseFromPercent?: number;
 };
 
