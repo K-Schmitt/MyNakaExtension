@@ -9,6 +9,9 @@ import type {
   AnswerQuestionMessage,
   AnswerRemovalMessage,
   HideQuestionMessage,
+  LinkTitleMessage,
+  RequeueQuestionMessage,
+  SearchTitlesMessage,
 } from "../ext/question-messages";
 import type {
   DismissRatingMessage,
@@ -20,6 +23,7 @@ import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
+import { linkTitleJob, requeueJob } from "./link-job";
 import {
   answerOpenQuestions,
   answerPageLists,
@@ -39,6 +43,7 @@ import { answerRemovalJob } from "./removal-job";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
+import { answerSearch, type SearchAnswer } from "./title-search";
 
 export type { JobDeps } from "./job-deps";
 export type { StatusSnapshot } from "./status-snapshot";
@@ -55,6 +60,9 @@ export type Jobs = {
   answerQuestion(msg: AnswerQuestionMessage): Promise<void>;
   answerRemoval(msg: AnswerRemovalMessage): Promise<void>;
   hideQuestion(msg: HideQuestionMessage): Promise<void>;
+  /** B6: the link by hand, and the question asked again. */
+  linkTitle(msg: LinkTitleMessage): Promise<void>;
+  requeueQuestion(msg: RequeueQuestionMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
@@ -67,6 +75,8 @@ export type Jobs = {
     answering: QuestionKey[],
   ): Promise<RemovalOfferAnswer>;
   pageLists(answering: QuestionKey[]): Promise<PageListsAnswer>;
+  /** A search on the other site: read-only, never rejects (a failure is an answer with its code). */
+  searchTitles(msg: SearchTitlesMessage): Promise<SearchAnswer>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -95,6 +105,9 @@ export function createJobs(deps: JobDeps): Jobs {
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
     answerRemoval: (msg) => quietly(() => answerRemovalJob(deps, msg)),
     hideQuestion: (msg) => quietly(() => hideQuestionJob(deps.store, msg)),
+    linkTitle: (msg) => quietly(() => linkTitleJob(deps, msg)),
+    requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
+    searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),
     ratingCards: () => answerCards(deps.store),

@@ -713,6 +713,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     answerRemoval: (msg) =>
       answerRun(w, msg, run, () => jobs.answerRemoval(msg)),
     hideQuestion: (msg) => answerRun(w, msg, run, () => jobs.hideQuestion(msg)),
+    // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
+    linkTitle: (msg) => jobs.linkTitle(msg),
+    requeueQuestion: (msg) => jobs.requeueQuestion(msg),
+    searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),
     openQuestions: (answering) => jobs.openQuestions(answering),

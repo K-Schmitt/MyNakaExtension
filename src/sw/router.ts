@@ -149,6 +149,9 @@ export function createRouter(deps: RouterDeps): Router {
       case "answer-question":
       case "answer-removal":
       case "hide-question":
+      case "search-titles":
+      case "link-title":
+      case "requeue-question":
         return questions.route(msg, respond);
     }
   }

@@ -44,15 +44,22 @@ function answered(
     : chooseCandidate(state, msg.side, msg.id, msg.choice);
 }
 
-// The finish that waited on the question, for a candidate choice only. The state schema keeps `finish` on
-// a Naka-side question, and of that question's own title (item-schema.ts).
+// The finish that waited on the question. The state schema keeps `finish` on a Naka-side question, and of
+// that question's own title (item-schema.ts). Shared with the link by hand (link-job.ts).
+export function finishWaitingOn(
+  question: AmbiguityItem | undefined,
+): FinishedMessage | undefined {
+  if (question?.finish === undefined) return undefined;
+  const ids = idsOfKey(question.finish);
+  return ids === undefined ? undefined : explicitFinish(ids);
+}
+
+// A candidate choice only: « Aucun de ceux-là » never runs it.
 function waitingFinish(
   question: AmbiguityItem | undefined,
   msg: AnswerQuestionMessage,
 ): FinishedMessage | undefined {
-  if (msg.choice === null || question?.finish === undefined) return undefined;
-  const ids = idsOfKey(question.finish);
-  return ids === undefined ? undefined : explicitFinish(ids);
+  return msg.choice === null ? undefined : finishWaitingOn(question);
 }
 
 async function settle(

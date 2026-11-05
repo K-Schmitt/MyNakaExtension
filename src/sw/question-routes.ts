@@ -3,7 +3,7 @@
 // of its own (`hide:`), so that it never replaces a waiting answer. `answering` comes from the queue's
 // memory, like the sending of the ratings, and lists the keys of answers only.
 
-import { QUESTION_KEY, type QuestionKey } from "../core/questions";
+import { linkKey, QUESTION_KEY, type QuestionKey } from "../core/questions";
 import type { AnswerMessage, QuestionMessage } from "../ext/question-messages";
 import type { RatingCardMessage } from "../ext/rating-messages";
 import { ambiguityTarget } from "./answer-jobs";
@@ -31,6 +31,10 @@ export function queueKeyOf(msg: AnswerMessage): QuestionKey {
       return removalTarget(msg);
     case "hide-question":
       return `hide:${msg.key}`;
+    case "link-title":
+      return linkKey(msg.side, msg.id);
+    case "requeue-question":
+      return `requeue:${msg.side}:${msg.id}`;
   }
 }
 
@@ -42,6 +46,10 @@ function runAnswer(jobs: Jobs, msg: AnswerMessage): Promise<void> {
       return jobs.answerRemoval(msg);
     case "hide-question":
       return jobs.hideQuestion(msg);
+    case "link-title":
+      return jobs.linkTitle(msg);
+    case "requeue-question":
+      return jobs.requeueQuestion(msg);
   }
 }
 
@@ -77,6 +85,9 @@ export function createQuestionRoutes(
           return true;
         case "page-lists":
           answerRead(() => jobs.pageLists(answering()), respond);
+          return true;
+        case "search-titles":
+          answerRead(() => jobs.searchTitles(msg), respond);
           return true;
         default:
           queue({ key: queueKeyOf(msg), msg });

@@ -59,6 +59,7 @@ export function answerWorld(o: WorldOpts = {}) {
     ...o.sc,
   });
   const traffic: Traffic = { sent: [], returned: [] };
+  const limited: string[] = [];
   const real = tabRunning(
     nk.client,
     o.nakaAccount ?? (() => "77"),
@@ -70,8 +71,8 @@ export function answerWorld(o: WorldOpts = {}) {
     sc: sk.client,
     scUsername: async () => o.username ?? "owner",
     limiters: {
-      naka: countingLimiter([], "naka"),
-      sc: countingLimiter([], "sc"),
+      naka: countingLimiter(limited, "naka"),
+      sc: countingLimiter(limited, "sc"),
     },
     now: () => NOW,
     today: () => "2026-11-05",
@@ -83,6 +84,8 @@ export function answerWorld(o: WorldOpts = {}) {
     nk,
     sk,
     traffic,
+    /** The slots taken on the shared limiters, in order: "limit:naka" | "limit:sc". */
+    limited,
     state: () => area.data.get("state") as SyncState,
     /** Parsed by the REAL parser: a record that breaks the settings fails here. */
     settings: () => parseSettings(area.data.get("settings")),

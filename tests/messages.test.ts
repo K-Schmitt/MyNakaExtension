@@ -917,6 +917,9 @@ describe("allowedFor", () => {
       remove: true,
     },
     { type: "hide-question", key: "ambiguity:naka:1" },
+    { type: "search-titles", side: "sc", query: "cowboy bebop" },
+    { type: "link-title", side: "naka", id: 1, otherId: 2 },
+    { type: "requeue-question", side: "naka", id: 1 },
     {
       type: "set-settings",
       thresholds: { film: 0.9, episode: 0.8 },
@@ -946,6 +949,9 @@ describe("allowedFor", () => {
       "page-lists",
       "answer-question",
       "answer-removal",
+      "search-titles",
+      "link-title",
+      "requeue-question",
     ],
   };
 
@@ -1001,6 +1007,45 @@ describe("allowedFor", () => {
     const types = messages.map((m) => m.type).sort();
     const tabbed = [...new Set(Object.values(allowed).flat())].sort();
     expect(tabbed).toEqual(types);
-    expect(new Set(types).size).toBe(17);
+    expect(new Set(types).size).toBe(20);
+  });
+});
+
+describe("the manual link messages (B6)", () => {
+  const SEARCH = { type: "search-titles", side: "sc", query: "cowboy bebop" };
+  const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
+  const REQUEUE = { type: "requeue-question", side: "sc", id: 7 };
+
+  it("parse to the known keys only; the query is trimmed", () => {
+    expect(
+      parseToWorker({ ...SEARCH, query: "  cowboy bebop ", x: 1 }),
+    ).toEqual(SEARCH);
+    expect(parseToWorker({ ...LINK, token: "T" })).toEqual(LINK);
+    expect(parseToWorker({ ...REQUEUE, x: 1 })).toEqual(REQUEUE);
+  });
+
+  it("refuse a bad query, side or id", () => {
+    for (const bad of [
+      { ...SEARCH, query: "   " },
+      { ...SEARCH, query: "x".repeat(201) },
+      { ...SEARCH, query: "\ud800" },
+      { ...SEARCH, side: "both" },
+      { ...LINK, id: 0 },
+      { ...LINK, otherId: 1.5 },
+      { ...LINK, otherId: null },
+      { ...REQUEUE, id: "7" },
+    ]) {
+      expect(parseToWorker(bad)).toBeUndefined();
+    }
+  });
+
+  it("only the status page may send them", () => {
+    for (const msg of [SEARCH, LINK, REQUEUE] as const) {
+      const parsed = parseToWorker(msg);
+      expect(parsed).toBeDefined();
+      if (parsed === undefined) continue;
+      expect(allowedFor("status-page", parsed)).toBe(true);
+      expect(allowedFor("naka-tab", parsed)).toBe(false);
+    }
   });
 });

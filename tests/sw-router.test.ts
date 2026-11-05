@@ -69,6 +69,9 @@ const REMOVAL = {
   remove: true,
 };
 const HIDE = { type: "hide-question", key: "ambiguity:naka:5" };
+const SEARCH = { type: "search-titles", side: "naka", query: "cowboy bebop" };
+const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
+const REQUEUE = { type: "requeue-question", side: "naka", id: 5 };
 // Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
 const QUESTION_MESSAGES: [string, unknown][] = [
   ["an open-questions", { type: "open-questions" }],
@@ -77,6 +80,9 @@ const QUESTION_MESSAGES: [string, unknown][] = [
   ["an answer-question", ANSWER],
   ["an answer-removal", REMOVAL],
   ["a hide-question", HIDE],
+  ["a search-titles", SEARCH],
+  ["a link-title", LINK],
+  ["a requeue-question", REQUEUE],
 ];
 
 const FINISHED = {
@@ -163,6 +169,16 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     pageLists: async (answering) => {
       calls.push(`page-lists:${JSON.stringify(answering)}`);
       return { questions: [], unlinked: [] };
+    },
+    linkTitle: async (msg) => {
+      calls.push(`link:${JSON.stringify(msg)}`);
+    },
+    requeueQuestion: async (msg) => {
+      calls.push(`requeue:${JSON.stringify(msg)}`);
+    },
+    searchTitles: async (msg) => {
+      calls.push(`search:${JSON.stringify(msg)}`);
+      return { candidates: [] };
     },
     ...over,
   };
@@ -2014,5 +2030,110 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       settingsPending: false,
       settings: toSettingsView({ film: 0.9, episode: 0.8 }, 0),
     });
+  });
+});
+
+describe("router: the manual link family (B6)", () => {
+  it("search-titles from the status page is answered by the job, outside the queue", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+      searchTitles: async () => ({
+        candidates: [{ id: 1, title: "A", type: "film" }],
+      }),
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(r.send(SEARCH, STATUS_PAGE)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([
+      { candidates: [{ id: 1, title: "A", type: "film" }] },
+    ]);
+    blocker.open();
+  });
+
+  it("link-title and requeue-question from the status page are queued and answered { ok: true } at once", async () => {
+    const r = router();
+    expect(r.send(LINK, STATUS_PAGE)).toBe(false);
+    expect(r.send(REQUEUE, STATUS_PAGE)).toBe(false);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+    await settle();
+    expect(r.calls).toEqual([
+      `link:${JSON.stringify(LINK)}`,
+      `requeue:${JSON.stringify(REQUEUE)}`,
+    ]);
+  });
+
+  it("the message keeps its known keys only", async () => {
+    const r = router();
+    r.send({ ...LINK, token: "T" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([`link:${JSON.stringify(LINK)}`]);
+  });
+
+  it("a second link of the same title replaces the waiting one (queue key link:naka:5)", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(LINK, STATUS_PAGE);
+    r.send({ ...LINK, otherId: 2006 }, STATUS_PAGE);
+    blocker.open();
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("link:"))).toEqual([
+      `link:${JSON.stringify({ ...LINK, otherId: 2006 })}`,
+    ]);
+  });
+
+  it("a waiting link is reported as answering by its key; a requeue is not", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send(LINK, STATUS_PAGE);
+    r.send(REQUEUE, STATUS_PAGE);
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toContain('page-lists:["link:naka:5"]');
+    blocker.open();
+  });
+
+  it("a malformed query or id is no message", async () => {
+    const r = router();
+    for (const bad of [
+      { ...SEARCH, query: "" },
+      { ...SEARCH, query: "x".repeat(201) },
+      { ...SEARCH, query: 5 },
+      { ...SEARCH, side: "x" },
+      { ...LINK, otherId: 0 },
+      { ...LINK, otherId: "2005" },
+      { ...LINK, otherId: undefined },
+      { ...REQUEUE, id: -1 },
+    ]) {
+      expect(r.send(bad, STATUS_PAGE)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("link-title, search-titles and requeue-question from a Naka tab are ignored (Review Focus 1)", async () => {
+    const r = router();
+    for (const msg of [LINK, SEARCH, REQUEUE]) {
+      expect(r.send(msg, NAKA_TAB)).toBe(false);
+    }
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
   });
 });
