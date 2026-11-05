@@ -12,6 +12,10 @@ export function seasonFactsOf(
   if (seasons === undefined) return { lastSeason: numberOfSeasons };
   return {
     episodesInSeason: seasons.episodeCounts[season],
-    lastSeason: Math.max(...seasons.seasons),
+    // A fold, not a spread: a long list would overflow the call stack.
+    lastSeason: seasons.seasons.reduce(
+      (high, season) => Math.max(high, season),
+      Number.NEGATIVE_INFINITY,
+    ),
   };
 }

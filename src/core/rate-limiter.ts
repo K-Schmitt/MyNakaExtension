@@ -24,10 +24,13 @@ async function waitForSlot(
 ): Promise<void> {
   const oldest = starts[0];
   if (starts.length < perWindow || oldest === undefined) return;
+  // A clock set back puts the oldest start ahead of now: the window then counts from now, so a clock
+  // set back never makes the wait longer than one window (as run-throttle and the finish window do).
+  const from = Math.min(oldest, clock.now());
   for (
-    let wait = oldest + windowMs - clock.now();
+    let wait = from + windowMs - clock.now();
     wait > 0;
-    wait = oldest + windowMs - clock.now()
+    wait = from + windowMs - clock.now()
   ) {
     await clock.sleep(wait);
   }

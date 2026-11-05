@@ -217,8 +217,13 @@ export function createRatingSession(
 
   function handlersOf(s: Session): RatingHandlers {
     const live = (): boolean => current === s && !s.locked;
-    const settled = (): boolean =>
-      live() && ports.now() - s.shownAt >= GRACE_MS;
+    // A clock set back puts the draw in the future: the grace then starts again from now, instead of
+    // leaving every button dead until the clock catches up.
+    const settled = (): boolean => {
+      if (!live()) return false;
+      if (ports.now() < s.shownAt) s.shownAt = ports.now();
+      return ports.now() - s.shownAt >= GRACE_MS;
+    };
     return {
       onChoose: (value) => settled() && choose(s, value),
       onAction: (action) => settled() && act(s, action),
