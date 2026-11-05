@@ -3,6 +3,7 @@
 import type { Mode } from "../ext/settings";
 import type { StatusSnapshot } from "../sw/status-snapshot";
 import { type SettingsView, toSettingsView } from "./settings-view";
+import { pendingActionLines } from "./status-actions";
 import { pendingModeLine, runningLine } from "./status-activity-lines";
 import type { StatusFormat } from "./status-format";
 import { readSnapshot } from "./status-input";
@@ -27,6 +28,8 @@ export type StatusView =
       switchLabel?: string;
       /** A mode change waits in the worker: a second click would stack another (Ruling 22). */
       switchDisabled: boolean;
+      /** A forget or a reset waits in the worker: both buttons stay disabled (a second would stack). */
+      actionsDisabled: boolean;
       /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
       inProgress: boolean;
       /** A settings change waits or runs in the worker: the values shown may be the old ones. */
@@ -68,10 +71,11 @@ function activityLines(
   snapshot: StatusSnapshot,
   format: StatusFormat,
 ): string[] {
-  const { running, pendingMode } = snapshot;
+  const { running, pendingMode, pendingActions } = snapshot;
   return present([
     running === undefined ? undefined : runningLine(running, format),
     pendingMode === undefined ? undefined : pendingModeLine(pendingMode),
+    ...pendingActionLines(pendingActions),
   ]);
 }
 
@@ -102,14 +106,17 @@ function settingsOf(snapshot: StatusSnapshot): { settings?: SettingsView } {
 
 function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
   const preview = previewLines(snapshot);
+  const actionsWait = (snapshot.pendingActions?.length ?? 0) > 0;
   const base = {
     ...settingsOf(snapshot),
     kind: "ready" as const,
     inProgress:
       snapshot.running !== undefined ||
       snapshot.pendingMode !== undefined ||
-      snapshot.pendingSettings !== undefined,
-    switchDisabled: snapshot.pendingMode !== undefined,
+      snapshot.pendingSettings !== undefined ||
+      actionsWait,
+    switchDisabled: snapshot.pendingMode !== undefined || actionsWait,
+    actionsDisabled: actionsWait,
     settingsPending: snapshot.pendingSettings !== undefined,
     previewCount: preview.length,
     lines: viewLines(snapshot, format),

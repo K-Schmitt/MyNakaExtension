@@ -3,6 +3,7 @@
 
 import type { ToWorker } from "../ext/messages";
 import type { Mode } from "../ext/settings";
+import type { LocalAction } from "../sw/activity";
 import {
   SETTINGS_COPY,
   type SettingsDraft,
@@ -10,6 +11,7 @@ import {
   sameValues,
   settingsMessage,
 } from "./settings-view";
+import { sendConfirmed } from "./status-actions";
 import type { StatusFormat } from "./status-format";
 import { confirmText } from "./status-mode-copy";
 import { LOADING_VIEW, type StatusView, toStatusView } from "./status-view";
@@ -22,7 +24,9 @@ export type PageTimer = {
   clear(handle: unknown): void;
 };
 
-export type FocusTarget = "resync" | "switch" | "headline";
+export type FocusTarget = "resync" | "switch" | "forget" | "reset" | "headline";
+
+type Pressed = Exclude<FocusTarget, "headline">;
 
 export type Ports = {
   send(message: ToWorker): Promise<unknown>;
@@ -41,6 +45,8 @@ export type Controller = {
   resync(): Promise<void>;
   toggleMode(): Promise<void>;
   saveSettings(draft: SettingsDraft): Promise<void>;
+  forgetBinding(): Promise<void>;
+  reset(): Promise<void>;
 };
 
 // A rejected send (worker restarted, port closed) is an absent answer, which the view model words.
@@ -63,10 +69,15 @@ async function sendQuietly(ports: Ports, message: ToWorker): Promise<void> {
 const inProgress = (view: StatusView): boolean =>
   view.kind === "ready" && view.inProgress;
 
-// The pressed button, unless the view now hides it: the switch shows only with a known mode.
-function focusTarget(pressed: "resync" | "switch", view: StatusView) {
-  const shown = view.kind === "ready" && view.switchLabel !== undefined;
-  return pressed === "switch" && !shown ? "headline" : pressed;
+// The pressed button, unless the view now hides or disables it: the switch shows only with a known mode,
+// and the two actions stay disabled while one waits.
+function focusTarget(pressed: Pressed, view: StatusView): FocusTarget {
+  if (pressed === "resync") return pressed;
+  if (view.kind !== "ready") return "headline";
+  if (pressed === "switch") {
+    return view.switchLabel === undefined ? "headline" : pressed;
+  }
+  return view.actionsDisabled ? "headline" : pressed;
 }
 
 export function createController(ports: Ports): Controller {
@@ -130,7 +141,7 @@ export function createController(ports: Ports): Controller {
   // button drops its focus, so it gets it back once the buttons are enabled again (Ruling 19).
   async function exclusive(
     action: () => Promise<void>,
-    pressed?: "resync" | "switch",
+    pressed?: Pressed,
   ): Promise<void> {
     if (busy) return;
     busy = true;
@@ -168,6 +179,11 @@ export function createController(ports: Ports): Controller {
     await refresh();
   }
 
+  // A yes sends the message; the answer after it shows the marker and arms the poll.
+  async function act(action: LocalAction): Promise<void> {
+    if (await sendConfirmed(ports, action)) await reload();
+  }
+
   return {
     load: () => exclusive(reload),
     resync: () =>
@@ -177,5 +193,7 @@ export function createController(ports: Ports): Controller {
       }, "resync"),
     toggleMode: () => exclusive(toggle, "switch"),
     saveSettings: (draft) => exclusive(() => save(draft)),
+    forgetBinding: () => exclusive(() => act("forget"), "forget"),
+    reset: () => exclusive(() => act("reset"), "reset"),
   };
 }

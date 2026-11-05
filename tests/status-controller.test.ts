@@ -536,3 +536,59 @@ describe("saveSettings", () => {
     expect(t.sent.map((m) => m.type)).toEqual(["status"]);
   });
 });
+
+const cps = (text: string) => [...text].map((c) => c.codePointAt(0));
+const FORGET_TEXT =
+  "Oublier les comptes liés efface seulement le lien enregistré entre votre compte SensCritique et votre compte Naka. Aucun jeton n'est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?";
+const RESET_TEXT =
+  "Réinitialiser efface l'état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu'ajouter, sans la mémoire des retraits\u202F: un titre retiré d'un côté et encore présent de l'autre y reviendrait. Vérifiez l'aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?";
+
+describe("the local actions", () => {
+  it.each([
+    ["reset", "reset", RESET_TEXT],
+    ["forgetBinding", "forget-binding", FORGET_TEXT],
+  ] as const)(
+    "%s: declined sends nothing, accepted sends exactly its message",
+    async (method, type, text) => {
+      const declined = setup([LIVE], false);
+      await declined.controller.load();
+      await declined.controller[method]();
+      expect(declined.sent.map((m) => m.type)).toEqual(["status"]);
+      expect(declined.confirms.map(cps)).toEqual([cps(text)]);
+
+      const accepted = setup([LIVE, LIVE]);
+      await accepted.controller.load();
+      await accepted.controller[method]();
+      expect(accepted.sent.slice(1)).toEqual([{ type }, { type: "status" }]);
+      expect(accepted.confirms.map(cps)).toEqual([cps(text)]);
+    },
+  );
+
+  it("a pending reset disables both buttons and the switch, and arms a poll", async () => {
+    const t = setup([{ mode: "live", pendingActions: ["reset"] }]);
+    await t.controller.load();
+    const view = t.shown.at(-1);
+    expect(view).toMatchObject({
+      actionsDisabled: true,
+      switchDisabled: true,
+      inProgress: true,
+    });
+    expect(view?.kind === "ready" && view.lines).toContain(
+      "Réinitialisation en attente",
+    );
+    expect(t.clock.armed.size).toBe(1);
+  });
+
+  it("an unreadable state leaves both buttons enabled: the reset is the repair", async () => {
+    const t = setup([{ error: "stored-state" }]);
+    await t.controller.load();
+    expect(t.shown.at(-1)).toMatchObject({ actionsDisabled: false });
+  });
+
+  it("the focus goes to the headline when the pressed button stays disabled", async () => {
+    const t = setup([LIVE, { mode: "live", pendingActions: ["forget"] }]);
+    await t.controller.load();
+    await t.controller.forgetBinding();
+    expect(t.page.at(-1)).toBe("focus:headline");
+  });
+});

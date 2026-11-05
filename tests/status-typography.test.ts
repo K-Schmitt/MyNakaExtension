@@ -12,6 +12,7 @@ import {
   toListsView,
 } from "../src/status/lists-view";
 import { SETTINGS_COPY, toSettingsView } from "../src/status/settings-view";
+import { ACTION_COPY, CONFIRM_TEXT } from "../src/status/status-actions";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
 import { type StatusView, toStatusView } from "../src/status/status-view";
@@ -83,6 +84,7 @@ const SNAPSHOTS: StatusSnapshot[] = [
     running: { kind: "finish", since: AT },
     pendingMode: "simulation",
   },
+  { mode: "live", pendingActions: ["forget", "reset"] },
 ];
 
 function texts(view: StatusView): string[] {
@@ -123,6 +125,8 @@ describe("French typography on the status page", () => {
       confirmText(0),
       confirmText(1),
       confirmText(3),
+      ...Object.values(CONFIRM_TEXT),
+      ...Object.values(ACTION_COPY),
       ...texts(toStatusView(undefined, localFormat("UTC"))),
     ];
     expect(all.flatMap(typographyFaults)).toEqual([]);

@@ -2128,6 +2128,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
       mode: "simulation",
       switchLabel: "Activer les écritures",
       switchDisabled: false,
+      actionsDisabled: false,
       inProgress: false,
       previewCount: 2,
       lines: [

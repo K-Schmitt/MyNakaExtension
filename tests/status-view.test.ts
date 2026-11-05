@@ -519,6 +519,31 @@ describe("toStatusView: the mode switch while a change waits", () => {
   });
 });
 
+describe("toStatusView: the local actions", () => {
+  it.each([
+    ["forget", "Oubli des comptes liés en attente"],
+    ["reset", "Réinitialisation en attente"],
+  ] as const)("names a pending %s and disables the actions", (action, line) => {
+    const view = ready({ mode: "live", pendingActions: [action] });
+    expect(view.lines).toContain(line);
+    expect(view.actionsDisabled).toBe(true);
+    expect(view.switchDisabled).toBe(true);
+    expect(view.inProgress).toBe(true);
+  });
+
+  it("names both when both wait", () => {
+    const view = ready({ mode: "live", pendingActions: ["forget", "reset"] });
+    expect(view.lines).toContain("Oubli des comptes liés en attente");
+    expect(view.lines).toContain("Réinitialisation en attente");
+  });
+
+  it("enables them with nothing waiting, and with an unreadable state", () => {
+    expect(ready({ mode: "live" }).actionsDisabled).toBe(false);
+    expect(ready({ error: "stored-state" }).actionsDisabled).toBe(false);
+    expect(ready({ mode: "live" }).switchDisabled).toBe(false);
+  });
+});
+
 describe("bindingLine: no-break space after n°", () => {
   it("holds n°, U+00A0, then the id", () => {
     const line = bindingLine({ scUsername: "a", nakaAccount: "7" }) ?? "";

@@ -30,9 +30,17 @@ function fill(list: HTMLElement, texts: string[]): void {
 let busyNow = false;
 // Whether the shown view says a mode change waits: the switch stays disabled meanwhile.
 let switchLocked = false;
+// Whether the shown view says a forget or a reset waits: both buttons stay disabled meanwhile.
+let actionsLocked = false;
 
 function syncSwitch(): void {
   element<HTMLButtonElement>("switch").disabled = busyNow || switchLocked;
+}
+
+function syncActions(): void {
+  for (const id of ["forget", "reset"]) {
+    element<HTMLButtonElement>(id).disabled = busyNow || actionsLocked;
+  }
 }
 
 function render(view: StatusView): void {
@@ -47,6 +55,10 @@ function render(view: StatusView): void {
   toggle.textContent = ready ? (view.switchLabel ?? "") : "";
   switchLocked = ready && view.switchDisabled;
   syncSwitch();
+  // Also shown on an unreadable state: the reset is the repair.
+  element("data").hidden = !ready;
+  actionsLocked = ready && view.actionsDisabled;
+  syncActions();
 }
 
 // The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
@@ -59,6 +71,7 @@ function setBusy(busy: boolean): void {
   syncForm(busy);
   element<HTMLButtonElement>("resync").disabled = busy;
   syncSwitch();
+  syncActions();
   element("status").setAttribute("aria-busy", String(busy));
 }
 
@@ -115,6 +128,11 @@ element("resync").addEventListener(
       .then(() => Promise.all([handled.load(), lists.load()])),
 );
 element("switch").addEventListener("click", () => void controller.toggleMode());
+element("forget").addEventListener(
+  "click",
+  () => void controller.forgetBinding(),
+);
+element("reset").addEventListener("click", () => void controller.reset());
 function onFormEdit(): void {
   showNote("");
   syncForm(busyNow);
