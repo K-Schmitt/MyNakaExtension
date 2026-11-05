@@ -51,6 +51,10 @@ export const SENDING_LINE = "Envoi de la note\u2026";
 
 export const UNREACHABLE_LINE = `La note n'est pas partie${NB}: l'extension ne répond pas.`;
 
+export function chosenLine(rating: number): string {
+  return `Note choisie${NB}: ${rating}`;
+}
+
 export const ACTION_LABELS: Record<RatingAction, string> = {
   "plus-tard": "Plus tard",
   ignorer: "Ignorer",

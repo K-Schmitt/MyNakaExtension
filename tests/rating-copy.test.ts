@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACTION_LABELS,
   CANCEL_LABEL,
+  chosenLine,
   currentLine,
   episodeHeading,
   errorLine,
@@ -72,6 +73,10 @@ describe("the rating copy, code point by code point", () => {
     );
   });
 
+  it("the chosen line", () => {
+    expect(chosenLine(7)).toBe(`Note choisie${NB}: 7`);
+  });
+
   it("the error line reuses the job error labels", () => {
     for (const code of CODES) {
       expect(errorLine(code)).toBe(
@@ -102,6 +107,7 @@ describe("the rating copy, code point by code point", () => {
       CANCEL_LABEL,
       SENDING_LINE,
       UNREACHABLE_LINE,
+      chosenLine(7),
       ...CODES.map(errorLine),
     ];
     expect(all.flatMap(typographyFaults)).toEqual([]);

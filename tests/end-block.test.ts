@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEndBlock } from "../src/content/ui/end-block";
 import {
+  chosenLine,
   errorLine,
   SENDING_LINE,
   SERIES_WARNING,
@@ -504,5 +505,64 @@ describe("the end block waits for the rating to be sent", () => {
     expect(w.last().view.notice).toBe(SENDING_LINE);
     expect(w.last().view.choices).toEqual([]);
     expect(w.calls.filter((c) => c.startsWith("rate"))).toHaveLength(1);
+  });
+});
+
+describe("the end block confirmation line and failing ports", () => {
+  it("the série confirmation shows the chosen rating", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSerie(), 7));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onChoose(9);
+    expect(w.last().view.notice).toBe(chosenLine(9));
+    expect(w.last().view.confirm).toBe(true);
+  });
+
+  it("asks that reject unlock the block with the unreachable line", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.fail.ask = true;
+    w.last().handlers.onChoose(6);
+    await flush();
+    await w.clock.advance(40000);
+    expect(w.hidden()).toBe(0);
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    expect(w.last().view.choices).toHaveLength(10);
+  });
+
+  it("a rate that rejects unlocks the block with the unreachable line", async () => {
+    const w = world();
+    w.script(FILM_IDS, answer(filmCard()));
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    w.ports.port.rate = async () => {
+      throw new Error("port bug");
+    };
+    w.last().handlers.onChoose(6);
+    await flush();
+    expect(w.last().view.error).toBe(UNREACHABLE_LINE);
+    expect(w.last().view.choices).toHaveLength(10);
+  });
+
+  it("an ask that rejects while opening a queued card does not break the block", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7 })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    w.fail.ask = true;
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    expect(w.block.isShown()).toBe(false);
+    w.fail.ask = false;
+    w.block.finished(FILM_IDS);
+    w.script(FILM_IDS, answer(filmCard()));
+    await w.clock.advance(2000);
+    expect(w.block.isShown()).toBe(true);
   });
 });

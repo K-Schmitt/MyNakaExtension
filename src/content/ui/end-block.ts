@@ -5,8 +5,14 @@
 import { type ContentIds, contentKeyOf } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
-import { type EndTimer, pollUntil, startEndPoll } from "./end-poll";
 import {
+  askOrNothing,
+  type EndTimer,
+  pollUntil,
+  startEndPoll,
+} from "./end-poll";
+import {
+  chosenLine,
   type RatingAction,
   SENDING_LINE,
   UNREACHABLE_LINE,
@@ -64,7 +70,14 @@ const failureOf = (card: RatingCard, label: RatingLabel): string | undefined =>
     : undefined;
 
 function confirmView(s: Session): RatingView {
-  return { ...viewOf(s), choices: [], others: [], actions: [], confirm: true };
+  return {
+    ...viewOf(s),
+    choices: [],
+    others: [],
+    actions: [],
+    confirm: true,
+    ...(s.confirming === undefined ? {} : { notice: chosenLine(s.confirming) }),
+  };
 }
 
 // A failed label is shown again with its failure line; otherwise the first pending one.
@@ -108,7 +121,7 @@ export function createEndBlock(ports: EndPorts) {
 
   async function openNext(): Promise<void> {
     for (let ids = queue.shift(); ids !== undefined; ids = queue.shift()) {
-      const answer = await ports.port.askCard(ids);
+      const answer = await askOrNothing(ports.port, ids);
       if (answer?.card && answer.card.pending.length > 0) {
         offer(ids, answer.card, answer.start);
         return;
@@ -120,7 +133,7 @@ export function createEndBlock(ports: EndPorts) {
     if (current !== s) return;
     current = undefined;
     ports.hide();
-    void openNext();
+    openNext().catch(() => {});
   }
 
   // The card after an action: the next label, or a failure line; the block unlocks.
@@ -162,11 +175,13 @@ export function createEndBlock(ports: EndPorts) {
       (answer) => judge(s, label, before, answer),
       (answered) => (answered ? close(s) : unreachable(s)),
     );
-    void send.then((sent) => {
-      if (sent) return;
-      stop();
-      unreachable(s);
-    });
+    void send
+      .catch(() => false)
+      .then((sent) => {
+        if (sent) return;
+        stop();
+        unreachable(s);
+      });
   }
 
   function judge(

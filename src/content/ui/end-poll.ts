@@ -18,6 +18,18 @@ export type CardAsker = {
 
 export type Found = (card: RatingCard, start?: number) => void;
 
+// A port that rejects is a worker that did not answer, never an error that escapes.
+export async function askOrNothing(
+  asker: CardAsker,
+  ids: ContentIds,
+): Promise<CardAnswer | undefined> {
+  try {
+    return await asker.askCard(ids);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Asks on the schedule. `judge` returns true when the answer settles the wait (the poll then stops);
  * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all.
@@ -40,7 +52,7 @@ export function pollUntil(
 
   async function poll(): Promise<void> {
     if (done) return;
-    const answer = await asker.askCard(ids);
+    const answer = await askOrNothing(asker, ids);
     if (done) return;
     if (answer !== undefined) answered = true;
     if (judge(answer)) {
