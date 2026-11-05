@@ -4,10 +4,13 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
 import type { VideoSample } from "../naka-tab";
-import { askOrNothing } from "./end-poll";
+import { askOrNothing, questionOf } from "./end-poll";
+import { createQuestionHost, type HostPorts } from "./question-host";
 import { createRatingSession, type SessionPorts } from "./rating-session";
+import { labelOf } from "./session-views";
 import { viewOnlyCard, viewOnlyLabel } from "./view-only-card";
 
 // Naka's next-episode zone: from here a pause is the end of the viewing, not a moment to rate.
@@ -16,11 +19,12 @@ export const PAUSE_AFTER_URL_MS = 3000;
 // Naka's page makes each pause reach a capture listener twice.
 export const DOUBLE_PAUSE_MS = 1000;
 
-export type PausePorts = SessionPorts & {
-  now(): number;
-  endShown(): boolean;
-  titleOf(contentId: number): Promise<string | undefined>;
-};
+export type PausePorts = Omit<SessionPorts, "onQuestion"> &
+  HostPorts & {
+    now(): number;
+    endShown(): boolean;
+    titleOf(contentId: number): Promise<string | undefined>;
+  };
 
 type Position = Pick<VideoSample, "currentTime" | "duration">;
 type Offer = { card: RatingCard; label: RatingLabel; viewOnly?: boolean };
@@ -32,12 +36,28 @@ function progressOf({ currentTime, duration }: Position): number | undefined {
 
 // A rated title can be rated again: with nothing pending, its first target.
 function offerOfCard(card: RatingCard): Offer | undefined {
-  const label = card.pending[0] ?? card.targets[0]?.label;
+  const label = labelOf(card) ?? card.targets[0]?.label;
   return label === undefined ? undefined : { card, label };
 }
 
 export function createPauseBlock(ports: PausePorts) {
-  const session = createRatingSession(ports, () => {});
+  // The pause being served: the question and a card-less rating's hand-over both need its ids and place.
+  let serving: { ids: ContentIds; progress: number; mine: number } | undefined;
+  const session = createRatingSession(
+    {
+      ...ports,
+      onQuestion: (found, answer) => {
+        if (serving?.mine === epoch) question.open(serving.ids, found, answer);
+      },
+    },
+    () => {},
+  );
+  const question = createQuestionHost(ports, (ids, linked) => {
+    const again = serving;
+    if (linked && again?.mine === epoch && again.ids === ids) {
+      offer(ids, again.progress, again.mine).catch(() => {});
+    }
+  });
   let lastUrlAt: number | undefined;
   let lastPauseAt: number | undefined;
   let epoch = 0; // each pause, play, URL change and close starts a new one: an older answer is dropped
@@ -75,17 +95,36 @@ export function createPauseBlock(ports: PausePorts) {
     const answer = await askOrNothing(ports.port, ids);
     if (answer === undefined) return;
     if (progress < answer.pauseFromPercent / 100) return;
+    const found = questionOf(answer);
+    if (found !== undefined) {
+      askFirst(ids, progress, mine, found, answer);
+      return;
+    }
     const chosen = await offerOf(ids, answer);
     if (chosen === undefined || epoch !== mine || ports.endShown()) return;
+    serving = { ids, progress, mine };
     const { card, label, viewOnly } = chosen;
     const { start, sending } = answer;
     session.open(ids, card, label, { start, sending, viewOnly });
   }
 
-  // The shown card closes, and an offer still on its way is dropped.
+  function askFirst(
+    ids: ContentIds,
+    progress: number,
+    mine: number,
+    found: AmbiguityOffer,
+    answer: CardAnswer,
+  ): void {
+    if (epoch !== mine || ports.endShown()) return;
+    serving = { ids, progress, mine };
+    question.open(ids, found, answer);
+  }
+
+  // The shown card or question closes, and an offer still on its way is dropped.
   function close(): void {
     epoch += 1;
     session.closeShown();
+    question.closeShown();
   }
 
   return {

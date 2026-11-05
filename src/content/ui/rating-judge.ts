@@ -2,6 +2,7 @@
 // Pure of the session's drawing: the session hands in what to do (close, settle, unlock) as `JudgeActs`.
 
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
 import { notSentLine } from "./rating-copy";
 import { failureOf, type Session } from "./session-views";
@@ -25,6 +26,7 @@ export const snapshotOf = ({ card, label, viewOnly }: Session): Snapshot => ({
 export type JudgeActs = {
   live(s: Session): boolean;
   absentIsDone: boolean;
+  onQuestion: ((offer: AmbiguityOffer, answer: CardAnswer) => void) | undefined;
   close(s: Session): void;
   settle(s: Session, answer: CardAnswer): void;
   unlock(s: Session): void;
@@ -44,8 +46,9 @@ function showFailure(
 }
 
 // An answer with no card, the label no longer being sent. For a list, the card has nothing left to
-// ask. For a view-only card, the rate job ran without making one: the line says why, the choices work
-// again. For a shown real card, it is "not yet".
+// ask. For a view-only card, the rate job ran without making one: with a question waiting, the question
+// block takes over; otherwise the line says why and the choices work again. For a shown real card, it is
+// "not yet".
 function absent(
   acts: JudgeActs,
   s: Session,
@@ -57,6 +60,11 @@ function absent(
     return true;
   }
   if (!at.cardless) return false;
+  if (answer.question !== undefined && acts.onQuestion !== undefined) {
+    acts.close(s); // the question comes first: the rating goes on once it is answered
+    acts.onQuestion(answer.question, answer);
+    return true;
+  }
   s.error = notSentLine(answer.lastFinish);
   acts.unlock(s);
   return true;

@@ -3,6 +3,7 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
 
 export const END_POLL_MS = [2000, 5000, 10000, 20000, 40000];
@@ -90,13 +91,24 @@ export function pollUntil(
   return pollSchedule(() => askOrNothing(asker, ids), timer, judge, onEnd);
 }
 
-/** Returns the stop of the poll: a stopped poll calls neither `onFound` nor `onMissed`. */
+/** The question a card-less answer carries; a card, even with nothing pending, is no question. */
+export function questionOf(
+  answer: CardAnswer | undefined,
+): AmbiguityOffer | undefined {
+  return answer?.card ? undefined : answer?.question;
+}
+
+/**
+ * Returns the stop of the poll: a stopped poll calls none of the three. A card with something pending
+ * settles it (`onFound`); so does a card-less answer with a question (`onQuestion`: it comes first).
+ */
 export function startEndPoll(
   asker: CardAsker,
   timer: EndTimer,
   ids: ContentIds,
   onFound: Found,
   onMissed: () => void,
+  onQuestion?: (offer: AmbiguityOffer, answer: CardAnswer) => void,
 ): () => void {
   return pollUntil(
     asker,
@@ -104,6 +116,11 @@ export function startEndPoll(
     ids,
     (answer) => {
       const card = answer?.card;
+      const question = questionOf(answer);
+      if (answer !== undefined && question !== undefined && onQuestion) {
+        onQuestion(question, answer);
+        return true;
+      }
       if (card === undefined || card === null || card.pending.length === 0) {
         return false;
       }

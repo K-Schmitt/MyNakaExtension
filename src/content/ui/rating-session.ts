@@ -7,23 +7,16 @@
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
-import { type EndTimer, pollUntil } from "./end-poll";
+import { pollUntil } from "./end-poll";
 import { type RatingAction, UNREACHABLE_LINE } from "./rating-copy";
 import { type JudgeActs, judge, snapshotOf } from "./rating-judge";
 import type { RatingHandlers } from "./rating-render";
-import type { RatingView } from "./rating-view";
+import type { SessionPorts } from "./session-ports";
 import { labelOf, needsConfirm, type Session, viewFor } from "./session-views";
-import type { WorkerPort } from "./worker-port";
 
 export const GRACE_MS = 400;
 
-export type SessionPorts = {
-  port: Pick<WorkerPort, "askCard" | "rate" | "dismiss">;
-  timer: EndTimer;
-  now(): number;
-  show(view: RatingView, handlers: RatingHandlers): void;
-  hide(): void;
-};
+export type { SessionPorts };
 
 // `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card
 // missing from the answer has nothing left to ask. For one shown card, a missing card is "not yet".
@@ -91,6 +84,7 @@ export function createRatingSession(
   const acts: JudgeActs = {
     live: (s) => current === s,
     absentIsDone: options.absentIsDone === true,
+    onQuestion: ports.onQuestion,
     close,
     settle,
     unlock,
