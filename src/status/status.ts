@@ -16,6 +16,7 @@ import {
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
 import type { StatusView } from "./status-view";
+import { createSyncEnd } from "./sync-end";
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -51,6 +52,7 @@ function syncActions(): void {
 }
 
 function render(view: StatusView): void {
+  syncEnd.see(view);
   const ready = view.kind === "ready";
   showSettings(ready ? view.settings : undefined, busyNow);
   element("headline").textContent = ready ? view.headline : view.message;
@@ -89,6 +91,11 @@ const timer = {
   clear: (handle: unknown) =>
     clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
+
+// The lists follow the sync the page shows as finished (or the reset, or the forget): both are asked again.
+const syncEnd = createSyncEnd(
+  () => void Promise.all([handled.load(), lists.load()]),
+);
 
 const controller = createController({
   send: (message) => chrome.runtime.sendMessage(message),
