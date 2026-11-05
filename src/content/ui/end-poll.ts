@@ -2,7 +2,7 @@
 // times counted from the event (the end of a viewing, a click), and stops when the answer says enough.
 
 import type { ContentIds } from "../../core/finish-event";
-import type { RatingCard } from "../../core/rating-cards";
+import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
 
 export const END_POLL_MS = [2000, 5000, 10000, 20000, 40000];
@@ -16,7 +16,11 @@ export type CardAsker = {
   askCard(ids: ContentIds): Promise<CardAnswer | undefined>;
 };
 
-export type Found = (card: RatingCard, start?: number) => void;
+export type Found = (
+  card: RatingCard,
+  start?: number,
+  sending?: RatingLabel[],
+) => void;
 
 // A port that rejects is a worker that did not answer, never an error that escapes.
 export async function askOrNothing(
@@ -92,7 +96,7 @@ export function startEndPoll(
       if (card === undefined || card === null || card.pending.length === 0) {
         return false;
       }
-      onFound(card, answer?.start);
+      onFound(card, answer?.start, answer?.sending);
       return true;
     },
     onMissed,

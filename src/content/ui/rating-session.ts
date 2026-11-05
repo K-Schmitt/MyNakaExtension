@@ -73,6 +73,10 @@ export function createRatingSession(
     s.label = label;
     delete s.start;
     if (answer.start !== undefined) s.start = answer.start;
+    if (answer.sending?.includes(label)) {
+      watch(s);
+      return;
+    }
     s.locked = false;
     render(s);
   }
@@ -95,6 +99,7 @@ export function createRatingSession(
     answer: CardAnswer | undefined,
   ): boolean {
     if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
+    if (answer?.sending?.includes(label)) return false; // the worker still has the rating to send
     const card = answer?.card;
     if (answer && !card && options.absentIsDone === true) {
       close(s);
@@ -120,7 +125,7 @@ export function createRatingSession(
 
   // Locked from the click until the card says the label left `pending`, or a failure that was not
   // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
-  function afterAction(s: Session, send: Promise<boolean>): void {
+  function watch(s: Session, send?: Promise<boolean>): void {
     const { label } = s;
     const at = snapshotOf(s.card, label);
     s.locked = true;
@@ -134,7 +139,7 @@ export function createRatingSession(
       (answered) => (answered ? close(s) : unreachable(s)),
     );
     void send
-      .catch(() => false)
+      ?.catch(() => false)
       .then((sent) => {
         if (sent) return;
         stop();
@@ -149,7 +154,7 @@ export function createRatingSession(
       render(s);
       return;
     }
-    afterAction(s, ports.port.rate(s.ids, s.label, value));
+    watch(s, ports.port.rate(s.ids, s.label, value));
   }
 
   function confirm(s: Session, send: boolean): void {
@@ -159,12 +164,12 @@ export function createRatingSession(
       render(s);
       return;
     }
-    afterAction(s, ports.port.rate(s.ids, s.label, value));
+    watch(s, ports.port.rate(s.ids, s.label, value));
   }
 
   function act(s: Session, action: RatingAction): void {
     if (action === "ignorer") {
-      afterAction(s, ports.port.dismiss(s.ids, s.label));
+      watch(s, ports.port.dismiss(s.ids, s.label));
       return;
     }
     close(s);
@@ -190,6 +195,7 @@ export function createRatingSession(
       card: RatingCard,
       label: RatingLabel,
       start?: number,
+      sending: RatingLabel[] = [],
     ): void {
       current = {
         ids,
@@ -198,7 +204,8 @@ export function createRatingSession(
         locked: false,
         ...(start === undefined ? {} : { start }),
       };
-      render(current);
+      if (sending.includes(label)) watch(current);
+      else render(current);
     },
     closeShown(): void {
       if (current !== undefined) close(current);

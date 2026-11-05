@@ -78,7 +78,7 @@ export function createPauseBlock(ports: PausePorts) {
     const chosen = await offerOf(ids, answer);
     if (chosen === undefined || epoch !== mine || ports.endShown()) return;
     const { card, label } = chosen;
-    session.open(ids, card, label, answer.start);
+    session.open(ids, card, label, answer.start, answer.sending);
   }
 
   return {

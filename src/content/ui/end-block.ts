@@ -3,7 +3,7 @@
 // rating session; this file owns the wait for the card and the queue of cards behind the shown one.
 
 import { type ContentIds, contentKeyOf } from "../../core/finish-event";
-import type { RatingCard } from "../../core/rating-cards";
+import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import { askOrNothing, type EndTimer, startEndPoll } from "./end-poll";
 import type { RatingHandlers } from "./rating-render";
 import { createRatingSession } from "./rating-session";
@@ -27,20 +27,25 @@ export function createEndBlock(ports: EndPorts) {
     openNext().catch(() => {});
   });
 
-  function offer(ids: ContentIds, card: RatingCard, start?: number): void {
+  function offer(
+    ids: ContentIds,
+    card: RatingCard,
+    start?: number,
+    sending?: RatingLabel[],
+  ): void {
     if (session.isOpen()) {
       queue.push(ids);
       return;
     }
     const label = labelOf(card);
-    if (label !== undefined) session.open(ids, card, label, start);
+    if (label !== undefined) session.open(ids, card, label, start, sending);
   }
 
   async function openNext(): Promise<void> {
     for (let ids = queue.shift(); ids !== undefined; ids = queue.shift()) {
       const answer = await askOrNothing(ports.port, ids);
       if (answer?.card && answer.card.pending.length > 0) {
-        offer(ids, answer.card, answer.start);
+        offer(ids, answer.card, answer.start, answer.sending);
         return;
       }
     }
@@ -56,7 +61,7 @@ export function createEndBlock(ports: EndPorts) {
         ports.port,
         ports.timer,
         ids,
-        (card, start) => offer(ids, card, start),
+        (card, start, sending) => offer(ids, card, start, sending),
         () => seen.delete(key),
       );
     },

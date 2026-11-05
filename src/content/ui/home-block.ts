@@ -5,6 +5,7 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { CardsAnswer } from "../../sw/rating-answers";
 import type { EndTimer } from "./end-poll";
 import { entryAsker } from "./home-asker";
 import { type HomeEntry, type HomeView, homeView } from "./home-view";
@@ -111,13 +112,14 @@ export function createHomeBlock(ports: HomePorts) {
     return slot;
   }
 
-  function open(cards: { card: RatingCard; start?: number }[]): void {
+  function open(cards: CardsAnswer["cards"]): void {
     opening = true;
-    slots = cards.filter(({ card }) => card.pending.length > 0).map(slotOf);
-    for (const { entry, session } of slots) {
-      const { card, start } = entry;
-      session.open(idsOf(card), card, firstPending(card), start);
-    }
+    const shown = cards.filter(({ card }) => card.pending.length > 0);
+    slots = shown.map(slotOf);
+    shown.forEach(({ card, start, sending }, i) => {
+      const session = slots[i]?.session;
+      session?.open(idsOf(card), card, firstPending(card), start, sending);
+    });
     opening = false;
     draw();
   }
