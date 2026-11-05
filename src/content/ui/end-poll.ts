@@ -3,6 +3,7 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
+import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
 
 export const END_POLL_MS = [2000, 5000, 10000, 20000, 40000];
@@ -36,13 +37,13 @@ export async function askOrNothing(
 
 /**
  * Asks on the schedule. `judge` returns true when the answer settles the wait (the poll then stops);
- * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all.
+ * `onEnd` runs when the schedule is spent unsettled, told whether any ask was answered at all. An ask
+ * that rejects is an unanswered one. Shared by the rating blocks (cards) and the question blocks.
  */
-export function pollUntil(
-  asker: CardAsker,
+export function pollSchedule<A>(
+  ask: () => Promise<A | undefined>,
   timer: EndTimer,
-  ids: ContentIds,
-  judge: (answer: CardAnswer | undefined) => boolean,
+  judge: (answer: A | undefined) => boolean,
   onEnd: (answered: boolean) => void,
 ): () => void {
   let done = false;
@@ -56,7 +57,7 @@ export function pollUntil(
 
   async function poll(): Promise<void> {
     if (done) return;
-    const answer = await askOrNothing(asker, ids);
+    const answer = await ask().catch(() => undefined);
     if (done) return;
     if (answer !== undefined) answered = true;
     if (judge(answer)) {
@@ -80,13 +81,34 @@ export function pollUntil(
   return stop;
 }
 
-/** Returns the stop of the poll: a stopped poll calls neither `onFound` nor `onMissed`. */
+export function pollUntil(
+  asker: CardAsker,
+  timer: EndTimer,
+  ids: ContentIds,
+  judge: (answer: CardAnswer | undefined) => boolean,
+  onEnd: (answered: boolean) => void,
+): () => void {
+  return pollSchedule(() => askOrNothing(asker, ids), timer, judge, onEnd);
+}
+
+/** The question a card-less answer carries; a card, even with nothing pending, is no question. */
+export function questionOf(
+  answer: CardAnswer | undefined,
+): AmbiguityOffer | undefined {
+  return answer?.card ? undefined : answer?.question;
+}
+
+/**
+ * Returns the stop of the poll: a stopped poll calls none of the three. A card with something pending
+ * settles it (`onFound`); so does a card-less answer with a question (`onQuestion`: it comes first).
+ */
 export function startEndPoll(
   asker: CardAsker,
   timer: EndTimer,
   ids: ContentIds,
   onFound: Found,
   onMissed: () => void,
+  onQuestion?: (offer: AmbiguityOffer, answer: CardAnswer) => void,
 ): () => void {
   return pollUntil(
     asker,
@@ -94,6 +116,11 @@ export function startEndPoll(
     ids,
     (answer) => {
       const card = answer?.card;
+      const question = questionOf(answer);
+      if (answer !== undefined && question !== undefined && onQuestion) {
+        onQuestion(question, answer);
+        return true;
+      }
       if (card === undefined || card === null || card.pending.length === 0) {
         return false;
       }

@@ -19,9 +19,9 @@ import {
   parseEvent,
 } from "./finish-event";
 import { matchOnSc } from "./finish-match";
+import { askOwner, remindOwner } from "./finish-question";
 import type { Pair } from "./list-diff";
 import {
-  addPending,
   isHandled,
   markHandled,
   type SyncState,
@@ -59,7 +59,7 @@ export type FinishOutcome =
   | { kind: "not-found" }
   | { kind: "done"; ratingTargets: RatingTarget[]; lastOfSeason?: boolean };
 
-type Found = { state: SyncState; key: string; pair: Pair };
+type Found = { state: SyncState; key: string; pair: Pair; title: string };
 
 // An explicit "seen" completes whatever the progress; a bad threshold throws for both sources.
 // The threshold is the one of the event's kind. Exported for the worker's local pre-check (Ruling 18):
@@ -75,25 +75,8 @@ export function isComplete(
   return isWatchComplete(signal, thresholds[event.kind]);
 }
 
-async function askOwner(
-  state: SyncState,
-  nakaId: number,
-  candidateIds: number[],
-  ports: FinishPorts,
-): Promise<FinishOutcome> {
-  await ports.save(
-    addPending(state, {
-      kind: "ambiguity",
-      side: "naka",
-      id: nakaId,
-      candidateIds,
-    }),
-  );
-  return { kind: "needs-choice", candidateIds };
-}
-
 async function finishFilm(
-  { state, key, pair }: Found,
+  { state, key, pair, title }: Found,
   ports: FinishPorts,
 ): Promise<FinishOutcome> {
   const { isDone, isWished, universe, rating } = await ports.productState(
@@ -106,7 +89,7 @@ async function finishFilm(
   await ports.save(state1);
   if (isWished) await ports.unwish(pair.scId);
   if (!isDone) await ports.markDone(pair.scId, ports.today());
-  await ports.save(markHandled(state1, key));
+  await ports.save(markHandled(state1, key, title));
   const film = {
     label: "film",
     productId: pair.scId,
@@ -149,7 +132,7 @@ function isLastOfSeason(
 }
 
 async function finishEpisode(
-  { state, key, pair }: Found,
+  { state, key, pair, title }: Found,
   { season, episode }: { season: number; episode: number },
   ports: FinishPorts,
 ): Promise<FinishOutcome> {
@@ -163,7 +146,7 @@ async function finishEpisode(
     throw new Error("finish: the SensCritique product is not an episode");
   }
   if (!isDone) await ports.markDone(found.productId, ports.today());
-  await ports.save(markHandled(state, key));
+  await ports.save(markHandled(state, key, title));
   const ratingTargets = episodeTargets(
     { productId: found.productId, current: rating },
     info.seasonProductId,
@@ -189,14 +172,17 @@ export async function handleFinish(
   }
   const match = await matchOnSc(state, event.contentId, event.titled, ports);
   if (match.kind === "not-found") return { kind: "not-found" };
-  if (match.kind === "asked") {
-    return { kind: "needs-choice", candidateIds: match.candidateIds };
-  }
-  if (match.kind === "needs-choice") {
-    return askOwner(state, event.contentId, match.candidateIds, ports);
-  }
+  if (match.kind === "asked")
+    return remindOwner(state, event, key, match, ports);
+  if (match.kind === "needs-choice")
+    return askOwner(state, event, match, ports);
   const mapped = match.isNew ? upsertMapping(state, match.pair) : state;
-  const found = { state: mapped, key, pair: match.pair };
+  const found = {
+    state: mapped,
+    key,
+    pair: match.pair,
+    title: event.titled.title,
+  };
   return event.kind === "film"
     ? finishFilm(found, ports)
     : finishEpisode(found, event, ports);

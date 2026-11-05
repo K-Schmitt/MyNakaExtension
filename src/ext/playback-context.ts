@@ -13,3 +13,14 @@ export function playbackContext(record: Record<string, unknown>): {
   if (season === undefined || episode === undefined) return fail("episode");
   return { season, episode };
 }
+
+// A playlist event: it may report the id of the title just removed from « Ma liste » (absent, or a positive
+// safe integer: anything else refuses the whole event). The channel is the caller's, to avoid an import cycle.
+export function playlistEvent<C extends string>(
+  channel: C,
+  record: Record<string, unknown>,
+): { channel: C; kind: "playlist"; removed?: number } {
+  const removed = whenPresent(record.removed, (v) => asId(v, "removed"));
+  const base = { channel, kind: "playlist" } as const;
+  return removed === undefined ? base : { ...base, removed };
+}

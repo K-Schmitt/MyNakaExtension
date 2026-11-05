@@ -5,8 +5,13 @@ import {
   resolveNakaIds,
   resolveScIds,
 } from "../src/core/resolver";
-import { emptyState, type SyncState } from "../src/core/state";
+import {
+  emptyState,
+  type PendingItem,
+  type SyncState,
+} from "../src/core/state";
 import type { Candidate, Titled } from "../src/core/title-match";
+import { parseState } from "../src/ext/state-schema";
 
 const p = (nakaId: number, scId: number): Pair => ({ nakaId, scId });
 const film = (title: string, extra: Partial<Titled> = {}): Titled => ({
@@ -18,6 +23,21 @@ const film = (title: string, extra: Partial<Titled> = {}): Titled => ({
 const cand = (id: number, title: string, extra: Partial<Titled> = {}) => ({
   id,
   ...film(title, extra),
+});
+
+// A question the resolver saves: the asked title and the candidates listed by the (film, 2000) search.
+const asked = (
+  side: "naka" | "sc",
+  id: number,
+  ids: number[],
+  title: string,
+): PendingItem => ({
+  kind: "ambiguity",
+  side,
+  id,
+  candidateIds: ids,
+  title,
+  candidates: ids.map((cid) => ({ id: cid, title, year: 2000, type: "film" })),
 });
 
 function deepFreeze<T>(value: T): T {
@@ -108,10 +128,7 @@ describe("resolveNakaIds", () => {
     const out = await resolveNakaIds([5], rich(), pt);
     expect(out).toEqual({
       ...rich(),
-      pending: [
-        ...rich().pending,
-        { kind: "ambiguity", side: "naka", id: 5, candidateIds: [50, 51] },
-      ],
+      pending: [...rich().pending, asked("naka", 5, [50, 51], "Dune")],
     });
   });
 
@@ -225,7 +242,7 @@ describe("resolveNakaIds", () => {
     expect(out.mapping).toEqual([p(1, 11), p(2, 12)]);
     expect(out.pending).toEqual([
       ...rich().pending,
-      { kind: "ambiguity", side: "naka", id: 5, candidateIds: [11] },
+      asked("naka", 5, [11], "Dune"),
     ]);
   });
 
@@ -244,9 +261,7 @@ describe("resolveNakaIds", () => {
     });
     const out = await resolveNakaIds([5, 6], emptyState(), pt);
     expect(out.mapping).toEqual([p(5, 50)]);
-    expect(out.pending).toEqual([
-      { kind: "ambiguity", side: "naka", id: 6, candidateIds: [50] },
-    ]);
+    expect(out.pending).toEqual([asked("naka", 6, [50], "Dune")]);
   });
 
   it("skips an id that is already mapped (zero port calls)", async () => {
@@ -426,7 +441,7 @@ describe("resolveNakaIds", () => {
       settled: [p(2, 12)],
       pending: [
         { kind: "removal", removeFrom: "sc", pair: p(1, 11), asked: true },
-        { kind: "ambiguity", side: "naka", id: 6, candidateIds: [61, 62] },
+        asked("naka", 6, [61, 62], "Twin"),
       ],
       handled: ["k"],
       unlinked: [
@@ -465,9 +480,7 @@ describe("resolveScIds (mirror)", () => {
       searchNaka: { Dune: [cand(5, "Dune"), cand(6, "Dune")] },
     });
     const out = await resolveScIds([50], emptyState(), pt);
-    expect(out.pending).toEqual([
-      { kind: "ambiguity", side: "sc", id: 50, candidateIds: [5, 6] },
-    ]);
+    expect(out.pending).toEqual([asked("sc", 50, [5, 6], "Dune")]);
     expect(out.mapping).toEqual([]);
   });
 
@@ -496,7 +509,7 @@ describe("resolveScIds (mirror)", () => {
     expect(out.mapping).toEqual([p(1, 11), p(2, 12)]);
     expect(out.pending).toEqual([
       ...rich().pending,
-      { kind: "ambiguity", side: "sc", id: 50, candidateIds: [1] },
+      asked("sc", 50, [1], "Dune"),
     ]);
   });
 
@@ -557,7 +570,7 @@ describe("resolveScIds (mirror)", () => {
       mapping: [p(1, 11), p(2, 12), p(5, 50)],
       pending: [
         { kind: "removal", removeFrom: "sc", pair: p(1, 11), asked: true },
-        { kind: "ambiguity", side: "sc", id: 51, candidateIds: [61, 62] },
+        asked("sc", 51, [61, 62], "Twin"),
       ],
       unlinked: [
         { side: "naka", id: 90, title: "Old", reason: "no-match" },
@@ -600,9 +613,7 @@ describe("resolveScIds (mirror)", () => {
     });
     const out = await resolveScIds([50, 51], emptyState(), pt);
     expect(out.mapping).toEqual([p(5, 50)]);
-    expect(out.pending).toEqual([
-      { kind: "ambiguity", side: "sc", id: 51, candidateIds: [5] },
-    ]);
+    expect(out.pending).toEqual([asked("sc", 51, [5], "Dune")]);
   });
 
   it("isolates failures and keeps order", async () => {
@@ -649,7 +660,7 @@ describe("a match whose counterpart has an open question on its own side", () =>
     const state = deepFreeze(withPending(open));
     const out = await resolveNakaIds([5], state, nakaPorts());
     expect(out.mapping).toEqual([]);
-    expect(out.pending).toEqual([open, question("naka", 5, [50])]);
+    expect(out.pending).toEqual([open, asked("naka", 5, [50], "Dune")]);
   });
 
   it("SC direction: 50 matches 5 while Naka's question on 5 is open, so 50 is asked about 5", async () => {
@@ -657,7 +668,7 @@ describe("a match whose counterpart has an open question on its own side", () =>
     const state = deepFreeze(withPending(open));
     const out = await resolveScIds([50], state, scPorts());
     expect(out.mapping).toEqual([]);
-    expect(out.pending).toEqual([open, question("sc", 50, [5])]);
+    expect(out.pending).toEqual([open, asked("sc", 50, [5], "Dune")]);
   });
 
   it.each([
@@ -698,4 +709,75 @@ describe("a match whose counterpart has an open question on its own side", () =>
       expect(out.pending).toEqual(pending);
     },
   );
+});
+
+describe("questions carry their titles", () => {
+  const serie = (title: string, extra: Partial<Titled> = {}): Titled => ({
+    title,
+    type: "serie",
+    ...extra,
+  });
+  const dune = (id: number, extra: Partial<Titled> = {}): Candidate => ({
+    id,
+    ...serie("Dune", extra),
+  });
+
+  it("stores the asked title and the candidates, without originalTitle", async () => {
+    const pt = ports({
+      naka: { 5: serie("Dune") },
+      searchSc: {
+        Dune: [
+          dune(50, { year: 1998, originalTitle: "Dune (orig)" }),
+          dune(51, { year: 2021 }),
+        ],
+      },
+    });
+    const out = await resolveNakaIds([5], emptyState(), pt);
+    expect(out.pending).toStrictEqual([
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: 5,
+        candidateIds: [50, 51],
+        title: "Dune",
+        candidates: [
+          { id: 50, title: "Dune", year: 1998, type: "serie" },
+          { id: 51, title: "Dune", year: 2021, type: "serie" },
+        ],
+      },
+    ]);
+  });
+
+  it("stores the one matched candidate of a swap-guard question", async () => {
+    const state: SyncState = { ...emptyState(), mapping: [p(1, 50)] };
+    const pt = ports({
+      naka: { 5: serie("Dune") },
+      searchSc: { Dune: [dune(50, { year: 1998 })] },
+    });
+    const out = await resolveNakaIds([5], state, pt);
+    expect(out.pending).toStrictEqual([
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: 5,
+        candidateIds: [50],
+        title: "Dune",
+        candidates: [{ id: 50, title: "Dune", year: 1998, type: "serie" }],
+      },
+    ]);
+  });
+
+  it("caps 25 candidates at 20, ids and candidates equal, and the state parses back", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => dune(100 + i));
+    const pt = ports({ naka: { 5: serie("Dune") }, searchSc: { Dune: many } });
+    const out = await resolveNakaIds([5], emptyState(), pt);
+    const [question] = out.pending;
+    if (question?.kind !== "ambiguity") throw new Error("expected a question");
+    expect(question.candidates).toHaveLength(20);
+    expect(question.candidateIds).toHaveLength(20);
+    expect(question.candidates?.map((c) => c.id)).toEqual(
+      question.candidateIds,
+    );
+    expect(parseState(JSON.parse(JSON.stringify(out)))).toEqual(out);
+  });
 });

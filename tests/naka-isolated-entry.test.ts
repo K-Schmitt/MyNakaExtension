@@ -179,7 +179,10 @@ describe("isolated-world entry", () => {
     vi.stubGlobal("location", { href: PLAYER });
     for (const { ms, fn } of intervals) if (ms === 1000) fn();
     await settle();
-    expect(toWorker.slice(before)).toEqual([{ type: "rating-cards" }]);
+    expect(toWorker.slice(before)).toEqual([
+      { type: "rating-cards" },
+      { type: "open-questions" },
+    ]);
   });
 
   it("nothing it sent or answered holds the token or the e-mail", async () => {

@@ -5,7 +5,7 @@ export const MAX_CONSECUTIVE_FAILURES = 2;
 
 export type Side = "naka" | "sc";
 
-type Write = { side: Side; pair: Pair };
+export type Write = { side: Side; pair: Pair };
 
 export type WritePorts = {
   addToNaka(nakaId: number): Promise<void>;
@@ -16,6 +16,8 @@ export type WritePorts = {
 export type WriteOutcome = {
   added: Pair[];
   deferred: Pair[];
+  /** The same writes as `deferred`, with their side, in order (internal: not part of the stored report). */
+  deferredWrites: Write[];
   failed: Pair[];
   /** Pairs whose SensCritique product is already done: attempted, not written. */
   alreadyDone: Pair[];
@@ -103,6 +105,7 @@ export async function executeWrites(
   const outcome: WriteOutcome = {
     added: [],
     deferred: [],
+    deferredWrites: [],
     failed: [],
     alreadyDone: [],
     written: { naka: [], sc: [] },
@@ -115,6 +118,7 @@ export async function executeWrites(
       streak[write.side] >= MAX_CONSECUTIVE_FAILURES
     ) {
       outcome.deferred.push(write.pair);
+      outcome.deferredWrites.push(write);
       continue;
     }
     attempts += 1;

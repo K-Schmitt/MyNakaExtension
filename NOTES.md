@@ -293,6 +293,63 @@ Faits appris pendant la recette :
   `watched: true` ou `false`. Décocher ne change rien sur SensCritique, et l'extension garde le titre
   comme traité : le Plan 4b le lui fera oublier.
 
+## 2026-11-05 — Plan 4b : les questions et la page de l'extension
+
+Le Plan 4b pose les questions au bon moment et complète la page de l'extension :
+- un titre ambigu est demandé dans le bloc de fin ou de pause, avant la note ;
+- un retrait fait sur Naka est suivi d'un petit bloc « Retirer aussi de vos envies SensCritique ? » ;
+- les autres questions vont dans une partie « Questions » du panneau d'accueil de Naka ;
+- la page de l'extension liste les questions et les titres non reliés, avec une recherche pour relier
+  un titre à la main ;
+- elle ajoute « Oublier les comptes liés », « Réinitialiser » et les « Titres traités » avec « Oublier » ;
+- décocher « vu » sur Naka fait oublier le titre traité (demande du propriétaire pendant la recette
+  du 4a).
+
+Décisions à connaître :
+- Une question garde son titre et ses candidats au moment où elle est posée : l'afficher ne demande
+  aucune lecture réseau. Une question enregistrée avant le 4b se repose par « Reposer la question ».
+- Une écriture sur un site part d'un seul vrai clic, et le service worker vérifie avant d'écrire :
+  un choix doit être un candidat enregistré ; un retrait doit correspondre à une question enregistrée,
+  ou, juste après un retrait sur Naka, à une paire reliée que les deux listes contenaient au dernier
+  passage. Le travail relit les deux sites avant sa seule écriture ; un retrait devenu sans objet
+  n'écrit rien.
+- « Non » à un retrait fige la paire : la synchro ne remet pas le titre du côté qu'il a quitté.
+- « Aucun de ceux-là » garde la question ouverte, sans candidat, et la liste avec les titres non
+  reliés pour une liaison à la main.
+- La synchro ferme seule un retrait sans objet (le titre est dans les deux listes ou dans aucune),
+  seulement si sa paire est encore reliée telle quelle. Une paire remplacée garde son retrait ouvert,
+  comme au Plan 3 : sinon la synchro oubliait le retrait et remettait le titre (trouvé par la
+  simulation aléatoire).
+- Le bloc après un retrait sur Naka exige les deux présences au dernier passage, sans repli sur
+  l'instantané de la synchro : l'instantané garde des paires anciennes, et un faux retrait aurait pu
+  retirer des envies un titre remis depuis (trouvé par la simulation aléatoire).
+- Un clic sur un bloc n'est pris que 0,4 s après tout redessin qui peut déplacer les boutons : celui
+  du bloc, d'un voisin du panneau d'accueil, ou du pliage du panneau. Sans cela, un double-clic pouvait
+  tomber sur « Retirer aussi… » d'un autre titre.
+- Décocher « vu » depuis un onglet Naka est plafonné à 10 oublis par heure (compte enregistré), une
+  seule demande en attente par titre ; « Oublier » sur la page n'a pas de plafond. Un script de la page
+  Naka peut imiter ce décochage : sans plafond, il aurait vidé la liste « À noter ».
+- « Réinitialiser » enregistre d'abord le mode simulation, puis efface l'état. Il garde les comptes
+  liés, les seuils, la pause, les fenêtres de budget et le compteur des réponses.
+
+Écarté :
+- Retirer aussi « vu » sur SensCritique quand on le décoche sur Naka : ce serait une écriture que le
+  propriétaire n'a pas cliquée dans un bloc de l'extension (idée gardée dans BACKLOG.md).
+
+Limites connues :
+- Les données enregistrées ne vont que vers l'avant : après le 4b, une version 4a lit l'état ET les
+  réglages comme illisibles (ses lecteurs stricts refusent les nouveaux champs). Le retour en arrière
+  passe par l'export de l'étape 0 de la recette.
+- Une liste « Ma liste » lue vide refuse un retrait (`naka-list-empty`) : une liste vide ne prouve
+  rien. Si elle l'est vraiment, ce retrait se fait à la main sur SensCritique.
+- La fermeture automatique d'un retrait suppose que les deux listes soient lues en entier ou pas du
+  tout : la liste d'envies est complète ou lève une erreur, « Ma liste » est un seul GET qui refuse
+  toute pagination.
+- Répondre à une question qui porte une fin de visionnage demande un onglet Naka ouvert : sans lui,
+  le titre est relié mais pas marqué vu. La reprise passe par une pause ou la fin du titre sur Naka.
+- Une écriture née d'une réponse ou d'une liaison peut attendre plusieurs passages quand d'autres
+  écritures sont reportées (10 par passage au plus).
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
@@ -305,3 +362,7 @@ Faits appris pendant la recette :
 - Un bloc qui écrit sur un vrai compte doit savoir si son écriture attend encore. Une relecture à
   heure fixe ne suffit pas quand la file de l'extension peut être occupée plusieurs minutes. La file,
   qui sait, doit le dire.
+- Une simulation aléatoire dont la règle de sécurité juge à partir de ce que le monde simulé a fait
+  (ses propres listes, les actions du propriétaire), et non à partir des définitions du code, a trouvé
+  deux défauts réels du Plan 4b que les relectures avaient laissés passer : la fermeture d'un retrait
+  qui faisait oublier un retrait voulu, et un instantané ancien qui laissait passer un faux retrait.

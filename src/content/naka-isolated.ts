@@ -72,4 +72,5 @@ startNakaTab({
   finished: blocks.finished,
   urlChanged: blocks.urlChanged,
   pathChanged: blocks.pathChanged,
+  removed: blocks.removed,
 });

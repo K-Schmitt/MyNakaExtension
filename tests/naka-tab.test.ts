@@ -126,6 +126,7 @@ function tab(start = PLAYER(3)) {
   const ended: ContentIds[] = [];
   const urls: (ContentIds | undefined)[] = [];
   const paths: string[] = [];
+  const removals: number[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -160,6 +161,9 @@ function tab(start = PLAYER(3)) {
     pathChanged: (pathname) => {
       paths.push(pathname);
     },
+    removed: (contentId) => {
+      removals.push(contentId);
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -172,7 +176,7 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, ended, urls, paths, timers, page, tick, post };
+  return { sent, ended, urls, paths, removals, timers, page, tick, post };
 }
 
 describe("the Naka tab URL changes", () => {
@@ -263,6 +267,19 @@ describe("the Naka tab", () => {
     expect(t.ended).toEqual([{ contentId: 7, season: 1, episode: 2 }]);
   });
 
+  it("a removal event sends playlist-changed, then tells the removal block the id", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "playlist", removed: 21391 });
+    expect(t.sent.slice(1)).toEqual([{ type: "playlist-changed" }]);
+    expect(t.removals).toEqual([21391]);
+  });
+
+  it("a playlist event with no removed id tells the removal block nothing", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "playlist" });
+    expect(t.removals).toEqual([]);
+  });
+
   it("a send that is not a finished never calls the end block", () => {
     const t = tab();
     t.post({ channel: PAGE_CHANNEL, kind: "playlist" });
@@ -336,6 +353,48 @@ describe("the Naka tab", () => {
         episode: 2,
       },
     ]);
+  });
+
+  it("an unticked vu asks the worker to forget that title, with its ids only", () => {
+    const t = tab();
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "unwatched",
+      contentId: 7,
+      season: 1,
+      episode: 2,
+    });
+    expect(t.sent.slice(1)).toEqual([
+      { type: "forget-handled", contentId: 7, season: 1, episode: 2 },
+    ]);
+    expect(t.ended).toEqual([]);
+  });
+
+  it("an unticked film asks for the film", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
+  });
+
+  it("after an unticked vu, the next tick of that title gives a finished again", () => {
+    const t = tab();
+    const on = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
+    t.post(on);
+    t.post({ ...on, kind: "unwatched" });
+    t.post(on);
+    expect(t.sent.slice(1).map((m) => m.type)).toEqual([
+      "finished",
+      "forget-handled",
+      "finished",
+    ]);
+  });
+
+  it("an unwatched event from another origin or window sends nothing", () => {
+    const t = tab();
+    const off = { channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 };
+    t.post(off, {}, "https://naka.cx");
+    t.post(off, SELF, "https://naka.cx.evil.com");
+    expect(t.sent).toEqual([{ type: "naka-ready" }]);
   });
 
   it.each([

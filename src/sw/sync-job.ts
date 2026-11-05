@@ -8,7 +8,7 @@ import { type Accounts, checkBinding } from "./binding";
 import { type FirstStop, firstStop } from "./first-stop";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import type { NakaProxy } from "./naka-proxy";
-import { type PreviewItem, previewOf } from "./preview";
+import { nextOf, type PreviewItem, previewOf } from "./preview";
 import { shouldStartAutoRun } from "./run-throttle";
 import { buildSyncPorts } from "./sync-ports";
 import { toJobError } from "./to-job-error";
@@ -16,7 +16,11 @@ import { toJobError } from "./to-job-error";
 export type Trigger = RunRecord["trigger"];
 
 type Attempt = { record: RunRecord; accounts?: Accounts };
-type RunResult = { report: SyncReport; preview?: PreviewItem[] };
+type RunResult = {
+  report: SyncReport;
+  preview?: PreviewItem[];
+  next?: PreviewItem[];
+};
 
 // Anything but the button is automatic, and waits out the gap.
 const isAutomatic = (trigger: Trigger): boolean => trigger !== "button";
@@ -36,9 +40,14 @@ async function runWithPreview(
     onStop: stop.note,
   });
   const report = await runSync(session.ports);
-  if (settings.mode === "live") return { report };
+  const next = await nextOf(session.deferredWrites, session.describe);
+  const withNext = next.length === 0 ? { report } : { report, next };
+  if (settings.mode === "live") return withNext;
   const { planned, describe } = session;
-  return { report, preview: await previewOf(planned, report.added, describe) };
+  return {
+    ...withNext,
+    preview: await previewOf(planned, report.added, describe),
+  };
 }
 
 async function attempt(

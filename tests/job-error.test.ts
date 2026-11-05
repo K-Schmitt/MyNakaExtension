@@ -9,6 +9,8 @@ const CODES: JobError[] = [
   "stored-state",
   "unavailable",
   "finish-limit",
+  "naka-list-empty",
+  "naka-tab-changed",
 ];
 
 describe("JobRejected", () => {
@@ -22,6 +24,18 @@ describe("JobRejected", () => {
   it("says the finish limit in fixed words", () => {
     expect(new JobRejected("finish-limit").message).toBe(
       "too many finishes this hour",
+    );
+  });
+
+  it("says an empty Naka list in fixed words", () => {
+    expect(new JobRejected("naka-list-empty").message).toBe(
+      "Naka playlist read empty",
+    );
+  });
+
+  it("says a Naka tab that changed page in fixed words", () => {
+    expect(new JobRejected("naka-tab-changed").message).toBe(
+      "Naka tab changed page",
     );
   });
 

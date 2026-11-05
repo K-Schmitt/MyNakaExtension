@@ -2,6 +2,7 @@
 // Every message from another context is untrusted: a parser takes `unknown`, never throws, and returns a
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
+import type { ContentIds } from "../core/finish-event";
 import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
@@ -12,7 +13,21 @@ import {
   fail,
   valuesOf,
 } from "./field-checks";
-import { playbackContext } from "./playback-context";
+import {
+  isPageType,
+  PAGE_SENDERS,
+  PAGE_TYPE_FLAGS,
+  type PageMessage,
+  parsePageMessage,
+} from "./page-messages";
+import { playbackContext, playlistEvent } from "./playback-context";
+import {
+  isQuestionType,
+  parseQuestionMessage,
+  QUESTION_SENDERS,
+  QUESTION_TYPE_FLAGS,
+  type QuestionMessage,
+} from "./question-messages";
 import {
   isRatingType,
   parseRatingMessage,
@@ -42,7 +57,9 @@ export type ToWorker =
       thresholds: Thresholds;
       pauseFromPercent: number;
     }
-  | RatingMessage;
+  | RatingMessage
+  | QuestionMessage
+  | PageMessage;
 
 export type ToNakaTab =
   | { type: "naka-call"; call: "playlistIds" }
@@ -68,14 +85,9 @@ export type NakaReply =
   | { ok: false; error: NakaReplyError };
 
 export type PageEvent =
-  | { channel: typeof PAGE_CHANNEL; kind: "playlist" }
-  | {
-      channel: typeof PAGE_CHANNEL;
-      kind: "watched";
-      contentId: number;
-      season?: number;
-      episode?: number;
-    };
+  | { channel: typeof PAGE_CHANNEL; kind: "playlist"; removed?: number }
+  | ({ channel: typeof PAGE_CHANNEL; kind: "watched" } & ContentIds)
+  | ({ channel: typeof PAGE_CHANNEL; kind: "unwatched" } & ContentIds);
 
 export type Sender = {
   id?: string;
@@ -100,6 +112,8 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   "rating-cards": true,
   rate: true,
   "dismiss-rating": true,
+  ...QUESTION_TYPE_FLAGS,
+  ...PAGE_TYPE_FLAGS,
 });
 const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
@@ -125,6 +139,7 @@ const REPLY_ERRORS = valuesOf<NakaReplyError>({
 const PAGE_KINDS = valuesOf<PageEvent["kind"]>({
   playlist: true,
   watched: true,
+  unwatched: true,
 });
 const NAKA_ORIGIN = "https://naka.cx/";
 
@@ -172,6 +187,8 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
     };
   }
   if (isRatingType(type)) return parseRatingMessage(type, record);
+  if (isQuestionType(type)) return parseQuestionMessage(type, record);
+  if (isPageType(type)) return parsePageMessage(type, record);
   return { type };
 }
 
@@ -221,7 +238,7 @@ export function parseNakaReply(raw: unknown): NakaReply | undefined {
 function parsePageEventRecord(record: Record<string, unknown>): PageEvent {
   asOneOf(record.channel, [PAGE_CHANNEL], "channel");
   const kind = asOneOf(record.kind, PAGE_KINDS, "kind");
-  if (kind === "playlist") return { channel: PAGE_CHANNEL, kind };
+  if (kind === "playlist") return playlistEvent(PAGE_CHANNEL, record);
   return {
     channel: PAGE_CHANNEL,
     kind,
@@ -279,6 +296,8 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   "rating-cards": ["naka-tab"],
   rate: ["naka-tab"],
   "dismiss-rating": ["naka-tab"],
+  ...QUESTION_SENDERS,
+  ...PAGE_SENDERS,
 };
 
 // A trusted role may send only its own types: a naka.cx script must not ask for set-mode or resync.

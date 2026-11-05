@@ -33,7 +33,7 @@ function urlType(url: string): MediaType | undefined {
   return undefined;
 }
 
-function universeType(universe: number): MediaType | undefined {
+export function universeType(universe: number): MediaType | undefined {
   if (universe === UNIVERSE.serie) return "serie";
   if (universe === UNIVERSE.film) return "film";
   return undefined;

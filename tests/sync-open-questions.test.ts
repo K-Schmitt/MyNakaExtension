@@ -56,11 +56,19 @@ function world(o: Opts) {
   return { w, ports };
 }
 
-const ask = (side: "naka" | "sc", id: number, candidateIds: number[]) => ({
+// A question as the runner saves it: the title, and each candidate as [id, year] ("Le Film", a film).
+const ask = (side: "naka" | "sc", id: number, listed: [number, number][]) => ({
   kind: "ambiguity",
   side,
   id,
-  candidateIds,
+  candidateIds: listed.map(([cid]) => cid),
+  title: "Le Film",
+  candidates: listed.map(([cid, year]) => ({
+    id: cid,
+    title: "Le Film",
+    year,
+    type: "film",
+  })),
 });
 
 describe("an open question is never decided by the other direction", () => {
@@ -77,8 +85,11 @@ describe("an open question is never decided by the other direction", () => {
     await runSync(ports);
     expect(w.state.mapping).toEqual([]);
     expect(w.state.pending).toEqual([
-      ask("naka", N, [X, Y]),
-      ask("sc", X, [N]),
+      ask("naka", N, [
+        [X, 2000],
+        [Y, 2002],
+      ]),
+      ask("sc", X, [[N, 2001]]),
     ]);
     await runSync(ports);
     expect(w.writes).toEqual([]);
@@ -93,13 +104,17 @@ describe("an open question is never decided by the other direction", () => {
       scTitles: { [X]: FILM },
     });
     await runSync(ports);
-    expect(w.state.pending).toEqual([ask("sc", X, [N, M])]);
+    const both: [number, number][] = [
+      [N, 2001],
+      [M, 2001],
+    ];
+    expect(w.state.pending).toEqual([ask("sc", X, both)]);
     w.naka.add(N);
     await runSync(ports);
     expect(w.state.mapping).toEqual([]);
     expect(w.state.pending).toEqual([
-      ask("sc", X, [N, M]),
-      ask("naka", N, [X]),
+      ask("sc", X, both),
+      ask("naka", N, [[X, 2001]]),
     ]);
     expect(w.writes).toEqual([]);
   });

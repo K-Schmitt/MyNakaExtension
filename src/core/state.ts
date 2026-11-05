@@ -1,12 +1,41 @@
 import type { Pair } from "./list-diff";
 import type { Presence } from "./presence";
+import type { MediaType } from "./title-match";
 import { DEFAULT_THRESHOLD } from "./watch-trigger";
 
-type Side = "naka" | "sc";
+export type Side = "naka" | "sc";
+
+/** One title the owner may choose for a question, as listed by the search that asked it. */
+export type QuestionCandidate = {
+  id: number;
+  title: string;
+  year?: number;
+  type: MediaType;
+};
 
 export type PendingItem =
-  | { kind: "removal"; removeFrom: Side; pair: Pair; asked: boolean }
-  | { kind: "ambiguity"; side: Side; id: number; candidateIds: number[] };
+  | {
+      kind: "removal";
+      removeFrom: Side;
+      pair: Pair;
+      /** Dismissed from the home panel. */
+      asked: boolean;
+      title?: string;
+    }
+  | {
+      kind: "ambiguity";
+      side: Side;
+      id: number;
+      candidateIds: number[];
+      /** Dismissed from the home panel (design §7). */
+      asked?: true;
+      /** The asked title, on its own side. */
+      title?: string;
+      /** Absent: a question saved before 4b ("legacy"). When present, its ids are `candidateIds`. */
+      candidates?: QuestionCandidate[];
+      /** Content key of the latest finish waiting on this question (a naka-side question only). */
+      finish?: string;
+    };
 
 export type UnlinkedItem = {
   side: Side;
@@ -22,6 +51,8 @@ export type SyncState = {
   settled: Pair[];
   pending: PendingItem[];
   handled: string[];
+  /** The title of each handled key, written at finish time; absent for keys handled before B8b. */
+  handledTitles?: Record<string, string>;
   unlinked: UnlinkedItem[];
   retryLast: Pair[];
   /** Completed sync runs, counted from 0. */
@@ -34,7 +65,7 @@ export type SyncState = {
 
 const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
-function samePair(a: Pair, b: Pair): boolean {
+export function samePair(a: Pair, b: Pair): boolean {
   return pairKey(a) === pairKey(b);
 }
 
@@ -118,9 +149,47 @@ export function markAsked(state: SyncState, pair: Pair): SyncState {
   return { ...state, pending };
 }
 
-export function markHandled(state: SyncState, key: string): SyncState {
+// The title, when known, is stored with the key; a key already handled keeps what it has.
+export function markHandled(
+  state: SyncState,
+  key: string,
+  title?: string,
+): SyncState {
   if (state.handled.includes(key)) return { ...state };
-  return { ...state, handled: [...state.handled, key] };
+  const handled = [...state.handled, key];
+  if (title === undefined) return { ...state, handled };
+  return {
+    ...state,
+    handled,
+    handledTitles: { ...state.handledTitles, [key]: title },
+  };
+}
+
+function waitsOnKey(item: PendingItem, key: string): boolean {
+  return item.kind === "ambiguity" && item.finish === key;
+}
+
+/** Something is kept about this key: it is handled, or a question holds its finish. */
+export function holdsKey(state: SyncState, key: string): boolean {
+  return isHandled(state, key) || state.pending.some((i) => waitsOnKey(i, key));
+}
+
+// An open question waiting on the forgotten finish forgets it: answering it later must not mark the
+// unticked title seen.
+function withoutFinish(item: PendingItem, key: string): PendingItem {
+  if (!waitsOnKey(item, key) || item.kind !== "ambiguity") return item;
+  const { finish: _forgotten, ...rest } = item;
+  return rest;
+}
+
+/** The title is no longer handled: its key, its stored title and any finish waiting on it go. */
+export function forgetHandled(state: SyncState, key: string): SyncState {
+  const pending = state.pending.map((item) => withoutFinish(item, key));
+  const { handledTitles, ...rest } = state;
+  const handled = state.handled.filter((k) => k !== key);
+  if (handledTitles === undefined) return { ...rest, handled, pending };
+  const { [key]: _gone, ...titles } = handledTitles;
+  return { ...rest, handled, pending, handledTitles: titles };
 }
 
 export function isHandled(state: SyncState, key: string): boolean {

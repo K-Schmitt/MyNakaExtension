@@ -7,47 +7,16 @@
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { CardAnswer } from "../../sw/rating-answers";
-import { type EndTimer, pollUntil } from "./end-poll";
-import {
-  notSentLine,
-  type RatingAction,
-  UNREACHABLE_LINE,
-} from "./rating-copy";
+import { GRACE_MS, graceOver, startGrace } from "./click-grace";
+import { pollUntil } from "./end-poll";
+import { type RatingAction, UNREACHABLE_LINE } from "./rating-copy";
+import { type JudgeActs, judge, snapshotOf } from "./rating-judge";
 import type { RatingHandlers } from "./rating-render";
-import type { RatingView } from "./rating-view";
-import {
-  failureOf,
-  labelOf,
-  needsConfirm,
-  type Session,
-  viewFor,
-} from "./session-views";
-import type { WorkerPort } from "./worker-port";
+import type { SessionPorts } from "./session-ports";
+import { labelOf, needsConfirm, type Session, viewFor } from "./session-views";
 
-export const GRACE_MS = 400;
-
-export type SessionPorts = {
-  port: Pick<WorkerPort, "askCard" | "rate" | "dismiss">;
-  timer: EndTimer;
-  now(): number;
-  show(view: RatingView, handlers: RatingHandlers): void;
-  hide(): void;
-};
-
-// The clicked label on the shown card, as it was at the click.
-type Snapshot = {
-  cardless: boolean;
-  pending: boolean;
-  given: number | undefined;
-  failure: string | undefined;
-};
-
-const snapshotOf = ({ card, label, viewOnly }: Session): Snapshot => ({
-  cardless: viewOnly === true,
-  pending: card.pending.includes(label),
-  given: card.given[label],
-  failure: failureOf(card, label),
-});
+export type { SessionPorts };
+export { GRACE_MS };
 
 // `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card
 // missing from the answer has nothing left to ask. For one shown card, a missing card is "not yet".
@@ -81,7 +50,7 @@ export function createRatingSession(
   // The label's buttons appear again: the grace counts from now.
   function unlock(s: Session): void {
     s.locked = false;
-    s.shownAt = ports.now();
+    startGrace(s, ports.now);
     render(s);
   }
 
@@ -112,50 +81,14 @@ export function createRatingSession(
     unlock(s);
   }
 
-  // An answer with no card, the label no longer being sent. For a list, the card has nothing left to
-  // ask. For a view-only card, the rate job ran without making one: the line says why, the choices work
-  // again. For a shown real card, it is "not yet".
-  function absent(s: Session, at: Snapshot, answer: CardAnswer): boolean {
-    if (options.absentIsDone === true) {
-      close(s);
-      return true;
-    }
-    if (!at.cardless) return false;
-    s.error = notSentLine(answer.lastFinish);
-    unlock(s);
-    return true;
-  }
-
-  // Moved on: the answer has a card where the clicked label left `pending`, or its given rating
-  // changed, or its failure changed, all against the card as it was at the click. A card unchanged on
-  // those three is "not yet"; no card is `absent`.
-  function judge(
-    s: Session,
-    label: RatingLabel,
-    at: Snapshot,
-    answer: CardAnswer | undefined,
-  ): boolean {
-    if (current !== s) return true; // closed meanwhile (a play): the wait is over, nothing is drawn
-    if (answer === undefined) return false;
-    if (answer.sending?.includes(label)) return false; // the worker still has the rating to send
-    const card = answer.card;
-    if (!card) return absent(s, at, answer);
-    const left = at.pending && !card.pending.includes(label);
-    const rated = card.given[label] !== at.given;
-    const failed = failureOf(card, label) !== at.failure;
-    if (!left && !rated && !failed) return false;
-    if (failed && !left && !rated) showFailure(s, card, label);
-    else settle(s, answer);
-    return true;
-  }
-
-  // A failure on a label that did not leave `pending`: the block stays, unlocked, with its line.
-  function showFailure(s: Session, card: RatingCard, label: RatingLabel): void {
-    s.card = card;
-    s.label = label;
-    delete s.viewOnly;
-    unlock(s);
-  }
+  const acts: JudgeActs = {
+    live: (s) => current === s,
+    absentIsDone: options.absentIsDone === true,
+    onQuestion: ports.onQuestion,
+    close,
+    settle,
+    unlock,
+  };
 
   // Locked from the click until the card says the label left `pending`, or a failure that was not
   // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
@@ -175,7 +108,7 @@ export function createRatingSession(
       ports.port,
       ports.timer,
       s.ids,
-      (answer) => judge(s, label, at, answer),
+      (answer) => judge(acts, s, label, at, answer),
       (answered) => (answered ? close(s) : unreachable(s)),
     );
     void send
@@ -191,6 +124,7 @@ export function createRatingSession(
     if (s.confirming !== undefined) return;
     if (needsConfirm(s)) {
       s.confirming = value;
+      startGrace(s, ports.now); // the confirmation view is drawn: its buttons have a grace of their own
       render(s);
       return;
     }
@@ -201,6 +135,7 @@ export function createRatingSession(
     const value = s.confirming;
     delete s.confirming;
     if (!send || value === undefined) {
+      startGrace(s, ports.now); // the choices are drawn again under the cursor
       render(s);
       return;
     }
@@ -217,19 +152,14 @@ export function createRatingSession(
 
   function handlersOf(s: Session): RatingHandlers {
     const live = (): boolean => current === s && !s.locked;
-    // A clock set back puts the draw in the future: the grace then starts again from now, instead of
-    // leaving every button dead until the clock catches up.
-    const settled = (): boolean => {
-      if (!live()) return false;
-      if (ports.now() < s.shownAt) s.shownAt = ports.now();
-      return ports.now() - s.shownAt >= GRACE_MS;
-    };
+    const settled = (): boolean => live() && graceOver(s, ports.now);
     return {
       onChoose: (value) => settled() && choose(s, value),
       onAction: (action) => settled() && act(s, action),
       onOther: (label) => {
         if (!live()) return;
         s.label = label;
+        startGrace(s, ports.now); // another label's buttons are drawn under the cursor
         render(s);
       },
       onConfirm: (send) => settled() && confirm(s, send),
@@ -257,6 +187,10 @@ export function createRatingSession(
     },
     closeShown(): void {
       if (current !== undefined) close(current);
+    },
+    /** The panel moved under the cursor: the grace counts again from now. */
+    regrace(): void {
+      if (current !== undefined) startGrace(current, ports.now);
     },
     isOpen: (): boolean => current !== undefined,
   };

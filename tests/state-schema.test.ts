@@ -375,3 +375,171 @@ describe("parseState rejects", () => {
     expect((error as Error).message).toBe("stored state: mapping[1]");
   });
 });
+
+describe("parseState and the titles of a question", () => {
+  const withPending = (...pending: unknown[]) => ({ ...emptyState(), pending });
+  const q = (extra: Record<string, unknown> = {}) => ({
+    kind: "ambiguity",
+    side: "naka",
+    id: 5,
+    candidateIds: [1005, 2005],
+    ...extra,
+  });
+  const c = (id: number, extra: Record<string, unknown> = {}) => ({
+    id,
+    title: `T${id}`,
+    type: "film",
+    ...extra,
+  });
+  const messageOf = (state: unknown): string =>
+    (rejection(state) as Error).message;
+
+  it("the exact 4a question parses and has no candidates", () => {
+    const state = withPending(q());
+    const out = parseState(state);
+    expect(out).toEqual(state);
+    expect(out.pending[0]).not.toHaveProperty("candidates");
+  });
+
+  it("the exact 4a removal parses", () => {
+    const state = withPending({
+      kind: "removal",
+      removeFrom: "sc",
+      pair: { nakaId: 21391, scId: 112240873 },
+      asked: false,
+    });
+    expect(parseState(state)).toEqual(state);
+  });
+
+  it("a full new question round-trips, equal", () => {
+    const state = withPending(
+      q({
+        asked: true,
+        title: "Dune",
+        candidateIds: [1, 2],
+        candidates: [c(1, { year: 1800 }), c(2, { type: "serie", year: 2100 })],
+        finish: "tv:5:S1E2",
+      }),
+      {
+        kind: "removal",
+        removeFrom: "naka",
+        pair: p(3, 4),
+        asked: true,
+        title: "Un Job",
+      },
+    );
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toStrictEqual(state);
+  });
+
+  it("an empty candidates list with empty ids parses (a none question)", () => {
+    const state = withPending(q({ candidateIds: [], candidates: [] }));
+    expect(parseState(state)).toEqual(state);
+  });
+
+  it("asked: false on a question is refused", () => {
+    expect(messageOf(withPending(q({ asked: false })))).toBe(
+      "stored state: pending[0].asked",
+    );
+  });
+
+  it("candidates whose ids differ from candidateIds are refused", () => {
+    const state = withPending(q({ candidateIds: [2], candidates: [c(1)] }));
+    expect(messageOf(state)).toBe("stored state: pending[0].candidates");
+  });
+
+  it("the same ids in another order are refused", () => {
+    const state = withPending(
+      q({ candidateIds: [2, 1], candidates: [c(1), c(2)] }),
+    );
+    expect(messageOf(state)).toBe("stored state: pending[0].candidates");
+  });
+
+  it("21 candidates are refused, 20 are accepted", () => {
+    const list = (n: number) => Array.from({ length: n }, (_, i) => c(i + 1));
+    const ids = (n: number) => list(n).map((x) => x.id);
+    const ok = withPending(q({ candidateIds: ids(20), candidates: list(20) }));
+    expect(parseState(ok)).toEqual(ok);
+    const tooMany = withPending(
+      q({ candidateIds: ids(21), candidates: list(21) }),
+    );
+    expect(messageOf(tooMany)).toBe("stored state: pending[0].candidates");
+  });
+
+  it.each([
+    ["a year below 1800", { year: 1799 }],
+    ["a year above 2100", { year: 2101 }],
+    ["a fractional year", { year: 2000.5 }],
+    ["an unknown type", { type: "book" }],
+    ["an extra key", { originalTitle: "x" }],
+    ["a title that is not a string", { title: 3 }],
+  ])("a candidate with %s is refused", (_name, extra) => {
+    const state = withPending(
+      q({ candidateIds: [1], candidates: [c(1, extra)] }),
+    );
+    expect(messageOf(state)).toMatch(/^stored state: pending\[0\]\.candidates/);
+  });
+
+  it("a title that is not a string is refused", () => {
+    expect(messageOf(withPending(q({ title: 3 })))).toBe(
+      "stored state: pending[0].title",
+    );
+  });
+
+  it("a finish for another contentId is refused", () => {
+    expect(messageOf(withPending(q({ finish: "tv:6:S1E1" })))).toBe(
+      "stored state: pending[0].finish",
+    );
+  });
+
+  it("a malformed finish is refused", () => {
+    expect(messageOf(withPending(q({ finish: "nope" })))).toBe(
+      "stored state: pending[0].finish",
+    );
+  });
+
+  it("a finish on a sc-side question is refused, even for its own id", () => {
+    const state = withPending(q({ side: "sc", finish: "tv:5:S1E1" }));
+    expect(messageOf(state)).toBe("stored state: pending[0].finish");
+  });
+
+  it("a finish for the question's own id on the naka side parses", () => {
+    const state = withPending(q({ finish: "movie:5" }));
+    expect(parseState(state)).toEqual(state);
+  });
+
+  it("a removal title that is not a string is refused", () => {
+    const state = withPending({
+      kind: "removal",
+      removeFrom: "sc",
+      pair: p(1, 2),
+      asked: false,
+      title: 7,
+    });
+    expect(messageOf(state)).toBe("stored state: pending[0].title");
+  });
+});
+
+describe("parseState handledTitles", () => {
+  const titled = { ...valid(), handledTitles: { "movie:5": "Un film" } };
+
+  it("is optional: the owner's state without it parses unchanged", () => {
+    expect(parseState(valid())).not.toHaveProperty("handledTitles");
+  });
+
+  it("is kept when valid", () => {
+    expect(parseState(titled)).toEqual(titled);
+    expect(parseState(JSON.parse(JSON.stringify(titled)))).toEqual(titled);
+  });
+
+  it.each([
+    ["not an object", "x"],
+    ["a list", ["movie:5"]],
+    ["a bad key", { "film 5": "x" }],
+    ["a title that is not text", { "movie:5": 3 }],
+    ["a null title", { "movie:5": null }],
+  ])("rejects %s, naming the field and not the value", (_name, raw) => {
+    const error = rejection({ ...valid(), handledTitles: raw });
+    expect(error).toBeInstanceOf(StoredStateError);
+    expect((error as Error).message).toMatch(/^stored state: handledTitles/);
+  });
+});

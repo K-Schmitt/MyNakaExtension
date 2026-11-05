@@ -104,6 +104,7 @@ const removal = (removeFrom: "naka" | "sc", pair: Pair): PendingItem => ({
   removeFrom,
   pair,
   asked: false,
+  title: `Film ${removeFrom === "naka" ? pair.nakaId : pair.scId - 1000}`,
 });
 
 // Plan 3's answer (contract): ONE save that upserts the chosen pair and resolves every open ambiguity
@@ -173,8 +174,22 @@ describe("a pair seen together before it was mapped", () => {
       });
       expect(await runSync(ports)).toEqual(report());
       expect(w.state.pending).toEqual([
-        { kind: "ambiguity", side: "naka", id: 5, candidateIds: [1005] },
-        { kind: "ambiguity", side: "sc", id: 1005, candidateIds: [5] },
+        {
+          kind: "ambiguity",
+          side: "naka",
+          id: 5,
+          candidateIds: [1005],
+          title: "Film 5",
+          candidates: [{ id: 1005, title: "Film 5", year: 2005, type: "film" }],
+        },
+        {
+          kind: "ambiguity",
+          side: "sc",
+          id: 1005,
+          candidateIds: [5],
+          title: "Film 5",
+          candidates: [{ id: 5, title: "Film 5", year: 2005, type: "film" }],
+        },
       ]);
       w.sc.delete(1005);
       if (runBetween) {
@@ -338,7 +353,9 @@ describe("each id is judged by its current period (amendment 1)", () => {
     w.state = answer(resolvePending(w.state, removed), pair2);
     const r = await runSync(ports);
     expect(w.writes).toEqual([]);
-    expect(w.state.pending).toEqual([removal("naka", pair2)]);
+    expect(w.state.pending).toEqual([
+      { ...removal("naka", pair2), title: "Film 1" },
+    ]);
     expect(r).toEqual(report({ pendingRemovals: 1 }));
   });
 
@@ -684,7 +701,9 @@ describe("presence bookkeeping", () => {
     const r = await runSync(ports);
     expect(loaded).toEqual(copy);
     expect(w.writes).toEqual([]);
-    expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
+    expect(w.state.pending).toEqual([
+      { kind: "removal", removeFrom: "naka", pair: PAIR5, asked: false },
+    ]);
     expect(r).toEqual(report({ pendingRemovals: 1 }));
     expect(w.state.presence).toEqual({
       naka: [{ id: 5, from: 1, to: 4 }],

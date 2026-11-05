@@ -2,6 +2,7 @@
 // The limiters come from the caller and are shared by every job.
 
 import type { SyncPorts } from "../core/sync-runner";
+import type { Write } from "../core/sync-writes";
 import type { Titled } from "../core/title-match";
 import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
@@ -41,6 +42,8 @@ export type SyncSession = {
   planned: PlannedWrite[];
   /** The run's describe caches, for the preview. */
   describe: Describe;
+  /** The writes the run deferred to the next pass, in order, both modes. */
+  deferredWrites: Write[];
 };
 
 export function buildSyncPorts(deps: SyncPortDeps): SyncSession {
@@ -49,6 +52,7 @@ export function buildSyncPorts(deps: SyncPortDeps): SyncSession {
     withBreaker(call, onStop);
   const wishlist = createWishlist(sc);
   const planned: PlannedWrite[] = [];
+  const deferredWrites: Write[] = [];
   const writes = writePorts(deps.mode, naka, sc, planned);
   const describe: Describe = {
     naka: remembered(
@@ -69,6 +73,9 @@ export function buildSyncPorts(deps: SyncPortDeps): SyncSession {
     searchSc: guard((q: string) => searchScBoth(sc, limiters.sc, q)),
     addToNaka: guard((id: number) => writes.addToNaka(id)),
     addToSc: guard((id: number) => writes.addToSc(id)),
+    deferred: (list) => {
+      deferredWrites.push(...list);
+    },
   };
-  return { ports, planned, describe };
+  return { ports, planned, describe, deferredWrites };
 }

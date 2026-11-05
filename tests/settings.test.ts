@@ -47,6 +47,36 @@ function rejection(raw: unknown): unknown {
   return undefined;
 }
 
+describe("lastAnswer", () => {
+  const lastAnswer = {
+    seq: 4,
+    at: 1_700_000_002_000,
+    target: "removal:sc:1:101",
+    outcome: "failed",
+    error: "unavailable",
+  };
+
+  it("the exact 4a settings parse with no lastAnswer", () => {
+    expect("lastAnswer" in parseSettings(full())).toBe(false);
+    expect("lastAnswer" in parseSettings({ mode: "live" })).toBe(false);
+  });
+
+  it("a stored lastAnswer round-trips", () => {
+    expect(parseSettings({ mode: "live", lastAnswer })).toEqual({
+      mode: "live",
+      lastAnswer,
+    });
+  });
+
+  it("a bad lastAnswer names its path", () => {
+    for (const bad of [null, { ...lastAnswer, error: undefined }, "x"]) {
+      expect(rejection({ mode: "live", lastAnswer: bad })).toMatchObject({
+        path: expect.stringMatching(/^settings\.lastAnswer/),
+      });
+    }
+  });
+});
+
 describe("parseSettings accepts", () => {
   it("an absent key as simulation", () => {
     expect(parseSettings(undefined)).toEqual({ mode: "simulation" });
@@ -118,6 +148,29 @@ describe("parseSettings accepts", () => {
     });
   });
 
+  it("a finish with its title parses, and one without (4a) still does", () => {
+    const withTitle = {
+      at: 1,
+      key: "movie:1",
+      outcome: "done",
+      title: "Enemy",
+    };
+    expect(parseSettings({ mode: "live", lastFinish: withTitle })).toEqual({
+      mode: "live",
+      lastFinish: withTitle,
+    });
+    const earlier = { at: 1, key: "tv:7:S1E2", outcome: "needs-choice" };
+    expect(parseSettings({ mode: "live", lastFinish: earlier })).toEqual({
+      mode: "live",
+      lastFinish: earlier,
+    });
+  });
+
+  it.each([42, null, {}, ["x"]])("a finish title %j is refused", (title) => {
+    const lastFinish = { at: 1, key: "movie:1", outcome: "done", title };
+    expect(() => parseSettings({ mode: "live", lastFinish })).toThrow();
+  });
+
   it.each(["ignored", "needs-choice", "not-found", "done"])(
     "a finish outcome %s",
     (outcome) => {
@@ -137,6 +190,8 @@ describe("parseSettings accepts", () => {
     "stored-state",
     "unavailable",
     "finish-limit",
+    "naka-list-empty",
+    "naka-tab-changed",
   ])("a failed finish with its reason %s", (error) => {
     const lastFinish = { at: 1, key: "movie:1", outcome: "failed", error };
     expect(parseSettings({ mode: "live", lastFinish })).toEqual({
@@ -155,6 +210,66 @@ describe("parseSettings accepts", () => {
     });
   });
 
+  it("a stored Plan 3 run record parses, without year, type or next", () => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "simulation",
+      outcome: "ok",
+      report: {
+        added: [],
+        deferred: [],
+        failed: [],
+        alreadyDone: [],
+        pendingRemovals: 0,
+        unresolved: 0,
+      },
+      preview: [
+        { side: "sc", title: "Film 1" },
+        { side: "naka", title: "" },
+      ],
+    };
+    expect(parseSettings({ mode: "simulation", lastRun })).toEqual({
+      mode: "simulation",
+      lastRun,
+    });
+  });
+
+  it("a run record with year, type and next parses", () => {
+    const item = { side: "sc", title: "Enemy", year: 2013, type: "film" };
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "ok",
+      preview: [item],
+      next: [item, { side: "naka", title: "", type: "serie" }],
+    };
+    expect(parseSettings({ mode: "live", lastRun })).toEqual({
+      mode: "live",
+      lastRun,
+    });
+  });
+
+  it.each([
+    { year: 1799 },
+    { year: 2101 },
+    { year: 2013.5 },
+    { year: "2013" },
+    { type: "game" },
+    { type: 1 },
+    { extra: true },
+  ])("a preview item with %o is refused", (bad) => {
+    const lastRun = {
+      at: 1,
+      trigger: "button",
+      mode: "live",
+      outcome: "ok",
+      next: [{ side: "sc", title: "x", ...bad }],
+    };
+    expect(() => parseSettings({ mode: "live", lastRun })).toThrow();
+  });
+
   it.each(["naka-ready", "playlist", "button"])("trigger %s", (trigger) => {
     const lastRun = { at: 1, trigger, mode: "live", outcome: "ok" };
     expect(parseSettings({ mode: "live", lastRun })).toEqual({
@@ -171,6 +286,8 @@ describe("parseSettings accepts", () => {
     "stored-state",
     "unavailable",
     "finish-limit",
+    "naka-list-empty",
+    "naka-tab-changed",
   ])("run error %s", (error) => {
     const lastRun = {
       at: 1,

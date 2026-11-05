@@ -1,12 +1,12 @@
-// Test-only in-memory world for the runtime fuzz: both sites, the Naka tab (running the REAL tab handler),
-// the storage area, and the oracles, checked at the moment each write happens.
+// Test-only in-memory world for the runtime fuzz: both sites, the Naka tab (running the REAL tab handler)
+// and the storage area. The oracles it calls, checked at the moment each write happens, live in
+// tests/runtime-oracles.ts.
 //
 // A worker restart bumps the generation: every port built for an older generation then hangs forever, so
 // a job of a dead worker stops at its next await (Review Focus 3) and never touches the world again.
 // The owner switches accounts and edits the lists only while no job runs (the fuzz drains the queue
 // first), so every oracle compares a write with the world the job itself checked.
 
-import { AsyncLocalStorage } from "node:async_hooks";
 import { handleNakaCall } from "../src/content/naka-bridge";
 import type { FinishedMessage } from "../src/content/playback-tracker";
 import {
@@ -14,6 +14,7 @@ import {
   MAX_FINISHES_PER_WINDOW,
 } from "../src/ext/finish-window";
 import type { ToNakaTab } from "../src/ext/messages";
+import type { AnswerMessage } from "../src/ext/question-messages";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import { parseState } from "../src/ext/state-schema";
 import type { StorageArea } from "../src/ext/store";
@@ -27,13 +28,33 @@ import {
 import type { ScWishItem } from "../src/sc/wishlist-page";
 import type { Jobs } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
+import {
+  type AnswerContext,
+  beginAnswer,
+  checkAnswerFinish,
+  checkRemovalWrite,
+  endAnswer,
+  isLocalAnswer,
+} from "./runtime-answer-oracles";
+import {
+  answering,
+  checkBinding,
+  checkListWrite,
+  checkQueryCall,
+  checkSend,
+  checkStatusWrite,
+  checkTabCall,
+  guard,
+  settingsOf,
+  violation,
+} from "./runtime-oracles";
 
 export const FILMS = [1, 2, 3, 4];
 export const SERIES = [11, 12];
 export const TITLES = [...FILMS, ...SERIES];
 export const EPISODES = 40;
 
-type Side = "naka" | "sc";
+export type Side = "naka" | "sc";
 
 export const scOf = (n: number): number => n + 1000;
 const isFilm = (n: number): boolean => FILMS.includes(n);
@@ -81,6 +102,7 @@ export type JobKey =
   | "finish"
   | "mode"
   | "rating"
+  | "answer"
   | "settings"
   | "status";
 
@@ -90,12 +112,15 @@ type TabTrace = {
   tried?: Set<number>;
   pinned?: number;
   tabLost?: boolean;
+  /** The pinned tab refused: the job may make ONE tabs.query to tell a changed tab from a closed one. */
+  lossQuery?: boolean;
 };
 
 type Context = (
-  | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number> }
+  | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number>; saved?: true }
   | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
   | { kind: "other" }
+  | AnswerContext
 ) &
   TabTrace;
 
@@ -133,6 +158,10 @@ export function createWorld(seed: number) {
     log: [] as string[],
     violations: [] as string[],
     seenBoth: new Set<number>(),
+    // The titles listed on BOTH sides when the last completed run read its lists (O14's own record).
+    lastRunBoth: new Set<number>(),
+    // After a « Non »: title -> the side it left, until the owner adds it back there (O15).
+    declined: new Map<number, Side>(),
     protectedFrom: new Map<number, Side>(),
     guarded: new Map<number, string>(),
     active: new Map<number, number>(),
@@ -156,6 +185,14 @@ export function createWorld(seed: number) {
       pinnedPastOrphan: 0,
       statusDuringJob: 0,
       incompleteFinishes: 0,
+      removalAnswers: 0,
+      blockAnswers: 0,
+      questionAnswers: 0,
+      hides: 0,
+      removalWrites: 0,
+      declines: 0,
+      candidateChoices: 0,
+      strayChoices: 0,
     },
   };
   for (const n of TITLES) {
@@ -208,88 +245,10 @@ export function sentFinish(w: World, msg: FinishedMessage): void {
   if (!complete) w.stats.incompleteFinishes += 1;
 }
 
-const ORACLES: [string, RegExp][] = [
-  ["O1 two jobs at once", /two jobs at once/],
-  ["O2 invalid storage", /invalid (state|settings) w/],
-  ["O3 write in simulation", /in simulation/],
-  ["O4 binding", /after a binding mismatch/],
-  ["O5 re-add", /re-add of/],
-  ["O6 re-wish", /re-wish of/],
-  ["O7 forged message", /ran without a message/],
-  ["O9 finish budget", /hour's finishes spent/],
-  ["O10 lost tab", /after the job lost its tab/],
-  ["O11 one tab per job", /pinned tab|out of query order|before any tab query/],
-  ["O12 read-only status", /a status answer wrote/],
-  ["O13 threshold rule", /incomplete viewing|never sent|outside a finish job/],
-];
-
-// The oracle a violation belongs to, for the fuzz's failure message.
-export function oracleOf(found: string): string {
-  return (
-    ORACLES.find(([, pattern]) => pattern.test(found))?.[0] ??
-    "O8 forbidden write"
-  );
-}
-
-function violation(w: World, what: string): void {
-  w.violations.push(`seed ${w.seed}: ${what} | ${w.log.slice(-12).join("; ")}`);
-}
-
 // A port of a dead worker: the job that called it stops here, as the worker died at this await.
 function frozen<T>(w: World): Promise<T> {
   w.stats.frozen += 1;
   return forever<T>();
-}
-
-// Plan 2's re-wish oracle: from now on, no run may wish this film again.
-function guard(w: World, id: number, why: string): void {
-  w.guarded.set(id, why);
-  w.stats.guards += 1;
-}
-
-function stored<T>(
-  w: World,
-  key: string,
-  parse: (raw: unknown) => T,
-): T | undefined {
-  try {
-    return parse(w.storage.get(key));
-  } catch {
-    return undefined;
-  }
-}
-
-const settingsOf = (w: World): Settings | undefined =>
-  stored(w, "settings", parseSettings);
-
-// Oracle: no write and no state save while the bound accounts are not the ones signed in.
-function checkBinding(w: World, what: string): void {
-  const binding = settingsOf(w)?.binding;
-  if (binding === undefined) return;
-  const sc = w.scLoggedIn ? w.scAccount : undefined;
-  const naka = w.nakaLoggedIn ? w.nakaAccount : undefined;
-  const otherSc = sc !== undefined && sc !== binding.scUsername;
-  const otherNaka =
-    naka !== undefined &&
-    binding.nakaAccount !== undefined &&
-    naka !== binding.nakaAccount;
-  if (otherSc || otherNaka) violation(w, `${what} after a binding mismatch`);
-}
-
-// Oracles of a list write (a wish, a playlist add): live mode only, the binding, Plan 2's re-add and re-wish.
-function checkListWrite(w: World, side: Side, id: number): void {
-  w.stats.liveWrites += 1;
-  if ((settingsOf(w)?.mode ?? "simulation") !== "live") {
-    violation(w, `${side} write ${id} in simulation`);
-  }
-  checkBinding(w, `${side} write ${id}`);
-  const n = side === "naka" ? id : id - 1000;
-  if (w.protectedFrom.get(n) === side) {
-    violation(w, `re-add of ${n} to ${side} after the owner removed it`);
-  }
-  if (side === "sc" && w.guarded.has(id)) {
-    violation(w, `re-wish of ${id} after ${w.guarded.get(id)}`);
-  }
 }
 
 function flaky(w: World, what: string): void {
@@ -299,15 +258,38 @@ function flaky(w: World, what: string): void {
   }
 }
 
+// A finish that parked behind an open question of its title (D4) is not handled yet: its film may still
+// be wished once the owner answers.
+function waitsOnQuestion(state: unknown, contentId: number): boolean {
+  const pending = (state as { pending?: { side?: string; id?: number }[] })
+    .pending;
+  return (pending ?? []).some((p) => p.side === "naka" && p.id === contentId);
+}
+
+// O14's record: the titles on both sides when the last completed run ended, its own writes included (the
+// run's final lists, as the world holds them: the owner edits only between jobs).
+function recordFinalLists(w: World): void {
+  w.lastRunBoth.clear();
+  for (const n of TITLES) {
+    if (w.playlist.has(n) && w.wishlist.has(scOf(n))) w.lastRunBoth.add(n);
+  }
+}
+
 // A completed run (its state saved) saw the pairs that were in both lists when it read them.
-function onStateSave(w: World): void {
+function onStateSave(w: World, value: unknown): void {
   const ctx = w.current;
   if (ctx?.kind === "sync" && ctx.nakaAt && ctx.scAt) {
+    ctx.saved = true;
+    recordFinalLists(w);
     for (const n of TITLES) {
       if (ctx.nakaAt.has(n) && ctx.scAt.has(scOf(n))) w.seenBoth.add(n);
     }
   }
-  if (ctx?.kind === "finish" && isFilm(ctx.msg.contentId)) {
+  if (
+    ctx?.kind === "finish" &&
+    isFilm(ctx.msg.contentId) &&
+    !waitsOnQuestion(value, ctx.msg.contentId)
+  ) {
     const id = scOf(ctx.msg.contentId);
     if (!w.guarded.has(id)) guard(w, id, "a save of its finish");
   }
@@ -334,8 +316,8 @@ function onWrite(w: World, key: string, value: unknown): void {
     } catch {
       violation(w, "an invalid state was stored");
     }
-    checkBinding(w, "state save");
-    onStateSave(w);
+    if (!isLocalAnswer(w)) checkBinding(w, "state save");
+    onStateSave(w, value);
   }
   if (key === "settings") {
     let next: Settings | undefined;
@@ -348,18 +330,8 @@ function onWrite(w: World, key: string, value: unknown): void {
   }
 }
 
-// The status answers in flight. AsyncLocalStorage follows an answer's own promise chain and no other, so
-// a storage write made inside it is the answer's, whatever job runs meanwhile (Ruling 20).
-const answering = new AsyncLocalStorage<true>();
-
 export function answerStatus<T>(read: () => Promise<T>): Promise<T> {
   return answering.run(true, read);
-}
-
-// Oracle O12: a status answer never writes storage.
-export function checkStatusWrite(w: World, keys: string[]): void {
-  if (answering.getStore() === true)
-    violation(w, `a status answer wrote ${keys.join(",")}`);
 }
 
 export function storageFor(w: World, gen: number): StorageArea {
@@ -407,7 +379,15 @@ function nakaClient(w: World): NakaClient {
       w.playlist.add(id);
     },
     removeFromPlaylist: async (id) => {
-      violation(w, `removeFromPlaylist ${id}`);
+      if (w.current?.kind !== "answer") {
+        violation(w, `removeFromPlaylist ${id}`);
+        return;
+      }
+      nakaGate(w, "remove");
+      checkRemovalWrite(w, "naka", id);
+      w.log.push(`answer remove naka ${id}`);
+      flaky(w, `remove naka ${id}`);
+      w.playlist.delete(id);
     },
     search: async (q) => {
       nakaGate(w, "search");
@@ -424,38 +404,6 @@ function nakaClient(w: World): NakaClient {
   };
 }
 
-// Oracle O10 (Ruling 17): once the job's pinned tab refused a send, or every tab it found did, its tab is
-// lost, and the job calls the tabs no more.
-export function checkTabCall(w: World): void {
-  if (w.current?.tabLost)
-    violation(w, "a tabs call after the job lost its tab");
-}
-
-// Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one
-// answers, and then sends to that pinned tab only, with no new lookup. A lost tab is O10's.
-export function checkQuery(w: World): void {
-  const ctx = w.current;
-  if (ctx?.tabLost) return;
-  if (ctx?.pinned !== undefined)
-    violation(w, `a tab query after the job pinned tab ${ctx.pinned}`);
-}
-
-export function checkSend(w: World, tabId: number): void {
-  const ctx = w.current;
-  if (ctx === undefined || ctx.tabLost) return;
-  if (ctx.pinned !== undefined) {
-    if (tabId !== ctx.pinned)
-      violation(w, `a send to tab ${tabId}, not the pinned tab ${ctx.pinned}`);
-    return;
-  }
-  if (ctx.found === undefined) {
-    violation(w, `a send to tab ${tabId} before any tab query`);
-    return;
-  }
-  const next = ctx.found.find((id) => !ctx.tried?.has(id));
-  if (tabId !== next) violation(w, `a try of tab ${tabId} out of query order`);
-}
-
 function loseTab(ctx: TabTrace, w: World): void {
   if (ctx.tabLost) return;
   ctx.tabLost = true;
@@ -466,7 +414,10 @@ function loseTab(ctx: TabTrace, w: World): void {
 function refuse(w: World, tabId: number): never {
   const ctx = w.current;
   if (ORPHAN_TABS.includes(tabId)) w.stats.orphanTries += 1;
-  if (ctx !== undefined && ctx.pinned === tabId) loseTab(ctx, w);
+  if (ctx !== undefined && ctx.pinned === tabId) {
+    ctx.lossQuery = !ctx.tabLost;
+    loseTab(ctx, w);
+  }
   if (ctx !== undefined && ctx.pinned === undefined) {
     ctx.tried ??= new Set();
     ctx.tried.add(tabId);
@@ -490,8 +441,7 @@ export function tabsFor(w: World, gen: number): TabsPort {
   return {
     query: async () => {
       if (gen !== w.gen) return frozen(w);
-      checkTabCall(w);
-      checkQuery(w);
+      checkQueryCall(w);
       const ids = found(w);
       if (w.current !== undefined) {
         w.current.found = ids;
@@ -597,6 +547,11 @@ export function scFor(w: World, gen: number): ScClient {
     },
     unwish: async (id) => {
       if (!mayWrite()) return frozen(w);
+      if (
+        w.current?.kind === "answer" &&
+        w.current.msg.type === "answer-removal"
+      )
+        return removeFromSc(w, id);
       checkFinishWrite(w, `unwish ${id}`);
       w.stats.finishWrites += 1;
       if (!isFilmProduct(id)) violation(w, `unwish of ${id}, not a film`);
@@ -628,14 +583,17 @@ export function scFor(w: World, gen: number): ScClient {
 export function clockFor(w: World): () => number {
   return () => {
     const ctx = w.current;
-    if (ctx?.kind === "finish" && ctx.spent === undefined) {
+    if (
+      (ctx?.kind === "finish" || ctx?.kind === "answer") &&
+      ctx.spent === undefined
+    ) {
       const stored = settingsOf(w)?.finishWindow;
       ctx.spent =
         stored !== undefined &&
         w.time >= stored.from &&
         w.time - stored.from < FINISH_WINDOW_MS &&
         stored.count >= MAX_FINISHES_PER_WINDOW;
-      if (ctx.spent) w.stats.spentBudgets += 1;
+      if (ctx.spent && ctx.kind === "finish") w.stats.spentBudgets += 1;
     }
     return w.time;
   };
@@ -644,10 +602,20 @@ export function clockFor(w: World): () => number {
 // Oracles of a finish write: the binding, and the hour's budget (at most 30 finishes per window).
 function checkFinishWrite(w: World, what: string): void {
   checkBinding(w, what);
-  if (w.current?.kind === "finish" && w.current.spent) {
+  const ctx = w.current;
+  if ((ctx?.kind === "finish" || ctx?.kind === "answer") && ctx.spent) {
     violation(w, `${what} with the hour's finishes spent`);
   }
-  checkViewing(w, what);
+  if (ctx?.kind === "answer") checkAnswerFinish(w, what);
+  else checkViewing(w, what);
+}
+
+// The unwish of a removal answer: « Retirer aussi… » from SensCritique, judged by O14.
+function removeFromSc(w: World, id: number): void {
+  checkRemovalWrite(w, "sc", id);
+  w.log.push(`answer unwish ${id}`);
+  flaky(w, `unwish ${id}`);
+  w.wishlist.delete(id);
 }
 
 const sameFinish = (a: FinishedMessage, b: FinishedMessage): boolean =>
@@ -699,12 +667,22 @@ export function checkInvoked(w: World, key: JobKey): void {
 
 // The jobs as the router sees them, counted, with the oracle O1 "never two jobs at once" per worker. The
 // status answer is no job (Ruling 20): O1 does not count it, O7 and O12 judge it.
+type Run = <T>(key: JobKey, ctx: Context, job: () => Promise<T>) => Promise<T>;
+
+// An answer job: O14 to O16 judge it from the state it started from (tests/runtime-answer-oracles.ts).
+async function answerRun(
+  w: World,
+  msg: AnswerMessage,
+  run: Run,
+  job: () => Promise<void>,
+): Promise<void> {
+  const ctx = beginAnswer(w, msg);
+  await run("answer", ctx, job);
+  endAnswer(w, ctx);
+}
+
 export function observed(w: World, gen: number, jobs: Jobs): Jobs {
-  const run = async <T>(
-    key: JobKey,
-    ctx: Context,
-    job: () => Promise<T>,
-  ): Promise<T> => {
+  const run: Run = async (key, ctx, job) => {
     checkInvoked(w, key);
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);
@@ -715,7 +693,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
       return await job();
     } finally {
       w.active.set(gen, (w.active.get(gen) ?? 1) - 1);
-      if (w.current === ctx) w.current = undefined;
+      if (w.current === ctx) {
+        if (ctx.kind === "sync" && ctx.saved) recordFinalLists(w);
+        w.current = undefined;
+      }
     }
   };
   return {
@@ -731,8 +712,27 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     rate: (msg) => run("rating", { kind: "other" }, () => jobs.rate(msg)),
     dismissRating: (msg) =>
       run("rating", { kind: "other" }, () => jobs.dismissRating(msg)),
+    answerQuestion: (msg) =>
+      answerRun(w, msg, run, () => jobs.answerQuestion(msg)),
+    answerRemoval: (msg) =>
+      answerRun(w, msg, run, () => jobs.answerRemoval(msg)),
+    hideQuestion: (msg) => answerRun(w, msg, run, () => jobs.hideQuestion(msg)),
+    // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
+    linkTitle: (msg) => jobs.linkTitle(msg),
+    requeueQuestion: (msg) => jobs.requeueQuestion(msg),
+    forget: () => jobs.forget(),
+    reset: () => jobs.reset(),
+    // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.
+    forgetHandled: (msg) => jobs.forgetHandled(msg),
+    forgetHandledFromTab: (msg) => jobs.forgetHandledFromTab(msg),
+    handledTitles: () => jobs.handledTitles(),
+    searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),
+    openQuestions: (answering) => jobs.openQuestions(answering),
+    removalOffer: (contentId, answering) =>
+      jobs.removalOffer(contentId, answering),
+    pageLists: (answering) => jobs.pageLists(answering),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)
@@ -758,6 +758,7 @@ export function ownerEdit(w: World, n: number, side: Side): void {
     w.log.push(`owner remove ${side} ${n}`);
   } else {
     list.add(id);
+    if (w.declined.get(n) === side) w.declined.delete(n);
     w.protectedFrom.delete(n);
     w.log.push(`owner add ${side} ${n}`);
   }

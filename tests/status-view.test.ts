@@ -3,9 +3,13 @@ import type { JobError } from "../src/ext/job-error";
 import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
-import { bindingLine } from "../src/status/status-owner-lines";
+import {
+  bindingLine,
+  COUNT_ORDER,
+  WAITING_LABELS,
+} from "../src/status/status-owner-lines";
 import { toStatusView } from "../src/status/status-view";
-import type { StatusSnapshot } from "../src/sw/status-snapshot";
+import type { Counts, StatusSnapshot } from "../src/sw/status-snapshot";
 
 // French typography: U+202F before « : ; ? ! » and inside « ». Every expected string below spells it
 // out by code point, so a plain space fails.
@@ -23,6 +27,8 @@ const LABELS: Record<JobError, string> = {
   "stored-state": "État enregistré illisible",
   unavailable: "Site indisponible, nouvel essai au prochain passage",
   "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessayez plus tard`,
+  "naka-list-empty": `Ma liste Naka lue vide${NB}: rien n'a été retiré`,
+  "naka-tab-changed": `L'onglet Naka a changé de page ou a été rechargé${NB}: la suite au prochain passage`,
 };
 const CODES = Object.keys(LABELS) as JobError[];
 
@@ -253,6 +259,31 @@ describe("toStatusView: the last run, by its own mode", () => {
     );
   });
 
+  it("names the finished title, the season and the episode of a series", () => {
+    const lastFinish: FinishRecord = {
+      at: AT,
+      key: "tv:21391:S1E3",
+      outcome: "done",
+      title: "Un Job Mortel",
+    };
+    expect(ready({ mode: "live", lastFinish }).lines).toContain(
+      `Dernière fin de visionnage${NB}: «${NB}Un Job Mortel${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
+    );
+  });
+
+  it("names the finished title of a film without a place", () => {
+    const lastFinish: FinishRecord = {
+      at: AT,
+      key: "movie:12",
+      outcome: "failed",
+      error: "unavailable",
+      title: "Alien",
+    };
+    expect(ready({ mode: "live", lastFinish }).lines).toContain(
+      `Dernière fin de visionnage${NB}: «${NB}Alien${NB}», 04/11/2026 14:05, échec${NB}: ${LABELS.unavailable}`,
+    );
+  });
+
   it("shows no run line before the first run", () => {
     expect(ready({ mode: "live", counts: ZERO }).lines).toEqual([
       "Rien en attente",
@@ -261,8 +292,8 @@ describe("toStatusView: the last run, by its own mode", () => {
 });
 
 describe("toStatusView: what waits for the owner", () => {
-  const QUESTIONS = "Questions à traiter dans une prochaine version";
-  const REMOVALS = "Retraits à confirmer dans une prochaine version";
+  const QUESTIONS = "Questions à traiter";
+  const REMOVALS = "Retraits à confirmer";
   const UNLINKED = "Titres non reliés";
 
   it("each count above zero on its own line", () => {
@@ -302,7 +333,7 @@ describe("toStatusView: the bound accounts", () => {
   it("names both accounts", () => {
     const binding = { scUsername: "owner", nakaAccount: "77" };
     expect(ready({ mode: "live", binding }).lines).toContain(
-      `Comptes liés${NB}: owner sur SensCritique, compte Naka n° 77`,
+      `Comptes liés${NB}: owner sur SensCritique, compte Naka n°\u00A077`,
     );
   });
 
@@ -316,7 +347,7 @@ describe("toStatusView: the bound accounts", () => {
 
   it("leaves out each part that is absent", () => {
     expect(bindingLine({ nakaAccount: "77" })).toBe(
-      `Comptes liés${NB}: compte Naka n° 77`,
+      `Comptes liés${NB}: compte Naka n°\u00A077`,
     );
     expect(bindingLine({ scUsername: "owner" })).toBe(
       `Comptes liés${NB}: owner sur SensCritique`,
@@ -361,6 +392,26 @@ describe("toStatusView: preview", () => {
     expect(view.previewCount).toBe(1);
   });
 
+  it("adds the year and the type of a title, only the known parts", () => {
+    const view = ready({
+      mode: "simulation",
+      lastRun: run({
+        preview: [
+          { side: "sc", title: "Cowboy Bebop", year: 2021, type: "serie" },
+          { side: "naka", title: "Alien", type: "film" },
+          { side: "naka", title: "Dune", year: 2021 },
+          { side: "naka", title: "Heat" },
+        ],
+      }),
+    });
+    expect(view.preview).toEqual([
+      `Envies SensCritique${NB}: Cowboy Bebop (2021, série)`,
+      `Ma liste Naka${NB}: Alien (film)`,
+      `Ma liste Naka${NB}: Dune (2021)`,
+      `Ma liste Naka${NB}: Heat`,
+    ]);
+  });
+
   it("hides the preview when writes are live", () => {
     const view = ready({ mode: "live", lastRun: run({ preview }) });
     expect(view.preview).toEqual([]);
@@ -377,17 +428,52 @@ describe("toStatusView: preview", () => {
   });
 });
 
+describe("toStatusView: the next pass's writes", () => {
+  const next = [
+    {
+      side: "sc" as const,
+      title: "Cowboy Bebop",
+      year: 2021,
+      type: "serie" as const,
+    },
+    { side: "naka" as const, title: "Alien", type: "film" as const },
+    { side: "naka" as const, title: "" },
+  ];
+  const lines = [
+    `Envies SensCritique${NB}: Cowboy Bebop (2021, série)`,
+    `Ma liste Naka${NB}: Alien (film)`,
+    `Ma liste Naka${NB}: (titre inconnu)`,
+  ];
+
+  it("lists them in live mode", () => {
+    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual(lines);
+  });
+
+  it("lists them in simulation too", () => {
+    const view = ready({ mode: "simulation", lastRun: run({ next }) });
+    expect(view.next).toEqual(lines);
+  });
+
+  it("is empty for a record without them", () => {
+    expect(ready({ mode: "live", lastRun: run() }).next).toEqual([]);
+    expect(ready({ mode: "live" }).next).toEqual([]);
+  });
+});
+
 describe("the confirmation before going live", () => {
-  it("with a preview: the cap, and that the next pass takes up its titles without a new preview", () => {
+  const ASK = `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures.`;
+  const NEXT = `La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka)`;
+
+  it("with a preview: the cap, and that the page shows the writes before each pass", () => {
     expect(confirmText(3)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra les 3 titres de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+      `${ASK} ${NEXT} reprendra les 3 titres de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
   // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
   it("with one title in the preview: le titre de l'aperçu", () => {
     expect(confirmText(1)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures. La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka) reprendra le titre de l'aperçu, puis les suivants, sans nouvel aperçu.`,
+      `${ASK} ${NEXT} reprendra le titre de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
@@ -397,9 +483,9 @@ describe("the confirmation before going live", () => {
     );
   });
 
-  it("without a preview: the cap, and no preview", () => {
+  it("without a preview: the cap, and where the page shows the writes", () => {
     expect(confirmText(0)).toBe(
-      `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures, sans aperçu.`,
+      `${ASK} La page de l'extension montre les écritures prévues au prochain passage.`,
     );
   });
 });
@@ -496,5 +582,74 @@ describe("toStatusView: an untrusted answer", () => {
     const view = toStatusView({ mode: "live", token: "secret" }, UTC);
     expect(view.kind).toBe("ready");
     expect(JSON.stringify(view)).not.toContain("secret");
+  });
+});
+
+describe("toStatusView: the mode switch while a change waits", () => {
+  it.each(["live", "simulation"] as const)(
+    "is disabled while a switch to %s waits",
+    (pendingMode) => {
+      expect(ready({ mode: "live", pendingMode }).switchDisabled).toBe(true);
+    },
+  );
+
+  it("is enabled with no switch waiting", () => {
+    expect(ready({ mode: "live", counts: COUNTS }).switchDisabled).toBe(false);
+    expect(ready({}).switchDisabled).toBe(false);
+  });
+});
+
+describe("toStatusView: the local actions", () => {
+  it.each([
+    ["forget", "Oubli des comptes liés en attente"],
+    ["reset", "Réinitialisation en attente"],
+  ] as const)("names a pending %s and disables the actions", (action, line) => {
+    const view = ready({ mode: "live", pendingActions: [action] });
+    expect(view.lines).toContain(line);
+    expect(view.actionsDisabled).toBe(true);
+    expect(view.switchDisabled).toBe(true);
+    expect(view.inProgress).toBe(true);
+  });
+
+  it("names both when both wait", () => {
+    const view = ready({ mode: "live", pendingActions: ["forget", "reset"] });
+    expect(view.lines).toContain("Oubli des comptes liés en attente");
+    expect(view.lines).toContain("Réinitialisation en attente");
+  });
+
+  it("enables them with nothing waiting, and with an unreadable state", () => {
+    expect(ready({ mode: "live" }).actionsDisabled).toBe(false);
+    expect(ready({ error: "stored-state" }).actionsDisabled).toBe(false);
+    expect(ready({ mode: "live" }).switchDisabled).toBe(false);
+  });
+});
+
+describe("bindingLine: no-break space after n°", () => {
+  it("holds n°, U+00A0, then the id", () => {
+    const line = bindingLine({ scUsername: "a", nakaAccount: "7" }) ?? "";
+    const tail = line.slice(line.indexOf("n°"));
+    expect(Array.from(tail, (c) => c.codePointAt(0))).toEqual([
+      0x6e, 0xb0, 0xa0, 0x37,
+    ]);
+  });
+});
+
+describe("the waiting-count labels", () => {
+  it("name every count, in the display order", () => {
+    expect([...COUNT_ORDER].sort()).toEqual(Object.keys(WAITING_LABELS).sort());
+    expect(COUNT_ORDER).toEqual([
+      "openQuestions",
+      "pendingRemovals",
+      "unlinked",
+    ]);
+  });
+
+  it("refuse a Record that misses a count (type check)", () => {
+    // @ts-expect-error unlinked is missing
+    const incomplete: Record<keyof Counts, string> = {
+      openQuestions: "a",
+      pendingRemovals: "b",
+    };
+    expect(Object.keys(incomplete)).toHaveLength(2);
   });
 });
