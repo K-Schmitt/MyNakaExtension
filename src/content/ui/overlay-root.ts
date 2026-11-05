@@ -7,10 +7,11 @@ import type { DocLike, NodeLike, ShadowRootLike } from "./dom-like";
 
 export type Placement = "top-right" | "bottom-right";
 
-// The rating blocks sit top right, at most 40% wide, never lower than 80% of the height (the bottom 20% is
-// Naka's controls). The home panel sits bottom right, 360 px wide and 60% of the height at most: the home
-// page has no player. Every declaration is !important: an author rule marked !important must not hide or
-// fade the host.
+// The rating blocks sit on the right, at most 40% wide, from 7% to at most 87% of the height. Naka's player
+// has a bar of controls from 1% to 5% of the height and another from 95% to 99%, with the progress bar just
+// above it (owner's probe of 2026-11-05). The home panel sits bottom right, 360 px wide and 60% of the
+// height at most: the home page has no player. Every declaration is !important: an author rule marked
+// !important must not hide or fade the host.
 const COMMON_STYLE = [
   "all: initial",
   "position: fixed",
@@ -19,7 +20,7 @@ const COMMON_STYLE = [
   "z-index: 2147483647",
 ];
 const PLACED_STYLE: Record<Placement, string[]> = {
-  "top-right": ["top: 0", "max-width: 40%", "max-height: 80%"],
+  "top-right": ["top: 7%", "max-width: 40%", "max-height: 80%"],
   "bottom-right": [
     "bottom: 0",
     "width: 360px",
