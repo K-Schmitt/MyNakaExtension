@@ -29,6 +29,20 @@ describe("ratingView", () => {
     expect(view.error).toBeUndefined();
   });
 
+  it("a label that is not pending offers Fermer only", () => {
+    expect(ratingView(filmCard({ pending: [] }), "film").actions).toEqual([
+      "fermer",
+    ]);
+    const card = episodeCard({ pending: ["saison"] });
+    expect(ratingView(card, "épisode").actions).toEqual(["fermer"]);
+    expect(ratingView(card, "série").actions).toEqual(["fermer"]);
+    expect(ratingView(card, "saison").actions).toEqual([
+      "plus-tard",
+      "ignorer",
+      "fermer",
+    ]);
+  });
+
   it("a saison with start 8: choice 8 marked and the start line", () => {
     const view = ratingView(episodeCard(), "saison", 8);
     expect(view.heading).toBe(`Noter la saison 1 de «${NB}Une série${NB}»`);
@@ -71,7 +85,7 @@ describe("ratingView", () => {
       failed: { label: "saison", error: "sc-session", at: 5 },
     });
     expect(ratingView(card, "saison").error).toBe(
-      `La note n'est pas partie${NB}: Reconnectez-vous sur SensCritique`,
+      `La note n'est pas partie${NB}: reconnectez-vous sur SensCritique.`,
     );
     expect(ratingView(card, "épisode").error).toBeUndefined();
   });

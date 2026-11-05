@@ -10,6 +10,7 @@ import {
   NEEDS_CHOICE_LINE,
   NOT_RATED_LINE,
   OTHER_LABELS,
+  RATING_ERROR_LABELS,
   SEND_LABEL,
   SENDING_LINE,
   SERIES_WARNING,
@@ -18,6 +19,7 @@ import {
   seriesHeading,
   seriesStartLine,
   UNREACHABLE_LINE,
+  WAIT_LINE,
 } from "../src/content/ui/rating-copy";
 import type { JobError } from "../src/ext/job-error";
 import { JOB_ERROR_LABELS } from "../src/status/job-error-labels";
@@ -88,12 +90,35 @@ describe("the rating copy, code point by code point", () => {
     expect(chosenLine(7)).toBe(`Note choisie${NB}: 7`);
   });
 
-  it("the error line reuses the job error labels", () => {
+  it("the rating error labels, word for word", () => {
+    expect(RATING_ERROR_LABELS).toEqual({
+      "no-naka-tab": "ouvrez ou rechargez un onglet Naka",
+      "sc-session": "reconnectez-vous sur SensCritique",
+      "naka-session": "reconnectez-vous sur Naka",
+      "other-account": "un autre compte est connecté que celui enregistré",
+      "stored-state": "l'état enregistré est illisible",
+      unavailable: "le site ne répond pas, réessayez plus tard",
+      "finish-limit":
+        "trop de fins de visionnage en une heure, réessayez plus tard",
+    });
+  });
+
+  it("the error line is the rating label of the code, not the status page's", () => {
     for (const code of CODES) {
       expect(errorLine(code)).toBe(
-        `La note n'est pas partie${NB}: ${JOB_ERROR_LABELS[code]}`,
+        `La note n'est pas partie${NB}: ${RATING_ERROR_LABELS[code]}.`,
       );
     }
+    expect(errorLine("sc-session")).toBe(
+      `La note n'est pas partie${NB}: reconnectez-vous sur SensCritique.`,
+    );
+    expect(JOB_ERROR_LABELS["sc-session"]).toBe(
+      "Reconnectez-vous sur SensCritique",
+    );
+  });
+
+  it("the wait after Ignorer", () => {
+    expect(WAIT_LINE).toBe("Un instant\u2026");
   });
 
   it("the check finds a plain space before a sign (control)", () => {
@@ -117,6 +142,7 @@ describe("the rating copy, code point by code point", () => {
       SEND_LABEL,
       CANCEL_LABEL,
       SENDING_LINE,
+      WAIT_LINE,
       UNREACHABLE_LINE,
       NEEDS_CHOICE_LINE,
       NOT_RATED_LINE,

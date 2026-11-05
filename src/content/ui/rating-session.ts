@@ -152,11 +152,17 @@ export function createRatingSession(
 
   // Locked from the click until the card says the label left `pending`, or a failure that was not
   // there at the click shows up. A spent schedule means the job is queued in the worker: the block hides.
-  function watch(s: Session, send?: Promise<boolean>): void {
+  function watch(
+    s: Session,
+    send?: Promise<boolean>,
+    dismissing = false,
+  ): void {
     const { label } = s;
     const at = snapshotOf(s);
     s.locked = true;
     delete s.error;
+    if (dismissing) s.dismissing = true;
+    else delete s.dismissing;
     render(s);
     const stop = pollUntil(
       ports.port,
@@ -196,7 +202,7 @@ export function createRatingSession(
 
   function act(s: Session, action: RatingAction): void {
     if (action === "ignorer") {
-      watch(s, ports.port.dismiss(s.ids, s.label));
+      watch(s, ports.port.dismiss(s.ids, s.label), true);
       return;
     }
     close(s);

@@ -5,6 +5,7 @@ import {
   SENDING_LINE,
   SERIES_WARNING,
   UNREACHABLE_LINE,
+  WAIT_LINE,
 } from "../src/content/ui/rating-copy";
 import type { RatingCard } from "../src/core/rating-cards";
 import { flush } from "./end-block-fakes";
@@ -257,7 +258,7 @@ describe("Ignorer and Réduire", () => {
     w.handlersOf(ep.key).onAction("ignorer");
     await flush();
     expect(sendsOf(w.calls)).toEqual(["dismiss 5:1:1 saison"]);
-    expect(w.viewOf(ep.key)?.notice).toBe(SENDING_LINE);
+    expect(w.viewOf(ep.key)?.notice).toBe(WAIT_LINE);
     w.state.answer = answerOf(A);
     await w.clock.advance(2000);
     expect(w.keys()).toEqual(["movie:1"]);

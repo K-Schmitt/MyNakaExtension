@@ -3,7 +3,7 @@
 
 import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
-import { chosenLine, SENDING_LINE } from "./rating-copy";
+import { chosenLine, SENDING_LINE, WAIT_LINE } from "./rating-copy";
 import { type RatingView, ratingView } from "./rating-view";
 
 // One shown card. `start` is the answer's, and belongs to the card's first pending label only.
@@ -16,6 +16,7 @@ export type Session = {
   confirming?: number;
   error?: string; // a line of the block's own: the worker did not answer, or no card came
   viewOnly?: true; // the card exists only in the view: the worker has none for the title
+  dismissing?: true; // locked after « Ignorer »: the wait is no rating
 };
 
 export const needsConfirm = ({ card, label }: Session): boolean =>
@@ -30,14 +31,14 @@ export function viewOf(s: Session): RatingView {
   return s.error === undefined ? view : { ...view, error: s.error };
 }
 
-// While a rating travels: no button, a cue, until the worker's card says where it went.
+// While a rating or an « Ignorer » travels: no button, a cue, until the worker's card says where it went.
 function sendingView(s: Session): RatingView {
   return {
     ...viewOf(s),
     choices: [],
     others: [],
     actions: [],
-    notice: SENDING_LINE,
+    notice: s.dismissing === true ? WAIT_LINE : SENDING_LINE,
   };
 }
 

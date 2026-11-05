@@ -30,6 +30,8 @@ export type RatingView = {
 
 const CHOICES = 10;
 const ACTIONS: RatingAction[] = ["plus-tard", "ignorer", "fermer"];
+// A label not pending (rated already, or a view-only card) has nothing to put off or to ignore.
+const CLOSE_ONLY: RatingAction[] = ["fermer"];
 
 function headingOf(card: RatingCard, label: RatingLabel): string {
   const { title, season, episode } = card;
@@ -77,7 +79,7 @@ export function ratingView(
       ? { warning: SERIES_WARNING }
       : {}),
     choices: choicesOf([start, current]),
-    actions: ACTIONS,
+    actions: card.pending.includes(label) ? ACTIONS : CLOSE_ONLY,
     others: card.targets.map((t) => t.label).filter((l) => l !== label),
     ...(failed === undefined ? {} : { error: errorLine(failed) }),
   };

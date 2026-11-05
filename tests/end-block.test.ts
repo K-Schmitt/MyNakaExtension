@@ -6,6 +6,7 @@ import {
   SENDING_LINE,
   SERIES_WARNING,
   UNREACHABLE_LINE,
+  WAIT_LINE,
 } from "../src/content/ui/rating-copy";
 import type { RatingCard } from "../src/core/rating-cards";
 import {
@@ -375,6 +376,47 @@ describe("the end block actions", () => {
     expect(w.calls).toContain("dismiss 5:1:1 épisode");
     await w.clock.advance(2000);
     expect(w.last().view.heading).toContain("saison 1");
+  });
+
+  it("Ignorer waits with « Un instant… », not the sending line", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onAction("ignorer");
+    await flush();
+    expect(w.last().view.notice).toBe(WAIT_LINE);
+    expect(w.last().view.choices).toEqual([]);
+    await w.clock.advance(2000);
+    expect(w.last().view.notice).toBe(WAIT_LINE);
+  });
+
+  it("a rating after an Ignorer that came back waits with the sending line again", async () => {
+    const w = world();
+    const failed = episodeCard({
+      failed: { label: "épisode", error: "unavailable", at: 3 },
+    });
+    w.script(EP_IDS, answer(episodeCard()), answer(failed));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.last().handlers.onAction("ignorer");
+    await w.clock.advance(2000);
+    expect(w.last().view.choices).toHaveLength(10);
+    w.last().handlers.onChoose(5);
+    await flush();
+    expect(w.last().view.notice).toBe(SENDING_LINE);
+  });
+
+  it("a manual choice of a label that is not pending offers Fermer only", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSaison({ pending: ["saison"] })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    expect(w.last().view.actions).toEqual(["plus-tard", "ignorer", "fermer"]);
+    w.last().handlers.onOther("épisode");
+    expect(w.last().view.actions).toEqual(["fermer"]);
+    w.last().handlers.onOther("saison");
+    expect(w.last().view.actions).toEqual(["plus-tard", "ignorer", "fermer"]);
   });
 
   it("Ignorer on the last pending label hides", async () => {

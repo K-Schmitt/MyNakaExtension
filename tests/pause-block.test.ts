@@ -6,6 +6,7 @@ import {
   NOT_RATED_LINE,
   SENDING_LINE,
   UNREACHABLE_LINE,
+  WAIT_LINE,
 } from "../src/content/ui/rating-copy";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard } from "../src/core/rating-cards";
@@ -200,6 +201,31 @@ describe("the pause block card", () => {
     w.last().handlers.onChoose(6);
     await flush();
     expect(w.calls).toContain("rate 9:: film 6");
+  });
+
+  it("a view-only card, or a rated title, offers Fermer only; a pending label all three", async () => {
+    const w = world();
+    w.script(EP_IDS, asked(null));
+    await w.pauseAt(0.5);
+    expect(w.last().view.actions).toEqual(["fermer"]);
+    w.script(FILM_IDS, asked(filmCard({ pending: [] })));
+    w.setNow(110_000);
+    await w.pauseAt(0.5, FILM_IDS);
+    expect(w.last().view.actions).toEqual(["fermer"]);
+    w.script(FILM_IDS, asked(filmCard()));
+    w.setNow(120_000);
+    await w.pauseAt(0.5, FILM_IDS);
+    expect(w.last().view.actions).toEqual(["plus-tard", "ignorer", "fermer"]);
+  });
+
+  it("Ignorer on a pending label waits with « Un instant… »", async () => {
+    const w = world();
+    w.script(FILM_IDS, asked(filmCard()));
+    await w.pauseAt(0.5, FILM_IDS);
+    w.last().handlers.onAction("ignorer");
+    await flush();
+    expect(w.calls).toContain("dismiss 9:: film");
+    expect(w.last().view.notice).toBe(WAIT_LINE);
   });
 
   it("shows nothing when no title can be read", async () => {

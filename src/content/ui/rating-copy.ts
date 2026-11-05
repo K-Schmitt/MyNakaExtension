@@ -3,7 +3,6 @@
 import type { RatingLabel } from "../../core/rating-cards";
 import type { JobError } from "../../ext/job-error";
 import type { LastFinish } from "../../ext/settings";
-import { JOB_ERROR_LABELS } from "../../status/job-error-labels";
 
 export type RatingAction = "plus-tard" | "ignorer" | "fermer";
 
@@ -44,11 +43,26 @@ export function seriesStartLine(rating: number): string {
 
 export const SERIES_WARNING = `Noter la série la retire de vos envies SensCritique, et elle n'est pas finie sur Naka. Envoyer quand même${NB}?`;
 
+// Why a rating did not go, as the block words it (the status page has its own table).
+export const RATING_ERROR_LABELS: Record<JobError, string> = {
+  "no-naka-tab": "ouvrez ou rechargez un onglet Naka",
+  "sc-session": "reconnectez-vous sur SensCritique",
+  "naka-session": "reconnectez-vous sur Naka",
+  "other-account": "un autre compte est connecté que celui enregistré",
+  "stored-state": "l'état enregistré est illisible",
+  unavailable: "le site ne répond pas, réessayez plus tard",
+  "finish-limit":
+    "trop de fins de visionnage en une heure, réessayez plus tard",
+};
+
 export function errorLine(error: JobError): string {
-  return `La note n'est pas partie${NB}: ${JOB_ERROR_LABELS[error]}`;
+  return `La note n'est pas partie${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
 export const SENDING_LINE = "Envoi de la note\u2026";
+
+// The wait after « Ignorer »: nothing is being rated.
+export const WAIT_LINE = "Un instant\u2026";
 
 export const UNREACHABLE_LINE = `La note n'est pas partie${NB}: l'extension ne répond pas.`;
 
