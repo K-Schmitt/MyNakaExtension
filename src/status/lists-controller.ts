@@ -65,7 +65,8 @@ export function createListsController(ports: ListsPorts): ListsController {
     const mine = loads;
     const read = await askLists(ports);
     if (mine !== loads) return;
-    answer = read;
+    // A failed read after a good one keeps the rows and the poll; only the first load can leave none.
+    if (read !== undefined) answer = read;
     const open = state.search;
     const closed = open !== undefined && itemOf(open.key) === undefined;
     if (closed) searches += 1;

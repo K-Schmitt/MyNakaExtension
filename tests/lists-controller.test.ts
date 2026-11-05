@@ -115,6 +115,54 @@ describe("loading", () => {
   });
 });
 
+describe("a failed poll", () => {
+  const MOOT = {
+    seq: 4,
+    at: 1,
+    target: REMOVAL.key,
+    outcome: "moot" as const,
+  };
+
+  it("keeps the rows, re-arms the poll, and the next good answer redraws", async () => {
+    const t = setup({ ...LISTS, answering: [LEGACY.key] });
+    await t.controller.load();
+    const before = t.last();
+    t.world.lists = undefined;
+    t.fire();
+    await settle();
+    expect(t.last().questions).toEqual(before.questions);
+    expect(t.last().unlinked).toEqual(before.unlinked);
+    expect(t.question(LEGACY.key).buttons).toEqual([]);
+    expect([...t.armed.values()].map((a) => a.ms)).toEqual([POLL_MS]);
+    t.world.lists = LISTS;
+    t.fire();
+    await settle();
+    expect(t.question(LEGACY.key).buttons).toHaveLength(1);
+    expect(t.armed.size).toBe(0);
+  });
+
+  it("a failure on the first load shows no rows", async () => {
+    const t = setup({ questions: "x" });
+    await t.controller.load();
+    expect(t.last()).toEqual({ questions: [], unlinked: [], note: "" });
+    expect(t.armed.size).toBe(0);
+  });
+
+  it("a failed first load leaves the seen answer unset: the first good one is not news, the next is", async () => {
+    const t = setup();
+    t.world.lists = undefined;
+    await t.controller.load();
+    t.world.lists = { ...LISTS, lastAnswer: MOOT };
+    await t.controller.load();
+    expect(t.last().note).toBe("");
+    t.world.lists = { ...LISTS, lastAnswer: { ...MOOT, seq: 5 } };
+    await t.controller.load();
+    expect(t.last().note).toBe(
+      `Rien à retirer${NB}: ce titre n'y est déjà plus.`,
+    );
+  });
+});
+
 describe("answers", () => {
   it("each button sends its message, then the lists are asked again", async () => {
     const t = setup();
@@ -310,6 +358,25 @@ describe("the search", () => {
     expect(t.without("page-lists")).toEqual([
       { type: "search-titles", side: "sc", query: "Alien" },
     ]);
+  });
+
+  it("« Relier » from an sc row sends the sc side and the row's own id", async () => {
+    const t = setup();
+    await t.controller.load();
+    await t.controller.act(UNLINKED_SC.key, { kind: "open-search" });
+    t.controller.type(UNLINKED_SC.key, "Alien");
+    void t.controller.act(UNLINKED_SC.key, { kind: "search" });
+    await settle();
+    t.searches[0]?.resolve({ candidates: [{ ...FOUND, id: 2007 }] });
+    await settle();
+    const relier = t.unlinked(UNLINKED_SC.key).search?.results[0]?.relier;
+    await t.controller.act(UNLINKED_SC.key, relier?.action as never);
+    expect(t.without("page-lists").at(-1)).toEqual({
+      type: "link-title",
+      side: "sc",
+      id: 60,
+      otherId: 2007,
+    });
   });
 
   it("an empty query is not sent and shows « Un titre à chercher »", async () => {
