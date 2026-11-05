@@ -5,21 +5,17 @@
 // entry leaves, the entries under it move up under the cursor: each remaining one, rating or question,
 // gets a fresh click grace from that redraw.
 
-import type { ContentIds } from "../../core/finish-event";
 import type { QuestionKey } from "../../core/questions";
-import type { RatingCard } from "../../core/rating-cards";
 import type { QuestionOffer } from "../../sw/question-offers";
 import type { CardsAnswer } from "../../sw/rating-answers";
 import type { EndTimer } from "./end-poll";
-import { entryAsker } from "./home-asker";
 import { createQuestionSlots } from "./home-question-slots";
-import { type HomeEntry, type HomeView, homeView } from "./home-view";
+import { createRatingSlots } from "./home-rating-slots";
+import { type HomeView, homeView } from "./home-view";
 import { NO_HANDLERS, NO_QUESTION_HANDLERS } from "./idle-handlers";
 import { titledOffer } from "./offer-title";
 import type { QuestionHandlers } from "./question-render";
 import type { RatingHandlers } from "./rating-render";
-import { createRatingSession } from "./rating-session";
-import { labelOf } from "./session-views";
 import type { WorkerPort } from "./worker-port";
 
 // The owner's probe (2026-11-05): the pathname is "/" after login and after the Naka logo.
@@ -49,26 +45,15 @@ export type HomePorts = {
   hide(): void;
 };
 
-type Slot = {
-  entry: HomeEntry;
-  session: ReturnType<typeof createRatingSession>;
-  handlers?: RatingHandlers;
-};
-
-function idsOf({ contentId, season, episode }: RatingCard): ContentIds {
-  return {
-    contentId,
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
-}
-
 export function createHomeBlock(ports: HomePorts) {
   let onHome = false;
   let folded = false;
   let arrival = 0; // each arrival and each departure starts a new one: an older answer is dropped
-  let slots: Slot[] = [];
   let opening = false;
+  const ratings = createRatingSlots(ports, {
+    redraw: () => draw(),
+    left: () => moved(),
+  });
   const questions = createQuestionSlots(ports, {
     redraw: () => draw(),
     left: () => moved(),
@@ -77,64 +62,25 @@ export function createHomeBlock(ports: HomePorts) {
   function draw(): void {
     if (opening) return;
     const asked = questions.views();
-    if (slots.length === 0 && asked.length === 0) {
+    if (ratings.count() === 0 && asked.length === 0) {
       ports.hide();
       return;
     }
-    ports.show(
-      homeView(
-        slots.map((slot) => slot.entry),
-        folded,
-        asked,
-      ),
-      {
-        question: (key) => questions.handlersOf(key) ?? NO_QUESTION_HANDLERS,
-        entry: (key) =>
-          slots.find((slot) => slot.entry.card.key === key)?.handlers ??
-          NO_HANDLERS,
-        onFold: () => {
-          folded = !folded;
-          draw();
-        },
+    ports.show(homeView(ratings.entries(), folded, asked), {
+      question: (key) => questions.handlersOf(key) ?? NO_QUESTION_HANDLERS,
+      entry: (key) => ratings.handlersOf(key) ?? NO_HANDLERS,
+      onFold: () => {
+        folded = !folded;
+        draw();
       },
-    );
+    });
   }
 
   // An entry left: the ones under it moved up, so each gets a fresh grace from this redraw.
   function moved(): void {
-    for (const slot of slots) slot.session.regrace();
+    ratings.regrace();
     questions.regrace();
     draw();
-  }
-
-  function slotOf({ card, start }: { card: RatingCard; start?: number }): Slot {
-    const key = card.key;
-    const slot: Slot = {
-      entry: { card, ...(start === undefined ? {} : { start }) },
-      session: createRatingSession(
-        {
-          port: {
-            askCard: entryAsker(ports.port, key),
-            rate: (ids, label, rating) => ports.port.rate(ids, label, rating),
-            dismiss: (ids, label) => ports.port.dismiss(ids, label),
-          },
-          timer: ports.timer,
-          now: ports.now,
-          show: (view, handlers) => {
-            slot.entry = { ...slot.entry, view };
-            slot.handlers = handlers;
-            draw();
-          },
-          hide: () => {},
-        },
-        () => {
-          slots = slots.filter((s) => s !== slot);
-          moved();
-        },
-        { absentIsDone: true },
-      ),
-    };
-    return slot;
   }
 
   function open(
@@ -143,16 +89,7 @@ export function createHomeBlock(ports: HomePorts) {
     baseline: number,
   ): void {
     opening = true;
-    const shown = cards.filter(({ card }) => card.pending.length > 0);
-    slots = shown.map(slotOf);
-    // Each entry opens on its failed label, else its first pending one (the list holds only cards with one).
-    shown.forEach(({ card, start, sending }, i) => {
-      const session = slots[i]?.session;
-      const label = labelOf(card);
-      if (label !== undefined) {
-        session?.open(idsOf(card), card, label, { start, sending });
-      }
-    });
+    ratings.open(cards);
     questions.open(offers, baseline);
     opening = false;
     draw();
@@ -175,9 +112,7 @@ export function createHomeBlock(ports: HomePorts) {
 
   function leave(): void {
     arrival += 1;
-    const gone = slots;
-    slots = [];
-    for (const slot of gone) slot.session.closeShown();
+    ratings.closeAll();
     questions.closeAll();
     ports.hide();
   }
