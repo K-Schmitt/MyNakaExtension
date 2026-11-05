@@ -29,11 +29,8 @@ export type Shown = {
 
 export function viewOf(s: Shown): QuestionView {
   if (s.mootNotice === true) {
-    return {
-      ...questionView(s.offer, ["fermer"]),
-      choices: [],
-      notice: MOOT_LINE,
-    };
+    const { question: _line, ...rest } = questionView(s.offer, ["fermer"]);
+    return { ...rest, choices: [], notice: MOOT_LINE };
   }
   const view = questionView(s.offer, s.actions);
   if (s.locked) {
