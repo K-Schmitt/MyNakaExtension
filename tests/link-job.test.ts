@@ -61,27 +61,48 @@ describe("link-title", () => {
     expect(w.writes()).toEqual([]);
   });
 
-  it("the sc side: an SC film entry linked to a Naka series: mismatch", async () => {
-    const state = stateWith({
+  // Per-id fakes: only Naka 5 and SC 2005 are known, so a swapped read finds nothing and refuses.
+  const scEntry = () =>
+    stateWith({
       unlinked: [{ side: "sc", id: 2005, title: "T", reason: "no-match" }],
     });
-    const w = answerWorld({
-      state,
-      ...sc(1),
-      naka: {
-        contentById: async (id) => ({
-          contentId: id,
-          tmdbId: 1,
-          mediaType: "tv",
-          title: "S",
-        }),
-      },
-    });
+  const nakaKnows = (mediaType: "movie" | "tv") => ({
+    contentById: async (id: number) =>
+      id === 5
+        ? { contentId: id, tmdbId: 1, mediaType, title: "S" }
+        : undefined,
+  });
+  const scKnows = {
+    product: (id: number) => ({ universe: id === 2005 ? 1 : 7 }),
+  };
+
+  it("the sc side: an SC film entry linked to a Naka series: mismatch, reading Naka 5 and SC 2005", async () => {
+    const state = scEntry();
+    const w = answerWorld({ state, ...scKnows, naka: nakaKnows("tv") });
     await w.jobs.linkTitle(link({ side: "sc", id: 2005, otherId: 5 }));
+    expect(w.nk.calls).toEqual(["contentById:5"]);
+    expect(w.sk.calls).toEqual(["productState:2005"]);
     expect(w.state()).toEqual(state);
     expect(w.settings().lastAnswer).toMatchObject({
       target: "link:sc:2005",
       outcome: "mismatch",
+    });
+  });
+
+  it("the sc side: SC film entry 2005 and Naka film 5: mapped {5, 2005}, done, link:sc:2005", async () => {
+    const w = answerWorld({
+      state: scEntry(),
+      ...scKnows,
+      naka: nakaKnows("movie"),
+    });
+    await w.jobs.linkTitle(link({ side: "sc", id: 2005, otherId: 5 }));
+    expect(w.nk.calls).toEqual(["contentById:5"]);
+    expect(w.sk.calls).toEqual(["productState:2005"]);
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(w.state().unlinked).toEqual([]);
+    expect(w.settings().lastAnswer).toMatchObject({
+      target: "link:sc:2005",
+      outcome: "done",
     });
   });
 
