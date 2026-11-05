@@ -43,6 +43,7 @@ describe("the extension's source", () => {
       ).toBe(true);
     }
     expect(files).toContain(join("src", "status", "status.ts"));
+    expect(files).toContain(join("src", "content", "ui", "rating-render.ts"));
     for (const file of files) {
       expect(htmlSinks(readFileSync(file, "utf8")), file).toEqual([]);
     }
