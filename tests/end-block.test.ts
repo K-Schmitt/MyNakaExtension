@@ -857,6 +857,7 @@ describe("the end block ignores a click right after a label appears", () => {
     await w.ready();
     w.last().handlers.onChoose(5);
     expect(w.last().view.confirm).toBe(true);
+    await w.clock.advance(1000); // the grace of the confirmation view is long spent: only the unlock restarts it
     fail(new Error("gone"));
     await flush();
     expect(w.last().view.error).toBe(UNREACHABLE_LINE);

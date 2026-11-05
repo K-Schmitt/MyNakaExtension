@@ -152,6 +152,7 @@ describe("a choice in the panel", () => {
     locked.onChoose(9);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
+    await w.ready(); // Ruling 27: the lock redrew the panel, the neighbour has a fresh grace
     w.handlersOf("movie:1").onChoose(6);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);

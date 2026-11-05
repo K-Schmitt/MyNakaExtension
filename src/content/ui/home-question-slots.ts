@@ -31,8 +31,8 @@ type Slot = {
   handlers?: QuestionHandlers;
 };
 
-/** `redraw`: a slot drew itself. `left`: a slot closed and is gone from the list. */
-export type SlotHooks = { redraw(): void; left(): void };
+/** `redraw(key)`: the slot of that question drew itself. `left`: a slot closed and is gone from the list. */
+export type SlotHooks = { redraw(key: QuestionKey): void; left(): void };
 
 function sendOf(
   ports: QuestionSlotPorts,
@@ -86,7 +86,7 @@ export function createQuestionSlots(
           show: (view, handlers) => {
             slot.view = view;
             slot.handlers = handlers;
-            hooks.redraw();
+            hooks.redraw(offer.key);
           },
           hide: () => {},
           ask: askerOf(offer.key),
@@ -104,11 +104,19 @@ export function createQuestionSlots(
   }
 
   return {
-    /** Opens one entry per offer; the baseline is the answer's last outcome, so an older one is not theirs. */
-    open(offers: QuestionOffer[], baseline: number): void {
+    /**
+     * Opens one entry per offer; the baseline is the answer's last outcome, so an older one is not theirs.
+     * A key the worker is still answering opens locked, as a rating entry that is being sent does.
+     */
+    open(
+      offers: QuestionOffer[],
+      baseline: number,
+      answering: QuestionKey[] = [],
+    ): void {
       slots = offers.map(slotOf);
       for (const slot of slots) {
-        slot.session.open(slot.offer, ["ecarter"], baseline);
+        const sending = answering.includes(slot.offer.key);
+        slot.session.open(slot.offer, ["ecarter"], baseline, sending);
       }
     },
     views: (): { key: QuestionKey; view: QuestionView }[] =>
@@ -117,8 +125,10 @@ export function createQuestionSlots(
       ),
     handlersOf: (key: QuestionKey): QuestionHandlers | undefined =>
       slots.find((s) => s.offer.key === key)?.handlers,
-    regrace(): void {
-      for (const slot of slots) slot.session.regrace();
+    regrace(exceptKey?: QuestionKey): void {
+      for (const slot of slots) {
+        if (slot.offer.key !== exceptKey) slot.session.regrace();
+      }
     },
     count: (): number => slots.length,
     closeAll(): void {

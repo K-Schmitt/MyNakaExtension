@@ -361,3 +361,147 @@ describe("Ruling U1: a fresh grace for the entries that remain", () => {
     ]);
   });
 });
+
+describe("Ruling 27: an entry that redraws gives every other entry a fresh grace", () => {
+  it("a rating entry locking: a click on its neighbour at 100 ms sends nothing, 400 ms after is taken", async () => {
+    const w = await arrived([A, B], questionsOf());
+    await w.ready();
+    w.handlersOf("movie:2").onChoose(7); // locks: the entry shrinks, the panel shifts
+    await flush();
+    await w.clock.advance(100);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 7"]);
+    await w.clock.advance(300);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 7", "rate 1:: film 7"]);
+  });
+
+  it("a question entry locking: the rating above it has a fresh grace", async () => {
+    const w = await arrived([A], questionsOf(Q1));
+    await w.ready();
+    w.questionHandlersOf(Q1.key).onChoose({ kind: "none" });
+    await flush();
+    await w.clock.advance(100);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["answer-question naka 1 null"]);
+    await w.clock.advance(300);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([
+      "answer-question naka 1 null",
+      "rate 1:: film 7",
+    ]);
+  });
+
+  it("a rating entry locking: the question below it has a fresh grace", async () => {
+    const w = await arrived([A], questionsOf(Q1));
+    await w.ready();
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    await w.clock.advance(100);
+    w.questionHandlersOf(Q1.key).onChoose({ kind: "none" });
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 7"]);
+    await w.clock.advance(300);
+    w.questionHandlersOf(Q1.key).onChoose({ kind: "none" });
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([
+      "rate 1:: film 7",
+      "answer-question naka 1 null",
+    ]);
+  });
+
+  it("an entry unlocking (the worker is unreachable): its neighbour has a fresh grace", async () => {
+    const w = await arrived([A, B], questionsOf());
+    await w.ready();
+    w.handlersOf("movie:2").onChoose(7);
+    w.state.answer = undefined; // no answer at all until the schedule is spent, at 40 s
+    await w.clock.advance(40000);
+    expect(w.viewOf("movie:2")?.choices).toHaveLength(10);
+    await w.clock.advance(100);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 7"]);
+    await w.clock.advance(300);
+    w.handlersOf("movie:1").onChoose(7);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 7", "rate 1:: film 7"]);
+  });
+});
+
+describe("Ruling 28 and 29: a question the worker is answering", () => {
+  it("a re-arrival opens it locked, with no button; a click sends nothing; it leaves once answered", async () => {
+    const w = await arrived([], { questions: [Q1], answering: [Q1.key] });
+    await w.ready();
+    const view = w.questionViewOf(Q1.key);
+    expect(view?.notice).toBe(SENDING_LINE);
+    expect(view?.choices).toEqual([]);
+    expect(view?.actions).toEqual([]);
+    w.questionHandlersOf(Q1.key).onChoose({ kind: "none" });
+    w.questionHandlersOf(Q1.key).onAction("ecarter");
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    w.state.questions = questionsOf();
+    const before = w.hidden();
+    await w.clock.advance(2000);
+    expect(w.hidden()).toBeGreaterThan(before); // the panel is empty: it is hidden
+  });
+
+  it("stays locked while answering, whatever an older answer of the same key says, and again on a re-arrival after the schedule", async () => {
+    const stale = {
+      seq: 6,
+      at: 1,
+      target: Q1.key,
+      outcome: "done" as const,
+    };
+    const w = await arrived([], questionsOf(Q1));
+    await w.ready();
+    w.state.questions = {
+      questions: [Q1],
+      answering: [Q1.key],
+      lastAnswer: stale,
+    };
+    w.questionHandlersOf(Q1.key).onChoose({ kind: "candidate", id: 1001 });
+    const hidden = w.hidden();
+    await w.clock.advance(39999);
+    expect(w.hidden()).toBe(hidden); // the panel is still drawn: the older answer closed nothing
+    expect(w.questionKeys()).toEqual([Q1.key]);
+    expect(w.questionViewOf(Q1.key)?.notice).toBe(SENDING_LINE);
+    await w.clock.advance(5001); // the schedule is spent: the entry hides, the job is queued
+    w.block.route("/player");
+    w.block.route("/");
+    await flush();
+    expect(w.questionViewOf(Q1.key)?.notice).toBe(SENDING_LINE);
+    expect(w.questionViewOf(Q1.key)?.choices).toEqual([]);
+    expect(sendsOf(w.calls)).toEqual(["answer-question naka 1 1001"]);
+  });
+});
+
+describe("Ruling 30: a title lookup that never answers", () => {
+  it("is given up after 2 s: the cards are shown, the question says « (titre inconnu) »", async () => {
+    const w = homeWorld();
+    w.ports.titleOf = () => new Promise<string | undefined>(() => {});
+    w.state.answer = answerOf(A);
+    w.state.questions = questionsOf({ ...REMOVAL, title: "" });
+    createHomeBlock(w.ports).route("/");
+    await flush(); // the lookup starts at 0
+    await w.clock.advance(1999);
+    expect(w.shown).toEqual([]);
+    await w.clock.advance(1);
+    expect(w.keys()).toEqual(["movie:1"]);
+    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain(UNKNOWN_TITLE);
+  });
+
+  it("a lookup that answers in time is kept, and its timer is cleared", async () => {
+    const w = homeWorld();
+    w.state.titles.set(21391, "Un Job Mortel");
+    w.state.questions = questionsOf({ ...REMOVAL, title: "" });
+    createHomeBlock(w.ports).route("/");
+    await flush();
+    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Un Job Mortel");
+    expect(w.clock.count()).toBe(0);
+  });
+});

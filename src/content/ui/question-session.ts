@@ -163,9 +163,16 @@ export function createQuestionSession(
   }
 
   return {
-    open(offer: QuestionOffer, actions: QuestionAction[], seq: number): void {
+    /** `sending`: the worker is already answering this question; it opens locked and waits as after a click. */
+    open(
+      offer: QuestionOffer,
+      actions: QuestionAction[],
+      seq: number,
+      sending = false,
+    ): void {
       current = { offer, actions, seq, locked: false, shownAt: ports.now() };
-      render(current);
+      if (sending) lock(current, Promise.resolve(true));
+      else render(current);
     },
     closeShown(): void {
       if (current !== undefined) close(current, "closed");

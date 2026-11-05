@@ -51,13 +51,24 @@ export function createHomeBlock(ports: HomePorts) {
   let arrival = 0; // each arrival and each departure starts a new one: an older answer is dropped
   let opening = false;
   const ratings = createRatingSlots(ports, {
-    redraw: () => draw(),
+    redraw: (key) => redrawn(key, undefined),
     left: () => moved(),
   });
   const questions = createQuestionSlots(ports, {
-    redraw: () => draw(),
+    redraw: (key) => redrawn(undefined, key),
     left: () => moved(),
   });
+
+  // An entry drew itself (a lock, an unlock, a failure line, the confirmation view): its height changed
+  // and the panel, anchored at the bottom, shifted the others under the cursor. Each other entry, rating
+  // or question, gets a fresh grace from this redraw.
+  function redrawn(rating?: string, question?: QuestionKey): void {
+    if (!opening) {
+      ratings.regrace(rating);
+      questions.regrace(question);
+    }
+    draw();
+  }
 
   function draw(): void {
     if (opening) return;
@@ -87,10 +98,11 @@ export function createHomeBlock(ports: HomePorts) {
     cards: CardsAnswer["cards"],
     offers: QuestionOffer[],
     baseline: number,
+    answering: QuestionKey[],
   ): void {
     opening = true;
     ratings.open(cards);
-    questions.open(offers, baseline);
+    questions.open(offers, baseline, answering);
     opening = false;
     draw();
   }
@@ -102,12 +114,19 @@ export function createHomeBlock(ports: HomePorts) {
       ports.port.askQuestions(),
     ]);
     const offers = await Promise.all(
-      (asked?.questions ?? []).map((q) => titledOffer(ports.titleOf, q)),
+      (asked?.questions ?? []).map((q) =>
+        titledOffer(ports.titleOf, ports.timer, q),
+      ),
     );
     if (arrival !== mine || (cards === undefined && asked === undefined)) {
       return;
     }
-    open(cards?.cards ?? [], offers, asked?.lastAnswer?.seq ?? 0);
+    open(
+      cards?.cards ?? [],
+      offers,
+      asked?.lastAnswer?.seq ?? 0,
+      asked?.answering ?? [],
+    );
   }
 
   function leave(): void {
