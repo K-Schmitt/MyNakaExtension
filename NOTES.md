@@ -263,6 +263,15 @@ dans une liste « À noter » sur l'accueil. La page de l'extension gagne des r�
   - le nom du titre dans la ligne de fin de visionnage.
 - Une note donnée à la pause sur un titre ambigu ne part pas : la question passe d'abord.
 
+## 2026-11-05 — Mesure de la couverture des tests
+
+- `npm run coverage` mesure la couverture avec le fournisseur v8 de Vitest (`@vitest/coverage-v8`,
+  même version que Vitest). Le rapport HTML va dans `coverage/`, ignoré par git.
+- Base de départ : 97,5 % des lignes et 96,9 % des branches de `src/`. Le plus faible est la page de
+  l'extension (75 %), dont les fichiers d'entrée ne sont pas chargés par les tests.
+- Écarté pour l'instant : un seuil bloquant dans le gate. Il faut d'abord voir comment la mesure
+  bouge au fil des plans. Un seuil fixé trop tôt bloquerait sans rien apprendre.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
