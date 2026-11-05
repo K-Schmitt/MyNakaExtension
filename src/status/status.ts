@@ -1,6 +1,8 @@
 // The status page's entry: binds the controller to the DOM, `chrome.runtime`, `window.confirm` and the clock.
 // Everything shown goes through textContent: titles are remote catalogue text.
 
+import { createHandledController } from "./handled-controller";
+import { showHandled } from "./handled-dom";
 import { readDraft, showNote, showSettings, syncForm } from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
@@ -72,7 +74,16 @@ const controller = createController({
   },
 });
 
-element("resync").addEventListener("click", () => void controller.resync());
+const handled = createHandledController({
+  send: (message) => chrome.runtime.sendMessage(message),
+  show: (view) => showHandled(view, (key) => void handled.forget(key)),
+});
+
+// A sync that ended may have changed what is handled: the list is asked again after it.
+element("resync").addEventListener(
+  "click",
+  () => void controller.resync().then(() => handled.load()),
+);
 element("switch").addEventListener("click", () => void controller.toggleMode());
 function onFormEdit(): void {
   showNote("");
@@ -93,3 +104,4 @@ element("save-settings").addEventListener(
   () => void controller.saveSettings(readDraft()),
 );
 void controller.load();
+void handled.load();
