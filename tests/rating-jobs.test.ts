@@ -275,19 +275,37 @@ describe("the finish creates the rating card", () => {
     expect(w.area.data.get("ratings")).toBe("garbage");
   });
 
-  it("a saison read that fails makes no card, and the finish stays recorded", async () => {
-    const w = world({
-      numberOfSeasons: 3,
-      sc: {
-        productState: async (id) => {
-          if (id === 5007) throw new ScUnavailableError("boom");
-          return { isDone: false, isWished: false, universe: 32, rating: null };
-        },
-      },
-    });
+  const failing = (...ids: number[]) => ({
+    productState: async (id: number) => {
+      if (ids.includes(id)) throw new ScUnavailableError("boom");
+      return { isDone: false, isWished: false, universe: 32, rating: null };
+    },
+  });
+
+  it("a saison read that fails drops only the saison: the card is kept with the épisode asked", async () => {
+    const w = world({ numberOfSeasons: 3, sc: failing(5007) });
     await w.jobs.finishJob(episode(3, 3));
     expect(w.settings().lastFinish).toMatchObject({ outcome: "done" });
-    expect(w.area.data.has("ratings")).toBe(false);
+    const [card] = w.cards();
+    expect(card?.pending).toEqual(["épisode", "série"]);
+    expect(card?.targets.map((t) => [t.label, t.current])).toEqual([
+      ["épisode", null],
+      ["saison", null],
+      ["série", null],
+    ]);
+  });
+
+  it("a série read that fails drops only the série", async () => {
+    const w = world({ numberOfSeasons: 3, sc: failing(1007) });
+    await w.jobs.finishJob(episode(3, 3));
+    expect(w.cards()[0]?.pending).toEqual(["épisode", "saison"]);
+  });
+
+  it("both reads failing leave the épisode asked, and the card saved", async () => {
+    const w = world({ numberOfSeasons: 3, sc: failing(5007, 1007) });
+    await w.jobs.finishJob(episode(3, 3));
+    expect(w.cards()[0]?.pending).toEqual(["épisode"]);
+    expect(w.cards()[0]?.targets).toHaveLength(3);
   });
 });
 
@@ -378,6 +396,27 @@ describe("rate", () => {
     expect(w.settings().lastFinish).toMatchObject({
       key: "tv:7:S1E2",
       outcome: "done",
+    });
+  });
+
+  it("the pause case with the saison read failing: markDone, then exactly one rate on the épisode, card kept", async () => {
+    const w = world({
+      numberOfSeasons: 3,
+      sc: {
+        productState: async (id) => {
+          if (id === 5007) throw new ScUnavailableError("boom");
+          return { isDone: false, isWished: false, universe: 32, rating: null };
+        },
+      },
+    });
+    await w.jobs.rate(rate("épisode", 7, SERIES_E));
+    expect(writesOf(w.sk.calls)).toEqual([
+      "markDone:5003:2026-11-04",
+      "rate:5003:7",
+    ]);
+    expect(w.cards()[0]).toMatchObject({
+      key: "tv:7:S3E3",
+      given: { épisode: 7 },
     });
   });
 

@@ -43,31 +43,39 @@ function isAsked(label: CardTarget["label"], end: SeasonEnd): boolean {
   return label === "série" && end.seriesFinished;
 }
 
+type Read = { target: CardTarget; unread: boolean };
+
+// A read that fails leaves the target as it was (manual choice stays possible) and marks it unread.
 async function withCurrent(
   target: CardTarget,
   end: SeasonEnd,
   productState: CardInput["productState"],
-): Promise<CardTarget> {
-  if (!isAsked(target.label, end)) return target;
-  const { rating } = await productState(target.productId);
-  return { ...target, current: rating };
-}
-
-async function targetsOf(
-  input: CardInput,
-  end: SeasonEnd,
-): Promise<CardTarget[]> {
-  const targets: CardTarget[] = [];
-  for (const target of input.outcome.ratingTargets) {
-    targets.push(await withCurrent(target, end, input.productState));
+): Promise<Read> {
+  if (!isAsked(target.label, end)) return { target, unread: false };
+  try {
+    const { rating } = await productState(target.productId);
+    return { target: { ...target, current: rating }, unread: false };
+  } catch {
+    return { target, unread: true };
   }
-  return targets;
 }
 
+async function readTargets(input: CardInput, end: SeasonEnd): Promise<Read[]> {
+  const reads: Read[] = [];
+  for (const target of input.outcome.ratingTargets) {
+    reads.push(await withCurrent(target, end, input.productState));
+  }
+  return reads;
+}
+
+// Only the label whose read failed is dropped from `pending`: the épisode, or any other, stays asked.
 export async function buildCard(input: CardInput): Promise<RatingCard> {
   const { event, item, at } = input;
   const end = endOf(input);
-  const targets = await targetsOf(input, end);
+  const reads = await readTargets(input, end);
+  const targets = reads.map((read) => read.target);
+  const unread = reads.filter((r) => r.unread).map((r) => r.target.label);
+  const pending = pendingOf(targets, end.lastOfSeason, end.seriesFinished);
   const { season, episode } = event.naka;
   return {
     key: contentKeyOf(event.naka),
@@ -78,7 +86,7 @@ export async function buildCard(input: CardInput): Promise<RatingCard> {
       : { season, episode }),
     at,
     targets,
-    pending: pendingOf(targets, end.lastOfSeason, end.seriesFinished),
+    pending: pending.filter((label) => !unread.includes(label)),
     given: {},
     seriesFinished: end.seriesFinished,
   };
