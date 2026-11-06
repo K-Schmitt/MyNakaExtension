@@ -1,7 +1,8 @@
 // The question family of the router. The three reads are answered outside the queue. The answers go
 // through the answer queue: at most one waiting job per key, the latest click wins. A dismissal has a key
 // of its own (`hide:`), so that it never replaces a waiting answer. `answering` comes from the queue's
-// memory, like the sending of the ratings, and lists the keys of answers only.
+// memory, like the sending of the ratings, and lists the keys of answers only; a requeue is listed under
+// its row's key, so that « Reposer la question » stays locked while it waits.
 
 import { linkKey, QUESTION_KEY, type QuestionKey } from "../core/questions";
 import type { AnswerMessage, QuestionMessage } from "../ext/question-messages";
@@ -38,6 +39,13 @@ export function queueKeyOf(msg: AnswerMessage): QuestionKey {
   }
 }
 
+/** The key of the row a queued answer locks: a requeue locks its legacy question's row (R1). */
+function rowKeyOf(key: QuestionKey): QuestionKey {
+  return key.startsWith("requeue:")
+    ? `ambiguity:${key.slice("requeue:".length)}`
+    : key;
+}
+
 function runAnswer(jobs: Jobs, msg: AnswerMessage): Promise<void> {
   switch (msg.type) {
     case "answer-question":
@@ -70,7 +78,11 @@ export function createQuestionRoutes(
   const queue = createAnswerQueue<Queued>(enqueue, ({ msg }) =>
     runAnswer(jobs, msg),
   );
-  const answering = () => queue.answering().filter((k) => QUESTION_KEY.test(k));
+  const answering = () =>
+    queue
+      .answering()
+      .map(rowKeyOf)
+      .filter((k) => QUESTION_KEY.test(k));
   return {
     route(msg, respond) {
       switch (msg.type) {
