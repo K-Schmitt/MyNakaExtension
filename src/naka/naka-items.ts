@@ -13,6 +13,8 @@ export type NakaItem = {
   releaseDate?: string;
   /** The seasons Naka lists for a series: a positive safe integer, else absent. */
   numberOfSeasons?: number;
+  /** The episodes Naka announces for a series, unreleased ones included: a positive safe integer, else absent. */
+  numberOfEpisodes?: number;
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,7 +27,7 @@ function nonEmpty(value: unknown): value is string {
 export function toItem(entry: unknown): NakaItem | undefined {
   if (!isRecord(entry)) return undefined;
   const { id, tmdbId, mediaType, title, originalTitle, releaseDate } = entry;
-  const { numberOfSeasons } = entry;
+  const { numberOfSeasons, numberOfEpisodes } = entry;
   if (!isPositiveId(id) || !isPositiveId(tmdbId) || !nonEmpty(title)) {
     return undefined;
   }
@@ -36,6 +38,7 @@ export function toItem(entry: unknown): NakaItem | undefined {
     item.releaseDate = releaseDate;
   }
   if (isPositiveId(numberOfSeasons)) item.numberOfSeasons = numberOfSeasons;
+  if (isPositiveId(numberOfEpisodes)) item.numberOfEpisodes = numberOfEpisodes;
   return item;
 }
 

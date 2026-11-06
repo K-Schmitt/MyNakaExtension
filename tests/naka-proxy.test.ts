@@ -649,6 +649,19 @@ describe("re-validation of the value", () => {
     }
   });
 
+  it("keeps a valid numberOfEpisodes through the tab's reply, drops an invalid one", async () => {
+    const kept = await proxyAnswering(() =>
+      ok({ ...item(7), numberOfEpisodes: 8 }),
+    ).proxy.contentById(7);
+    expect(kept?.numberOfEpisodes).toBe(8);
+    for (const bad of [0, -1, 1.5, "8", null]) {
+      const result = await proxyAnswering(() =>
+        ok({ ...item(7), numberOfEpisodes: bad }),
+      ).proxy.contentById(7);
+      expect(result).toStrictEqual(item(7));
+    }
+  });
+
   it("drops a forged field inside search items", async () => {
     const { proxy } = proxyAnswering(() => ok([{ ...item(1), admin: true }]));
     expect(await proxy.search("a")).toStrictEqual([item(1)]);

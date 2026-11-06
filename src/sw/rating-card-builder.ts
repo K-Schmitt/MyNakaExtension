@@ -36,7 +36,7 @@ function endOf({ outcome, event, item, seasons }: CardInput): SeasonEnd {
   if (season === undefined || episode === undefined) return FILM_END;
   return seasonEnd(
     { season, episode },
-    seasonFactsOf(seasons, season, item.numberOfSeasons),
+    seasonFactsOf(seasons, season, item.numberOfSeasons, item.numberOfEpisodes),
     outcome.lastOfSeason === true,
   );
 }
