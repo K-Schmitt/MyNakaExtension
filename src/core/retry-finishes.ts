@@ -8,7 +8,8 @@ export type WaitingQuestion = Omit<AmbiguityItem, "finish">;
 
 /**
  * A finish that waits for a Naka tab. `key`: content key; `pair`: the link the answer made; `evicted`: the
- * mapping pairs the answer removed; `question`: the question as it was, without its finish; `at`: ms.
+ * mapping pairs the answer removed; `question`: the question as it was, without its finish; `at`: ms;
+ * `linkedBefore`: the pair was already linked when the answer came (a cross-question), so a cancel keeps it.
  */
 export type RetryFinish = {
   key: string;
@@ -16,6 +17,7 @@ export type RetryFinish = {
   evicted: Pair[];
   question: WaitingQuestion;
   at: number;
+  linkedBefore?: true;
 };
 
 export function retriesOf(state: SyncState): RetryFinish[] {
@@ -70,6 +72,7 @@ export function cancelRetry(
   const entry = retriesOf(state).find((e) => e.key === key);
   if (entry === undefined) return undefined;
   const dropped = dropRetry(state, key);
+  if (entry.linkedBefore) return addPending(dropped, entry.question);
   if (!state.mapping.some((p) => samePair(p, entry.pair))) return dropped;
   return undoLink(dropped, entry);
 }

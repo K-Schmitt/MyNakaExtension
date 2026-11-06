@@ -17,6 +17,7 @@ const ENTRY_KEYS = valuesOf<keyof RetryFinish>({
   evicted: true,
   question: true,
   at: true,
+  linkedBefore: true,
 });
 
 // The question is a naka-side ambiguity as it was before the answer: it holds no finish of its own.
@@ -29,13 +30,16 @@ function parseQuestion(raw: unknown, path: string): RetryFinish["question"] {
 function parseEntry(raw: unknown, path: string): RetryFinish {
   const record = asRecord(raw, path);
   onlyKeys(record, ENTRY_KEYS, path);
-  return {
+  const entry: RetryFinish = {
     key: parseContentKey(record.key, `${path}.key`),
     pair: parsePair(record.pair, `${path}.pair`),
     evicted: parsePairs(record.evicted, `${path}.evicted`),
     question: parseQuestion(record.question, `${path}.question`),
     at: asInt(record.at, 0, `${path}.at`),
   };
+  if (record.linkedBefore === undefined) return entry;
+  if (record.linkedBefore !== true) return fail(`${path}.linkedBefore`);
+  return { ...entry, linkedBefore: true };
 }
 
 export function parseRetryFinishes(raw: unknown, path: string): RetryFinish[] {

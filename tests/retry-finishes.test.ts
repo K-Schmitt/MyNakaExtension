@@ -121,6 +121,17 @@ describe("cancelRetry", () => {
     expect(cancelRetry(state, "movie:5")?.pending).toHaveLength(1);
   });
 
+  it("cancelRetry keeps a link made before the answer", () => {
+    const e = entry({ linkedBefore: true });
+    const state = withEntry(linked(), e);
+    const after = cancelRetry(state, "movie:5");
+    expect(after?.mapping).toEqual([p(5, 50)]);
+    expect(after?.snapshot).toEqual([p(5, 50)]);
+    expect(after?.retryLast).toEqual([p(5, 50)]);
+    expect(after?.pending).toEqual([e.question]);
+    expect(retriesOf(after as SyncState)).toEqual([]);
+  });
+
   it("is undefined for an unknown key", () => {
     expect(cancelRetry(linked(), "movie:5")).toBeUndefined();
   });

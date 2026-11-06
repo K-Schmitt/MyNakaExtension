@@ -212,6 +212,26 @@ describe("answer-question", () => {
       });
     });
 
+    it("records a waiting finish when the pair was already linked", async () => {
+      const w = waiting({
+        state: stateWith({
+          mapping: [{ nakaId: 5, scId: 2005 }],
+          pending: [question({ finish: "movie:5" })],
+        }),
+      });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.state().retryFinishes).toEqual([
+        {
+          key: "movie:5",
+          pair: { nakaId: 5, scId: 2005 },
+          evicted: [],
+          question: question(),
+          at: NOW,
+          linkedBefore: true,
+        },
+      ]);
+    });
+
     it("records nothing when the finish succeeds", async () => {
       const w = waiting({ tabs: undefined });
       await w.jobs.answerQuestion(answer(2005));

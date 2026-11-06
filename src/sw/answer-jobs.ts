@@ -78,18 +78,28 @@ function absentFrom(pairs: readonly Pair[], others: readonly Pair[]): Pair[] {
   return pairs.filter((p) => !others.some((o) => samePair(o, p)));
 }
 
-// What undoing the answer needs later: the link it made, the links it displaced, the question as it was.
+function chosenPair(msg: AnswerQuestionMessage, choice: number): Pair {
+  return msg.side === "naka"
+    ? { nakaId: msg.id, scId: choice }
+    : { nakaId: choice, scId: msg.id };
+}
+
+// What undoing the answer needs later: the link it made (or found already made), the links it displaced,
+// the question as it was.
 function seedOf(
   before: SyncState,
   after: SyncState,
   question: AmbiguityItem | undefined,
+  msg: AnswerQuestionMessage,
 ): Seed | undefined {
-  if (question?.finish === undefined) return undefined;
-  const [pair] = absentFrom(after.mapping, before.mapping);
-  if (pair === undefined) return undefined;
+  if (question?.finish === undefined || msg.choice === null) return undefined;
   const { finish: key, ...asked }: AmbiguityItem = question;
-  const evicted = absentFrom(before.mapping, after.mapping);
-  return { key, pair, evicted, question: asked satisfies WaitingQuestion };
+  const pair = chosenPair(msg, msg.choice);
+  const base = { key, pair, question: asked satisfies WaitingQuestion };
+  if (before.mapping.some((p) => samePair(p, pair))) {
+    return { ...base, evicted: [], linkedBefore: true };
+  }
+  return { ...base, evicted: absentFrom(before.mapping, after.mapping) };
 }
 
 async function settle(
@@ -101,7 +111,7 @@ async function settle(
   if (next === undefined) return { outcome: "refused" };
   await store.saveState(next);
   const question = openAmbiguity(state, msg.side, msg.id);
-  const seed = msg.choice === null ? undefined : seedOf(state, next, question);
+  const seed = seedOf(state, next, question, msg);
   return { outcome: "done", finish: waitingFinish(question, msg), seed };
 }
 

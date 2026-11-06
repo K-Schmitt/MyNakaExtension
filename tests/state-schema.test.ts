@@ -572,8 +572,15 @@ describe("parseState retryFinishes", () => {
     expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
   });
 
+  it("round-trips linkedBefore: true", () => {
+    const state = withRetries([{ ...good, linkedBefore: true }]);
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+  });
+
   it.each([
     ["a bad content key", { ...good, key: "film 5" }],
+    ["linkedBefore false", { ...good, linkedBefore: false }],
+    ["linkedBefore not a boolean", { ...good, linkedBefore: 1 }],
     [
       "a removal question",
       {
