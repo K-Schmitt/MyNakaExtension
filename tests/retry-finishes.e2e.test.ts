@@ -51,7 +51,7 @@ function calmWorld(): World {
   return w;
 }
 
-function startHarness(w: World): Harness {
+function startHarness(w: World, beforeRetry?: () => void): Harness {
   let steps = 0;
   const clock = {
     now: () => w.time,
@@ -77,6 +77,7 @@ function startHarness(w: World): Harness {
     ...jobs,
     retryNext: async (since) => {
       steps += 1;
+      if (steps <= 20) beforeRetry?.();
       return steps > 20 ? false : jobs.retryNext(since);
     },
   };
@@ -194,10 +195,35 @@ describe("the retry of a finish, end to end", () => {
     expect(w.violations).toEqual([]);
   });
 
-  it("a disconnected tab does not spend the budget", async () => {
+  it("a retry that meets a lost session takes one slot and stops", async () => {
+    const w = calmWorld();
+    // The sync succeeds; the session is lost just before the retry step runs.
+    let armed = false;
+    const h = startHarness(w, () => {
+      if (armed) w.nakaLoggedIn = false;
+    });
+    await h.send({ type: "naka-ready" }, "tab");
+    w.time += MINUTE;
+    await answerWithoutTab(h);
+    await answerWithoutTab(h);
+    const spent = windowCount(w);
+    expect(state(w).retryFinishes).toHaveLength(2);
+    const before = h.retrySteps();
+
+    armed = true;
+    w.time += 15 * MINUTE;
+    await h.send({ type: "naka-ready" }, "tab");
+
+    expect(h.retrySteps() - before).toBe(1);
+    expect(windowCount(w)).toBe((spent ?? 0) + 1);
+    expect(state(w).retryFinishes).toHaveLength(2);
+    expect(finishWrites(w)).toEqual([]);
+    expect(w.violations).toEqual([]);
+  });
+
+  it("a throttled sync runs no retry and spends no slot", async () => {
     const h = startHarness(calmWorld());
     const { w } = h;
-    // A first sync succeeds, so a throttled one later leaves a run record that is older than the retry.
     await h.send({ type: "naka-ready" }, "tab");
     w.time += MINUTE;
     await answerWithoutTab(h);
