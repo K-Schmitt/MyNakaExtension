@@ -95,6 +95,7 @@ describe("the handled-titles answer", () => {
         { key: "movie:9", label: "Un film" },
       ],
       waiting: [],
+      cancelling: [],
     });
     expect(w.area.sets).toEqual([]);
     expect(w.network()).toEqual([]);

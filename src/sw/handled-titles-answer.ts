@@ -11,6 +11,8 @@ import type { Store } from "../ext/store";
 export type HandledTitlesAnswer = {
   titles: HandledTitle[];
   waiting: HandledTitle[];
+  /** The keys whose cancel is queued or running: the page waits for them to leave before it reloads the lists. */
+  cancelling: string[];
 };
 
 export async function answerHandledTitles(
@@ -25,5 +27,6 @@ export async function answerHandledTitles(
     waiting: waitingTitles(state, cards).filter(
       (t) => !cancelling.includes(t.key),
     ),
+    cancelling: [...cancelling],
   };
 }

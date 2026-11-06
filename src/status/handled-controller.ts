@@ -5,17 +5,20 @@
 import { idsOfKey } from "../core/finish-event";
 import type { ToWorker } from "../ext/messages";
 import {
+  cancellingOf,
   type HandledItem,
   type HandledView,
   toHandledView,
   viewOf,
 } from "./handled-view";
+import { type PageTimer, POLL_MS } from "./status-controller";
 
 export type HandledPorts = {
   send(message: ToWorker): Promise<unknown>;
   show(view: HandledView): void;
   /** A cancel settled: the question it puts back may be on the lists. */
   cancelled?(): void;
+  timer?: PageTimer;
 };
 
 export type HandledController = {
@@ -37,6 +40,23 @@ async function sendQuietly(ports: HandledPorts, message: ToWorker) {
     await ports.send(message);
   } catch {
     // The next load tells what the worker holds.
+  }
+}
+
+// The cancel is acked while its job still waits in the worker's queue: ask again until the key leaves the
+// `cancelling` set, so that whatever follows sees the state the job saved. A failed read ends the wait.
+async function untilRun(ports: HandledPorts, key: string): Promise<void> {
+  const { timer } = ports;
+  if (timer === undefined) return;
+  for (;;) {
+    let raw: unknown;
+    try {
+      raw = await ports.send({ type: "handled-titles" });
+    } catch {
+      return;
+    }
+    if (!cancellingOf(raw).includes(key)) return;
+    await new Promise<void>((resolve) => timer.set(resolve, POLL_MS));
   }
 }
 
@@ -81,6 +101,7 @@ export function createHandledController(
       sending.delete(key);
     }
     display(viewOf(items, without(waiting, key)));
+    await untilRun(ports, key);
     ports.cancelled?.();
   }
 

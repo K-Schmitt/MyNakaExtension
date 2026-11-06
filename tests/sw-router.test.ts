@@ -204,7 +204,11 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     handledTitles: async (cancelling) => {
       calls.push(`handled-titles:${JSON.stringify(cancelling)}`);
-      return { titles: [{ key: "movie:3", label: "Trois" }], waiting: [] };
+      return {
+        titles: [{ key: "movie:3", label: "Trois" }],
+        waiting: [],
+        cancelling,
+      };
     },
     searchTitles: async (msg) => {
       calls.push(`search:${JSON.stringify(msg)}`);
@@ -1423,6 +1427,7 @@ describe("router: the status answer waits for no job", () => {
     expect(g.r.answers.at(-1)).toEqual({
       titles: [{ key: "movie:3", label: "Trois" }],
       waiting: [],
+      cancelling: [],
     });
     g.sync.open();
   });

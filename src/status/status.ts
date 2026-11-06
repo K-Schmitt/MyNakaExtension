@@ -117,6 +117,7 @@ const handled = createHandledController({
       (key) => void handled.cancel(key),
     ),
   cancelled: () => void lists.load(),
+  timer,
 });
 
 // The search field of a row just opened takes the focus on the next draw.

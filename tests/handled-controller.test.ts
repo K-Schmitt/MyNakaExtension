@@ -12,6 +12,7 @@ const TITLES = {
 
 function setup(answers: unknown[] = [TITLES]) {
   const cancelled: string[] = [];
+  const armed: (() => void)[] = [];
   const sent: ToWorker[] = [];
   const shown: HandledView[] = [];
   const queue = [...answers];
@@ -25,8 +26,16 @@ function setup(answers: unknown[] = [TITLES]) {
     },
     show: (view) => shown.push(view),
     cancelled: () => cancelled.push("cancelled"),
+    timer: {
+      set: (fn: () => void) => armed.push(fn),
+      clear: () => undefined,
+    },
   });
-  return { controller, sent, shown, cancelled };
+  const tick = async () => {
+    for (const fn of armed.splice(0)) fn();
+    await new Promise((r) => setImmediate(r));
+  };
+  return { controller, sent, shown, cancelled, tick, armed };
 }
 
 describe("the handled titles controller", () => {
@@ -120,7 +129,7 @@ describe("the handled titles controller", () => {
       const t = setup([WITH_WAITING]);
       await t.controller.load();
       await t.controller.cancel("tv:5:S1E1");
-      expect(t.sent.slice(1)).toEqual([
+      expect(t.sent.slice(1).filter((m) => m.type === "cancel-retry")).toEqual([
         { type: "cancel-retry", contentId: 5, season: 1, episode: 1 },
       ]);
       expect(t.shown.at(-1)).toEqual({
@@ -137,6 +146,20 @@ describe("the handled titles controller", () => {
       await t.controller.forget("movie:9");
       expect(t.cancelled).toEqual([]);
       await t.controller.cancel("tv:5:S1E1");
+      expect(t.cancelled).toEqual(["cancelled"]);
+    });
+
+    it("tells the page only once the worker no longer reports the key as cancelling", async () => {
+      const still = { ...WITH_WAITING, cancelling: ["tv:5:S1E1"] };
+      const t = setup([WITH_WAITING, still, still, WITH_WAITING]);
+      await t.controller.load();
+      const done = t.controller.cancel("tv:5:S1E1");
+      await new Promise((r) => setImmediate(r));
+      expect(t.cancelled).toEqual([]);
+      await t.tick();
+      expect(t.cancelled).toEqual([]);
+      await t.tick();
+      await done;
       expect(t.cancelled).toEqual(["cancelled"]);
     });
 

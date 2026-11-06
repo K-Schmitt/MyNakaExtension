@@ -53,6 +53,19 @@ function parseWaiting(record: Record<string, unknown>): HandledItem[] {
   return asList(record.waiting, "waiting", parseItem);
 }
 
+/** The keys the worker still cancels; an answer without the field, or a malformed one, reads as none. */
+export function cancellingOf(raw: unknown): string[] {
+  try {
+    const record = asRecord(raw, "handled-titles");
+    if (record.cancelling === undefined) return [];
+    return asList(record.cancelling, "cancelling", (key, path) =>
+      parseContentKey(key, path),
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function toHandledView(raw: unknown): HandledView {
   try {
     const record = asRecord(raw, "handled-titles");

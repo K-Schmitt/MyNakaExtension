@@ -167,7 +167,26 @@ describe("a failed poll", () => {
 });
 
 describe("answers", () => {
-  it("an accepted answer-question tells the page once the lists are asked again", async () => {
+  it("tells the page once the worker has run the answer, not at the ack", async () => {
+    const t = setup();
+    await t.controller.load();
+    const row = t.question(AMBIGUITY.key);
+    t.world.lists = { ...LISTS, answering: [AMBIGUITY.key] };
+    await t.controller.act(row.key, row.buttons[1]?.action as never);
+    expect(t.answered).toEqual([]);
+    t.fire();
+    await settle();
+    expect(t.answered).toEqual([]);
+    t.world.lists = LISTS;
+    t.fire();
+    await settle();
+    expect(t.answered).toEqual(["answered"]);
+    t.fire();
+    await settle();
+    expect(t.answered).toEqual(["answered"]);
+  });
+
+  it("tells the page at once when the answer already ran at the first reload", async () => {
     const t = setup();
     await t.controller.load();
     const row = t.question(AMBIGUITY.key);
