@@ -126,8 +126,9 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     syncJob: async (trigger: Trigger) => {
       calls.push(`sync:${trigger}`);
     },
-    retryFinishes: async (since: number) => {
+    retryNext: async (since: number) => {
       calls.push(`retry:${since}`);
+      return false;
     },
     finishJob: async (msg: FinishedMessage) => {
       calls.push(`finish:${JSON.stringify(msg)}`);
@@ -269,6 +270,34 @@ describe("router: trusted messages become jobs", () => {
     r.send({ type: "resync" }, STATUS_PAGE);
     await settle();
     expect(r.calls).toEqual(["sync:button", `retry:${ROUTER_NOW}`]);
+  });
+
+  it("a step that answers true queues one more step, each its own job", async () => {
+    let answers = [true, true, false];
+    const r = router({
+      retryNext: async (since: number) => {
+        r.calls.push(`retry:${since}`);
+        return answers.shift() ?? false;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      `retry:${ROUTER_NOW}`,
+      "mode:live",
+      `retry:${ROUTER_NOW}`,
+      `retry:${ROUTER_NOW}`,
+    ]);
+    answers = [];
+  });
+
+  it("a step that answers false queues no other", async () => {
+    const r = router();
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("retry:"))).toHaveLength(1);
   });
 
   it("each retry takes the time its sync was queued", async () => {

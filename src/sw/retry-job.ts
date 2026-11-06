@@ -1,6 +1,6 @@
-// I2: after a sync that ran and succeeded, the finishes that wait for a Naka tab are retried, one by one
-// in stored order, each through the one finish job (pre-check, budget, binding). Only `state.retryFinishes`
-// decides what is retried. A failure that keeps waiting stops the batch; any other end drops the entry.
+// I2: after a sync that ran and succeeded, the finishes that wait for a Naka tab are retried in stored
+// order, each through the one finish job (pre-check, budget, binding). Only `state.retryFinishes` decides
+// what is retried. A failure that keeps waiting stops the chain; any other end drops the entry.
 
 import { idsOfKey } from "../core/finish-event";
 import { dropRetry, type RetryFinish, retriesOf } from "../core/retry-finishes";
@@ -25,30 +25,32 @@ async function drop(deps: JobDeps, key: string): Promise<void> {
   if (dropped !== state) await deps.store.saveState(dropped);
 }
 
-// true when the entry is spent; false when it keeps waiting and the batch stops.
+async function remaining(deps: JobDeps): Promise<boolean> {
+  return retriesOf(await deps.store.loadState()).length > 0;
+}
+
+// true when the entry is spent; false when it keeps waiting.
 async function retryOne(deps: JobDeps, entry: RetryFinish): Promise<boolean> {
   const ids = idsOfKey(entry.key);
   const state = await deps.store.loadState();
   const linked = state.mapping.some((p) => samePair(p, entry.pair));
-  if (ids === undefined || !linked) {
-    await drop(deps, entry.key);
-    return true;
-  }
+  if (ids === undefined || !linked) return true;
   const error = await finishJob(deps, explicitFinish(ids));
-  if (error !== undefined && KEEPS_WAITING.includes(error)) return false;
-  await drop(deps, entry.key);
-  return true;
+  return error === undefined || !KEEPS_WAITING.includes(error);
 }
 
-export async function retryFinishesJob(
+/**
+ * One step of the retry: the first waiting finish only, so that each finish is its own queued job (one job,
+ * one tab). Answers true when another step should be queued: this one dropped its entry and others remain.
+ */
+export async function retryNextJob(
   deps: JobDeps,
   since: number,
-): Promise<void> {
-  if (!(await syncedSince(deps, since))) return;
-  const waiting = retriesOf(await deps.store.loadState());
-  for (const entry of waiting) {
-    const current = retriesOf(await deps.store.loadState());
-    if (!current.some((e) => e.key === entry.key)) continue;
-    if (!(await retryOne(deps, entry))) return;
-  }
+): Promise<boolean> {
+  if (!(await syncedSince(deps, since))) return false;
+  const [entry] = retriesOf(await deps.store.loadState());
+  if (entry === undefined) return false;
+  if (!(await retryOne(deps, entry))) return false;
+  await drop(deps, entry.key);
+  return remaining(deps);
 }

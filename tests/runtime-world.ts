@@ -198,6 +198,8 @@ export function createWorld(seed: number) {
       declines: 0,
       candidateChoices: 0,
       strayChoices: 0,
+      waitingNotes: 0,
+      retryWrites: 0,
     },
   };
   for (const n of TITLES) {
@@ -733,9 +735,15 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
     linkTitle: (msg) => jobs.linkTitle(msg),
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
-    // I2: the router queues one retry per sync (O7 counts them with the syncs; O17 judges its writes).
-    retryFinishes: (since) =>
-      run("retry", { kind: "retry" }, () => jobs.retryFinishes(since)),
+    // I2: the router queues one retry step per sync, then one per step that answered true (O7 counts both;
+    // O17 judges the writes).
+    retryNext: async (since) => {
+      const more = await run("retry", { kind: "retry" }, () =>
+        jobs.retryNext(since),
+      );
+      if (more) w.allowed.set("retry", (w.allowed.get("retry") ?? 0) + 1);
+      return more;
+    },
     forget: () => jobs.forget(),
     reset: () => jobs.reset(),
     // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.

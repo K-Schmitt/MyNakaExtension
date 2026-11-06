@@ -183,11 +183,15 @@ export function checkAnswerFinish(w: World, what: string): void {
 // O17: the retry of a waiting finish writes only the SensCritique id of a note an accepted answer saved
 // (w.waitingSc, the world's own record); a markDone spends the note.
 export function checkRetryWrite(w: World, what: string, id: number): void {
-  if (!w.waitingSc.has(id)) {
+  // The code never marks a product done twice: a title finished another way while its note waits is spent.
+  if (!w.waitingSc.has(id) || (what.startsWith("markDone") && w.done.has(id))) {
     violation(w, `${what} retried without a waiting note`);
     return;
   }
-  if (what.startsWith("markDone")) w.waitingSc.delete(id);
+  if (what.startsWith("markDone")) {
+    w.waitingSc.delete(id);
+    w.stats.retryWrites += 1;
+  }
 }
 
 // Written here on purpose: an oracle must not restate the code's list (STARTS_WAITING).
@@ -222,7 +226,9 @@ function noteWaiting(
   msg: Extract<AnswerMessage, { type: "answer-question" }>,
 ): void {
   const id = msg.side === "naka" ? msg.choice : msg.id;
-  if (id !== null) w.waitingSc.add(id);
+  if (id === null) return;
+  w.waitingSc.add(id);
+  w.stats.waitingNotes += 1;
 }
 
 // A state save the binding check does not judge: the answer only edits the stored questions (D10), with

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { RetryFinish } from "../src/core/retry-finishes";
+import { MAX_FINISHES_PER_WINDOW } from "../src/ext/finish-window";
 import type { Settings } from "../src/ext/settings";
 import { ScUnauthenticatedError } from "../src/sc/sc-errors";
-import { retryFinishesJob } from "../src/sw/retry-job";
+import { retryNextJob } from "../src/sw/retry-job";
 import { answerWorld, BOUND, NOW } from "./answer-world";
 import { cand, stateWith } from "./question-fixtures";
 
@@ -55,11 +56,37 @@ const NOT_YET = [
   ["is ok with an error", settingsWith(lastRun({ error: "no-naka-tab" }))],
 ] as const;
 
-describe("retryFinishesJob", () => {
+// The router's chain: a step is queued again while it answers true.
+async function steps(w: ReturnType<typeof answerWorld>): Promise<boolean[]> {
+  const answers: boolean[] = [];
+  do {
+    answers.push(await retryNextJob(w.jobDeps, SINCE));
+  } while (answers[answers.length - 1] && answers.length < 10);
+  return answers;
+}
+
+describe("retryNextJob", () => {
+  it("handles only the first entry per step and answers true while more remain", async () => {
+    const w = waitingWorld([entry(5), entry(6)]);
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(true);
+    expect(doneCalls(w)).toEqual(["markDone:1005:2026-11-05"]);
+    expect(w.state().retryFinishes?.map((e) => e.key)).toEqual(["movie:6"]);
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
+    expect(w.state().retryFinishes).toEqual([]);
+  });
+
+  it("answers false and keeps the entry when it keeps waiting", async () => {
+    const w = waitingWorld([entry(5), entry(6)], {
+      nakaAccount: () => undefined,
+    });
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
+    expect(w.state().retryFinishes).toHaveLength(2);
+  });
+
   for (const [name, settings] of NOT_YET) {
     it(`does nothing when the last run ${name}`, async () => {
       const w = waitingWorld([entry(5)], { settings });
-      await retryFinishesJob(w.jobDeps, SINCE);
+      await steps(w);
       expect(w.writes()).toEqual([]);
       expect(w.network()).toEqual([]);
       expect(w.state().retryFinishes).toHaveLength(1);
@@ -68,13 +95,13 @@ describe("retryFinishesJob", () => {
 
   it("does nothing when no run was ever recorded", async () => {
     const w = waitingWorld([entry(5)], { settings: { mode: "live" } });
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(w.state().retryFinishes).toHaveLength(1);
   });
 
   it("retries each waiting finish in order and drops it when done", async () => {
     const w = waitingWorld([entry(5), entry(6)]);
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(doneCalls(w)).toEqual([
       "markDone:1005:2026-11-05",
       "markDone:1006:2026-11-05",
@@ -87,7 +114,7 @@ describe("retryFinishesJob", () => {
     const w = waitingWorld([entry(5), entry(6)], {
       nakaAccount: () => undefined,
     });
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(doneCalls(w)).toEqual([]);
     expect(w.state().retryFinishes?.map((e) => e.key)).toEqual([
       "movie:5",
@@ -98,12 +125,27 @@ describe("retryFinishesJob", () => {
     );
   });
 
+  it("stops the batch when the hour's budget is full", async () => {
+    const full = {
+      ...settingsWith(),
+      finishWindow: { from: NOW - 1000, count: MAX_FINISHES_PER_WINDOW },
+    };
+    const w = waitingWorld([entry(5), entry(6)], { settings: full });
+    await steps(w);
+    expect(doneCalls(w)).toEqual([]);
+    expect(w.state().retryFinishes?.map((e) => e.key)).toEqual([
+      "movie:5",
+      "movie:6",
+    ]);
+    expect(w.settings().lastFinish).toMatchObject({ error: "finish-limit" });
+  });
+
   it("drops an entry whose pair is no longer linked, without a finish", async () => {
     const w = answerWorld({
       state: stateWith({ retryFinishes: [entry(5)] }),
       settings: settingsWith(),
     });
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(w.state().retryFinishes).toEqual([]);
     expect(w.network()).toEqual([]);
   });
@@ -117,7 +159,7 @@ describe("retryFinishesJob", () => {
       }),
       settings: settingsWith(),
     });
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(w.state().retryFinishes).toEqual([]);
     expect(w.writes()).toEqual([]);
   });
@@ -128,7 +170,7 @@ describe("retryFinishesJob", () => {
         productState: async () => Promise.reject(new ScUnauthenticatedError()),
       },
     });
-    await retryFinishesJob(w.jobDeps, SINCE);
+    await steps(w);
     expect(w.state().retryFinishes).toEqual([]);
     expect(w.settings().lastFinish).toMatchObject({ outcome: "failed" });
   });
