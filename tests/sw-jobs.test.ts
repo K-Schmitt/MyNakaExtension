@@ -18,6 +18,8 @@ import {
 } from "../src/sc/sc-errors";
 import type { ScWishItem } from "../src/sc/wishlist-page";
 import { readScUsername } from "../src/sw/binding";
+import { finishJob } from "../src/sw/finish-job";
+import type { JobDeps } from "../src/sw/job-deps";
 import { createJobQueue } from "../src/sw/job-queue";
 import { createJobs } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
@@ -109,7 +111,7 @@ function world(o: Opts = {}) {
   const tabs =
     o.tabs ?? tabRunning(nk.client, o.account ?? (() => "77"), traffic).tabs;
   const slots: string[] = [];
-  const jobs = createJobs({
+  const deps: JobDeps = {
     store,
     tabs,
     sc: sk.client,
@@ -121,8 +123,10 @@ function world(o: Opts = {}) {
     now: o.now ?? (() => NOW),
     today: () => "2026-11-04",
     timer: { set: () => 0, clear: () => undefined },
-  });
+  };
+  const jobs = createJobs(deps);
   return {
+    deps,
     jobs,
     area,
     nk,
@@ -1158,6 +1162,53 @@ describe("finish job", () => {
         outcome: "failed",
         error: "no-naka-tab",
       },
+    });
+  });
+
+  describe("returns its failure", () => {
+    it("gives the code of a pre-check failure and of a read failure", async () => {
+      const tabs: TabsPort = {
+        query: async () => [],
+        send: async () => undefined,
+      };
+      const w = world({ tabs });
+      expect(await finishJob(w.deps, finished())).toBe("no-naka-tab");
+    });
+
+    it("gives finish-limit on a full budget, twice, the second saving nothing", async () => {
+      const w = world({
+        settings: {
+          mode: "live",
+          binding: BOUND,
+          finishWindow: { from: NOW, count: MAX_FINISHES_PER_WINDOW },
+        },
+      });
+      expect(await finishJob(w.deps, finished())).toBe("finish-limit");
+      const saved = w.settings();
+      expect(await finishJob(w.deps, finished())).toBe("finish-limit");
+      expect(w.settings()).toEqual(saved);
+    });
+
+    it("gives undefined for a done, a free and an unknown content", async () => {
+      const w = world({ settings: { mode: "simulation" } });
+      expect(await finishJob(w.deps, finished())).toBeUndefined();
+      expect(
+        await finishJob(w.deps, finished({ progress: 0.5 })),
+      ).toBeUndefined();
+      expect(
+        await finishJob(w.deps, finished({ contentId: 999 })),
+      ).toBeUndefined();
+    });
+
+    it("gives the code of a failed attempt", async () => {
+      const w = world({
+        sc: catalogueSc({
+          search: async () => {
+            throw new ScUnavailableError("down");
+          },
+        }),
+      });
+      expect(await finishJob(w.deps, finished())).toBe("unavailable");
     });
   });
 

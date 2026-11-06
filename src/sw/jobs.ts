@@ -112,7 +112,10 @@ async function setMode(store: Store, mode: Mode): Promise<void> {
 export function createJobs(deps: JobDeps): Jobs {
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
-    finishJob: (msg) => quietly(() => finishJob(deps, msg)),
+    finishJob: (msg) =>
+      quietly(async () => {
+        await finishJob(deps, msg);
+      }),
     setMode: (mode) => quietly(() => setMode(deps.store, mode)),
     setSettings: (thresholds, pause) =>
       quietly(() => settingsJob(deps.store, thresholds, pause)),
