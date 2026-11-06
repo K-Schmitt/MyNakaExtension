@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { PendingItem, SyncState } from "../src/core/state";
 import type { AnswerQuestionMessage } from "../src/ext/question-messages";
 import type { Settings } from "../src/ext/settings";
+import { ScUnauthenticatedError } from "../src/sc/sc-errors";
+import type { TabsPort } from "../src/sw/naka-proxy";
 import { answerWorld, BOUND, NOW } from "./answer-world";
 import { cand, stateWith } from "./question-fixtures";
 
@@ -153,6 +155,93 @@ describe("answer-question", () => {
     expect(w.settings().lastAnswer).toMatchObject({
       outcome: "failed",
       error: "stored-state",
+    });
+  });
+
+  describe("a finish that waits for a Naka tab", () => {
+    const noTab = (): TabsPort => ({
+      query: async () => [],
+      send: async () => undefined,
+    });
+    const LIVE_BOUND: Settings = { mode: "live", binding: BOUND };
+    const waiting = (over: Parameters<typeof answerWorld>[0] = {}) =>
+      answerWorld({
+        state: asked({ finish: "movie:5" }),
+        settings: LIVE_BOUND,
+        tabs: noTab,
+        ...over,
+      });
+
+    it("records a waiting finish on no-naka-tab", async () => {
+      const w = waiting();
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.settings().lastFinish).toMatchObject({ error: "no-naka-tab" });
+      expect(w.state().retryFinishes).toEqual([
+        {
+          key: "movie:5",
+          pair: { nakaId: 5, scId: 2005 },
+          evicted: [],
+          question: question(),
+          at: NOW,
+        },
+      ]);
+      expect(w.state().retryFinishes?.[0]?.question).not.toHaveProperty(
+        "finish",
+      );
+    });
+
+    it("records a waiting finish on naka-session", async () => {
+      const w = waiting({ tabs: undefined, nakaAccount: () => undefined });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.settings().lastFinish).toMatchObject({ error: "naka-session" });
+      expect(w.state().retryFinishes).toHaveLength(1);
+      expect(w.state().retryFinishes?.[0]).toMatchObject({ key: "movie:5" });
+    });
+
+    it("records the evicted pair", async () => {
+      const w = waiting({
+        state: stateWith({
+          mapping: [{ nakaId: 5, scId: 1005 }],
+          pending: [question({ finish: "movie:5" })],
+        }),
+      });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.state().retryFinishes?.[0]).toMatchObject({
+        pair: { nakaId: 5, scId: 2005 },
+        evicted: [{ nakaId: 5, scId: 1005 }],
+      });
+    });
+
+    it("records nothing when the finish succeeds", async () => {
+      const w = waiting({ tabs: undefined });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.settings().lastFinish).toMatchObject({ outcome: "done" });
+      expect(w.state().retryFinishes).toBeUndefined();
+    });
+
+    it("records nothing when the finish fails with sc-session", async () => {
+      const w = waiting({
+        tabs: undefined,
+        sc: {
+          productState: async () =>
+            Promise.reject(new ScUnauthenticatedError()),
+        },
+      });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.settings().lastFinish).toMatchObject({ error: "sc-session" });
+      expect(w.state().retryFinishes).toBeUndefined();
+    });
+
+    it("records nothing for « Aucun de ceux-là »", async () => {
+      const w = waiting();
+      await w.jobs.answerQuestion(answer(null));
+      expect(w.state().retryFinishes).toBeUndefined();
+    });
+
+    it("records nothing for a question with no finish", async () => {
+      const w = waiting({ state: asked() });
+      await w.jobs.answerQuestion(answer(2005));
+      expect(w.state().retryFinishes).toBeUndefined();
     });
   });
 

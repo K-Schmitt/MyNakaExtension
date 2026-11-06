@@ -6,6 +6,7 @@
 
 import type { FinishedMessage } from "../content/playback-tracker";
 import { idsOfKey } from "../core/finish-event";
+import type { Pair } from "../core/list-diff";
 import {
   type AmbiguityItem,
   chooseCandidate,
@@ -14,7 +15,12 @@ import {
   openAmbiguity,
   type QuestionKey,
 } from "../core/questions";
-import type { SyncState } from "../core/state";
+import {
+  addRetry,
+  type RetryFinish,
+  type WaitingQuestion,
+} from "../core/retry-finishes";
+import { type SyncState, samePair } from "../core/state";
 import type {
   AnswerQuestionMessage,
   HideQuestionMessage,
@@ -24,9 +30,15 @@ import { recordAnswer } from "./answer-log";
 import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
+import { STARTS_WAITING } from "./retry-rules";
 import { toJobError } from "./to-job-error";
 
-type Settled = { outcome: "done" | "refused"; finish?: FinishedMessage };
+type Seed = Omit<RetryFinish, "at">;
+type Settled = {
+  outcome: "done" | "refused";
+  finish?: FinishedMessage;
+  seed?: Seed;
+};
 
 export function ambiguityTarget({
   side,
@@ -62,6 +74,24 @@ function waitingFinish(
   return msg.choice === null ? undefined : finishWaitingOn(question);
 }
 
+function absentFrom(pairs: readonly Pair[], others: readonly Pair[]): Pair[] {
+  return pairs.filter((p) => !others.some((o) => samePair(o, p)));
+}
+
+// What undoing the answer needs later: the link it made, the links it displaced, the question as it was.
+function seedOf(
+  before: SyncState,
+  after: SyncState,
+  question: AmbiguityItem | undefined,
+): Seed | undefined {
+  if (question?.finish === undefined) return undefined;
+  const [pair] = absentFrom(after.mapping, before.mapping);
+  if (pair === undefined) return undefined;
+  const { finish: key, ...asked }: AmbiguityItem = question;
+  const evicted = absentFrom(before.mapping, after.mapping);
+  return { key, pair, evicted, question: asked satisfies WaitingQuestion };
+}
+
 async function settle(
   store: Pick<Store, "loadState" | "saveState">,
   msg: AnswerQuestionMessage,
@@ -71,7 +101,20 @@ async function settle(
   if (next === undefined) return { outcome: "refused" };
   await store.saveState(next);
   const question = openAmbiguity(state, msg.side, msg.id);
-  return { outcome: "done", finish: waitingFinish(question, msg) };
+  const seed = msg.choice === null ? undefined : seedOf(state, next, question);
+  return { outcome: "done", finish: waitingFinish(question, msg), seed };
+}
+
+async function keepWaiting(deps: JobDeps, seed: Seed): Promise<void> {
+  const state = await deps.store.loadState();
+  await deps.store.saveState(addRetry(state, { ...seed, at: deps.now() }));
+}
+
+async function finishAnswered(deps: JobDeps, settled: Settled): Promise<void> {
+  if (settled.finish === undefined) return;
+  const failure = await finishJob(deps, settled.finish);
+  if (failure === undefined || !STARTS_WAITING.includes(failure)) return;
+  if (settled.seed !== undefined) await keepWaiting(deps, settled.seed);
 }
 
 export async function answerQuestionJob(
@@ -93,7 +136,7 @@ export async function answerQuestionJob(
     return;
   }
   await recordAnswer(deps.store, target, settled.outcome, deps.now());
-  if (settled.finish !== undefined) await finishJob(deps, settled.finish);
+  await finishAnswered(deps, settled);
 }
 
 // Local: no site, no record. A key with no question changes nothing and saves nothing.

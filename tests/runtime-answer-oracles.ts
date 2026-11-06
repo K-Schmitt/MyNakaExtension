@@ -6,7 +6,8 @@ import type {
   AnswerMessage,
   AnswerRemovalMessage,
 } from "../src/ext/question-messages";
-import { checkBinding, violation } from "./runtime-oracles";
+import { STARTS_WAITING } from "../src/sw/retry-rules";
+import { checkBinding, settingsOf, violation } from "./runtime-oracles";
 import type { Side, World } from "./runtime-world";
 
 type RawPair = { nakaId: number; scId: number };
@@ -175,14 +176,22 @@ export function checkAnswerFinish(w: World, what: string): void {
 // A state save the binding check does not judge: the answer only edits the stored questions (D10), with
 // no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
 // and a choice's own save, the first of its job; the saves after it are those of the finish the choice
-// runs, which checks the binding itself. The block « Non » (no stored item) rests on a Naka read, and
+// runs, which checks the binding itself. One more is local: the note that a finish waits for a Naka tab, saved
+// once the finish failed for lack of that tab or session (I2; the binding is checked at the retry). The block « Non » (no stored item) rests on a Naka read, and
 // « Retirer aussi… » on its job's binding check: O4 judges both.
+function finishWaits(w: World): boolean {
+  const error = settingsOf(w)?.lastFinish?.error;
+  return error !== undefined && STARTS_WAITING.includes(error);
+}
+
 export function isLocalAnswer(w: World): boolean {
   const ctx = w.current;
   if (ctx?.kind !== "answer") return false;
   const { msg } = ctx;
   ctx.saves += 1;
   if (msg.type === "answer-removal") return !msg.remove && ctx.removal;
-  if (msg.type === "answer-question") return ctx.saves === 1;
+  if (msg.type === "answer-question") {
+    return ctx.saves === 1 || (ctx.saves === 2 && finishWaits(w));
+  }
   return true;
 }
