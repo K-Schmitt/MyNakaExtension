@@ -2209,7 +2209,7 @@ describe("router: the manual link family (B6)", () => {
     ]);
   });
 
-  it("a waiting link is reported as answering by its key; a requeue is not", async () => {
+  it("a waiting link is reported as answering by its key, a waiting requeue by its row's key (R1)", async () => {
     const blocker = latch();
     const r = router({
       syncJob: async () => {
@@ -2222,8 +2222,17 @@ describe("router: the manual link family (B6)", () => {
     r.send(REQUEUE, STATUS_PAGE);
     r.send({ type: "page-lists" }, STATUS_PAGE);
     await settle();
-    expect(r.calls).toContain('page-lists:["link:naka:5"]');
+    expect(r.calls).toContain('page-lists:["link:naka:5","ambiguity:naka:5"]');
     blocker.open();
+  });
+
+  it("a requeue is answering only while it waits: the row unlocks once it has run (R1)", async () => {
+    const r = router();
+    r.send(REQUEUE, STATUS_PAGE);
+    await settle();
+    r.send({ type: "page-lists" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toContain("page-lists:[]");
   });
 
   it("a malformed query or id is no message", async () => {
