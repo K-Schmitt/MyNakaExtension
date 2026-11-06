@@ -142,6 +142,39 @@ describe("waitingTitles", () => {
     ]);
   });
 
+  it("an entry whose key is already handled is not listed", () => {
+    const state = {
+      ...emptyState(),
+      handled: ["movie:9"],
+      retryFinishes: [waitingEntry("movie:9"), waitingEntry("movie:7")],
+    };
+    expect(waitingTitles(state, []).map((t) => t.key)).toEqual(["movie:7"]);
+  });
+
+  it("without a question title, the chosen candidate's title names the line before the card", () => {
+    const state = {
+      ...emptyState(),
+      retryFinishes: [
+        waitingEntry("movie:9", {
+          pair: { nakaId: 9, scId: 1009 },
+          question: {
+            kind: "ambiguity",
+            side: "naka",
+            id: 9,
+            candidateIds: [1008, 1009],
+            candidates: [
+              { id: 1008, title: "Autre", type: "film" },
+              { id: 1009, title: "Le choisi", type: "film" },
+            ],
+          },
+        }),
+      ],
+    };
+    expect(waitingTitles(state, [filmCard()])).toEqual([
+      { key: "movie:9", label: "Le choisi" },
+    ]);
+  });
+
   it("an entry whose cancel is queued is not listed", async () => {
     const w = answerWorld({
       state: {
