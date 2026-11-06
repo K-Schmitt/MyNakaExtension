@@ -1166,7 +1166,7 @@ describe("finish job", () => {
   });
 
   describe("returns its failure", () => {
-    it("gives the code of a pre-check failure and of a read failure", async () => {
+    it("gives no-naka-tab when no Naka tab is open", async () => {
       const tabs: TabsPort = {
         query: async () => [],
         send: async () => undefined,

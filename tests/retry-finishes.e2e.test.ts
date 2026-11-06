@@ -164,6 +164,21 @@ describe("the retry of a finish, end to end", () => {
     expect(w.violations).toEqual([]);
   });
 
+  it("a retry after « Synchroniser » on the status page marks the title seen", async () => {
+    const h = startHarness(calmWorld());
+    const { w } = h;
+    const film = await answerWithoutTab(h);
+    expect(w.done.has(scOf(film))).toBe(false);
+
+    w.time += MINUTE;
+    await h.send({ type: "resync" }, "page");
+
+    expect(w.done.has(scOf(film))).toBe(true);
+    expect(state(w).retryFinishes).toBeUndefined();
+    expect(state(w).handled).toContain(`movie:${film}`);
+    expect(w.violations).toEqual([]);
+  });
+
   it("cancel undoes the link and the next sync asks again", async () => {
     const h = startHarness(calmWorld());
     const { w } = h;
