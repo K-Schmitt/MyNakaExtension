@@ -72,7 +72,7 @@ describe("retryNextJob", () => {
     expect(doneCalls(w)).toEqual(["markDone:1005:2026-11-05"]);
     expect(w.state().retryFinishes?.map((e) => e.key)).toEqual(["movie:6"]);
     expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
   });
 
   it("answers false and keeps the entry when it keeps waiting", async () => {
@@ -106,8 +106,38 @@ describe("retryNextJob", () => {
       "markDone:1005:2026-11-05",
       "markDone:1006:2026-11-05",
     ]);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
     expect(w.state().handled).toEqual(["movie:5", "movie:6"]);
+  });
+
+  it("retries an episode key: the episode is marked seen and the entry dropped", async () => {
+    const w = waitingWorld([entry(5, { key: "tv:5:S1E2" })], {
+      naka: {
+        contentById: async (id) => ({
+          contentId: id,
+          tmdbId: 9000 + id,
+          mediaType: "tv",
+          title: `Serie ${id}`,
+          releaseDate: "2005-01-01",
+        }),
+      },
+      product: (id) => ({ universe: id >= 5000 ? 32 : 4 }),
+      sc: {
+        seasonInfo: async (_id, season) => ({
+          seasonProductId: 4005,
+          episodes: [1, 2].map((e) => ({
+            productId: 5000 + e,
+            season,
+            episode: e,
+            title: `Episode ${e}`,
+          })),
+        }),
+      },
+    });
+    await steps(w);
+    expect(doneCalls(w)).toEqual(["markDone:5002:2026-11-05"]);
+    expect(w.state().retryFinishes).toBeUndefined();
+    expect(w.state().handled).toEqual(["tv:5:S1E2"]);
   });
 
   it("stops the batch at the first finish that keeps waiting", async () => {
@@ -146,7 +176,7 @@ describe("retryNextJob", () => {
       settings: settingsWith(),
     });
     await steps(w);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
     expect(w.network()).toEqual([]);
   });
 
@@ -160,7 +190,7 @@ describe("retryNextJob", () => {
       settings: settingsWith(),
     });
     await steps(w);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
     expect(w.writes()).toEqual([]);
   });
 
@@ -171,7 +201,7 @@ describe("retryNextJob", () => {
       },
     });
     await steps(w);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
     expect(w.settings().lastFinish).toMatchObject({ outcome: "failed" });
   });
 });

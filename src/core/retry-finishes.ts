@@ -33,7 +33,10 @@ export function addRetry(state: SyncState, entry: RetryFinish): SyncState {
 export function dropRetry(state: SyncState, key: string): SyncState {
   const kept = retriesOf(state).filter((e) => e.key !== key);
   if (kept.length === retriesOf(state).length) return state;
-  return { ...state, retryFinishes: kept };
+  if (kept.length > 0) return { ...state, retryFinishes: kept };
+  // An empty list leaves the state, so an older build reads it again.
+  const { retryFinishes: _gone, ...rest } = state;
+  return rest;
 }
 
 function withoutPair(pairs: readonly Pair[], pair: Pair): Pair[] {
@@ -72,7 +75,9 @@ export function cancelRetry(
   const entry = retriesOf(state).find((e) => e.key === key);
   if (entry === undefined) return undefined;
   const dropped = dropRetry(state, key);
-  if (entry.linkedBefore) return addPending(dropped, entry.question);
+  // Handled another way meanwhile, or the pair already gone: nothing to undo and nothing to ask.
+  if (state.handled.includes(key)) return dropped;
   if (!state.mapping.some((p) => samePair(p, entry.pair))) return dropped;
+  if (entry.linkedBefore) return addPending(dropped, entry.question);
   return undoLink(dropped, entry);
 }

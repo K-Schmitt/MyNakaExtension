@@ -77,6 +77,21 @@ describe("dropRetry", () => {
     const state = withEntry(emptyState(), entry());
     expect(retriesOf(dropRetry(state, "movie:5"))).toEqual([]);
   });
+
+  it("dropping the last entry leaves no retryFinishes key", () => {
+    const state = withEntry(emptyState(), entry());
+    expect("retryFinishes" in dropRetry(state, "movie:5")).toBe(false);
+  });
+
+  it("keeps the field while another entry waits", () => {
+    const state = withEntry(
+      withEntry(emptyState(), entry()),
+      entry({ key: "movie:6" }),
+    );
+    expect(retriesOf(dropRetry(state, "movie:5")).map((e) => e.key)).toEqual([
+      "movie:6",
+    ]);
+  });
 });
 
 describe("cancelRetry", () => {
@@ -130,6 +145,34 @@ describe("cancelRetry", () => {
     expect(after?.retryLast).toEqual([p(5, 50)]);
     expect(after?.pending).toEqual([e.question]);
     expect(retriesOf(after as SyncState)).toEqual([]);
+  });
+
+  it("cancelRetry with a linkedBefore entry whose pair left the mapping only drops the entry", () => {
+    const state = withEntry(
+      linked({ mapping: [], snapshot: [], retryLast: [] }),
+      entry({ linkedBefore: true }),
+    );
+    const after = cancelRetry(state, "movie:5");
+    expect(after?.pending).toEqual([]);
+    expect(retriesOf(after as SyncState)).toEqual([]);
+    expect("retryFinishes" in (after as SyncState)).toBe(false);
+  });
+
+  it("a cancel on a title already handled only removes the entry", () => {
+    const state = withEntry(linked({ handled: ["movie:5"] }), entry());
+    const after = cancelRetry(state, "movie:5");
+    expect(after?.mapping).toEqual([p(5, 50)]);
+    expect(after?.snapshot).toEqual([p(5, 50)]);
+    expect(after?.pending).toEqual([]);
+    expect(retriesOf(after as SyncState)).toEqual([]);
+  });
+
+  it("a cancel on a handled linkedBefore entry asks nothing", () => {
+    const state = withEntry(
+      linked({ handled: ["movie:5"] }),
+      entry({ linkedBefore: true }),
+    );
+    expect(cancelRetry(state, "movie:5")?.pending).toEqual([]);
   });
 
   it("is undefined for an unknown key", () => {

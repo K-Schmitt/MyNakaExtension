@@ -37,7 +37,7 @@ describe("cancelRetryJob", () => {
   it("cancels the entry and saves", async () => {
     const w = waiting();
     await cancelRetryJob(w.jobDeps.store, cancel);
-    expect(w.state().retryFinishes).toEqual([]);
+    expect(w.state().retryFinishes).toBeUndefined();
     expect(w.state().mapping).toEqual([]);
     expect(w.state().pending).toHaveLength(1);
     expect(w.stateSaves()).toBe(1);
@@ -54,7 +54,7 @@ describe("cancelRetryJob", () => {
     const w = waiting();
     await retryNextJob(w.jobDeps, NOW - 1000);
     const after = structuredClone(w.state());
-    expect(after.retryFinishes).toEqual([]);
+    expect(after.retryFinishes).toBeUndefined();
     await cancelRetryJob(w.jobDeps.store, cancel);
     expect(w.state()).toEqual(after);
     expect(w.state().handled).toEqual(["movie:5"]);

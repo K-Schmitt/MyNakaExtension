@@ -423,7 +423,8 @@ SensCritique n'est pas marquée vue, et la fin est perdue. Elle est désormais g
 ### Limites connues
 
 - Les données ne vont que vers l'avant : une version plus ancienne de l'extension ne lit plus un état qui contient
-  `retryFinishes` (état illisible, comme pour tout champ inconnu).
+  `retryFinishes` (état illisible, comme pour tout champ inconnu), mais seulement tant qu'une fin attend : la liste
+  vide quitte l'état. « Réinitialiser » est la sortie.
 - Une relance peut tourner des heures après la réponse (D2, aucune limite d'âge) : la fiche est alors marquée vue
   à ce moment-là, non à la date du visionnage.
 
