@@ -126,6 +126,9 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     syncJob: async (trigger: Trigger) => {
       calls.push(`sync:${trigger}`);
     },
+    retryFinishes: async (since: number) => {
+      calls.push(`retry:${since}`);
+    },
     finishJob: async (msg: FinishedMessage) => {
       calls.push(`finish:${JSON.stringify(msg)}`);
     },
@@ -233,7 +236,7 @@ describe("router: trusted messages become jobs", () => {
     const r = router();
     expect(r.send({ type: "naka-ready" }, NAKA_TAB)).toBe(false);
     await settle();
-    expect(r.calls).toEqual(["sync:naka-ready"]);
+    expect(r.calls).toEqual(["sync:naka-ready", `retry:${ROUTER_NOW}`]);
     expect(r.answers).toEqual([]);
   });
 
@@ -249,18 +252,37 @@ describe("router: trusted messages become jobs", () => {
     ]);
     r.fire();
     await settle();
-    expect(r.calls).toEqual(["sync:playlist"]);
+    expect(r.calls).toEqual(["sync:playlist", `retry:${ROUTER_NOW}`]);
     r.send({ type: "playlist-changed" }, NAKA_TAB);
     r.fire();
     await settle();
-    expect(r.calls).toEqual(["sync:playlist", "sync:playlist"]);
+    expect(r.calls).toEqual([
+      "sync:playlist",
+      `retry:${ROUTER_NOW}`,
+      "sync:playlist",
+      `retry:${ROUTER_NOW}`,
+    ]);
   });
 
   it("resync from the status page is the button", async () => {
     const r = router();
     r.send({ type: "resync" }, STATUS_PAGE);
     await settle();
-    expect(r.calls).toEqual(["sync:button"]);
+    expect(r.calls).toEqual(["sync:button", `retry:${ROUTER_NOW}`]);
+  });
+
+  it("each retry takes the time its sync was queued", async () => {
+    const r = router();
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.time.now = ROUTER_NOW + 60_000;
+    r.send({ type: "naka-ready" }, NAKA_TAB);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      `retry:${ROUTER_NOW}`,
+      "sync:naka-ready",
+      `retry:${ROUTER_NOW + 60_000}`,
+    ]);
   });
 
   it("finished from the Naka tab gives the parsed message to the finish job", async () => {
@@ -1131,7 +1153,7 @@ describe("router: one queue", () => {
     r.send({ type: "resync" }, STATUS_PAGE);
     r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
     await settle();
-    expect(r.calls).toEqual(["mode:live"]);
+    expect(r.calls).toEqual([`retry:${ROUTER_NOW}`, "mode:live"]);
   });
 
   it("a snapshot that rejects is not answered", async () => {

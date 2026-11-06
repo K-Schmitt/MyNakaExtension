@@ -225,6 +225,10 @@ function send(w: World, worker: Worker): void {
         : forgedMessage(w);
   if (sent.key !== undefined) {
     w.allowed.set(sent.key, (w.allowed.get(sent.key) ?? 0) + 1);
+    // The router queues one retry after each sync.
+    if (sent.key.startsWith("sync:")) {
+      w.allowed.set("retry", (w.allowed.get("retry") ?? 0) + 1);
+    }
   }
   if (sent.key === "finish") sentFinish(w, sent.msg as FinishedMessage);
   w.log.push(`msg ${JSON.stringify(sent.msg)}${sent.key ? "" : " (forged)"}`);

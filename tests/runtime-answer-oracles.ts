@@ -180,6 +180,16 @@ export function checkAnswerFinish(w: World, what: string): void {
   }
 }
 
+// O17: the retry of a waiting finish writes only the SensCritique id of a note an accepted answer saved
+// (w.waitingSc, the world's own record); a markDone spends the note.
+export function checkRetryWrite(w: World, what: string, id: number): void {
+  if (!w.waitingSc.has(id)) {
+    violation(w, `${what} retried without a waiting note`);
+    return;
+  }
+  if (what.startsWith("markDone")) w.waitingSc.delete(id);
+}
+
 // Written here on purpose: an oracle must not restate the code's list (STARTS_WAITING).
 const NO_TAB_ERRORS = ["no-naka-tab", "naka-session"];
 
@@ -206,6 +216,15 @@ function isWaitingNote(w: World, ctx: AnswerContext, saved: unknown): boolean {
   );
 }
 
+// The SensCritique id of the pair an accepted answer made: the choice of a Naka question, the asked id of an SC one.
+function noteWaiting(
+  w: World,
+  msg: Extract<AnswerMessage, { type: "answer-question" }>,
+): void {
+  const id = msg.side === "naka" ? msg.choice : msg.id;
+  if (id !== null) w.waitingSc.add(id);
+}
+
 // A state save the binding check does not judge: the answer only edits the stored questions (D10), with
 // no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
 // and a choice's own save, the first of its job. The saves after it are those of the finish the choice
@@ -219,7 +238,10 @@ export function isLocalAnswer(w: World, saved: unknown): boolean {
   ctx.saves += 1;
   if (msg.type === "answer-removal") return !msg.remove && ctx.removal;
   if (msg.type === "answer-question") {
-    return ctx.saves === 1 || (ctx.saves === 2 && isWaitingNote(w, ctx, saved));
+    if (ctx.saves === 1) return true;
+    if (ctx.saves !== 2 || !isWaitingNote(w, ctx, saved)) return false;
+    noteWaiting(w, msg);
+    return true;
   }
   return true;
 }

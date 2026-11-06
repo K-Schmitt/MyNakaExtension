@@ -57,8 +57,12 @@ export function createRouter(deps: RouterDeps): Router {
   const enqueue = (job: () => Promise<void>): void => {
     queue.run(job).catch(ignore);
   };
-  const sync = (trigger: Trigger) =>
+  // The retry runs right after the sync it follows, and only counts a run recorded since it was queued.
+  const sync = (trigger: Trigger) => {
+    const since = deps.now();
     enqueue(activity.track("sync", () => jobs.syncJob(trigger)));
+    enqueue(() => jobs.retryFinishes(since));
+  };
   const rate = createRateQueue(enqueue, (msg) => jobs.rate(msg));
   const finish = createFinishQueue(
     (job) => enqueue(activity.track("finish", job)),

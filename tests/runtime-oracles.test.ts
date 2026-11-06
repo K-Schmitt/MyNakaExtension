@@ -53,6 +53,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
   return {
     syncJob: async () => undefined,
     finishJob: async () => undefined,
+    retryFinishes: async () => undefined,
     setMode: async () => undefined,
     setSettings: async () => undefined,
     rate: async () => undefined,
@@ -866,5 +867,43 @@ describe("O4 on the state saves of answers", () => {
     await save(w);
     await withNote(w);
     expect(fired(w)).toEqual(["O4 binding"]);
+  });
+});
+
+describe("O17 a retry writes only for a waiting note", () => {
+  async function retryMarkDone(w: World) {
+    w.current = { kind: "retry" };
+    await scFor(w, 0).markDone(1005, "2026-11-06");
+    return fired(w);
+  }
+
+  it("stays silent on a retry of a waiting note, and spends the note", async () => {
+    const w = quietWorld();
+    w.waitingSc.add(1005);
+    expect(await retryMarkDone(w)).toEqual([]);
+    expect(w.waitingSc.has(1005)).toBe(false);
+  });
+
+  it("fires on a retry markDone with no waiting note", async () => {
+    expect(await retryMarkDone(quietWorld())).toEqual(["O17 retry"]);
+  });
+
+  it("fires on a second markDone for a note already spent", async () => {
+    const w = quietWorld();
+    w.waitingSc.add(1005);
+    await retryMarkDone(w);
+    expect(await retryMarkDone(w)).toEqual(["O17 retry"]);
+  });
+
+  it("counts the retry the router queues after a sync as allowed (O7)", async () => {
+    const w = quietWorld();
+    w.allowed.set("sync:button", 1);
+    w.allowed.set("retry", 1);
+    const jobs = observed(w, 0, fakeJobs());
+    await jobs.syncJob("button");
+    await jobs.retryFinishes(0);
+    expect(w.violations).toEqual([]);
+    await jobs.retryFinishes(0);
+    expect(fired(w)).toEqual(["O7 forged message"]);
   });
 });

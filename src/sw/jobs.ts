@@ -47,6 +47,7 @@ import {
 import { dismissJob, rateJob } from "./rating-jobs";
 import { answerRemovalJob } from "./removal-job";
 import { forgetJob, resetJob } from "./reset-jobs";
+import { retryFinishesJob } from "./retry-job";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
@@ -59,6 +60,8 @@ export type { Trigger } from "./sync-job";
 export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
+  /** I2: retries the waiting finishes when a sync queued at `since` ran and succeeded. */
+  retryFinishes(since: number): Promise<void>;
   setMode(mode: Mode): Promise<void>;
   setSettings(thresholds: Thresholds, pauseFromPercent: number): Promise<void>;
   rate(msg: RateMessage): Promise<void>;
@@ -116,6 +119,7 @@ export function createJobs(deps: JobDeps): Jobs {
       quietly(async () => {
         await finishJob(deps, msg);
       }),
+    retryFinishes: (since) => quietly(() => retryFinishesJob(deps, since)),
     setMode: (mode) => quietly(() => setMode(deps.store, mode)),
     setSettings: (thresholds, pause) =>
       quietly(() => settingsJob(deps.store, thresholds, pause)),
