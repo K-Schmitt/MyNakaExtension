@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { handledTitles } from "../src/core/handled-titles";
+import { handledTitles, waitingTitles } from "../src/core/handled-titles";
+import type { RetryFinish } from "../src/core/retry-finishes";
 import { emptyState } from "../src/core/state";
 import { answerWorld } from "./answer-world";
 import { episodeCard, filmCard } from "./rating-fixtures";
@@ -88,11 +89,13 @@ describe("the handled-titles answer", () => {
       },
     });
     w.area.data.set("ratings", [filmCard()]);
-    expect(await w.jobs.handledTitles()).toEqual({
+    expect(await w.jobs.handledTitles([])).toEqual({
       titles: [
         { key: "tv:5:S1E1", label: "Série · saison 1, épisode 1" },
         { key: "movie:9", label: "Un film" },
       ],
+      waiting: [],
+      cancelling: [],
     });
     expect(w.area.sets).toEqual([]);
     expect(w.network()).toEqual([]);
@@ -101,6 +104,86 @@ describe("the handled-titles answer", () => {
   it("rejects when the state cannot be read", async () => {
     const w = answerWorld();
     w.area.data.set("state", { version: 2 });
-    await expect(w.jobs.handledTitles()).rejects.toThrow();
+    await expect(w.jobs.handledTitles([])).rejects.toThrow();
+  });
+});
+
+const waitingEntry = (key: string, over: Partial<RetryFinish> = {}) =>
+  ({
+    key,
+    pair: { nakaId: 5, scId: 1005 },
+    evicted: [],
+    question: { kind: "ambiguity", side: "naka", id: 5, candidateIds: [1] },
+    at: 1,
+    ...over,
+  }) as RetryFinish;
+
+describe("waitingTitles", () => {
+  it("waiting lists each entry with the question's title", () => {
+    const state = {
+      ...emptyState(),
+      retryFinishes: [
+        waitingEntry("tv:5:S1E2", {
+          question: {
+            kind: "ambiguity",
+            side: "naka",
+            id: 5,
+            title: "La Série",
+            candidateIds: [1],
+          },
+        }),
+        waitingEntry("movie:9"),
+        waitingEntry("movie:7"),
+      ],
+    };
+    expect(waitingTitles(state, [filmCard()])).toEqual([
+      { key: "tv:5:S1E2", label: "La Série · saison 1, épisode 2" },
+      { key: "movie:9", label: "Un film" },
+      { key: "movie:7", label: `Contenu Naka n°${NBSP}7` },
+    ]);
+  });
+
+  it("an entry whose key is already handled is not listed", () => {
+    const state = {
+      ...emptyState(),
+      handled: ["movie:9"],
+      retryFinishes: [waitingEntry("movie:9"), waitingEntry("movie:7")],
+    };
+    expect(waitingTitles(state, []).map((t) => t.key)).toEqual(["movie:7"]);
+  });
+
+  it("without a question title, the chosen candidate's title names the line before the card", () => {
+    const state = {
+      ...emptyState(),
+      retryFinishes: [
+        waitingEntry("movie:9", {
+          pair: { nakaId: 9, scId: 1009 },
+          question: {
+            kind: "ambiguity",
+            side: "naka",
+            id: 9,
+            candidateIds: [1008, 1009],
+            candidates: [
+              { id: 1008, title: "Autre", type: "film" },
+              { id: 1009, title: "Le choisi", type: "film" },
+            ],
+          },
+        }),
+      ],
+    };
+    expect(waitingTitles(state, [filmCard()])).toEqual([
+      { key: "movie:9", label: "Le choisi" },
+    ]);
+  });
+
+  it("an entry whose cancel is queued is not listed", async () => {
+    const w = answerWorld({
+      state: {
+        ...emptyState(),
+        retryFinishes: [waitingEntry("movie:9"), waitingEntry("movie:7")],
+      },
+    });
+    const answer = await w.jobs.handledTitles(["movie:9"]);
+    expect(answer.waiting.map((t) => t.key)).toEqual(["movie:7"]);
   });
 });

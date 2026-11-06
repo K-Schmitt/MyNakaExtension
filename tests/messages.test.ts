@@ -1105,3 +1105,27 @@ describe("forget-handled and handled-titles messages", () => {
     expect(allowedFor("naka-tab", msg)).toBe(false);
   });
 });
+
+describe("cancel-retry message", () => {
+  const cancel = { type: "cancel-retry", contentId: 21391 };
+
+  it("keeps its ids and drops any other key", () => {
+    expect(
+      parseToWorker({ ...cancel, season: 1, episode: 2, title: "forged" }),
+    ).toEqual({ ...cancel, season: 1, episode: 2 });
+  });
+
+  it.each([
+    ["no content id", { type: "cancel-retry" }],
+    ["content id 0", { ...cancel, contentId: 0 }],
+    ["a season alone", { ...cancel, season: 1 }],
+  ])("is refused with %s", (_name, raw) => {
+    expect(parseToWorker(raw)).toBeUndefined();
+  });
+
+  it("is allowed for the status page only", () => {
+    const msg = parseToWorker(cancel) as ToWorker;
+    expect(allowedFor("status-page", msg)).toBe(true);
+    expect(allowedFor("naka-tab", msg)).toBe(false);
+  });
+});

@@ -13,6 +13,7 @@ describe("toHandledView", () => {
       kind: "list",
       heading: "Titres traités (2)",
       items: titles,
+      waiting: [],
     });
   });
 
@@ -26,6 +27,51 @@ describe("toHandledView", () => {
 
   it("an empty list hides the section", () => {
     expect(toHandledView({ titles: [] })).toEqual({ kind: "none" });
+    expect(toHandledView({ titles: [], waiting: [] })).toEqual({
+      kind: "none",
+    });
+  });
+
+  it("parses the waiting finishes and the heading counts the handled titles only", () => {
+    const waiting = [{ key: "movie:9", label: "Un film" }];
+    expect(
+      toHandledView({
+        titles: [{ key: "movie:1", label: "A" }],
+        waiting,
+      }),
+    ).toEqual({
+      kind: "list",
+      heading: "Titres traités (1)",
+      items: [{ key: "movie:1", label: "A" }],
+      waiting,
+    });
+  });
+
+  it("a list with waiting finishes only still shows, with a zero count", () => {
+    const waiting = [{ key: "movie:9", label: "Un film" }];
+    expect(toHandledView({ titles: [], waiting })).toEqual({
+      kind: "list",
+      heading: "Titres traités (0)",
+      items: [],
+      waiting,
+    });
+  });
+
+  it("the waiting and cancel copy is exact", () => {
+    expect(HANDLED_COPY.waiting).toBe("en attente d'un onglet Naka");
+    expect(HANDLED_COPY.cancel).toBe("Annuler");
+  });
+
+  it("a malformed waiting list hides the section", () => {
+    expect(
+      toHandledView({ titles: [{ key: "movie:1", label: "A" }], waiting: {} }),
+    ).toEqual({ kind: "none" });
+    expect(
+      toHandledView({
+        titles: [{ key: "movie:1", label: "A" }],
+        waiting: [{ key: "x", label: "B" }],
+      }),
+    ).toEqual({ kind: "none" });
   });
 
   it("keeps remote text as it is, markup included", () => {
@@ -43,6 +89,7 @@ describe("toHandledView", () => {
       kind: "list",
       heading: "Titres traités (1)",
       items: [{ key: "movie:1", label: "A" }],
+      waiting: [],
     });
   });
 

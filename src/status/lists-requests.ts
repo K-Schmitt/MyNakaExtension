@@ -11,6 +11,8 @@ export type ListsPorts = {
   send(message: ToWorker): Promise<unknown>;
   show(view: ListsView): void;
   timer: PageTimer;
+  /** An answer or a link was accepted: the handled titles may have changed. */
+  answered?(): void;
 };
 
 export function messageOf(action: RowAction):

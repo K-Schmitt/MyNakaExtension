@@ -22,6 +22,7 @@ export const ORACLES: [string, RegExp][] = [
   ["O13 threshold rule", /incomplete viewing|never sent|outside a finish job/],
   ["O14 removal write", /removal write/],
   ["O15 written back", /written back after a Non/],
+  ["O17 retry", /retried without a waiting note/],
   ["O16 stray choice", /changed by an answer to a non-candidate/],
 ];
 

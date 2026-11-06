@@ -6,7 +6,12 @@ import { createJobQueue } from "../src/sw/job-queue";
 import { createJobs } from "../src/sw/jobs";
 import type { Timer } from "../src/sw/naka-proxy";
 import { createRouter } from "../src/sw/router";
-import { answerSend, askQuestion, forgedAnswer } from "./runtime-answers";
+import {
+  answerSend,
+  askQuestion,
+  forgedAnswer,
+  waitingAnswer,
+} from "./runtime-answers";
 import { oracleOf } from "./runtime-oracles";
 import {
   clockFor,
@@ -225,6 +230,10 @@ function send(w: World, worker: Worker): void {
         : forgedMessage(w);
   if (sent.key !== undefined) {
     w.allowed.set(sent.key, (w.allowed.get(sent.key) ?? 0) + 1);
+    // The router queues one retry after each sync.
+    if (sent.key.startsWith("sync:")) {
+      w.allowed.set("retry", (w.allowed.get("retry") ?? 0) + 1);
+    }
   }
   if (sent.key === "finish") sentFinish(w, sent.msg as FinishedMessage);
   w.log.push(`msg ${JSON.stringify(sent.msg)}${sent.key ? "" : " (forged)"}`);
@@ -269,6 +278,29 @@ function burst(w: World, worker: Worker): void {
   w.log.push(`burst of ${count} finishes`);
 }
 
+// I2 on purpose: an owner's answer to a title question while the Naka tab is gone leaves a waiting finish;
+// the tab and the sessions come back, and a sync follows, which retries it.
+async function waitingFinish(w: World, worker: Worker): Promise<void> {
+  await drain();
+  askQuestion(w);
+  const answer = waitingAnswer(w);
+  if (answer === undefined) return;
+  w.tabOpen = false;
+  w.allowed.set("answer", (w.allowed.get("answer") ?? 0) + 1);
+  w.log.push(`msg ${JSON.stringify(answer.msg)} (tab gone)`);
+  worker.handle(answer.msg, SENDERS[answer.role]);
+  await drain();
+  w.tabOpen = true;
+  w.nakaToken = true;
+  w.nakaLoggedIn = true;
+  w.scLoggedIn = true;
+  w.allowed.set("sync:button", (w.allowed.get("sync:button") ?? 0) + 1);
+  w.allowed.set("retry", (w.allowed.get("retry") ?? 0) + 1);
+  w.log.push("msg resync (tab back)");
+  worker.handle({ type: "resync" }, STATUS_PAGE);
+  await drain();
+}
+
 async function step(w: World, worker: Worker): Promise<Worker> {
   w.time += Math.floor(w.r() * 8 * 60_000);
   outages(w);
@@ -294,6 +326,8 @@ async function step(w: World, worker: Worker): Promise<Worker> {
     burst(w, worker);
   } else if (a < 0.77) {
     worker.fire();
+  } else if (a < 0.79) {
+    await waitingFinish(w, worker);
   } else if (a < 0.86) {
     await drain();
   }
@@ -343,6 +377,8 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
       declines: 0,
       candidateChoices: 0,
       strayChoices: 0,
+      waitingNotes: 0,
+      retryWrites: 0,
     };
     const seeds = [
       ...Array.from({ length: SEEDS }, (_, i) => i + 1),
@@ -370,7 +406,9 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     // The answers (measured over the 450 seeds: 1500 removal answers, 1400 block answers, 1100 question
     // answers, 120 candidate choices, 900 stray choices, 90 dismissals, 19 removal writes, 20 « Non »
     // that closed a stored removal): the last three kinds are rare by nature, a lower floor.
-    const rare = ["hides", "removalWrites", "declines"];
+    // The I2 retry (measured: 61 retry writes over the 450 seeds, the lever at weight 0.02): it needs a
+    // waiting note, then a sync with the tab back, so it is rare too.
+    const rare = ["hides", "removalWrites", "declines", "retryWrites"];
     for (const [situation, count] of Object.entries(totals)) {
       expect(count, situation).toBeGreaterThan(
         rare.includes(situation) ? 10 : 100,
