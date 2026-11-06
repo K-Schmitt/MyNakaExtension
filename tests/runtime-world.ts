@@ -316,7 +316,7 @@ function onWrite(w: World, key: string, value: unknown): void {
     } catch {
       violation(w, "an invalid state was stored");
     }
-    if (!isLocalAnswer(w)) checkBinding(w, "state save");
+    if (!isLocalAnswer(w, value)) checkBinding(w, "state save");
     onStateSave(w, value);
   }
   if (key === "settings") {

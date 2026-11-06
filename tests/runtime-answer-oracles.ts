@@ -6,8 +6,7 @@ import type {
   AnswerMessage,
   AnswerRemovalMessage,
 } from "../src/ext/question-messages";
-import { STARTS_WAITING } from "../src/sw/retry-rules";
-import { checkBinding, settingsOf, violation } from "./runtime-oracles";
+import { checkBinding, violation } from "./runtime-oracles";
 import type { Side, World } from "./runtime-world";
 
 type RawPair = { nakaId: number; scId: number };
@@ -20,6 +19,7 @@ type RawItem = {
   candidateIds?: number[];
   finish?: string;
 };
+type RawLastFinish = { key?: string; error?: string };
 type RawState = {
   pending?: RawItem[];
   mapping?: RawPair[];
@@ -68,12 +68,18 @@ export type AnswerContext = {
   before: string | undefined;
   candidateIds?: number[];
   finish?: string;
+  /** The raw `lastFinish` record when the job started. */
+  lastFinishBefore?: string;
   /** The pair was a stored removal when the job started. */
   removal: boolean;
   /** State saves made so far by this job. */
   saves: number;
   spent?: boolean;
 };
+
+const rawLastFinish = (w: World): RawLastFinish | undefined =>
+  (w.storage.get("settings") as { lastFinish?: RawLastFinish } | undefined)
+    ?.lastFinish;
 
 export function beginAnswer(w: World, msg: AnswerMessage): AnswerContext {
   const ctx: AnswerContext = {
@@ -82,6 +88,7 @@ export function beginAnswer(w: World, msg: AnswerMessage): AnswerContext {
     writes: 0,
     saves: 0,
     before: JSON.stringify(w.storage.get("state")),
+    lastFinishBefore: JSON.stringify(rawLastFinish(w)),
     removal:
       msg.type === "answer-removal" &&
       storedRemoval(w, msg.removeFrom, pairOf(msg)),
@@ -173,25 +180,46 @@ export function checkAnswerFinish(w: World, what: string): void {
   }
 }
 
-// A state save the binding check does not judge: the answer only edits the stored questions (D10), with
-// no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
-// and a choice's own save, the first of its job; the saves after it are those of the finish the choice
-// runs, which checks the binding itself. One more is local: the note that a finish waits for a Naka tab, saved
-// once the finish failed for lack of that tab or session (I2; the binding is checked at the retry). The block « Non » (no stored item) rests on a Naka read, and
-// « Retirer aussi… » on its job's binding check: O4 judges both.
-function finishWaits(w: World): boolean {
-  const error = settingsOf(w)?.lastFinish?.error;
-  return error !== undefined && STARTS_WAITING.includes(error);
+// Written here on purpose: an oracle must not restate the code's list (STARTS_WAITING).
+const NO_TAB_ERRORS = ["no-naka-tab", "naka-session"];
+
+const withoutRetries = (state: unknown): string => {
+  const { retryFinishes: _retries, ...rest } = (state ?? {}) as RawState & {
+    retryFinishes?: unknown;
+  };
+  return JSON.stringify(rest);
+};
+
+// I2's note that a finish waits for a Naka tab: the state saved is the stored one but for `retryFinishes`,
+// and the finish of the question's own title failed, in this job, for lack of that tab or session.
+function isWaitingNote(w: World, ctx: AnswerContext, saved: unknown): boolean {
+  if (withoutRetries(saved) !== withoutRetries(w.storage.get("state"))) {
+    return false;
+  }
+  const last = rawLastFinish(w);
+  const changed = JSON.stringify(last) !== ctx.lastFinishBefore;
+  return (
+    changed &&
+    last?.key === ctx.finish &&
+    last?.error !== undefined &&
+    NO_TAB_ERRORS.includes(last.error)
+  );
 }
 
-export function isLocalAnswer(w: World): boolean {
+// A state save the binding check does not judge: the answer only edits the stored questions (D10), with
+// no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
+// and a choice's own save, the first of its job. The saves after it are those of the finish the choice
+// runs, which checks the binding itself, but for the waiting note (isWaitingNote), saved after a finish
+// that failed for lack of a Naka tab (I2; the retry checks the binding). The block « Non » (no stored
+// item) rests on a Naka read, and « Retirer aussi… » on its job's binding check: O4 judges both.
+export function isLocalAnswer(w: World, saved: unknown): boolean {
   const ctx = w.current;
   if (ctx?.kind !== "answer") return false;
   const { msg } = ctx;
   ctx.saves += 1;
   if (msg.type === "answer-removal") return !msg.remove && ctx.removal;
   if (msg.type === "answer-question") {
-    return ctx.saves === 1 || (ctx.saves === 2 && finishWaits(w));
+    return ctx.saves === 1 || (ctx.saves === 2 && isWaitingNote(w, ctx, saved));
   }
   return true;
 }

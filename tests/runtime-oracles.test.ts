@@ -831,4 +831,40 @@ describe("O4 on the state saves of answers", () => {
     await save(w);
     expect(fired(w)).toEqual(["O4 binding"]);
   });
+
+  const settle = (w: World, lastFinish: object | undefined) =>
+    w.storage.set("settings", {
+      ...(w.storage.get("settings") as object),
+      lastFinish,
+    });
+  const FAILED = {
+    at: 1,
+    key: "movie:1",
+    outcome: "failed",
+    error: "no-naka-tab",
+  };
+  const withNote = (w: World) => {
+    const state = w.storage.get("state") as SyncState;
+    return storageFor(w, 0).set({ state: { ...state, retryFinishes: [] } });
+  };
+
+  it("stays silent on the waiting note", async () => {
+    const w = mismatched();
+    stored(w, { pending: [{ ...ASK, finish: "movie:1" }] });
+    answeringWith(w, CHOOSE);
+    await save(w);
+    settle(w, FAILED);
+    await withNote(w);
+    expect(w.violations).toEqual([]);
+  });
+
+  it("fires on the finish's save after a stale no-naka-tab lastFinish", async () => {
+    const w = mismatched();
+    settle(w, FAILED);
+    stored(w, { pending: [{ ...ASK, finish: "movie:1" }] });
+    answeringWith(w, CHOOSE);
+    await save(w);
+    await withNote(w);
+    expect(fired(w)).toEqual(["O4 binding"]);
+  });
 });
