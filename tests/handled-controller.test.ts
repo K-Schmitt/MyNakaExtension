@@ -11,6 +11,7 @@ const TITLES = {
 };
 
 function setup(answers: unknown[] = [TITLES]) {
+  const cancelled: string[] = [];
   const sent: ToWorker[] = [];
   const shown: HandledView[] = [];
   const queue = [...answers];
@@ -23,8 +24,9 @@ function setup(answers: unknown[] = [TITLES]) {
       return next;
     },
     show: (view) => shown.push(view),
+    cancelled: () => cancelled.push("cancelled"),
   });
-  return { controller, sent, shown };
+  return { controller, sent, shown, cancelled };
 }
 
 describe("the handled titles controller", () => {
@@ -127,6 +129,15 @@ describe("the handled titles controller", () => {
         items: [TITLES.titles[1]],
         waiting: [],
       });
+    });
+
+    it("a settled cancel tells the page once; a forget does not", async () => {
+      const t = setup([WITH_WAITING]);
+      await t.controller.load();
+      await t.controller.forget("movie:9");
+      expect(t.cancelled).toEqual([]);
+      await t.controller.cancel("tv:5:S1E1");
+      expect(t.cancelled).toEqual(["cancelled"]);
     });
 
     it("cancelling the last line of a list with no handled title hides the section", async () => {

@@ -40,6 +40,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 // `lists` is what the worker answers to page-lists now; searches wait for the test to answer them.
 function setup(lists: unknown = LISTS) {
+  const answered: string[] = [];
   const sent: ToWorker[] = [];
   const shown: ListsView[] = [];
   const searches: Deferred[] = [];
@@ -61,6 +62,7 @@ function setup(lists: unknown = LISTS) {
     },
     show: (view) => shown.push(view),
     timer: t.timer,
+    answered: () => answered.push("answered"),
   });
   const last = () => {
     expect(shown.length, "a view was shown").toBeGreaterThan(0);
@@ -76,6 +78,7 @@ function setup(lists: unknown = LISTS) {
   const without = (type: string) => sent.filter((m) => m.type !== type);
   return {
     controller,
+    answered,
     sent,
     shown,
     searches,
@@ -164,6 +167,26 @@ describe("a failed poll", () => {
 });
 
 describe("answers", () => {
+  it("an accepted answer-question tells the page once the lists are asked again", async () => {
+    const t = setup();
+    await t.controller.load();
+    const row = t.question(AMBIGUITY.key);
+    await t.controller.act(row.key, row.buttons[1]?.action as never);
+    expect(t.answered).toEqual(["answered"]);
+  });
+
+  it("a refused answer or a removal answer does not tell the page", async () => {
+    const t = setup();
+    await t.controller.load();
+    t.world.rejectActions = true;
+    const row = t.question(AMBIGUITY.key);
+    await t.controller.act(row.key, row.buttons[1]?.action as never);
+    t.world.rejectActions = false;
+    const removal = t.question(REMOVAL.key);
+    await t.controller.act(removal.key, removal.buttons[0]?.action as never);
+    expect(t.answered).toEqual([]);
+  });
+
   it("each button sends its message, then the lists are asked again", async () => {
     const t = setup();
     await t.controller.load();

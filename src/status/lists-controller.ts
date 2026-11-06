@@ -123,6 +123,9 @@ export function createListsController(ports: ListsPorts): ListsController {
       ...(closing && sent ? { search: undefined } : {}),
     };
     await load();
+    if (sent && (action.kind === "answer-question" || action.kind === "link")) {
+      ports.answered?.();
+    }
   }
 
   async function act(key: QuestionKey, action: RowAction): Promise<void> {

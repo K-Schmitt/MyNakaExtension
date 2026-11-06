@@ -116,6 +116,7 @@ const handled = createHandledController({
       (key) => void handled.forget(key),
       (key) => void handled.cancel(key),
     ),
+  cancelled: () => void lists.load(),
 });
 
 // The search field of a row just opened takes the focus on the next draw.
@@ -138,6 +139,7 @@ const lists = createListsController({
     );
     focusKey = undefined;
   },
+  answered: () => void handled.load(),
 });
 
 // A sync that ended may have changed what is handled and asked: both lists are asked again after it.

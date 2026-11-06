@@ -14,6 +14,8 @@ import {
 export type HandledPorts = {
   send(message: ToWorker): Promise<unknown>;
   show(view: HandledView): void;
+  /** A cancel settled: the question it puts back may be on the lists. */
+  cancelled?(): void;
 };
 
 export type HandledController = {
@@ -79,6 +81,7 @@ export function createHandledController(
       sending.delete(key);
     }
     display(viewOf(items, without(waiting, key)));
+    ports.cancelled?.();
   }
 
   return {
