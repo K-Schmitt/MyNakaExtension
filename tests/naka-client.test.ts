@@ -265,6 +265,32 @@ describe("search", () => {
     },
   );
 
+  it("keeps numberOfEpisodes when it is a positive safe integer", async () => {
+    const { client } = setup(() =>
+      json({ data: [entry(1, { numberOfEpisodes: 8 })] }),
+    );
+    const [item] = await client.search("x");
+    expect(item?.numberOfEpisodes).toBe(8);
+  });
+
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["zero", 0],
+    ["fractional", 7.5],
+    ["a string", "8"],
+  ])(
+    "drops numberOfEpisodes when it is %s, and the item stays valid",
+    async (_name, value) => {
+      const { client } = setup(() =>
+        json({ data: [entry(1, { numberOfEpisodes: value })] }),
+      );
+      const items = await client.search("x");
+      expect(items).toHaveLength(1);
+      expect(items[0]).not.toHaveProperty("numberOfEpisodes");
+    },
+  );
+
   it("drops entries that cannot be trusted and keeps the rest", async () => {
     const bad: unknown[] = [
       entry(0),

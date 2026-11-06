@@ -40,6 +40,8 @@ const sc = (id: number, universe = 1): ScWishItem => ({
 type Opts = {
   /** What Naka says of series 7. */
   numberOfSeasons?: number;
+  /** Naka's announced episode count of series 7, unreleased ones included. */
+  numberOfEpisodes?: number;
   episodesPerSeason?: number;
   /** The owner's current rating per SensCritique product. */
   rated?: Record<number, number>;
@@ -61,6 +63,9 @@ function catalogue(o: Opts): Map<number, NakaItem> {
     ...(o.numberOfSeasons === undefined
       ? {}
       : { numberOfSeasons: o.numberOfSeasons }),
+    ...(o.numberOfEpisodes === undefined
+      ? {}
+      : { numberOfEpisodes: o.numberOfEpisodes }),
   };
   const film: NakaItem = {
     contentId: FILM,
@@ -358,6 +363,34 @@ describe("the season list of Naka decides the ends", () => {
     expect(w.cards()[0]).toMatchObject({
       seriesFinished: false,
       pending: ["épisode", "saison"],
+    });
+  });
+
+  it("an airing last season (VisionQuest: 7 released of 8 announced) does not end at its last released episode", async () => {
+    const w = world({
+      episodesPerSeason: 8,
+      numberOfSeasons: 1,
+      numberOfEpisodes: 8,
+      naka: seasons([1], { 1: 7 }),
+    });
+    await w.jobs.finishJob(episode(1, 7));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: false,
+      pending: ["épisode"],
+    });
+  });
+
+  it("an announced count equal to the released ones keeps the season end", async () => {
+    const w = world({
+      episodesPerSeason: 8,
+      numberOfSeasons: 1,
+      numberOfEpisodes: 7,
+      naka: seasons([1], { 1: 7 }),
+    });
+    await w.jobs.finishJob(episode(1, 7));
+    expect(w.cards()[0]).toMatchObject({
+      seriesFinished: true,
+      pending: ["épisode", "saison", "série"],
     });
   });
 
