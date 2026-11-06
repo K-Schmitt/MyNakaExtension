@@ -350,6 +350,27 @@ Limites connues :
 - Une écriture née d'une réponse ou d'une liaison peut attendre plusieurs passages quand d'autres
   écritures sont reportées (10 par passage au plus).
 
+## 2026-11-06 — Saison en cours de diffusion (VisionQuest)
+
+Défaut vu pendant la recette du 4b : l'épisode 7 de VisionQuest passait pour la fin de la saison et de la
+série. `available-seasons` ne compte que les épisodes sortis (`{1: 7}`), alors que la fiche du catalogue
+annonce `numberOfEpisodes: 8`.
+
+### Décisions
+
+- `NakaItem` lit `numberOfEpisodes`, comme `numberOfSeasons` : un entier positif, sinon absent. Le
+  worker le recopie depuis l'onglet.
+- Les épisodes annoncés mais pas encore sortis (annoncés moins sortis, jamais négatif) s'ajoutent à la
+  saison la plus haute de la liste, et seulement quand le catalogue n'annonce pas de saison plus loin.
+  Sinon, ils appartiennent à cette saison non listée.
+
+### Limites connues
+
+- Si Naka n'a pas un épisode déjà sorti d'une saison ancienne d'une série finie, le compte affiché est
+  inférieur au compte annoncé. Cet écart ne se distingue pas d'un épisode à venir : la fin de la dernière
+  saison n'est alors plus reconnue, et le bloc ne propose que l'épisode (on peut toujours noter la saison
+  à la main). On n'écrit rien de faux : on propose moins. Un test fixe ce comportement.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit

@@ -51,3 +51,50 @@ describe("seasonFactsOf", () => {
     expect(seasonFactsOf(GAP, 1, 2).lastSeason).toBe(4);
   });
 });
+
+describe("seasonFactsOf with Naka's announced episode count", () => {
+  const AIRING = { seasons: [1], episodeCounts: { 1: 7 } };
+
+  it("gives the unreleased episodes to the last season (VisionQuest: 7 released of 8)", () => {
+    expect(seasonFactsOf(AIRING, 1, 1, 8)).toEqual({
+      episodesInSeason: 8,
+      lastSeason: 1,
+    });
+  });
+
+  it("leaves an earlier season as Naka counts it", () => {
+    // 16 + 25 + 8 released, 52 announced: the 3 missing ones are season 4's.
+    expect(seasonFactsOf(GAP, 2, undefined, 52).episodesInSeason).toBe(25);
+    expect(seasonFactsOf(GAP, 4, undefined, 52).episodesInSeason).toBe(11);
+  });
+
+  it("changes nothing when the announced count equals the released ones (a finished series)", () => {
+    expect(seasonFactsOf(AIRING, 1, 1, 7).episodesInSeason).toBe(7);
+  });
+
+  it("ignores an announced count below the released ones", () => {
+    expect(seasonFactsOf(AIRING, 1, 1, 5).episodesInSeason).toBe(7);
+  });
+
+  it("changes nothing without an announced count", () => {
+    expect(seasonFactsOf(AIRING, 1, 1, undefined).episodesInSeason).toBe(7);
+  });
+
+  it("adds nothing when the catalogue announces a season the list lacks", () => {
+    // Seasons 1 and 2 listed, 3 announced: the 3 missing episodes are season 3's, not season 2's.
+    const unlisted = { seasons: [1, 2], episodeCounts: { 1: 10, 2: 10 } };
+    expect(seasonFactsOf(unlisted, 2, 3, 23).episodesInSeason).toBe(10);
+    expect(seasonFactsOf(unlisted, 2, 2, 23).episodesInSeason).toBe(13);
+  });
+
+  it("keeps a finished series open when Naka lacks an older episode (known limit)", () => {
+    // Naka misses one episode of season 1: the gap cannot be told from an unreleased one.
+    const shortfall = { seasons: [1, 2], episodeCounts: { 1: 15, 2: 24 } };
+    expect(seasonFactsOf(shortfall, 2, 2, 40).episodesInSeason).toBe(25);
+  });
+
+  it("does not invent a count for a last season Naka gives none", () => {
+    const missing = { seasons: [1, 2], episodeCounts: { 1: 10 } };
+    expect(seasonFactsOf(missing, 2, 2, 20).episodesInSeason).toBeUndefined();
+  });
+});
