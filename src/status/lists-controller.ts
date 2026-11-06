@@ -31,6 +31,8 @@ export function createListsController(ports: ListsPorts): ListsController {
   let answer: PageListsAnswer | undefined;
   let state: ListsState = EMPTY_STATE;
   let poll: unknown;
+  // The keys whose answer the worker accepted and has not yet been seen to finish.
+  const awaiting = new Set<QuestionKey>();
   let loads = 0;
   let searches = 0;
 
@@ -59,6 +61,14 @@ export function createListsController(ports: ListsPorts): ListsController {
     }, POLL_MS);
   }
 
+  // True when an awaited answer is no longer in the worker's `answering`: its job has run.
+  function releaseRun(read: PageListsAnswer): boolean {
+    const busy = read.answering ?? [];
+    const done = [...awaiting].filter((key) => !busy.includes(key));
+    for (const key of done) awaiting.delete(key);
+    return done.length > 0;
+  }
+
   // Only the latest question is answered; a search whose row left the lists is closed and its answer dropped.
   async function load(): Promise<void> {
     loads += 1;
@@ -67,6 +77,7 @@ export function createListsController(ports: ListsPorts): ListsController {
     if (mine !== loads) return;
     // A failed read after a good one keeps the rows and the poll; only the first load can leave none.
     if (read !== undefined) answer = read;
+    const ran = read === undefined ? false : releaseRun(read);
     const open = state.search;
     const closed = open !== undefined && itemOf(open.key) === undefined;
     if (closed) searches += 1;
@@ -80,6 +91,7 @@ export function createListsController(ports: ListsPorts): ListsController {
     };
     redraw();
     schedule();
+    if (ran) ports.answered?.();
   }
 
   function openSearch(key: QuestionKey): void {
@@ -122,6 +134,9 @@ export function createListsController(ports: ListsPorts): ListsController {
       unsent: sent ? state.unsent : [...state.unsent, key],
       ...(closing && sent ? { search: undefined } : {}),
     };
+    if (sent && (action.kind === "answer-question" || action.kind === "link")) {
+      awaiting.add(key);
+    }
     await load();
   }
 

@@ -5,7 +5,10 @@
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
-import type { ForgetHandledMessage } from "../ext/page-messages";
+import type {
+  CancelRetryMessage,
+  ForgetHandledMessage,
+} from "../ext/page-messages";
 import type {
   AnswerQuestionMessage,
   AnswerRemovalMessage,
@@ -22,6 +25,7 @@ import type {
 import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
+import { cancelRetryJob } from "./cancel-retry-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -47,6 +51,7 @@ import {
 import { dismissJob, rateJob } from "./rating-jobs";
 import { answerRemovalJob } from "./removal-job";
 import { forgetJob, resetJob } from "./reset-jobs";
+import { retryNextJob } from "./retry-job";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
@@ -59,6 +64,8 @@ export type { Trigger } from "./sync-job";
 export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
+  /** I2: retries the first waiting finish when a sync queued at `since` ran and succeeded; true: queue another step. */
+  retryNext(since: number): Promise<boolean>;
   setMode(mode: Mode): Promise<void>;
   setSettings(thresholds: Thresholds, pauseFromPercent: number): Promise<void>;
   rate(msg: RateMessage): Promise<void>;
@@ -75,8 +82,10 @@ export type Jobs = {
   reset(): Promise<void>;
   /** B8b: a handled title forgotten (an unticked « vu », or the page's « Oublier »): storage only. */
   forgetHandled(msg: ForgetHandledMessage): Promise<void>;
-  /** The handled titles for the page: read-only, answered outside the queue. */
-  handledTitles(): Promise<HandledTitlesAnswer>;
+  /** I2: « Annuler » on a waiting finish: the link undone, the question asked again; storage only. */
+  cancelRetry(msg: CancelRetryMessage): Promise<void>;
+  /** The handled and waiting titles for the page: read-only, outside the queue; `cancelling`: keys with a queued cancel. */
+  handledTitles(cancelling: string[]): Promise<HandledTitlesAnswer>;
   /** The same, asked by a Naka tab: counted against the hour's budget of forgets. */
   forgetHandledFromTab(msg: ForgetHandledMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
@@ -112,7 +121,17 @@ async function setMode(store: Store, mode: Mode): Promise<void> {
 export function createJobs(deps: JobDeps): Jobs {
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
-    finishJob: (msg) => quietly(() => finishJob(deps, msg)),
+    finishJob: (msg) =>
+      quietly(async () => {
+        await finishJob(deps, msg);
+      }),
+    retryNext: async (since) => {
+      try {
+        return await retryNextJob(deps, since);
+      } catch {
+        return false;
+      }
+    },
     setMode: (mode) => quietly(() => setMode(deps.store, mode)),
     setSettings: (thresholds, pause) =>
       quietly(() => settingsJob(deps.store, thresholds, pause)),
@@ -128,7 +147,8 @@ export function createJobs(deps: JobDeps): Jobs {
     forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
     forgetHandledFromTab: (msg) =>
       quietly(() => forgetFromTabJob(deps.store, deps.now, msg)),
-    handledTitles: () => answerHandledTitles(deps.store),
+    cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
+    handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),
     searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),

@@ -110,7 +110,14 @@ const controller = createController({
 
 const handled = createHandledController({
   send: (message) => chrome.runtime.sendMessage(message),
-  show: (view) => showHandled(view, (key) => void handled.forget(key)),
+  show: (view) =>
+    showHandled(
+      view,
+      (key) => void handled.forget(key),
+      (key) => void handled.cancel(key),
+    ),
+  cancelled: () => void lists.load(),
+  timer,
 });
 
 // The search field of a row just opened takes the focus on the next draw.
@@ -133,6 +140,7 @@ const lists = createListsController({
     );
     focusKey = undefined;
   },
+  answered: () => void handled.load(),
 });
 
 // A sync that ended may have changed what is handled and asked: both lists are asked again after it.

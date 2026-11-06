@@ -1,5 +1,6 @@
 import type { Pair } from "./list-diff";
 import type { Presence } from "./presence";
+import type { RetryFinish } from "./retry-finishes";
 import type { MediaType } from "./title-match";
 import { DEFAULT_THRESHOLD } from "./watch-trigger";
 
@@ -53,6 +54,8 @@ export type SyncState = {
   handled: string[];
   /** The title of each handled key, written at finish time; absent for keys handled before B8b. */
   handledTitles?: Record<string, string>;
+  /** Answers whose finish waits for a Naka tab, at most 20. */
+  retryFinishes?: RetryFinish[];
   unlinked: UnlinkedItem[];
   retryLast: Pair[];
   /** Completed sync runs, counted from 0. */

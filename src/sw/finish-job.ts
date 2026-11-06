@@ -94,25 +94,27 @@ async function counted(
   settings: Settings,
   msg: FinishedMessage,
   { at, key }: { at: number; key: string },
-): Promise<void> {
+): Promise<JobError | undefined> {
   const window = windowAt(settings.finishWindow, at);
   if (isFull(window)) {
-    if (alreadyRefused(settings, window)) return;
-    await record(deps, settings, {
-      at,
-      key,
-      outcome: "failed",
-      error: "finish-limit",
-    });
-    return;
+    if (!alreadyRefused(settings, window)) {
+      await record(deps, settings, {
+        at,
+        key,
+        outcome: "failed",
+        error: "finish-limit",
+      });
+    }
+    return "finish-limit";
   }
   const reserved: Settings = { ...settings, finishWindow: withOneMore(window) };
   await deps.store.saveSettings(reserved);
   const attempted = await attempt(deps, settings, msg);
-  if (attempted === undefined) return;
+  if (attempted === undefined) return undefined;
   const { card, seasons, ...done } = attempted;
   await record(deps, reserved, { at, key, ...done });
   if (card !== undefined) await keepCard(deps, { ...card, at }, seasons);
+  return done.outcome === "failed" ? done.error : undefined;
 }
 
 // After the finish record: the finish is a fact on SensCritique, the card only a way to rate it. Whatever
@@ -134,15 +136,13 @@ async function keepCard(
 export async function finishJob(
   deps: JobDeps,
   msg: FinishedMessage,
-): Promise<void> {
+): Promise<JobError | undefined> {
   const settings = await deps.store.loadSettings();
   const at = deps.now();
   const key = contentKeyOf(msg);
   const check = await preCheck(deps.store, msg, key, thresholdsOf(settings));
-  if (check === "free") return;
-  if (check === "go") {
-    await counted(deps, settings, msg, { at, key });
-    return;
-  }
+  if (check === "free") return undefined;
+  if (check === "go") return counted(deps, settings, msg, { at, key });
   await record(deps, settings, { at, key, outcome: "failed", ...check });
+  return check.error;
 }

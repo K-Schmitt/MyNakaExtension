@@ -11,6 +11,7 @@ export type PageMessage =
   | { type: "forget-binding" }
   | { type: "reset" }
   | ({ type: "forget-handled" } & ContentIds)
+  | ({ type: "cancel-retry" } & ContentIds)
   | { type: "handled-titles" };
 
 export type PageType = PageMessage["type"];
@@ -18,12 +19,14 @@ export type ForgetHandledMessage = Extract<
   PageMessage,
   { type: "forget-handled" }
 >;
+export type CancelRetryMessage = Extract<PageMessage, { type: "cancel-retry" }>;
 
 /** Spread into the worker's type list (messages.ts). */
 export const PAGE_TYPE_FLAGS: Record<PageType, true> = {
   "forget-binding": true,
   reset: true,
   "forget-handled": true,
+  "cancel-retry": true,
   "handled-titles": true,
 };
 
@@ -31,6 +34,7 @@ export const PAGE_SENDERS: Record<PageType, readonly SenderRole[]> = {
   "forget-binding": ["status-page"],
   reset: ["status-page"],
   "forget-handled": ["naka-tab", "status-page"],
+  "cancel-retry": ["status-page"],
   "handled-titles": ["status-page"],
 };
 
@@ -42,7 +46,7 @@ export function parsePageMessage(
   type: PageType,
   record: Record<string, unknown>,
 ): PageMessage {
-  if (type !== "forget-handled") return { type };
+  if (type !== "forget-handled" && type !== "cancel-retry") return { type };
   return {
     type,
     contentId: asId(record.contentId, "contentId"),

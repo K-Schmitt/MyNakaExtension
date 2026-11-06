@@ -2,6 +2,7 @@
 
 import { type ContentIds, idsOfKey } from "./finish-event";
 import { cardFor, type RatingCard } from "./rating-cards";
+import { type RetryFinish, retriesOf } from "./retry-finishes";
 import type { SyncState } from "./state";
 
 export type HandledTitle = { key: string; label: string };
@@ -28,6 +29,28 @@ function labelOf(
     cardFor([...cards], key)?.title ??
     unknownTitle(ids.contentId);
   return withPlace(ids, title);
+}
+
+function chosenTitle(entry: RetryFinish): string | undefined {
+  return entry.question.candidates?.find((c) => c.id === entry.pair.scId)
+    ?.title;
+}
+
+/** The finishes that wait for a Naka tab, in stored order; the question's title names each. */
+export function waitingTitles(
+  state: SyncState,
+  cards: readonly RatingCard[],
+): HandledTitle[] {
+  return retriesOf(state).flatMap((entry) => {
+    const ids = idsOfKey(entry.key);
+    if (ids === undefined || state.handled.includes(entry.key)) return [];
+    const title =
+      entry.question.title ??
+      chosenTitle(entry) ??
+      cardFor([...cards], entry.key)?.title ??
+      unknownTitle(ids.contentId);
+    return [{ key: entry.key, label: withPlace(ids, title) }];
+  });
 }
 
 /** Every handled key, most recent first, each with its label. */

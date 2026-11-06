@@ -33,6 +33,7 @@ import {
   beginAnswer,
   checkAnswerFinish,
   checkRemovalWrite,
+  checkRetryWrite,
   endAnswer,
   isLocalAnswer,
 } from "./runtime-answer-oracles";
@@ -100,6 +101,7 @@ export type JobKey =
   | "sync:playlist"
   | "sync:button"
   | "finish"
+  | "retry"
   | "mode"
   | "rating"
   | "answer"
@@ -119,6 +121,7 @@ type TabTrace = {
 type Context = (
   | { kind: "sync"; nakaAt?: Set<number>; scAt?: Set<number>; saved?: true }
   | { kind: "finish"; msg: FinishedMessage; spent?: boolean }
+  | { kind: "retry"; spent?: boolean }
   | { kind: "other" }
   | AnswerContext
 ) &
@@ -167,6 +170,8 @@ export function createWorld(seed: number) {
     active: new Map<number, number>(),
     current: undefined as Context | undefined,
     allowed: new Map<JobKey, number>(),
+    /** SensCritique ids whose finish waits for a Naka tab, from the answers the oracles accepted (O17). */
+    waitingSc: new Set<number>(),
     invoked: new Map<JobKey, number>(),
     // Every finished message a Naka tab sent, as the world built it (O13 judges from these).
     sentFinishes: [] as FinishedMessage[],
@@ -193,6 +198,8 @@ export function createWorld(seed: number) {
       declines: 0,
       candidateChoices: 0,
       strayChoices: 0,
+      waitingNotes: 0,
+      retryWrites: 0,
     },
   };
   for (const n of TITLES) {
@@ -316,7 +323,7 @@ function onWrite(w: World, key: string, value: unknown): void {
     } catch {
       violation(w, "an invalid state was stored");
     }
-    if (!isLocalAnswer(w)) checkBinding(w, "state save");
+    if (!isLocalAnswer(w, value)) checkBinding(w, "state save");
     onStateSave(w, value);
   }
   if (key === "settings") {
@@ -552,7 +559,7 @@ export function scFor(w: World, gen: number): ScClient {
         w.current.msg.type === "answer-removal"
       )
         return removeFromSc(w, id);
-      checkFinishWrite(w, `unwish ${id}`);
+      checkFinishWrite(w, `unwish ${id}`, id);
       w.stats.finishWrites += 1;
       if (!isFilmProduct(id)) violation(w, `unwish of ${id}, not a film`);
       w.log.push(`finish unwish ${id}`);
@@ -562,7 +569,7 @@ export function scFor(w: World, gen: number): ScClient {
     },
     markDone: async (id) => {
       if (!mayWrite()) return frozen(w);
-      checkFinishWrite(w, `markDone ${id}`);
+      checkFinishWrite(w, `markDone ${id}`, id);
       w.stats.finishWrites += 1;
       w.log.push(`finish markDone ${id}`);
       flaky(w, `markDone ${id}`);
@@ -584,7 +591,9 @@ export function clockFor(w: World): () => number {
   return () => {
     const ctx = w.current;
     if (
-      (ctx?.kind === "finish" || ctx?.kind === "answer") &&
+      (ctx?.kind === "finish" ||
+        ctx?.kind === "answer" ||
+        ctx?.kind === "retry") &&
       ctx.spent === undefined
     ) {
       const stored = settingsOf(w)?.finishWindow;
@@ -600,13 +609,19 @@ export function clockFor(w: World): () => number {
 }
 
 // Oracles of a finish write: the binding, and the hour's budget (at most 30 finishes per window).
-function checkFinishWrite(w: World, what: string): void {
+function checkFinishWrite(w: World, what: string, id: number): void {
   checkBinding(w, what);
   const ctx = w.current;
-  if ((ctx?.kind === "finish" || ctx?.kind === "answer") && ctx.spent) {
+  if (
+    (ctx?.kind === "finish" ||
+      ctx?.kind === "answer" ||
+      ctx?.kind === "retry") &&
+    ctx.spent
+  ) {
     violation(w, `${what} with the hour's finishes spent`);
   }
-  if (ctx?.kind === "answer") checkAnswerFinish(w, what);
+  if (ctx?.kind === "retry") checkRetryWrite(w, what, id);
+  else if (ctx?.kind === "answer") checkAnswerFinish(w, what);
   else checkViewing(w, what);
 }
 
@@ -720,12 +735,23 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
     linkTitle: (msg) => jobs.linkTitle(msg),
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
+    // I2: the router queues one retry step per sync, then one per step that answered true (O7 counts both;
+    // O17 judges the writes).
+    retryNext: async (since) => {
+      const more = await run("retry", { kind: "retry" }, () =>
+        jobs.retryNext(since),
+      );
+      if (more) w.allowed.set("retry", (w.allowed.get("retry") ?? 0) + 1);
+      return more;
+    },
     forget: () => jobs.forget(),
     reset: () => jobs.reset(),
     // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.
     forgetHandled: (msg) => jobs.forgetHandled(msg),
     forgetHandledFromTab: (msg) => jobs.forgetHandledFromTab(msg),
-    handledTitles: () => jobs.handledTitles(),
+    // The fuzz sends no cancel-retry (I2 has its own tests): it passes through unobserved.
+    cancelRetry: (msg) => jobs.cancelRetry(msg),
+    handledTitles: (cancelling) => jobs.handledTitles(cancelling),
     searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),

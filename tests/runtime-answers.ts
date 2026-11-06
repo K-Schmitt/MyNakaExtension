@@ -80,6 +80,23 @@ function questionAnswer(w: World): AnswerSend {
   return { msg: { type: "answer-question", side, id, choice }, role: role(w) };
 }
 
+// The answer the lever of the I2 situation sends: a candidate of an open Naka question that waits on a finish.
+export function waitingAnswer(w: World): AnswerSend | undefined {
+  const open = (rawState(w).pending ?? []).filter(
+    (item) =>
+      item.kind === "ambiguity" &&
+      item.side === "naka" &&
+      item.finish !== undefined,
+  );
+  const item = open.length > 0 ? pick(w, open) : undefined;
+  const choice = item?.candidateIds?.[0];
+  if (item === undefined || choice === undefined) return undefined;
+  w.stats.questionAnswers += 1;
+  w.stats.candidateChoices += 1;
+  const msg = { type: "answer-question", side: "naka", id: item.id, choice };
+  return { msg, role: role(w) };
+}
+
 function hideAnswer(w: World): AnswerSend | undefined {
   const items = rawState(w).pending ?? [];
   if (items.length === 0) return undefined;

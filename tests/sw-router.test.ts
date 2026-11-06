@@ -77,6 +77,7 @@ const PAGE_MESSAGES: [string, unknown][] = [
   ["a reset", { type: "reset" }],
   ["a forget-handled", { type: "forget-handled", contentId: 3 }],
   ["a handled-titles", { type: "handled-titles" }],
+  ["a cancel-retry", { type: "cancel-retry", contentId: 3 }],
 ];
 // Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
 const QUESTION_MESSAGES: [string, unknown][] = [
@@ -125,6 +126,10 @@ function recordingJobs(over: Partial<Jobs> = {}) {
   const jobs: Jobs = {
     syncJob: async (trigger: Trigger) => {
       calls.push(`sync:${trigger}`);
+    },
+    retryNext: async (since: number) => {
+      calls.push(`retry:${since}`);
+      return false;
     },
     finishJob: async (msg: FinishedMessage) => {
       calls.push(`finish:${JSON.stringify(msg)}`);
@@ -194,9 +199,16 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     forgetHandledFromTab: async (msg) => {
       calls.push(`forget-handled-tab:${JSON.stringify(msg)}`);
     },
-    handledTitles: async () => {
-      calls.push("handled-titles");
-      return { titles: [{ key: "movie:3", label: "Trois" }] };
+    cancelRetry: async (msg) => {
+      calls.push(`cancel-retry:${JSON.stringify(msg)}`);
+    },
+    handledTitles: async (cancelling) => {
+      calls.push(`handled-titles:${JSON.stringify(cancelling)}`);
+      return {
+        titles: [{ key: "movie:3", label: "Trois" }],
+        waiting: [],
+        cancelling,
+      };
     },
     searchTitles: async (msg) => {
       calls.push(`search:${JSON.stringify(msg)}`);
@@ -233,7 +245,7 @@ describe("router: trusted messages become jobs", () => {
     const r = router();
     expect(r.send({ type: "naka-ready" }, NAKA_TAB)).toBe(false);
     await settle();
-    expect(r.calls).toEqual(["sync:naka-ready"]);
+    expect(r.calls).toEqual(["sync:naka-ready", `retry:${ROUTER_NOW}`]);
     expect(r.answers).toEqual([]);
   });
 
@@ -249,18 +261,65 @@ describe("router: trusted messages become jobs", () => {
     ]);
     r.fire();
     await settle();
-    expect(r.calls).toEqual(["sync:playlist"]);
+    expect(r.calls).toEqual(["sync:playlist", `retry:${ROUTER_NOW}`]);
     r.send({ type: "playlist-changed" }, NAKA_TAB);
     r.fire();
     await settle();
-    expect(r.calls).toEqual(["sync:playlist", "sync:playlist"]);
+    expect(r.calls).toEqual([
+      "sync:playlist",
+      `retry:${ROUTER_NOW}`,
+      "sync:playlist",
+      `retry:${ROUTER_NOW}`,
+    ]);
   });
 
   it("resync from the status page is the button", async () => {
     const r = router();
     r.send({ type: "resync" }, STATUS_PAGE);
     await settle();
-    expect(r.calls).toEqual(["sync:button"]);
+    expect(r.calls).toEqual(["sync:button", `retry:${ROUTER_NOW}`]);
+  });
+
+  it("a step that answers true queues one more step, each its own job", async () => {
+    let answers = [true, true, false];
+    const r = router({
+      retryNext: async (since: number) => {
+        r.calls.push(`retry:${since}`);
+        return answers.shift() ?? false;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      `retry:${ROUTER_NOW}`,
+      "mode:live",
+      `retry:${ROUTER_NOW}`,
+      `retry:${ROUTER_NOW}`,
+    ]);
+    answers = [];
+  });
+
+  it("a step that answers false queues no other", async () => {
+    const r = router();
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("retry:"))).toHaveLength(1);
+  });
+
+  it("each retry takes the time its sync was queued", async () => {
+    const r = router();
+    r.send({ type: "resync" }, STATUS_PAGE);
+    r.time.now = ROUTER_NOW + 60_000;
+    r.send({ type: "naka-ready" }, NAKA_TAB);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      `retry:${ROUTER_NOW}`,
+      "sync:naka-ready",
+      `retry:${ROUTER_NOW + 60_000}`,
+    ]);
   });
 
   it("finished from the Naka tab gives the parsed message to the finish job", async () => {
@@ -1131,7 +1190,7 @@ describe("router: one queue", () => {
     r.send({ type: "resync" }, STATUS_PAGE);
     r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
     await settle();
-    expect(r.calls).toEqual(["mode:live"]);
+    expect(r.calls).toEqual([`retry:${ROUTER_NOW}`, "mode:live"]);
   });
 
   it("a snapshot that rejects is not answered", async () => {
@@ -1367,8 +1426,41 @@ describe("router: the status answer waits for no job", () => {
     await settle();
     expect(g.r.answers.at(-1)).toEqual({
       titles: [{ key: "movie:3", label: "Trois" }],
+      waiting: [],
+      cancelling: [],
     });
     g.sync.open();
+  });
+
+  it("a queued cancel-retry hides its key from handled-titles until its job ends", async () => {
+    const blocker = latch();
+    const r = router({
+      syncJob: async () => {
+        await blocker.opened;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    const msg = { type: "cancel-retry", contentId: 3 };
+    expect(r.send(msg, STATUS_PAGE)).toBe(false);
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toContain('handled-titles:["movie:3"]');
+    blocker.open();
+    await settle();
+    expect(r.calls).toContain(`cancel-retry:${JSON.stringify(msg)}`);
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.at(-1)).toBe("handled-titles:[]");
+  });
+
+  it("cancel-retry from a Naka tab is ignored", async () => {
+    const r = router();
+    expect(r.send({ type: "cancel-retry", contentId: 3 }, NAKA_TAB)).toBe(
+      false,
+    );
+    await settle();
+    expect(r.calls).toEqual([]);
   });
 
   it("handled-titles from a Naka tab is ignored", async () => {

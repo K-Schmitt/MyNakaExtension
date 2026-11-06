@@ -53,6 +53,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
   return {
     syncJob: async () => undefined,
     finishJob: async () => undefined,
+    retryNext: async () => false,
     setMode: async () => undefined,
     setSettings: async () => undefined,
     rate: async () => undefined,
@@ -66,7 +67,8 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     reset: async () => undefined,
     forgetHandled: async () => undefined,
     forgetHandledFromTab: async () => undefined,
-    handledTitles: async () => ({ titles: [] }),
+    cancelRetry: async () => undefined,
+    handledTitles: async () => ({ titles: [], waiting: [], cancelling: [] }),
     searchTitles: async () => ({ candidates: [] }),
     statusSnapshot: async () => ({}),
     ratingCard: async () => ({ card: null, pauseFromPercent: 0 }),
@@ -830,5 +832,92 @@ describe("O4 on the state saves of answers", () => {
     expect(w.violations).toEqual([]);
     await save(w);
     expect(fired(w)).toEqual(["O4 binding"]);
+  });
+
+  const settle = (w: World, lastFinish: object | undefined) =>
+    w.storage.set("settings", {
+      ...(w.storage.get("settings") as object),
+      lastFinish,
+    });
+  const FAILED = {
+    at: 1,
+    key: "movie:1",
+    outcome: "failed",
+    error: "no-naka-tab",
+  };
+  const withNote = (w: World) => {
+    const state = w.storage.get("state") as SyncState;
+    return storageFor(w, 0).set({ state: { ...state, retryFinishes: [] } });
+  };
+
+  it("stays silent on the waiting note", async () => {
+    const w = mismatched();
+    stored(w, { pending: [{ ...ASK, finish: "movie:1" }] });
+    answeringWith(w, CHOOSE);
+    await save(w);
+    settle(w, FAILED);
+    await withNote(w);
+    expect(w.violations).toEqual([]);
+  });
+
+  it("fires on the finish's save after a stale no-naka-tab lastFinish", async () => {
+    const w = mismatched();
+    settle(w, FAILED);
+    stored(w, { pending: [{ ...ASK, finish: "movie:1" }] });
+    answeringWith(w, CHOOSE);
+    await save(w);
+    await withNote(w);
+    expect(fired(w)).toEqual(["O4 binding"]);
+  });
+});
+
+describe("O17 a retry writes only for a waiting note", () => {
+  async function retryMarkDone(w: World) {
+    w.current = { kind: "retry" };
+    await scFor(w, 0).markDone(1005, "2026-11-06");
+    return fired(w);
+  }
+
+  it("stays silent on a retry of a waiting note, and spends the note", async () => {
+    const w = quietWorld();
+    w.waitingSc.add(1005);
+    expect(await retryMarkDone(w)).toEqual([]);
+    expect(w.waitingSc.has(1005)).toBe(false);
+  });
+
+  it("fires on a retry markDone with no waiting note", async () => {
+    expect(await retryMarkDone(quietWorld())).toEqual(["O17 retry"]);
+  });
+
+  it("fires on a second markDone for a note already spent", async () => {
+    const w = quietWorld();
+    w.waitingSc.add(1005);
+    await retryMarkDone(w);
+    expect(await retryMarkDone(w)).toEqual(["O17 retry"]);
+  });
+
+  it("fires on a markDone of a product already done, though a note waits", async () => {
+    const w = quietWorld();
+    w.waitingSc.add(1005);
+    w.done.add(1005);
+    expect(await retryMarkDone(w)).toEqual(["O17 retry"]);
+  });
+
+  it("counts the retry steps the router queues as allowed (O7): one per sync, one per true", async () => {
+    const w = quietWorld();
+    w.allowed.set("sync:button", 1);
+    w.allowed.set("retry", 1);
+    const answers = [true, false];
+    const jobs = observed(
+      w,
+      0,
+      fakeJobs({ retryNext: async () => answers.shift() ?? false }),
+    );
+    await jobs.syncJob("button");
+    await jobs.retryNext(0);
+    await jobs.retryNext(0);
+    expect(w.violations).toEqual([]);
+    await jobs.retryNext(0);
+    expect(fired(w)).toEqual(["O7 forged message"]);
   });
 });

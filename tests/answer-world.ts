@@ -6,7 +6,7 @@ import { emptyState, type SyncState } from "../src/core/state";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import type { NakaClient, NakaItem } from "../src/naka/naka-client";
 import type { ProductState, ScClient } from "../src/sc/sc-client";
-import { createJobs } from "../src/sw/jobs";
+import { createJobs, type JobDeps } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
 import { type Traffic, tabRunning } from "./naka-bridge-fakes";
 import { countingLimiter, fakeNaka, fakeSc, memoryStore } from "./sw-fakes";
@@ -65,7 +65,7 @@ export function answerWorld(o: WorldOpts = {}) {
     o.nakaAccount ?? (() => "77"),
     traffic,
   ).tabs;
-  const jobs = createJobs({
+  const jobDeps: JobDeps = {
     store,
     tabs: o.tabs ? o.tabs(real) : real,
     sc: sk.client,
@@ -77,9 +77,11 @@ export function answerWorld(o: WorldOpts = {}) {
     now: () => NOW,
     today: () => "2026-11-05",
     timer: { set: () => 0, clear: () => undefined },
-  });
+  };
+  const jobs = createJobs(jobDeps);
   return {
     jobs,
+    jobDeps,
     area,
     nk,
     sk,
