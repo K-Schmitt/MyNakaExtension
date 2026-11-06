@@ -371,6 +371,62 @@ annonce `numberOfEpisodes: 8`.
   saison n'est alors plus reconnue, et le bloc ne propose que l'épisode (on peut toujours noter la saison
   à la main). On n'écrit rien de faux : on propose moins. Un test fixe ce comportement.
 
+## 2026-11-06 — I2 : relancer une fin échouée faute d'onglet
+
+Constat I2 de la revue finale du Plan 4b. Le propriétaire répond à « Quel titre est-ce ? » depuis la page
+de l'extension sans onglet Naka (ou avec une session Naka expirée) : la liaison est faite, mais la fiche
+SensCritique n'est pas marquée vue, et la fin est perdue. Elle est désormais gardée et relancée seule.
+
+### Décisions du propriétaire
+
+- D1. La relance compte comme son clic d'origine : elle passe par `finishJob` (pré-contrôle, budget horaire,
+  vérification du compte, relecture du catalogue), jamais par un autre chemin d'écriture.
+- D2. Aucune limite d'âge.
+- D3. Déclencheurs : `no-naka-tab` et `naka-session`.
+- D4. Une ligne « en attente d'un onglet Naka » dans « Titres traités ».
+- D5. « Annuler » empêche le « vu » ET défait la liaison ; la question revient.
+- D6. Si le choix avait évincé la liaison d'un autre titre, « Annuler » la rétablit.
+
+### Choix de l'auteur, relus par le propriétaire
+
+- C1. Au plus 20 fins en attente, la 21ᵉ remplace la plus ancienne ; une clé n'y figure qu'une fois (la plus récente).
+- C2. Les échecs qui gardent la fin pendant une relance sont `no-naka-tab`, `naka-session`, `finish-limit` et
+  `naka-tab-changed` ; aucun n'a rien écrit.
+- C3. Les relances passent après une synchronisation réussie ; le lot s'arrête au premier échec qui garde, donc un
+  onglet déconnecté ne brûle pas le budget horaire (chaque tentative y prend une place).
+- C4. Une fin dont la paire n'est plus dans `mapping` est retirée sans rien lancer.
+- C5. La ligne porte le titre (Naka si connu, sinon SensCritique), « en attente d'un onglet Naka » et « Annuler ».
+- C6. « Annuler » retire aussi la paire de `snapshot` et de `retryLast` : sinon la synchro suivante la croirait connue.
+- C7. La liaison à la main est hors du champ (elle lit Naka avant d'enregistrer, sans onglet elle échoue sans rien perdre).
+
+### Décisions du plan
+
+- P1. Les relances suivent TOUTE synchronisation qui a tourné et réussi (naka-ready, bouton, liste), pas
+  seulement `naka-ready` : la raison de C3 vaut pour chacune. Une synchro espacée ne compte pas (elle ne tourne pas).
+- P2. « Réussi » = `lastRun.outcome === "ok"`, sans `error`, et `lastRun.at` au moins égal à l'instant où le
+  router a mis la synchro en file.
+- P3. « Annuler » fait quitter la ligne à l'instant côté page, et la réponse `handled-titles` omet une clé dont
+  l'annulation est encore en file (mémoire du router) : un rechargement ne la ramène pas (leçon du D7).
+- P4. `retryFinishes` est facultatif dans `SyncState` (comme `handledTitles`) : `emptyState()` et « Réinitialiser »
+  le vident sans changement.
+
+### Arbitrages de mise en œuvre
+
+- `linkedBefore` : une réponse dont la paire choisie était déjà liée enregistre quand même une fin en attente ;
+  « Annuler » laisse cette liaison (D6 : l'état d'avant la réponse la contenait déjà) et ne fait que reposer la question.
+- Une file, un travail par relance : chaque relance est son propre travail, comme toute fin (un travail épingle un
+  onglet Naka). Le router en met un en file après chaque synchro, puis un autre tant que le précédent a retiré son
+  entrée et qu'il en reste ; d'autres travaux peuvent passer entre deux relances.
+- La simulation aléatoire juge les relances avec l'oracle O17 : une relance ne peut marquer faite qu'une fiche que le
+  monde a vue mise en attente par une réponse acceptée, jamais une fiche déjà faite.
+
+### Limites connues
+
+- Les données ne vont que vers l'avant : une version plus ancienne de l'extension ne lit plus un état qui contient
+  `retryFinishes` (état illisible, comme pour tout champ inconnu).
+- Une relance peut tourner des heures après la réponse (D2, aucune limite d'âge) : la fiche est alors marquée vue
+  à ce moment-là, non à la date du visionnage.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
