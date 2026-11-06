@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { END_POLL_MS } from "../src/content/ui/end-poll";
 import { createEndUi } from "../src/content/ui/end-ui";
-import { NONE_LABEL } from "../src/content/ui/question-copy";
+import {
+  NONE_LABEL,
+  REFUSED_LINE,
+  UNREACHABLE_LINE,
+} from "../src/content/ui/question-copy";
 import { GRACE_MS } from "../src/content/ui/rating-session";
 import { createRemovalBlock } from "../src/content/ui/removal-block";
 import type { WorkerPort } from "../src/content/ui/worker-port";
+import type { QuestionKey } from "../src/core/questions";
+import type { LastAnswer } from "../src/ext/answer-record";
 import type {
   RemovalOffer,
   RemovalOfferAnswer,
@@ -20,6 +27,16 @@ const OFFER: RemovalOffer = {
   title: "Un Job Mortel",
 };
 const REMOVE = "Retirer aussi de vos envies SensCritique";
+
+function pollAt(i: number): number {
+  const ms = END_POLL_MS[i];
+  if (ms === undefined) throw new Error(`no re-ask ${i}`);
+  return ms;
+}
+
+function lastFor(target: QuestionKey, seq: number): LastAnswer {
+  return { seq, at: 0, target, outcome: "refused" };
+}
 
 function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   const clock = fakeClock();
@@ -212,6 +229,57 @@ describe("the removal block", () => {
     t.block.close();
     expect(t.block.isShown()).toBe(false);
     expect(t.texts()).toEqual([]);
+  });
+
+  it("re-asks after the click, stays locked while the answer is sent, and closes once the offer is gone", async () => {
+    const t = setup();
+    t.block.removed(21391);
+    await flush();
+    await t.clock.advance(GRACE_MS);
+    t.button(REMOVE).click(true);
+    await flush();
+    // Still sending wins over a newer record of the same question.
+    t.script.answer = {
+      offer: OFFER,
+      answering: true,
+      lastAnswer: lastFor(OFFER.key, 1),
+    };
+    await t.clock.advance(pollAt(0));
+    expect(t.asked).toEqual([21391, 21391]);
+    expect(t.texts()).toContain("Envoi de la réponse…");
+    expect(t.texts()).not.toContain(REFUSED_LINE);
+    t.script.answer = { offer: null };
+    await t.clock.advance(pollAt(1));
+    expect(t.asked).toEqual([21391, 21391, 21391]);
+    expect(t.block.isShown()).toBe(false);
+    expect(t.texts()).toEqual([]);
+  });
+
+  it("shows the refusal the worker records for this question, and unlocks", async () => {
+    const t = setup({ offer: OFFER, lastAnswer: lastFor(OFFER.key, 3) });
+    t.block.removed(21391);
+    await flush();
+    await t.clock.advance(GRACE_MS);
+    t.button("Non").click(true);
+    await flush();
+    t.script.answer = { offer: OFFER, lastAnswer: lastFor(OFFER.key, 4) };
+    await t.clock.advance(pollAt(0));
+    expect(t.texts()).toContain(REFUSED_LINE);
+    expect(t.button("Non")).toBeDefined();
+    expect(t.sent).toHaveLength(1);
+  });
+
+  it("says the extension does not answer when every re-ask goes unanswered", async () => {
+    const t = setup();
+    t.block.removed(21391);
+    await flush();
+    await t.clock.advance(GRACE_MS);
+    t.button(REMOVE).click(true);
+    await flush();
+    t.script.answer = undefined;
+    for (const ms of END_POLL_MS) await t.clock.advance(ms);
+    expect(t.texts()).toContain(UNREACHABLE_LINE);
+    expect(t.sent).toHaveLength(1);
   });
 
   it("does not show a second removal over the shown one, and does not show an answering offer", async () => {
