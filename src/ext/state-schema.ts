@@ -15,6 +15,7 @@ import {
 import { parseContentKey, parsePending, parseUnlinked } from "./item-schema";
 import { parseMapping, parsePairs } from "./pair-schema";
 import { parsePresence } from "./presence-schema";
+import { parseRetryFinishes } from "./retry-schema";
 
 const KEYS = valuesOf<keyof SyncState>({
   version: true,
@@ -24,6 +25,7 @@ const KEYS = valuesOf<keyof SyncState>({
   pending: true,
   handled: true,
   handledTitles: true,
+  retryFinishes: true,
   unlinked: true,
   retryLast: true,
   run: true,
@@ -55,6 +57,13 @@ function titlesOf(record: Record<string, unknown>) {
   return handledTitles === undefined ? {} : { handledTitles };
 }
 
+function retriesOfRecord(record: Record<string, unknown>) {
+  const retryFinishes = whenPresent(record.retryFinishes, (v) =>
+    parseRetryFinishes(v, "retryFinishes"),
+  );
+  return retryFinishes === undefined ? {} : { retryFinishes };
+}
+
 export function parseState(raw: unknown): SyncState {
   const record = asRecord(raw, "state");
   onlyKeys(record, KEYS, "state");
@@ -68,6 +77,7 @@ export function parseState(raw: unknown): SyncState {
     pending: asList(record.pending, "pending", parsePending),
     handled: asList(record.handled, "handled", parseContentKey),
     ...titlesOf(record),
+    ...retriesOfRecord(record),
     unlinked: asList(record.unlinked, "unlinked", parseUnlinked),
     retryLast: parsePairs(record.retryLast, "retryLast"),
     run,

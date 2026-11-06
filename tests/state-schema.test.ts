@@ -543,3 +543,67 @@ describe("parseState handledTitles", () => {
     expect((error as Error).message).toMatch(/^stored state: handledTitles/);
   });
 });
+
+describe("parseState retryFinishes", () => {
+  const question = {
+    kind: "ambiguity",
+    side: "naka",
+    id: 5,
+    candidateIds: [50, 51],
+  };
+  const good = {
+    key: "movie:5",
+    pair: p(5, 50),
+    evicted: [p(7, 70)],
+    question,
+    at: 1000,
+  };
+  const withRetries = (retryFinishes: unknown) => ({
+    ...valid(),
+    retryFinishes,
+  });
+
+  it("is optional: a state without it parses with no such field", () => {
+    expect(parseState(valid())).not.toHaveProperty("retryFinishes");
+  });
+
+  it("round-trips a valid entry", () => {
+    const state = withRetries([good]);
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+  });
+
+  it.each([
+    ["a bad content key", { ...good, key: "film 5" }],
+    [
+      "a removal question",
+      {
+        ...good,
+        question: {
+          kind: "removal",
+          removeFrom: "sc",
+          pair: p(5, 50),
+          asked: false,
+        },
+      },
+    ],
+    [
+      "a question holding finish",
+      { ...good, question: { ...question, finish: "movie:5" } },
+    ],
+    ["an unknown entry key", { ...good, extra: 1 }],
+  ])("rejects %s, naming retryFinishes", (_name, bad) => {
+    const error = rejection(withRetries([bad]));
+    expect(error).toBeInstanceOf(StoredStateError);
+    expect((error as Error).message).toMatch(/^stored state: retryFinishes/);
+  });
+
+  it("rejects more than 20 entries", () => {
+    const many = Array.from({ length: 21 }, (_v, i) => ({
+      ...good,
+      key: `movie:${i + 1}`,
+    }));
+    const error = rejection(withRetries(many));
+    expect(error).toBeInstanceOf(StoredStateError);
+    expect((error as Error).message).toMatch(/^stored state: retryFinishes/);
+  });
+});
