@@ -749,7 +749,9 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.
     forgetHandled: (msg) => jobs.forgetHandled(msg),
     forgetHandledFromTab: (msg) => jobs.forgetHandledFromTab(msg),
-    handledTitles: () => jobs.handledTitles(),
+    // The fuzz sends no cancel-retry (I2 has its own tests): it passes through unobserved.
+    cancelRetry: (msg) => jobs.cancelRetry(msg),
+    handledTitles: (cancelling) => jobs.handledTitles(cancelling),
     searchTitles: (msg) => jobs.searchTitles(msg),
     ratingCard: (msg) => jobs.ratingCard(msg),
     ratingCards: () => jobs.ratingCards(),

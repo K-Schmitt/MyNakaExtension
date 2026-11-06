@@ -7,6 +7,7 @@
 // `{ ok: true }` at once: the tab reads a resolved send as "sent", and a listener that neither answers nor
 // keeps the channel may make Chrome reject the send.
 
+import { contentKeyOf } from "../core/finish-event";
 import {
   allowedFor,
   isTrustedSender,
@@ -79,6 +80,8 @@ export function createRouter(deps: RouterDeps): Router {
   const tabForgets = createForgetQueue(enqueue, (msg) =>
     jobs.forgetHandledFromTab(msg),
   );
+  // P3: the keys whose cancel is queued; the handled-titles answer omits them until the job ends.
+  const cancelling = new Set<string>();
   const questions = createQuestionRoutes(enqueue, jobs);
 
   // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
@@ -181,8 +184,23 @@ export function createRouter(deps: RouterDeps): Router {
               : enqueue(() => jobs.forgetHandled(msg)),
           respond,
         );
+      case "cancel-retry": {
+        const key = contentKeyOf(msg);
+        cancelling.add(key);
+        return queued(
+          () =>
+            enqueue(async () => {
+              try {
+                await jobs.cancelRetry(msg);
+              } finally {
+                cancelling.delete(key);
+              }
+            }),
+          respond,
+        );
+      }
       case "handled-titles":
-        answerRead(() => jobs.handledTitles(), respond);
+        answerRead(() => jobs.handledTitles([...cancelling]), respond);
         return true;
       case "open-questions":
       case "removal-offer":

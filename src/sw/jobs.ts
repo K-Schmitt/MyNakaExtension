@@ -5,7 +5,10 @@
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
-import type { ForgetHandledMessage } from "../ext/page-messages";
+import type {
+  CancelRetryMessage,
+  ForgetHandledMessage,
+} from "../ext/page-messages";
 import type {
   AnswerQuestionMessage,
   AnswerRemovalMessage,
@@ -22,6 +25,7 @@ import type {
 import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
+import { cancelRetryJob } from "./cancel-retry-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -78,8 +82,10 @@ export type Jobs = {
   reset(): Promise<void>;
   /** B8b: a handled title forgotten (an unticked « vu », or the page's « Oublier »): storage only. */
   forgetHandled(msg: ForgetHandledMessage): Promise<void>;
-  /** The handled titles for the page: read-only, answered outside the queue. */
-  handledTitles(): Promise<HandledTitlesAnswer>;
+  /** I2: « Annuler » on a waiting finish: the link undone, the question asked again; storage only. */
+  cancelRetry(msg: CancelRetryMessage): Promise<void>;
+  /** The handled and waiting titles for the page: read-only, outside the queue; `cancelling`: keys with a queued cancel. */
+  handledTitles(cancelling: string[]): Promise<HandledTitlesAnswer>;
   /** The same, asked by a Naka tab: counted against the hour's budget of forgets. */
   forgetHandledFromTab(msg: ForgetHandledMessage): Promise<void>;
   /** No job: read-only, answered outside the queue (Ruling 20). */
@@ -141,7 +147,8 @@ export function createJobs(deps: JobDeps): Jobs {
     forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
     forgetHandledFromTab: (msg) =>
       quietly(() => forgetFromTabJob(deps.store, deps.now, msg)),
-    handledTitles: () => answerHandledTitles(deps.store),
+    cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
+    handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),
     searchTitles: (msg) => answerSearch(deps, msg),
     statusSnapshot: () => statusSnapshot(deps.store),
     ratingCard: (msg) => answerCard(deps.store, msg),
