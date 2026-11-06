@@ -110,7 +110,12 @@ const controller = createController({
 
 const handled = createHandledController({
   send: (message) => chrome.runtime.sendMessage(message),
-  show: (view) => showHandled(view, (key) => void handled.forget(key)),
+  show: (view) =>
+    showHandled(
+      view,
+      (key) => void handled.forget(key),
+      (key) => void handled.cancel(key),
+    ),
 });
 
 // The search field of a row just opened takes the focus on the next draw.

@@ -33,7 +33,12 @@ describe("the handled titles controller", () => {
     await t.controller.load();
     expect(t.sent).toEqual([{ type: "handled-titles" }]);
     expect(t.shown).toEqual([
-      { kind: "list", heading: "Titres traités (2)", items: TITLES.titles },
+      {
+        kind: "list",
+        heading: "Titres traités (2)",
+        items: TITLES.titles,
+        waiting: [],
+      },
     ]);
   });
 
@@ -54,6 +59,7 @@ describe("the handled titles controller", () => {
       kind: "list",
       heading: "Titres traités (1)",
       items: [TITLES.titles[1]],
+      waiting: [],
     });
   });
 
@@ -102,5 +108,74 @@ describe("the handled titles controller", () => {
     });
     await controller.load();
     await expect(controller.forget("movie:9")).resolves.toBeUndefined();
+  });
+
+  describe("cancel", () => {
+    const WAITING = { key: "tv:5:S1E1", label: "Une série" };
+    const WITH_WAITING = { titles: [TITLES.titles[1]], waiting: [WAITING] };
+
+    it("sends one cancel-retry with the ids, then shows the list without that line", async () => {
+      const t = setup([WITH_WAITING]);
+      await t.controller.load();
+      await t.controller.cancel("tv:5:S1E1");
+      expect(t.sent.slice(1)).toEqual([
+        { type: "cancel-retry", contentId: 5, season: 1, episode: 1 },
+      ]);
+      expect(t.shown.at(-1)).toEqual({
+        kind: "list",
+        heading: "Titres traités (1)",
+        items: [TITLES.titles[1]],
+        waiting: [],
+      });
+    });
+
+    it("cancelling the last line of a list with no handled title hides the section", async () => {
+      const t = setup([{ titles: [], waiting: [WAITING] }]);
+      await t.controller.load();
+      await t.controller.cancel("tv:5:S1E1");
+      expect(t.shown.at(-1)).toEqual({ kind: "none" });
+    });
+
+    it("a second click while the first is sent sends nothing more", async () => {
+      const t = setup([WITH_WAITING]);
+      await t.controller.load();
+      await Promise.all([
+        t.controller.cancel("tv:5:S1E1"),
+        t.controller.cancel("tv:5:S1E1"),
+      ]);
+      expect(t.sent.filter((m) => m.type === "cancel-retry")).toHaveLength(1);
+    });
+
+    it("a key not waiting, or not a content key, sends nothing", async () => {
+      const t = setup([WITH_WAITING]);
+      await t.controller.load();
+      await t.controller.cancel("movie:9");
+      await t.controller.cancel("x");
+      expect(t.sent).toEqual([{ type: "handled-titles" }]);
+    });
+
+    it("forgetting a handled title keeps the waiting lines", async () => {
+      const t = setup([WITH_WAITING]);
+      await t.controller.load();
+      await t.controller.forget("movie:9");
+      expect(t.shown.at(-1)).toEqual({
+        kind: "list",
+        heading: "Titres traités (0)",
+        items: [],
+        waiting: [WAITING],
+      });
+    });
+
+    it("a send that rejects does not throw", async () => {
+      const controller = createHandledController({
+        send: async (message) => {
+          if (message.type === "cancel-retry") throw new Error("closed");
+          return WITH_WAITING;
+        },
+        show: () => undefined,
+      });
+      await controller.load();
+      await expect(controller.cancel("tv:5:S1E1")).resolves.toBeUndefined();
+    });
   });
 });

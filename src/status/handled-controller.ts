@@ -1,4 +1,4 @@
-// The « Titres traités » list without the DOM: it asks the worker, shows the view, and sends « Oublier ».
+// The « Titres traités » list without the DOM: it asks the worker, shows the view, and sends « Oublier » and « Annuler ».
 // A forgotten title leaves the list at once; the next load shows what the worker holds (its job may still
 // wait behind a sync).
 
@@ -19,6 +19,7 @@ export type HandledPorts = {
 export type HandledController = {
   load(): Promise<void>;
   forget(key: string): Promise<void>;
+  cancel(key: string): Promise<void>;
 };
 
 async function ask(ports: HandledPorts): Promise<HandledView> {
@@ -37,14 +38,20 @@ async function sendQuietly(ports: HandledPorts, message: ToWorker) {
   }
 }
 
+function without(lines: HandledItem[], key: string): HandledItem[] {
+  return lines.filter((item) => item.key !== key);
+}
+
 export function createHandledController(
   ports: HandledPorts,
 ): HandledController {
   let items: HandledItem[] = [];
+  let waiting: HandledItem[] = [];
   const sending = new Set<string>();
 
   function display(view: HandledView): void {
     items = view.kind === "list" ? view.items : [];
+    waiting = view.kind === "list" ? view.waiting : [];
     ports.show(view);
   }
 
@@ -58,11 +65,25 @@ export function createHandledController(
     } finally {
       sending.delete(key);
     }
-    display(viewOf(items.filter((item) => item.key !== key)));
+    display(viewOf(without(items, key), waiting));
+  }
+
+  async function cancel(key: string): Promise<void> {
+    const ids = idsOfKey(key);
+    if (ids === undefined || sending.has(key)) return;
+    if (!waiting.some((item) => item.key === key)) return;
+    sending.add(key);
+    try {
+      await sendQuietly(ports, { type: "cancel-retry", ...ids });
+    } finally {
+      sending.delete(key);
+    }
+    display(viewOf(items, without(waiting, key)));
   }
 
   return {
     load: async () => display(await ask(ports)),
     forget,
+    cancel,
   };
 }

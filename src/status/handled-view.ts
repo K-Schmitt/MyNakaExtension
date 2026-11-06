@@ -9,10 +9,17 @@ export type HandledItem = { key: string; label: string };
 
 export type HandledView =
   | { kind: "none" }
-  | { kind: "list"; heading: string; items: HandledItem[] };
+  | {
+      kind: "list";
+      heading: string;
+      items: HandledItem[];
+      waiting: HandledItem[];
+    };
 
 export const HANDLED_COPY = {
   forget: "Oublier",
+  waiting: "en attente d'un onglet Naka",
+  cancel: "Annuler",
   heading: (count: number): string => `Titres traités (${count})`,
 };
 
@@ -26,20 +33,31 @@ function parseItem(raw: unknown, path: string): HandledItem {
   };
 }
 
-/** The same view for these items: none when the list is empty. */
-export function viewOf(items: HandledItem[]): HandledView {
-  if (items.length === 0) return NONE;
-  return { kind: "list", heading: HANDLED_COPY.heading(items.length), items };
+/** The same view for these lines: none when both lists are empty; the heading counts the handled titles. */
+export function viewOf(
+  items: HandledItem[],
+  waiting: HandledItem[],
+): HandledView {
+  if (items.length === 0 && waiting.length === 0) return NONE;
+  return {
+    kind: "list",
+    heading: HANDLED_COPY.heading(items.length),
+    items,
+    waiting,
+  };
+}
+
+// An answer without `waiting` (an older worker) reads as no waiting finish.
+function parseWaiting(record: Record<string, unknown>): HandledItem[] {
+  if (record.waiting === undefined) return [];
+  return asList(record.waiting, "waiting", parseItem);
 }
 
 export function toHandledView(raw: unknown): HandledView {
   try {
-    const items = asList(
-      asRecord(raw, "handled-titles").titles,
-      "titles",
-      parseItem,
-    );
-    return viewOf(items);
+    const record = asRecord(raw, "handled-titles");
+    const items = asList(record.titles, "titles", parseItem);
+    return viewOf(items, parseWaiting(record));
   } catch {
     return NONE;
   }

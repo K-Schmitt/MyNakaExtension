@@ -1,5 +1,5 @@
 // The « Titres traités » section bound to the DOM: it fills the folded list from the view and reports the
-// pressed « Oublier ». No logic of its own. Titles are remote text: textContent and setAttribute only.
+// pressed « Oublier » and « Annuler ». No logic of its own. Titles are remote text: textContent and setAttribute only.
 
 import {
   HANDLED_COPY,
@@ -26,9 +26,26 @@ function line(item: HandledItem, onForget: (key: string) => void): HTMLElement {
   return row;
 }
 
+function waitingLine(
+  item: HandledItem,
+  onCancel: (key: string) => void,
+): HTMLElement {
+  const row = document.createElement("li");
+  const label = document.createElement("span");
+  label.textContent = `${item.label} \u2014 ${HANDLED_COPY.waiting}`;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = HANDLED_COPY.cancel;
+  button.setAttribute("aria-label", `${HANDLED_COPY.cancel} ${item.label}`);
+  button.addEventListener("click", () => onCancel(item.key));
+  row.append(label, " ", button);
+  return row;
+}
+
 export function showHandled(
   view: HandledView,
   onForget: (key: string) => void,
+  onCancel: (key: string) => void,
 ): void {
   element("handled").hidden = view.kind === "none";
   if (view.kind === "none") {
@@ -37,6 +54,7 @@ export function showHandled(
   }
   element("handled-heading").textContent = view.heading;
   element("handled-list").replaceChildren(
+    ...view.waiting.map((item) => waitingLine(item, onCancel)),
     ...view.items.map((item) => line(item, onForget)),
   );
 }

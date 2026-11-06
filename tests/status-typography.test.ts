@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { JobError } from "../src/ext/job-error";
 import type { RunRecord } from "../src/ext/settings";
+import { HANDLED_COPY } from "../src/status/handled-view";
 import { JOB_ERROR_LABELS } from "../src/status/job-error-labels";
 import { LISTS_COPY } from "../src/status/lists-copy";
 import {
@@ -163,6 +164,16 @@ describe("French typography on the status page", () => {
       .replace(/<[^>]*>/g, " ")
       .replaceAll("&#8239;", String.fromCodePoint(0x202f));
     expect(typographyFaults(shown)).toEqual([]);
+  });
+
+  it("the handled section copy follows it", () => {
+    const all = [
+      HANDLED_COPY.forget,
+      HANDLED_COPY.waiting,
+      HANDLED_COPY.cancel,
+      HANDLED_COPY.heading(3),
+    ];
+    expect(all.flatMap(typographyFaults)).toEqual([]);
   });
 
   it("every sentence of the question and unlinked rows follows it", () => {
