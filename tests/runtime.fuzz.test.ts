@@ -316,6 +316,8 @@ async function simulate(
   return { violations: w.violations, stats: w.stats };
 }
 
+// The 60 s bound: the run is CPU-bound, 3 s on CI, 7–10 s on the owner's machine at load 5–8, over 20 s at
+// load 17–28 (2026-11-06). It only has to catch a hang (a wait loop spinning on microtasks).
 describe("runtime fuzz: the worker against an in-memory world", () => {
   it(`finds no violation over ${SEEDS} fixed seeds`, async () => {
     const violations: string[] = [];
@@ -374,5 +376,5 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
         rare.includes(situation) ? 10 : 100,
       );
     }
-  }, 20_000);
+  }, 60_000);
 });
