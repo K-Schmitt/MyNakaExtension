@@ -737,6 +737,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
     // I2: the router queues one retry step per sync, then one per step that answered true (O7 counts both;
     // O17 judges the writes).
+    retryPending: (since) => jobs.retryPending(since),
     retryNext: async (since) => {
       const more = await run("retry", { kind: "retry" }, () =>
         jobs.retryNext(since),

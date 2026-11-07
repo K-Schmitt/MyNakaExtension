@@ -144,7 +144,7 @@ describe("retryNextJob", () => {
     const w = waitingWorld([entry(5), entry(6)], {
       nakaAccount: () => undefined,
     });
-    await steps(w);
+    expect(await steps(w)).toEqual([false]);
     expect(doneCalls(w)).toEqual([]);
     expect(w.state().retryFinishes?.map((e) => e.key)).toEqual([
       "movie:5",

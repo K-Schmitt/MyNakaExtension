@@ -163,6 +163,41 @@ describe("the handled titles controller", () => {
       expect(t.cancelled).toEqual(["cancelled"]);
     });
 
+    it("a malformed cancelling still shows the list and ends the wait", async () => {
+      const malformed = { ...WITH_WAITING, cancelling: "x" };
+      const t = setup([malformed, malformed]);
+      await t.controller.load();
+      expect(t.shown.at(-1)).toMatchObject({ kind: "list" });
+      await t.controller.cancel("tv:5:S1E1");
+      expect(t.cancelled).toEqual(["cancelled"]);
+      expect(t.armed).toEqual([]);
+    });
+
+    it("a failed read ends the wait, with one cancelled", async () => {
+      const t = setup([WITH_WAITING, new Error("closed")]);
+      await t.controller.load();
+      await t.controller.cancel("tv:5:S1E1");
+      expect(t.cancelled).toEqual(["cancelled"]);
+      expect(t.armed).toEqual([]);
+    });
+
+    it("a controller with no timer does not wait", async () => {
+      const sent: ToWorker[] = [];
+      const cancelled: string[] = [];
+      const controller = createHandledController({
+        send: async (message) => {
+          sent.push(message);
+          return WITH_WAITING;
+        },
+        show: () => undefined,
+        cancelled: () => cancelled.push("cancelled"),
+      });
+      await controller.load();
+      await controller.cancel("tv:5:S1E1");
+      expect(cancelled).toEqual(["cancelled"]);
+      expect(sent.filter((m) => m.type === "handled-titles")).toHaveLength(1);
+    });
+
     it("cancelling the last line of a list with no handled title hides the section", async () => {
       const t = setup([{ titles: [], waiting: [WAITING] }]);
       await t.controller.load();
