@@ -25,6 +25,15 @@ function withStyleNode(root: ShadowRootLike, style: NodeLike): ShadowRootLike {
   };
 }
 
+function tryAdopt(root: ShadowRootLike, sheet: unknown): boolean {
+  try {
+    root.adoptedStyleSheets = [sheet];
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function attachSheet(
   doc: Pick<DocLike, "createElement">,
   root: ShadowRootLike,
@@ -32,10 +41,7 @@ export function attachSheet(
   make: SheetMaker = defaultSheetMaker,
 ): ShadowRootLike {
   const sheet = make(css);
-  if (sheet !== undefined) {
-    root.adoptedStyleSheets = [sheet];
-    return root;
-  }
+  if (sheet !== undefined && tryAdopt(root, sheet)) return root;
   const style = doc.createElement("style");
   style.textContent = css;
   root.replaceChildren(style);
