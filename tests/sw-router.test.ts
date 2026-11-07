@@ -356,7 +356,7 @@ describe("router: trusted messages become jobs", () => {
   });
 
   it("a chain step queued while a sync's step waits merges with it", async () => {
-    let answers = [true, false];
+    const answers = [true, false];
     const r = router({
       retryNext: async (since: number) => {
         r.calls.push(`retry:${since}`);
@@ -376,7 +376,6 @@ describe("router: trusted messages become jobs", () => {
       "sync:naka-ready",
       `retry:${ROUTER_NOW}`,
     ]);
-    answers = [];
   });
 
   it("finished from the Naka tab gives the parsed message to the finish job", async () => {

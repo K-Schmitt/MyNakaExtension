@@ -2,6 +2,8 @@
 // the new one runs after the last sync and keeps the earliest time, since a sync stamps its run at its
 // start and the later time alone would miss the first sync's success. A step already started is left alone.
 // A step is tracked as a finish only when it will try an entry: a status read must not show one otherwise.
+// The price: a merged step reads the last run only, so a later sync that fails delays the retry an earlier
+// success earned until the next success (the entry waits, nothing is lost).
 
 type Step = { since: number; live: boolean };
 
