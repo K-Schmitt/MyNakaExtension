@@ -27,6 +27,15 @@ describe("status stylesheet", () => {
     ).toBe(true);
   });
 
+  it("renders native controls dark, outside the tokens block", () => {
+    const outside = css.replace(/\/\* tokens:start[\s\S]*tokens:end \*\//, "");
+    expect(outside).toMatch(/:root\s*\{\s*color-scheme:\s*dark;\s*\}/);
+  });
+
+  it("colours the radios with the readable accent", () => {
+    expect(css).toMatch(/accent-color:\s*var\(--mn-color-accent-text\)/);
+  });
+
   it("is linked by the page and copied by the build", () => {
     expect(read("src/status/status.html")).toContain(
       '<link rel="stylesheet" href="status.css" />',

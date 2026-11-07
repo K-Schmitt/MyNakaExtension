@@ -39,6 +39,10 @@
 }
 /* tokens:end */
 
+:root {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   background: var(--mn-color-bg);
@@ -177,7 +181,7 @@ input[type="text"] {
 }
 
 input[type="radio"] {
-  accent-color: var(--mn-color-accent);
+  accent-color: var(--mn-color-accent-text);
 }
 
 fieldset {
