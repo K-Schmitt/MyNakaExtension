@@ -33,5 +33,6 @@ for (const entry of ENTRIES) {
 
 await cp("src/manifest.json", "dist/manifest.json");
 await cp("src/status/status.html", "dist/status.html");
+await cp("src/status/status.css", "dist/status.css");
 
 console.log(`Built dist/ (${ENTRIES.length} bundles, manifest, status page)`);
