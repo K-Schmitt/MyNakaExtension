@@ -24,6 +24,11 @@ export function retriesOf(state: SyncState): RetryFinish[] {
   return state.retryFinishes ?? [];
 }
 
+/** A finish waits for a Naka tab under this key. */
+export function isWaiting(state: SyncState, key: string): boolean {
+  return retriesOf(state).some((e) => e.key === key);
+}
+
 export function addRetry(state: SyncState, entry: RetryFinish): SyncState {
   const others = retriesOf(state).filter((e) => e.key !== entry.key);
   const retryFinishes = [...others, entry].slice(-MAX_RETRY_FINISHES);

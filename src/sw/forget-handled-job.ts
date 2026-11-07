@@ -4,7 +4,8 @@
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor, type RatingCard } from "../core/rating-cards";
-import { forgetHandled, holdsKey } from "../core/state";
+import { dropRetry, isWaiting } from "../core/retry-finishes";
+import { forgetHandled, holdsKey, type SyncState } from "../core/state";
 import { windowAt, withOneMore } from "../ext/finish-window";
 import { isForgetFull } from "../ext/forget-window";
 import type { ForgetHandledMessage } from "../ext/page-messages";
@@ -15,9 +16,15 @@ type ForgetStore = Pick<
   "loadState" | "saveState" | "loadRatings" | "saveRatings"
 >;
 
+// A finish waiting for a Naka tab (I2) is held too: once unticked, no retry may mark the title seen.
+function holds(state: SyncState, key: string): boolean {
+  return holdsKey(state, key) || isWaiting(state, key);
+}
+
 async function forgetKey(store: ForgetStore, key: string): Promise<void> {
   const state = await store.loadState();
-  if (holdsKey(state, key)) await store.saveState(forgetHandled(state, key));
+  if (!holds(state, key)) return;
+  await store.saveState(dropRetry(forgetHandled(state, key), key));
 }
 
 // An unwatched title is not « à noter »: its card goes, other cards stay.
@@ -36,9 +43,9 @@ export async function forgetHandledJob(
   await dropCard(store, key);
 }
 
-// Something is kept under the key: handled, a question's finish, or a card. A forged id holds nothing.
+// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds nothing.
 async function heldBy(store: ForgetStore, key: string): Promise<boolean> {
-  if (holdsKey(await store.loadState(), key)) return true;
+  if (holds(await store.loadState(), key)) return true;
   return cardFor(await store.loadRatings(), key) !== undefined;
 }
 
