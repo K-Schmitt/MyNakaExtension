@@ -4,6 +4,7 @@
 
 import { valuesOf } from "../../ext/field-checks";
 import type { DocLike, NodeLike, ShadowRootLike } from "./dom-like";
+import { attachSheet } from "./sheet";
 
 export type Placement = "top-right" | "bottom-right";
 
@@ -73,6 +74,7 @@ function targetOf(doc: DocLike): NodeLike {
 export function createOverlayRoot(
   doc: DocLike,
   placement: Placement = "top-right",
+  css = "",
 ): {
   root: ShadowRootLike;
   /** Puts the host back under its target when the page removed it; does nothing when it is there. */
@@ -83,7 +85,8 @@ export function createOverlayRoot(
   for (const type of STOPPED_EVENTS) {
     host.addEventListener(type, (event) => event.stopPropagation());
   }
-  const root = host.attachShadow({ mode: "closed" });
+  const shadow = host.attachShadow({ mode: "closed" });
+  const root = css === "" ? shadow : attachSheet(doc, shadow, css);
   const place = (): void => {
     targetOf(doc).appendChild(host);
   };

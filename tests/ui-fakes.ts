@@ -30,6 +30,7 @@ export class FakeNode implements NodeLike {
 
 export class FakeShadow extends FakeNode implements ShadowRootLike {
   host: FakeElement | null = null;
+  adoptedStyleSheets?: unknown[];
 
   replaceChildren(...nodes: NodeLike[]): void {
     for (const child of [...this.children]) this.drop(child);
@@ -39,6 +40,7 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
 
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
+  className = "";
   style = { cssText: "" };
   attributes: Record<string, string> = {};
   listeners: Record<string, ((event: EventLike) => void)[]> = {};
