@@ -7,8 +7,8 @@ const v = (name: string): string => `var(--mn-${name})`;
 const RULES = [
   `.mn-card{display:block;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:color-mix(in srgb, ${v("color-surface")} 96%, transparent);border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};padding:${v("space-4")};margin:${v("space-3")};box-shadow:${v("shadow")};}`,
   `.mn-card::before{content:"SensCritique";display:block;font:${v("text-small")} ${v("font")};color:${v("color-accent-text")};text-transform:uppercase;font-weight:600;letter-spacing:.04em;margin-bottom:${v("space-2")};}`,
-  `.mn-title{font:${v("text-title")} ${v("font")};font-weight:600;color:${v("color-text")};}`,
   `.mn-line{color:${v("color-text-secondary")};}`,
+  `.mn-title{font:${v("text-title")} ${v("font")};font-weight:600;color:${v("color-text")};}`,
   `.mn-warning{color:${v("color-warning-text")};background:${v("color-warning-bg")};padding:${v("space-2")};border-radius:${v("radius-sm")};}`,
   `.mn-error{color:${v("color-error-text")};background:${v("color-error-bg")};padding:${v("space-2")};border-radius:${v("radius-sm")};}`,
   `.mn-row{display:flex;flex-wrap:wrap;gap:${v("space-2")};margin-top:${v("space-3")};}`,
@@ -20,6 +20,7 @@ const RULES = [
   `.mn-btn[aria-pressed=true]{background:${v("color-accent")};color:${v("color-on-accent")};border-color:${v("color-accent")};font-weight:600;}`,
   `.mn-btn--primary{background:${v("color-accent")};color:${v("color-on-accent")};border-color:${v("color-accent")};font-weight:600;}`,
   `.mn-btn--primary:hover{background:${v("color-accent-hover")};}`,
+  `.mn-btn--ghost{background:transparent;color:${v("color-accent-text")};border-color:transparent;}`,
   `.mn-panel{display:block;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:color-mix(in srgb, ${v("color-surface")} 96%, transparent);border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};padding:${v("space-3")};box-shadow:${v("shadow")};}`,
   `.mn-panel-head{display:flex;align-items:center;justify-content:space-between;gap:${v("space-2")};margin-bottom:${v("space-2")};}`,
   `.mn-heading{font:${v("text-title")} ${v("font")};font-weight:600;margin:0;}`,

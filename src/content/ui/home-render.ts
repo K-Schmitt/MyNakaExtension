@@ -7,39 +7,24 @@ import { FOLD_LABEL, UNFOLD_LABEL } from "./home-copy";
 import type { HomeView } from "./home-view";
 import { buildQuestionBlock } from "./question-render";
 import type { BlockLayout, Maker } from "./rating-render";
-import {
-  BLOCK_TEXT_CSS,
-  BUTTON_CLASS,
-  buildBlock,
-  button,
-  textLine,
-} from "./rating-render";
+import { buildBlock, button, textLine } from "./rating-render";
 
-// The panel's own style sheet. The panel declares the blocks' text, so that the fold button, whose
-// `font: inherit` is the one of every block button, draws in the same font.
-const PANEL_CSS = BLOCK_TEXT_CSS;
-const HEAD_CSS =
-  "display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 12px 0;";
-const HEADING_CSS = "font: 700 15px/1.4 system-ui, sans-serif; color: #fff;";
-const SUBHEADING_CSS = `${HEADING_CSS} margin: 12px 12px 0;`;
+const PANEL_CLASS = "mn-panel";
+const HEAD_CLASS = "mn-panel-head";
+const HEADING_CLASS = "mn-heading";
+const SUBHEADING_CLASS = "mn-subheading";
+const FOLD_CLASS = "mn-btn mn-btn--ghost";
 // 360 px wide: the ten choices on two rows of five, never a lone « 10 » on a row of its own.
 const PANEL_LAYOUT: BlockLayout = {
   choicesRow: "mn-row mn-row--grid5",
 };
 
-// Temporary (Task 5 migrates the panel): a heading line still styled inline.
-function cssLine(doc: Maker, text: string, css: string): ElementLike {
-  const line = textLine(doc, text, "");
-  line.style.cssText = css;
-  return line;
-}
-
 function header(doc: Maker, view: HomeView, onFold: () => void) {
   const head = doc.createElement("div");
-  head.style.cssText = HEAD_CSS;
-  head.appendChild(cssLine(doc, view.heading, HEADING_CSS));
+  head.className = HEAD_CLASS;
+  head.appendChild(textLine(doc, view.heading, HEADING_CLASS));
   const label = view.folded ? UNFOLD_LABEL : FOLD_LABEL;
-  head.appendChild(button(doc, label, BUTTON_CLASS, onFold));
+  head.appendChild(button(doc, label, FOLD_CLASS, onFold));
   return head;
 }
 
@@ -52,7 +37,7 @@ function appendQuestions(
 ): void {
   if (view.questions.length === 0) return;
   if (view.entries.length > 0) {
-    panel.appendChild(cssLine(doc, view.questionsHeading, SUBHEADING_CSS));
+    panel.appendChild(textLine(doc, view.questionsHeading, SUBHEADING_CLASS));
   }
   for (const { key, view: question } of view.questions) {
     panel.appendChild(
@@ -69,7 +54,7 @@ export function renderHome(
   handlers: HomeHandlers,
 ): void {
   const panel = doc.createElement("div");
-  panel.style.cssText = PANEL_CSS;
+  panel.className = PANEL_CLASS;
   panel.appendChild(header(doc, view, handlers.onFold));
   if (!view.folded) {
     for (const { key, view: entry } of view.entries) {

@@ -107,26 +107,38 @@ describe("the home panel's drawing", () => {
     expect(buttons(doc, "8")).toHaveLength(0);
   });
 
-  it("the fold button looks like the other buttons: same declarations, and the block's font to inherit", () => {
+  it("the panel, its head and headings are drawn by classes, with no inline style", () => {
+    const doc = new FakeDoc();
+    const { handlers } = handlersOf();
+    const view = questionView(OFFER, ["ecarter"]);
+    createHomeUi(doc).show(
+      homeView([{ card: FILM }], false, [{ key: OFFER.key, view }]),
+      handlers,
+    );
+    const all = descendants(hostOf(doc).shadow);
+    const byClass = (cls: string) => all.filter((el) => el.className === cls);
+    const panel = byClass("mn-panel");
+    expect(panel).toHaveLength(1);
+    expect(byClass("mn-panel-head")).toHaveLength(1);
+    expect(byClass("mn-heading").map((el) => el.textContent)).toEqual([
+      "À noter",
+    ]);
+    expect(byClass("mn-subheading").map((el) => el.textContent)).toEqual([
+      "Questions",
+    ]);
+    expect(panel[0]?.style.cssText ?? "").toBe("");
+    expect(all.filter((el) => (el.style?.cssText ?? "") !== "")).toEqual([]);
+  });
+
+  it("the fold button is a ghost button inside the panel, whose class declares the font", () => {
     const doc = new FakeDoc();
     const { handlers } = handlersOf();
     createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
     const [fold] = buttons(doc, "Réduire");
-    const [ignore] = buttons(doc, "Ignorer");
-    expect(fold?.className).toBe(ignore?.className);
-    expect(fold?.className).toBe("mn-btn");
-    // `font: inherit` takes the nearest declared font: the panel's, for the fold button; the block's, for
-    // the entry's buttons. Both must declare the same one.
-    const fontOf = (el: FakeElement | undefined): string | undefined => {
-      for (let node = el?.parent; node instanceof Object; node = node.parent) {
-        const css = (node as FakeElement).style?.cssText ?? "";
-        const font = css.match(/font: [^;]+;/)?.[0];
-        if (font !== undefined) return font;
-      }
-      return undefined;
-    };
-    expect(fontOf(fold)).toBe("font: 14px/1.4 system-ui, sans-serif;");
-    expect(fontOf(ignore)).toBe(fontOf(fold));
+    expect(fold?.className).toBe("mn-btn mn-btn--ghost");
+    expect((fold?.parent?.parent as FakeElement | null)?.className).toBe(
+      "mn-panel",
+    );
   });
 
   it("the ten choices sit in a 5-column grid: two equal rows, never a lone 10", () => {
