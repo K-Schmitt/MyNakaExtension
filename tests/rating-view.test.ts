@@ -61,6 +61,19 @@ describe("ratingView", () => {
     expect(view.choices.find((c) => c.value === 6)?.marked).toBe(true);
   });
 
+  it("a current rating wins over the start: only the current is marked, both lines stay", () => {
+    const card = episodeCard({
+      targets: [target("épisode", 9), target("saison", 6)],
+      pending: [],
+    });
+    const view = ratingView(card, "saison", 8);
+    expect(view.choices.filter((c) => c.marked)).toEqual([
+      { value: 6, marked: true },
+    ]);
+    expect(view.current).toBe(`Votre note actuelle${NB}: 6`);
+    expect(view.start).toBe(`Moyenne de vos épisodes${NB}: 8`);
+  });
+
   it("a série not finished: the warning", () => {
     const view = ratingView(episodeCard({ seriesFinished: false }), "série");
     expect(view.warning).toContain("n'est pas finie sur Naka");

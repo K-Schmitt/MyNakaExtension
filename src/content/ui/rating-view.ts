@@ -20,7 +20,7 @@ export type RatingView = {
   current?: string;
   start?: string;
   warning?: string;
-  choices: { value: number; marked: boolean }[]; // 1..10, marked = start or current
+  choices: { value: number; marked: boolean }[]; // 1..10, marked = current, else start
   actions: RatingAction[];
   others: RatingLabel[]; // the card's other target labels: the manual choice
   notice?: string; // a neutral line: the chosen rating, or the sending cue
@@ -56,10 +56,11 @@ function currentOf(card: RatingCard, label: RatingLabel): number | null {
   return card.targets.find((t) => t.label === label)?.current ?? null;
 }
 
-function choicesOf(marks: (number | null | undefined)[]) {
+// The rating on SensCritique wins over the start: the stars show what is there.
+function choicesOf(mark: number | undefined) {
   return Array.from({ length: CHOICES }, (_, i) => ({
     value: i + 1,
-    marked: marks.includes(i + 1),
+    marked: mark === i + 1,
   }));
 }
 
@@ -78,7 +79,7 @@ export function ratingView(
     ...(label === "série" && !card.seriesFinished
       ? { warning: SERIES_WARNING }
       : {}),
-    choices: choicesOf([start, current]),
+    choices: choicesOf(current ?? start),
     actions: card.pending.includes(label) ? ACTIONS : CLOSE_ONLY,
     others: card.targets.map((t) => t.label).filter((l) => l !== label),
     ...(failed === undefined ? {} : { error: errorLine(failed) }),
