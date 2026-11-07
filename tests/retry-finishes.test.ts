@@ -118,6 +118,13 @@ describe("cancelRetry", () => {
     expect(after?.mapping).toEqual([p(7, 99)]);
   });
 
+  it("does not restore an evicted link whose sc id a later link took", () => {
+    const e = entry({ evicted: [p(7, 70)] });
+    const state = withEntry(linked({ mapping: [p(5, 50), p(8, 70)] }), e);
+    const after = cancelRetry(state, "movie:5");
+    expect(after?.mapping).toEqual([p(8, 70)]);
+  });
+
   it("only drops the entry when the pair is no longer linked", () => {
     const state = withEntry(
       linked({ mapping: [], snapshot: [p(1, 2)], retryLast: [] }),

@@ -170,6 +170,31 @@ describe("retryNextJob", () => {
     expect(w.settings().lastFinish).toMatchObject({ error: "finish-limit" });
   });
 
+  it("keeps the entry and stops when the Naka tab changed page under the retry", async () => {
+    // The content read pins the tab; it is still listed but no longer answers: naka-tab-changed.
+    let sends = 0;
+    const w = waitingWorld([entry(5), entry(6)], {
+      tabs: (real) => ({
+        query: real.query,
+        send: async (tabId, msg) => {
+          sends += 1;
+          if (sends > 1) throw new Error("Could not establish connection.");
+          return real.send(tabId, msg);
+        },
+      }),
+    });
+    expect(await steps(w)).toEqual([false]);
+    expect(w.settings().lastFinish).toMatchObject({
+      outcome: "failed",
+      error: "naka-tab-changed",
+    });
+    expect(w.state().retryFinishes?.map((e) => e.key)).toEqual([
+      "movie:5",
+      "movie:6",
+    ]);
+    expect(w.writes()).toEqual([]);
+  });
+
   it("drops an entry whose pair is no longer linked, without a finish", async () => {
     const w = answerWorld({
       state: stateWith({ retryFinishes: [entry(5)] }),
