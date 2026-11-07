@@ -24,7 +24,6 @@ const SELECTORS = [
   ".mn-btn:hover",
   ".mn-btn:focus-visible",
   ".mn-btn:active",
-  ".mn-btn[aria-pressed=true]",
   ".mn-btn--primary",
   ".mn-btn--primary:hover",
   ".mn-btn--ghost",
@@ -45,7 +44,7 @@ describe("BLOCK_SHEET", () => {
 
   it("draws the card from the tokens", () => {
     expect(BLOCK_SHEET).toContain(
-      "color-mix(in srgb, var(--mn-color-surface) 96%, transparent)",
+      "color-mix(in srgb, var(--mn-color-surface) calc(var(--mn-surface-alpha) * 100%), transparent)",
     );
     expect(BLOCK_SHEET).toContain('content:"SensCritique"');
     expect(BLOCK_SHEET).toContain(
@@ -64,6 +63,34 @@ describe("BLOCK_SHEET", () => {
     expect(BLOCK_SHEET).toMatch(
       /\.mn-btn--ghost\{[^}]*background:transparent[^}]*color:var\(--mn-color-accent-text\)[^}]*border-color:transparent/,
     );
+  });
+
+  it("flattens the cards inside the home panel", () => {
+    expect(BLOCK_SHEET).toContain(
+      ".mn-panel .mn-card{background:transparent;border:0;border-top:1px solid var(--mn-color-border);border-radius:0;box-shadow:none;margin:0;padding:var(--mn-space-3) 0}",
+    );
+    expect(BLOCK_SHEET).toContain(".mn-panel .mn-card::before{content:none}");
+    expect(BLOCK_SHEET).toMatch(/\.mn-panel\{[^}]*margin:var\(--mn-space-3\)/);
+  });
+
+  it("has no rule for a pressed button", () => {
+    expect(BLOCK_SHEET).not.toContain("aria-pressed");
+  });
+
+  it("takes the surface opacity from the token", () => {
+    expect(BLOCK_SHEET).toContain("calc(var(--mn-surface-alpha) * 100%)");
+    expect(BLOCK_SHEET).not.toContain(" 96%");
+  });
+
+  it("spaces the notices, widens the stars and lets the row wrap", () => {
+    expect(BLOCK_SHEET).toMatch(
+      /\.mn-warning\{[^}]*margin-top:var\(--mn-space-2\)/,
+    );
+    expect(BLOCK_SHEET).toMatch(
+      /\.mn-error\{[^}]*margin-top:var\(--mn-space-2\)/,
+    );
+    expect(BLOCK_SHEET).toMatch(/\.mn-star\{[^}]*min-width:24px/);
+    expect(BLOCK_SHEET).toMatch(/\.mn-row--stars\{[^}]*flex-wrap:wrap/);
   });
 
   it("removes the transitions for reduced motion", () => {
