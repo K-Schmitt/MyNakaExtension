@@ -151,7 +151,10 @@ describe("the home panel's drawing", () => {
     const ui = createHomeUi(doc);
     ui.show(homeView([{ card: FILM }]), handlers);
     ui.hide();
-    expect(hostOf(doc).shadow.children).toEqual([]);
+    // Only the stylesheet's <style> node is left (Node has no adopted sheets).
+    expect(
+      hostOf(doc).shadow.children.map((c) => (c as FakeElement).tag),
+    ).toEqual(["style"]);
   });
 
   it("keeps the input events from the page, like the rating blocks", () => {

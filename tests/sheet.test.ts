@@ -24,6 +24,25 @@ describe("attachSheet, adopted path", () => {
   });
 });
 
+describe("attachSheet, adoption refused", () => {
+  it("falls back to the style node when the setter throws", () => {
+    const doc = new FakeDoc();
+    const root = new FakeShadow();
+    Object.defineProperty(root, "adoptedStyleSheets", {
+      set() {
+        throw new Error("refused");
+      },
+    });
+    const out = attachSheet(doc, root, CSS, () => ({ made: true }));
+    const a = new FakeNode();
+    out.replaceChildren(a);
+    const style = root.children[0] as FakeElement;
+    expect(style.tag).toBe("style");
+    expect(style.textContent).toBe(CSS);
+    expect(root.children).toEqual([style, a]);
+  });
+});
+
 describe("attachSheet, fallback path", () => {
   it("keeps one style node first through redraws and hide", () => {
     const doc = new FakeDoc();
