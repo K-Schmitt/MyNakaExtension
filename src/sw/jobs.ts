@@ -51,7 +51,7 @@ import {
 import { dismissJob, rateJob } from "./rating-jobs";
 import { answerRemovalJob } from "./removal-job";
 import { forgetJob, resetJob } from "./reset-jobs";
-import { retryNextJob } from "./retry-job";
+import { retryNextJob, retryPendingJob } from "./retry-job";
 import { settingsJob } from "./settings-job";
 import { type StatusSnapshot, statusSnapshot } from "./status-snapshot";
 import { syncJob, type Trigger } from "./sync-job";
@@ -64,6 +64,8 @@ export type { Trigger } from "./sync-job";
 export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
+  /** I2: true when a retry step would try an entry (read-only); the router tracks a finish only then. */
+  retryPending(since: number): Promise<boolean>;
   /** I2: retries the first waiting finish when a sync queued at `since` ran and succeeded; true: queue another step. */
   retryNext(since: number): Promise<boolean>;
   setMode(mode: Mode): Promise<void>;
@@ -125,6 +127,13 @@ export function createJobs(deps: JobDeps): Jobs {
       quietly(async () => {
         await finishJob(deps, msg);
       }),
+    retryPending: async (since) => {
+      try {
+        return await retryPendingJob(deps, since);
+      } catch {
+        return false;
+      }
+    },
     retryNext: async (since) => {
       try {
         return await retryNextJob(deps, since);

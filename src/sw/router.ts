@@ -59,12 +59,14 @@ export function createRouter(deps: RouterDeps): Router {
     queue.run(job).catch(ignore);
   };
   // One queued job per waiting finish (one job, one tab); a step that dropped its entry queues the next.
+  // Tracked as a finish only when the step will try an entry: a status read must not show one otherwise.
   const retry = (since: number): void =>
-    enqueue(
-      activity.track("finish", async () => {
+    enqueue(async () => {
+      if (!(await jobs.retryPending(since))) return;
+      await activity.track("finish", async () => {
         if (await jobs.retryNext(since)) retry(since);
-      }),
-    );
+      })();
+    });
   // The retry runs right after the sync it follows, and only counts a run recorded since it was queued.
   const sync = (trigger: Trigger) => {
     const since = deps.now();
