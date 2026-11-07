@@ -43,6 +43,19 @@ describe("attachSheet, adoption refused", () => {
   });
 });
 
+describe("attachSheet, no adoptedStyleSheets support", () => {
+  it("falls back to the style node without creating the property", () => {
+    const doc = new FakeDoc();
+    const root = new FakeShadow();
+    Reflect.deleteProperty(root, "adoptedStyleSheets");
+    const out = attachSheet(doc, root, CSS, () => ({ made: true }));
+    expect("adoptedStyleSheets" in root).toBe(false);
+    const style = root.children[0] as FakeElement;
+    expect(style.tag).toBe("style");
+    expect(out).not.toBe(root);
+  });
+});
+
 describe("attachSheet, fallback path", () => {
   it("keeps one style node first through redraws and hide", () => {
     const doc = new FakeDoc();
