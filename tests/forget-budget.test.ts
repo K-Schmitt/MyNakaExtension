@@ -254,6 +254,34 @@ describe("forgetting clears the finish waiting on that title", () => {
     expect(w.network()).toEqual([]);
   });
 
+  // M-2: a drop is never a write; keeping the entry would let the next sync mark the title seen.
+  it("over the hour's budget an untick still drops the waiting finish, and only that", async () => {
+    const w = answerWorld({
+      state: { ...waiting(21, 22), handled: [keyOf(21)] },
+      settings: { mode: "live", forgetWindow: { from: NOW, count: 10 } },
+    });
+    await w.jobs.forgetHandledFromTab(forget(21));
+    expect(w.state().retryFinishes).toEqual([entryOf(22)]);
+    expect(w.state().handled).toEqual([keyOf(21)]);
+    expect(w.state().mapping).toEqual([
+      { nakaId: 21, scId: 1021 },
+      { nakaId: 22, scId: 1022 },
+    ]);
+    expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 10 });
+    expect(w.network()).toEqual([]);
+  });
+
+  it("over the budget, a key with no waiting finish saves nothing", async () => {
+    const w = answerWorld({
+      state: waiting(22),
+      settings: { mode: "live", forgetWindow: { from: NOW, count: 10 } },
+    });
+    w.area.data.set("ratings", [filmCard({ key: keyOf(21), contentId: 21 })]);
+    await w.jobs.forgetHandledFromTab(forget(21));
+    expect(w.stateSaves()).toBe(0);
+    expect(w.cards()).toHaveLength(1);
+  });
+
   it("the page's forget of that key drops the waiting finish too, and only that one", async () => {
     const w = answerWorld({ state: waiting(21, 22) });
     await w.jobs.forgetHandled(forget(21));
