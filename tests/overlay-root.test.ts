@@ -113,7 +113,7 @@ describe("createOverlayRoot", () => {
       onConfirm: vi.fn(),
     });
     const eight = descendants(hostOf(doc).shadow).find(
-      (el) => el.tag === "button" && el.textContent === "8",
+      (el) => el.tag === "button" && el.attributes["aria-label"] === "8 sur 10",
     );
     expect(eight?.dispatch("click", true)).toBe(false);
     expect(onChoose).toHaveBeenCalledTimes(1);

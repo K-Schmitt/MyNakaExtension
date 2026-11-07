@@ -6,7 +6,7 @@ import type { HomeHandlers } from "./home-block";
 import { FOLD_LABEL, UNFOLD_LABEL } from "./home-copy";
 import type { HomeView } from "./home-view";
 import { buildQuestionBlock } from "./question-render";
-import type { BlockLayout, Maker } from "./rating-render";
+import type { Maker } from "./rating-render";
 import { buildBlock, button, textLine } from "./rating-render";
 
 const PANEL_CLASS = "mn-panel";
@@ -14,10 +14,6 @@ const HEAD_CLASS = "mn-panel-head";
 const HEADING_CLASS = "mn-heading";
 const SUBHEADING_CLASS = "mn-subheading";
 const FOLD_CLASS = "mn-btn mn-btn--ghost";
-// 360 px wide: the ten choices on two rows of five, never a lone « 10 » on a row of its own.
-const PANEL_LAYOUT: BlockLayout = {
-  choicesRow: "mn-row mn-row--grid5",
-};
 
 function header(doc: Maker, view: HomeView, onFold: () => void) {
   const head = doc.createElement("div");
@@ -58,9 +54,7 @@ export function renderHome(
   panel.appendChild(header(doc, view, handlers.onFold));
   if (!view.folded) {
     for (const { key, view: entry } of view.entries) {
-      panel.appendChild(
-        buildBlock(doc, entry, handlers.entry(key), PANEL_LAYOUT),
-      );
+      panel.appendChild(buildBlock(doc, entry, handlers.entry(key)));
     }
     appendQuestions(doc, panel, view, handlers);
   }

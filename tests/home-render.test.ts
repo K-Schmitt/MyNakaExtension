@@ -34,6 +34,11 @@ const buttons = (doc: FakeDoc, text: string): FakeElement[] =>
     (el) => el.tag === "button" && el.textContent === text,
   );
 
+const stars = (doc: FakeDoc, n: number): FakeElement[] =>
+  descendants(hostOf(doc).shadow).filter(
+    (el) => el.attributes["aria-label"] === `${n} sur 10`,
+  );
+
 const OFFER: AmbiguityOffer = {
   kind: "ambiguity",
   key: "ambiguity:naka:1",
@@ -77,7 +82,7 @@ describe("the home panel's drawing", () => {
     const doc = new FakeDoc();
     const { handlers, entry } = handlersOf();
     createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
-    const [eight] = buttons(doc, "8");
+    const [eight] = stars(doc, 8);
     eight?.click(false);
     expect(entry.onChoose).not.toHaveBeenCalled();
     eight?.click(true);
@@ -104,7 +109,7 @@ describe("the home panel's drawing", () => {
     const { handlers } = handlersOf();
     createHomeUi(doc).show(homeView([{ card: FILM }], true), handlers);
     expect(buttons(doc, "Développer")).toHaveLength(1);
-    expect(buttons(doc, "8")).toHaveLength(0);
+    expect(stars(doc, 8)).toHaveLength(0);
   });
 
   it("the panel, its head and headings are drawn by classes, with no inline style", () => {
@@ -141,17 +146,14 @@ describe("the home panel's drawing", () => {
     );
   });
 
-  it("the ten choices sit in a 5-column grid: two equal rows, never a lone 10", () => {
+  it("the ten stars sit on one row of the panel", () => {
     const doc = new FakeDoc();
     const { handlers } = handlersOf();
     createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
-    const choices = Array.from(
-      { length: 10 },
-      (_, i) => buttons(doc, String(i + 1))[0],
-    );
-    const row = choices[0]?.parent as FakeElement | null;
-    expect(choices.every((b) => b?.parent === row)).toBe(true);
-    expect(row?.className).toBe("mn-row mn-row--grid5");
+    const choices = Array.from({ length: 10 }, (_, i) => stars(doc, i + 1)[0]);
+    const group = choices[0]?.parent as FakeElement | null;
+    expect(choices.every((b) => b?.parent === group)).toBe(true);
+    expect(group?.className).toBe("mn-stars");
   });
 
   it("hide empties the panel", () => {
