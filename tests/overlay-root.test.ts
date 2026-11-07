@@ -141,4 +141,24 @@ describe("createOverlayRoot", () => {
     expect(declarations.length).toBeGreaterThan(5);
     for (const d of declarations) expect(d, d).toMatch(/ !important$/);
   });
+
+  it("keeps the sheet when the host moves", () => {
+    const doc = new FakeDoc();
+    const player = new FakeNode();
+    const { root } = createOverlayRoot(
+      doc,
+      "top-right",
+      ".mn-card { color: red; }",
+    );
+    root.replaceChildren(new FakeNode());
+    doc.enterFullscreen(player);
+    root.replaceChildren(new FakeNode());
+    doc.enterFullscreen(null);
+    root.replaceChildren(new FakeNode());
+    const style = hostOf(doc).shadow.children[0] as FakeElement;
+    expect(style.tag).toBe("style");
+    expect(style.textContent).toBe(".mn-card { color: red; }");
+    expect(hostOf(doc).shadow.children).toHaveLength(2);
+    expect(hostOf(doc).parent).toBe(doc.body);
+  });
 });

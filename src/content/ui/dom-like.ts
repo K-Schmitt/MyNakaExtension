@@ -10,6 +10,7 @@ export interface NodeLike {
 
 export interface ElementLike extends NodeLike {
   textContent: string | null;
+  className: string;
   readonly parentNode: NodeLike | null;
   style: { cssText: string };
   setAttribute(name: string, value: string): void;
@@ -19,6 +20,7 @@ export interface ElementLike extends NodeLike {
 }
 
 export interface ShadowRootLike extends NodeLike {
+  adoptedStyleSheets?: unknown[];
   replaceChildren(...nodes: NodeLike[]): void;
 }
 
