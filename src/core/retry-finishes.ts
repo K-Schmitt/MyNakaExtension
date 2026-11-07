@@ -61,12 +61,14 @@ function restoreEvicted(mapping: Pair[], evicted: readonly Pair[]): Pair[] {
   return restored;
 }
 
+// A « garder » given on the pair while the finish waited goes with the link: the question comes back open.
 function undoLink(state: SyncState, entry: RetryFinish): SyncState {
   const mapping = withoutPair(state.mapping, entry.pair);
   const undone: SyncState = {
     ...state,
     mapping: restoreEvicted(mapping, entry.evicted),
     snapshot: withoutPair(state.snapshot, entry.pair),
+    settled: withoutPair(state.settled, entry.pair),
     retryLast: withoutPair(state.retryLast, entry.pair),
   };
   return addPending(undone, entry.question);
