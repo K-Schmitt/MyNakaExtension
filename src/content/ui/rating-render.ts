@@ -11,6 +11,7 @@ import {
   SEND_LABEL,
 } from "./rating-copy";
 import type { RatingView } from "./rating-view";
+import { starRater } from "./star-rater";
 import { onTrustedClick } from "./trusted";
 
 export type RatingHandlers = {
@@ -29,10 +30,6 @@ export const ERROR_CLASS = "mn-line mn-error";
 export const WARNING_CLASS = "mn-line mn-warning";
 export const TITLE_CLASS = "mn-line mn-title";
 const ROW_CLASS = "mn-row";
-
-/** How the choices sit: on a wrapping row by default; a narrow panel can ask for a grid (a class string). */
-export type BlockLayout = { choicesRow: string };
-const ROW_LAYOUT: BlockLayout = { choicesRow: ROW_CLASS };
 
 export function textLine(
   doc: Maker,
@@ -70,21 +67,6 @@ export function row(
   return el;
 }
 
-function choiceButton(
-  doc: Maker,
-  choice: RatingView["choices"][number],
-  handlers: RatingHandlers,
-): ElementLike {
-  const el = button(
-    doc,
-    String(choice.value),
-    choice.marked ? PRIMARY_CLASS : BUTTON_CLASS,
-    () => handlers.onChoose(choice.value),
-  );
-  el.setAttribute("aria-pressed", String(choice.marked));
-  return el;
-}
-
 function lines(doc: Maker, view: RatingView): ElementLike[] {
   return [
     textLine(doc, view.heading, TITLE_CLASS),
@@ -111,7 +93,6 @@ function buttonRows(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
-  layout: BlockLayout,
 ): ElementLike[] {
   if (view.confirm === true) return [confirmRow(doc, handlers)];
   const others = view.others.map((label) =>
@@ -124,9 +105,10 @@ function buttonRows(
       handlers.onAction(action),
     ),
   );
-  const choices = view.choices.map((c) => choiceButton(doc, c, handlers));
   return [
-    ...(choices.length > 0 ? [row(doc, choices, layout.choicesRow)] : []),
+    ...(view.choices.length > 0
+      ? [starRater(doc, view.choices, handlers.onChoose)]
+      : []),
     ...[others, actions]
       .filter((buttons) => buttons.length > 0)
       .map((buttons) => row(doc, buttons)),
@@ -137,11 +119,10 @@ export function buildBlock(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
-  layout: BlockLayout = ROW_LAYOUT,
 ): ElementLike {
   const block = doc.createElement("div");
   block.className = BLOCK_CLASS;
-  const rows = buttonRows(doc, view, handlers, layout);
+  const rows = buttonRows(doc, view, handlers);
   for (const el of [...lines(doc, view), ...rows]) block.appendChild(el);
   return block;
 }

@@ -14,9 +14,10 @@ import {
 } from "../src/content/ui/rating-render";
 import { type RatingView, ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
+import { descendants, FakeDoc, FakeElement, FakeShadow } from "./ui-fakes";
 
 function setup() {
+  FakeElement.focused = null;
   const doc = new FakeDoc();
   const root = new FakeShadow();
   const handlers = {
@@ -34,7 +35,14 @@ function setup() {
     if (found === undefined) throw new Error(`no button ${text}`);
     return found;
   };
-  return { doc, root, handlers, block, buttons, button };
+  const star = (n: number) => {
+    const found = buttons().find(
+      (b) => b.attributes["aria-label"] === `${n} sur 10`,
+    );
+    if (found === undefined) throw new Error(`no star ${n}`);
+    return found;
+  };
+  return { doc, root, handlers, block, buttons, button, star };
 }
 
 describe("the rating block", () => {
@@ -42,18 +50,13 @@ describe("the rating block", () => {
     const { block, buttons } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
     const texts = buttons().map((b) => b.textContent);
-    expect(texts.slice(0, 10)).toEqual([
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-    ]);
+    expect(
+      buttons()
+        .slice(0, 10)
+        .map((b) => [b.textContent, b.attributes["aria-label"]]),
+    ).toEqual(
+      Array.from({ length: 10 }, (_, i) => ["\u2605", `${i + 1} sur 10`]),
+    );
     expect(texts).toContain(OTHER_LABELS.épisode);
     expect(texts).toContain(OTHER_LABELS.série);
     expect(texts).not.toContain(OTHER_LABELS.saison);
@@ -71,9 +74,9 @@ describe("the rating block", () => {
   });
 
   it("a trusted click calls the handler with the value, the action, the label", () => {
-    const { block, handlers, button } = setup();
+    const { block, handlers, button, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
-    button("8").click(true);
+    star(8).click(true);
     button(ACTION_LABELS.ignorer).click(true);
     button(OTHER_LABELS.série).click(true);
     expect(handlers.onChoose).toHaveBeenCalledWith(8);
@@ -91,10 +94,13 @@ describe("the rating block", () => {
   });
 
   it("marks the start choice", () => {
-    const { block, button } = setup();
+    const { block, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
-    expect(button("8").attributes["aria-pressed"]).toBe("true");
-    expect(button("7").attributes["aria-pressed"]).toBe("false");
+    expect(star(8).attributes["aria-checked"]).toBe("true");
+    expect(star(7).attributes["aria-checked"]).toBe("false");
+    expect(star(8).attributes.tabindex).toBe("0");
+    expect(star(7).attributes.tabindex).toBe("-1");
+    expect(star(8).attributes.role).toBe("radio");
   });
 
   it("shows the warning and the error lines", () => {
@@ -146,11 +152,61 @@ describe("the rating block", () => {
     expect(handlers.onConfirm.mock.calls).toEqual([[true], [false]]);
   });
 
-  it("the rating block keeps its choices on a wrapping row", () => {
-    const { block, button } = setup();
+  it("the ten stars sit in one radiogroup, followed by the marked value", () => {
+    const { block, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
-    const row = button("1").parent as { className: string } | null;
-    expect(row?.className).toBe("mn-row");
+    const group = star(1).parent as FakeElement;
+    expect(group.className).toBe("mn-stars");
+    expect(group.attributes.role).toBe("radiogroup");
+    expect(group.attributes["aria-label"]).toBe("Note");
+    expect(group.children.filter((c) => c === star(1))).toHaveLength(1);
+    expect(
+      Array.from({ length: 10 }, (_, i) => star(i + 1).parent === group),
+    ).toEqual(Array(10).fill(true));
+    const value = group.parent?.children[1] as FakeElement;
+    expect(value.className).toBe("mn-stars-value");
+    expect(value.textContent).toBe("8/10");
+  });
+
+  it("with no marked value the first star takes the tab stop and the value is empty", () => {
+    const { block, star } = setup();
+    block.show({
+      ...ratingView(episodeCard(), "saison", 8),
+      choices: ratingView(episodeCard(), "saison", 8).choices.map((c) => ({
+        ...c,
+        marked: false,
+      })),
+    });
+    expect(star(1).attributes.tabindex).toBe("0");
+    expect(star(2).attributes.tabindex).toBe("-1");
+    const group = star(1).parent as FakeElement;
+    const value = group.parent?.children[1] as FakeElement | undefined;
+    expect(value?.textContent).toBe("");
+  });
+
+  it("arrow keys move the focus and the tab stop, never choosing", () => {
+    const { block, handlers, star } = setup();
+    block.show(ratingView(episodeCard(), "saison", 8));
+    const group = star(8).parent as FakeElement;
+    group.press("ArrowRight");
+    expect(FakeElement.focused).toBe(star(9));
+    expect(star(9).attributes.tabindex).toBe("0");
+    expect(star(8).attributes.tabindex).toBe("-1");
+    group.press("ArrowLeft");
+    group.press("ArrowLeft");
+    expect(FakeElement.focused).toBe(star(7));
+    group.press("Enter");
+    expect(FakeElement.focused).toBe(star(7));
+    expect(handlers.onChoose).not.toHaveBeenCalled();
+  });
+
+  it("arrow keys stop at both ends", () => {
+    const { block, star } = setup();
+    block.show(ratingView(episodeCard(), "saison", 10));
+    const group = star(10).parent as FakeElement;
+    group.press("ArrowRight");
+    expect(FakeElement.focused).toBeNull();
+    expect(star(10).attributes.tabindex).toBe("0");
   });
 
   it("a view with a notice and no buttons draws the notice and no row", () => {
@@ -209,11 +265,10 @@ describe("the block's classes", () => {
     );
   });
 
-  it("marks the chosen note and « Envoyer » as primary, the rest plain", () => {
-    const { block, button } = setup();
+  it("marks « Envoyer » as primary, the rest plain", () => {
+    const { block, button, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
-    expect(button("8").className).toBe("mn-btn mn-btn--primary");
-    expect(button("7").className).toBe("mn-btn");
+    expect(star(8).className).toBe("mn-star");
     block.show({ ...ratingView(episodeCard(), "saison", 8), confirm: true });
     expect(button(SEND_LABEL).className).toBe("mn-btn mn-btn--primary");
     expect(button(CANCEL_LABEL).className).toBe("mn-btn");

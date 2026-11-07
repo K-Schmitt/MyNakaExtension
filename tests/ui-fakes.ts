@@ -46,6 +46,8 @@ export class FakeElement extends FakeNode implements ElementLike {
   listeners: Record<string, ((event: EventLike) => void)[]> = {};
   shadowInit: { mode: string }[] = [];
   shadow = new FakeShadow();
+  focusCount = 0;
+  static focused: FakeElement | null = null;
 
   constructor(readonly tag: string) {
     super();
@@ -65,15 +67,21 @@ export class FakeElement extends FakeNode implements ElementLike {
     return this.shadow;
   }
 
+  focus(): void {
+    this.focusCount += 1;
+    FakeElement.focused = this;
+  }
+
   remove(): void {
     this.parent?.drop(this);
   }
 
   /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
-  dispatch(type: string, isTrusted: unknown = true): boolean {
+  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
     let stopped = false;
     const event = {
       isTrusted,
+      key,
       stopPropagation: () => {
         stopped = true;
       },
@@ -86,6 +94,10 @@ export class FakeElement extends FakeNode implements ElementLike {
       node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
     }
     return !stopped;
+  }
+
+  press(key: string): void {
+    this.dispatch("keydown", true, key);
   }
 
   click(isTrusted: boolean): void {
