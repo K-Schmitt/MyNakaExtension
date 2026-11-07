@@ -113,8 +113,8 @@ describe("the home panel's drawing", () => {
     createHomeUi(doc).show(homeView([{ card: FILM }]), handlers);
     const [fold] = buttons(doc, "Réduire");
     const [ignore] = buttons(doc, "Ignorer");
-    expect(fold?.style.cssText).toBe(ignore?.style.cssText);
-    expect(fold?.style.cssText).toContain("font: inherit;");
+    expect(fold?.className).toBe(ignore?.className);
+    expect(fold?.className).toBe("mn-btn");
     // `font: inherit` takes the nearest declared font: the panel's, for the fold button; the block's, for
     // the entry's buttons. Both must declare the same one.
     const fontOf = (el: FakeElement | undefined): string | undefined => {
@@ -139,10 +139,7 @@ describe("the home panel's drawing", () => {
     );
     const row = choices[0]?.parent as FakeElement | null;
     expect(choices.every((b) => b?.parent === row)).toBe(true);
-    const css = row?.style.cssText ?? "";
-    expect(css).toContain("display: grid;");
-    expect(css).toContain("grid-template-columns: repeat(5, 1fr);");
-    expect(css).not.toContain("flex");
+    expect(row?.className).toBe("mn-row mn-row--grid5");
   });
 
   it("hide empties the panel", () => {

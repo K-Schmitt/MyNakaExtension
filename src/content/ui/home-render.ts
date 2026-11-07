@@ -9,7 +9,7 @@ import { buildQuestionBlock } from "./question-render";
 import type { BlockLayout, Maker } from "./rating-render";
 import {
   BLOCK_TEXT_CSS,
-  BUTTON_CSS,
+  BUTTON_CLASS,
   buildBlock,
   button,
   textLine,
@@ -24,16 +24,22 @@ const HEADING_CSS = "font: 700 15px/1.4 system-ui, sans-serif; color: #fff;";
 const SUBHEADING_CSS = `${HEADING_CSS} margin: 12px 12px 0;`;
 // 360 px wide: the ten choices on two rows of five, never a lone « 10 » on a row of its own.
 const PANEL_LAYOUT: BlockLayout = {
-  choicesRow:
-    "display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px;",
+  choicesRow: "mn-row mn-row--grid5",
 };
+
+// Temporary (Task 5 migrates the panel): a heading line still styled inline.
+function cssLine(doc: Maker, text: string, css: string): ElementLike {
+  const line = textLine(doc, text, "");
+  line.style.cssText = css;
+  return line;
+}
 
 function header(doc: Maker, view: HomeView, onFold: () => void) {
   const head = doc.createElement("div");
   head.style.cssText = HEAD_CSS;
-  head.appendChild(textLine(doc, view.heading, HEADING_CSS));
+  head.appendChild(cssLine(doc, view.heading, HEADING_CSS));
   const label = view.folded ? UNFOLD_LABEL : FOLD_LABEL;
-  head.appendChild(button(doc, label, BUTTON_CSS, onFold));
+  head.appendChild(button(doc, label, BUTTON_CLASS, onFold));
   return head;
 }
 
@@ -46,7 +52,7 @@ function appendQuestions(
 ): void {
   if (view.questions.length === 0) return;
   if (view.entries.length > 0) {
-    panel.appendChild(textLine(doc, view.questionsHeading, SUBHEADING_CSS));
+    panel.appendChild(cssLine(doc, view.questionsHeading, SUBHEADING_CSS));
   }
   for (const { key, view: question } of view.questions) {
     panel.appendChild(

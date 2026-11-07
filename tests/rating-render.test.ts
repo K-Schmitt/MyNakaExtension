@@ -149,9 +149,8 @@ describe("the rating block", () => {
   it("the rating block keeps its choices on a wrapping row", () => {
     const { block, button } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
-    const row = button("1").parent as { style: { cssText: string } } | null;
-    expect(row?.style.cssText).toContain("display: flex;");
-    expect(row?.style.cssText).toContain("flex-wrap: wrap;");
+    const row = button("1").parent as { className: string } | null;
+    expect(row?.className).toBe("mn-row");
   });
 
   it("a view with a notice and no buttons draws the notice and no row", () => {
@@ -168,7 +167,9 @@ describe("the rating block", () => {
       descendants(root).some((el) => el.textContent === SENDING_LINE),
     ).toBe(true);
     expect(
-      descendants(root).filter((el) => el.style.cssText.includes("flex")),
+      descendants(root).filter((el) =>
+        el.className.split(" ").includes("mn-row"),
+      ),
     ).toEqual([]);
   });
 });
@@ -177,8 +178,9 @@ describe("the shared draw pieces", () => {
   it("makes a button that acts on a trusted click only, with text", () => {
     const doc = new FakeDoc();
     const fn = vi.fn();
-    const el = button(doc, "<b>x</b>", "", fn) as FakeElement;
+    const el = button(doc, "<b>x</b>", "mn-btn", fn) as FakeElement;
     expect(el.textContent).toBe("<b>x</b>");
+    expect(el.className).toBe("mn-btn");
     el.click(false);
     expect(fn).not.toHaveBeenCalled();
     el.click(true);
@@ -186,12 +188,47 @@ describe("the shared draw pieces", () => {
   });
 
   it("makes a text line holding text, not markup", () => {
-    const line = textLine(
-      new FakeDoc(),
-      "<i>y</i>",
-      "color: red;",
-    ) as FakeElement;
+    const doc = new FakeDoc();
+    const line = textLine(doc, "<i>y</i>") as FakeElement;
     expect(line.textContent).toBe("<i>y</i>");
-    expect(line.style.cssText).toBe("color: red;");
+    expect(line.className).toBe("mn-line");
+    expect(textLine(doc, "z", "mn-line mn-error").className).toBe(
+      "mn-line mn-error",
+    );
+  });
+});
+
+describe("the block's classes", () => {
+  it("draws the block as a card, its heading as a title", () => {
+    const { block, root } = setup();
+    block.show(ratingView(episodeCard(), "épisode"));
+    const card = root.children[0] as FakeElement;
+    expect(card.className).toBe("mn-card");
+    expect((card.children[0] as FakeElement).className).toBe(
+      "mn-line mn-title",
+    );
+  });
+
+  it("marks the chosen note and « Envoyer » as primary, the rest plain", () => {
+    const { block, button } = setup();
+    block.show(ratingView(episodeCard(), "saison", 8));
+    expect(button("8").className).toBe("mn-btn mn-btn--primary");
+    expect(button("7").className).toBe("mn-btn");
+    block.show({ ...ratingView(episodeCard(), "saison", 8), confirm: true });
+    expect(button(SEND_LABEL).className).toBe("mn-btn mn-btn--primary");
+    expect(button(CANCEL_LABEL).className).toBe("mn-btn");
+  });
+
+  it("draws an error and a warning with their classes", () => {
+    const { block, root } = setup();
+    block.show({
+      ...ratingView(episodeCard(), "épisode"),
+      error: "boom",
+      warning: "careful",
+    });
+    const classOf = (text: string) =>
+      descendants(root).find((el) => el.textContent === text)?.className;
+    expect(classOf("boom")).toBe("mn-line mn-error");
+    expect(classOf("careful")).toBe("mn-line mn-warning");
   });
 });
