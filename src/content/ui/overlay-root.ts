@@ -15,6 +15,7 @@ export type Placement = "top-right" | "bottom-right";
 // !important must not hide or fade the host.
 const COMMON_STYLE = [
   "all: initial",
+  "color-scheme: dark",
   "position: fixed",
   "right: 0",
   "overflow: auto",

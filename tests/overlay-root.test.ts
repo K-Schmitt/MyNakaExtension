@@ -73,6 +73,7 @@ describe("createOverlayRoot", () => {
     expect(css).toContain("right: 0");
     expect(css).toContain("max-width: 40%");
     expect(css).toContain("max-height: 80%");
+    expect(css).toContain("color-scheme: dark !important");
   });
 
   it("the bottom right placement keeps the reset, the z-index and the stopped events", () => {
