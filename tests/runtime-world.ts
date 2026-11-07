@@ -698,6 +698,9 @@ async function answerRun(
 
 export function observed(w: World, gen: number, jobs: Jobs): Jobs {
   const run: Run = async (key, ctx, job) => {
+    // A real clock moves between two jobs: without it, two failures of one title made in one step leave
+    // identical records, and an oracle cannot tell this job's record from the one before it.
+    w.time += 1;
     checkInvoked(w, key);
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);

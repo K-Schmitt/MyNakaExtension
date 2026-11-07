@@ -29,7 +29,7 @@ function removalOf(
     type: "answer-removal",
     removeFrom,
     ...pair,
-    remove: w.r() < 0.6,
+    remove: w.r() < 0.7,
   };
   return { msg, role: role(w) };
 }
@@ -112,7 +112,7 @@ function hideAnswer(w: World): AnswerSend | undefined {
 // One answer from a sender that may send it.
 export function answerSend(w: World): AnswerSend {
   const a = w.r();
-  if (a < 0.3) return storedRemovalAnswer(w) ?? blockAnswer(w);
+  if (a < 0.4) return storedRemovalAnswer(w) ?? blockAnswer(w);
   if (a < 0.55) return blockAnswer(w);
   if (a < 0.9) return questionAnswer(w);
   return hideAnswer(w) ?? questionAnswer(w);

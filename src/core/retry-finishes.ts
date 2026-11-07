@@ -24,6 +24,11 @@ export function retriesOf(state: SyncState): RetryFinish[] {
   return state.retryFinishes ?? [];
 }
 
+/** A finish waits for a Naka tab under this key. */
+export function isWaiting(state: SyncState, key: string): boolean {
+  return retriesOf(state).some((e) => e.key === key);
+}
+
 export function addRetry(state: SyncState, entry: RetryFinish): SyncState {
   const others = retriesOf(state).filter((e) => e.key !== entry.key);
   const retryFinishes = [...others, entry].slice(-MAX_RETRY_FINISHES);
@@ -56,12 +61,14 @@ function restoreEvicted(mapping: Pair[], evicted: readonly Pair[]): Pair[] {
   return restored;
 }
 
+// A « garder » given on the pair while the finish waited goes with the link: the question comes back open.
 function undoLink(state: SyncState, entry: RetryFinish): SyncState {
   const mapping = withoutPair(state.mapping, entry.pair);
   const undone: SyncState = {
     ...state,
     mapping: restoreEvicted(mapping, entry.evicted),
     snapshot: withoutPair(state.snapshot, entry.pair),
+    settled: withoutPair(state.settled, entry.pair),
     retryLast: withoutPair(state.retryLast, entry.pair),
   };
   return addPending(undone, entry.question);

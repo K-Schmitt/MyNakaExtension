@@ -83,6 +83,16 @@ describe("retryNextJob", () => {
     expect(w.state().retryFinishes).toHaveLength(2);
   });
 
+  // In Chrome a sync often stamps its run in the very millisecond its retry was queued.
+  it("retries after a run stamped at the exact time the step was queued", async () => {
+    const w = waitingWorld([entry(5)], {
+      settings: settingsWith(lastRun({ at: SINCE })),
+    });
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
+    expect(doneCalls(w)).toEqual(["markDone:1005:2026-11-05"]);
+    expect(w.state().retryFinishes).toBeUndefined();
+  });
+
   for (const [name, settings] of NOT_YET) {
     it(`does nothing when the last run ${name}`, async () => {
       const w = waitingWorld([entry(5)], { settings });
@@ -168,6 +178,31 @@ describe("retryNextJob", () => {
       "movie:6",
     ]);
     expect(w.settings().lastFinish).toMatchObject({ error: "finish-limit" });
+  });
+
+  it("keeps the entry and stops when the Naka tab changed page under the retry", async () => {
+    // The content read pins the tab; it is still listed but no longer answers: naka-tab-changed.
+    let sends = 0;
+    const w = waitingWorld([entry(5), entry(6)], {
+      tabs: (real) => ({
+        query: real.query,
+        send: async (tabId, msg) => {
+          sends += 1;
+          if (sends > 1) throw new Error("Could not establish connection.");
+          return real.send(tabId, msg);
+        },
+      }),
+    });
+    expect(await steps(w)).toEqual([false]);
+    expect(w.settings().lastFinish).toMatchObject({
+      outcome: "failed",
+      error: "naka-tab-changed",
+    });
+    expect(w.state().retryFinishes?.map((e) => e.key)).toEqual([
+      "movie:5",
+      "movie:6",
+    ]);
+    expect(w.writes()).toEqual([]);
   });
 
   it("drops an entry whose pair is no longer linked, without a finish", async () => {
