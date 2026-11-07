@@ -26,6 +26,7 @@ function withStyleNode(root: ShadowRootLike, style: NodeLike): ShadowRootLike {
 }
 
 function tryAdopt(root: ShadowRootLike, sheet: unknown): boolean {
+  if (!("adoptedStyleSheets" in root)) return false;
   try {
     root.adoptedStyleSheets = [sheet];
     return true;
