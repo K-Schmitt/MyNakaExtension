@@ -1496,6 +1496,30 @@ describe("router: the status answer waits for no job", () => {
     expect(r.calls.at(-1)).toBe("handled-titles:[]");
   });
 
+  it("two cancel-retry of one key keep it hidden until the second job ends", async () => {
+    const second = latch();
+    let runs = 0;
+    const r = router({
+      cancelRetry: async () => {
+        runs += 1;
+        if (runs === 2) await second.opened;
+      },
+    });
+    const msg = { type: "cancel-retry", contentId: 3 };
+    r.send(msg, STATUS_PAGE);
+    r.send(msg, STATUS_PAGE);
+    await settle();
+    expect(runs).toBe(2);
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.at(-1)).toBe('handled-titles:["movie:3"]');
+    second.open();
+    await settle();
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.at(-1)).toBe("handled-titles:[]");
+  });
+
   it("cancel-retry from a Naka tab is ignored", async () => {
     const r = router();
     expect(r.send({ type: "cancel-retry", contentId: 3 }, NAKA_TAB)).toBe(
