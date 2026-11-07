@@ -308,17 +308,73 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls.filter((c) => c.startsWith("retry:"))).toHaveLength(1);
   });
 
-  it("each retry takes the time its sync was queued", async () => {
+  // A2: one waiting step, after the last sync, with the earliest time: a sync stamps its run at its
+  // start, so the later time alone would miss the first sync's success.
+  it("a sync queued while a retry step waits merges them: one step, last, with the earlier time", async () => {
     const r = router();
     r.send({ type: "resync" }, STATUS_PAGE);
     r.time.now = ROUTER_NOW + 60_000;
     r.send({ type: "naka-ready" }, NAKA_TAB);
+    r.time.now = ROUTER_NOW + 120_000;
+    r.send({ type: "naka-ready" }, NAKA_TAB);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      "sync:naka-ready",
+      "sync:naka-ready",
+      `retry:${ROUTER_NOW}`,
+    ]);
+  });
+
+  it("a retry step already started is not merged: the next sync queues its own, with its own time", async () => {
+    const r = router();
+    let release = (): void => {};
+    let first = true;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    r.jobs.retryNext = async (since: number) => {
+      r.calls.push(`retry:${since}`);
+      if (first) {
+        first = false;
+        await blocked;
+      }
+      return false;
+    };
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.time.now = ROUTER_NOW + 60_000;
+    r.send({ type: "naka-ready" }, NAKA_TAB);
+    release();
     await settle();
     expect(r.calls).toEqual([
       "sync:button",
       `retry:${ROUTER_NOW}`,
       "sync:naka-ready",
       `retry:${ROUTER_NOW + 60_000}`,
+    ]);
+  });
+
+  it("a chain step queued while a sync's step waits merges with it", async () => {
+    const answers = [true, false];
+    const r = router({
+      retryNext: async (since: number) => {
+        r.calls.push(`retry:${since}`);
+        const next = answers.shift() ?? false;
+        if (next) {
+          r.time.now = ROUTER_NOW + 60_000;
+          r.send({ type: "naka-ready" }, NAKA_TAB);
+        }
+        return next;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls).toEqual([
+      "sync:button",
+      `retry:${ROUTER_NOW}`,
+      "sync:naka-ready",
+      `retry:${ROUTER_NOW}`,
     ]);
   });
 
