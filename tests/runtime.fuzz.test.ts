@@ -404,8 +404,10 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     // tab after an orphan refused, 810 status answers given while a job ran, 1431 finished messages
     // sent below the stored threshold). The oracles' positive controls: tests/runtime-oracles.test.ts.
     // The answers (measured over the 450 seeds: 1500 removal answers, 1400 block answers, 1100 question
-    // answers, 120 candidate choices, 900 stray choices, 90 dismissals, 19 removal writes, 20 « Non »
-    // that closed a stored removal): the last three kinds are rare by nature, a lower floor.
+    // answers, 120 candidate choices, 900 stray choices, 90 dismissals, 15 removal writes, 14 « Non »
+    // that closed a stored removal): the last three kinds are rare by nature, a lower floor. The two
+    // removal kinds drifted from 15 down to 10 with unrelated changes (2026-11-07): the stored-removal
+    // share is 0.4 and « Retirer » 0.7 of removal answers, so that they keep a margin over the floor.
     // The I2 retry (measured: 61 retry writes over the 450 seeds, the lever at weight 0.02): it needs a
     // waiting note, then a sync with the tab back, so it is rare too.
     const rare = ["hides", "removalWrites", "declines", "retryWrites"];

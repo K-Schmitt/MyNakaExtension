@@ -60,11 +60,12 @@ export function createRouter(deps: RouterDeps): Router {
     queue.run(job).catch(ignore);
   };
   // One queued job per waiting finish (one job, one tab); a step that dropped its entry queues the next.
-  const retry = createRetrySteps(
+  const retry = createRetrySteps({
     enqueue,
-    (job) => activity.track("finish", job),
-    (since) => jobs.retryNext(since),
-  );
+    track: (job) => activity.track("finish", job),
+    pending: (since) => jobs.retryPending(since),
+    next: (since) => jobs.retryNext(since),
+  });
   // The retry runs after the sync it follows, and only counts a run recorded since it was queued.
   const sync = (trigger: Trigger) => {
     const since = deps.now();
@@ -80,8 +81,13 @@ export function createRouter(deps: RouterDeps): Router {
   const tabForgets = createForgetQueue(enqueue, (msg) =>
     jobs.forgetHandledFromTab(msg),
   );
-  // P3: the keys whose cancel is queued; the handled-titles answer omits them until the job ends.
-  const cancelling = new Set<string>();
+  // P3: the keys whose cancel is queued, with how many; the handled-titles answer omits them until the last job ends.
+  const cancelling = new Map<string, number>();
+  const cancelEnded = (key: string): void => {
+    const left = (cancelling.get(key) ?? 1) - 1;
+    if (left > 0) cancelling.set(key, left);
+    else cancelling.delete(key);
+  };
   const questions = createQuestionRoutes(enqueue, jobs);
 
   // The answers add what the queue alone knows: the ratings still being sent. With no card, the asked
@@ -186,21 +192,21 @@ export function createRouter(deps: RouterDeps): Router {
         );
       case "cancel-retry": {
         const key = contentKeyOf(msg);
-        cancelling.add(key);
+        cancelling.set(key, (cancelling.get(key) ?? 0) + 1);
         return queued(
           () =>
             enqueue(async () => {
               try {
                 await jobs.cancelRetry(msg);
               } finally {
-                cancelling.delete(key);
+                cancelEnded(key);
               }
             }),
           respond,
         );
       }
       case "handled-titles":
-        answerRead(() => jobs.handledTitles([...cancelling]), respond);
+        answerRead(() => jobs.handledTitles([...cancelling.keys()]), respond);
         return true;
       case "open-questions":
       case "removal-offer":

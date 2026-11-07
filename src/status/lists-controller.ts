@@ -50,11 +50,11 @@ export function createListsController(ports: ListsPorts): ListsController {
   const locked = (key: QuestionKey) =>
     state.busy.includes(key) || answer?.answering?.includes(key) === true;
 
-  // One poll armed at most, and only while the worker holds an answer.
+  // One poll armed at most, and only while the worker holds an answer or an accepted one is awaited.
   function schedule(): void {
     if (poll !== undefined) ports.timer.clear(poll);
     poll = undefined;
-    if ((answer?.answering ?? []).length === 0) return;
+    if ((answer?.answering ?? []).length === 0 && awaiting.size === 0) return;
     poll = ports.timer.set(() => {
       poll = undefined;
       void load();

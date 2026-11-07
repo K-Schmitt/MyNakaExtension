@@ -127,6 +127,7 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     syncJob: async (trigger: Trigger) => {
       calls.push(`sync:${trigger}`);
     },
+    retryPending: async () => true,
     retryNext: async (since: number) => {
       calls.push(`retry:${since}`);
       return false;
@@ -281,7 +282,7 @@ describe("router: trusted messages become jobs", () => {
   });
 
   it("a step that answers true queues one more step, each its own job", async () => {
-    let answers = [true, true, false];
+    const answers = [true, true, false];
     const r = router({
       retryNext: async (since: number) => {
         r.calls.push(`retry:${since}`);
@@ -298,7 +299,6 @@ describe("router: trusted messages become jobs", () => {
       `retry:${ROUTER_NOW}`,
       `retry:${ROUTER_NOW}`,
     ]);
-    answers = [];
   });
 
   it("a step that answers false queues no other", async () => {
@@ -1344,6 +1344,48 @@ describe("router: the status answer waits for no job", () => {
     expect(await g.status()).not.toHaveProperty("running");
   });
 
+  it("a retry step with nothing waiting shows no finish in progress", async () => {
+    const check = latch();
+    const r = router({
+      retryPending: async () => {
+        await check.opened;
+        return false;
+      },
+      retryNext: async () => {
+        await check.opened;
+        return false;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).not.toHaveProperty("running");
+    check.open();
+    await settle();
+    expect(r.calls.filter((c) => c.startsWith("retry:"))).toEqual([]);
+  });
+
+  it("a retry step with an entry waiting shows a finish in progress", async () => {
+    const step = latch();
+    const r = router({
+      retryPending: async () => true,
+      retryNext: async () => {
+        await step.opened;
+        return false;
+      },
+    });
+    r.send({ type: "resync" }, STATUS_PAGE);
+    await settle();
+    r.send({ type: "status" }, STATUS_PAGE);
+    await settle();
+    expect(r.answers.at(-1)).toMatchObject({
+      running: { kind: "finish" },
+    });
+    step.open();
+    await settle();
+  });
+
   it("a set-mode queued behind a sync shows pendingMode until it is applied", async () => {
     const g = gated();
     g.r.send({ type: "resync" }, STATUS_PAGE);
@@ -1506,6 +1548,30 @@ describe("router: the status answer waits for no job", () => {
     blocker.open();
     await settle();
     expect(r.calls).toContain(`cancel-retry:${JSON.stringify(msg)}`);
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.at(-1)).toBe("handled-titles:[]");
+  });
+
+  it("two cancel-retry of one key keep it hidden until the second job ends", async () => {
+    const second = latch();
+    let runs = 0;
+    const r = router({
+      cancelRetry: async () => {
+        runs += 1;
+        if (runs === 2) await second.opened;
+      },
+    });
+    const msg = { type: "cancel-retry", contentId: 3 };
+    r.send(msg, STATUS_PAGE);
+    r.send(msg, STATUS_PAGE);
+    await settle();
+    expect(runs).toBe(2);
+    r.send({ type: "handled-titles" }, STATUS_PAGE);
+    await settle();
+    expect(r.calls.at(-1)).toBe('handled-titles:["movie:3"]');
+    second.open();
+    await settle();
     r.send({ type: "handled-titles" }, STATUS_PAGE);
     await settle();
     expect(r.calls.at(-1)).toBe("handled-titles:[]");

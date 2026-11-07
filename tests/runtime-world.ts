@@ -698,6 +698,9 @@ async function answerRun(
 
 export function observed(w: World, gen: number, jobs: Jobs): Jobs {
   const run: Run = async (key, ctx, job) => {
+    // A real clock moves between two jobs: without it, two failures of one title made in one step leave
+    // identical records, and an oracle cannot tell this job's record from the one before it.
+    w.time += 1;
     checkInvoked(w, key);
     if ((w.active.get(gen) ?? 0) > 0) violation(w, `two jobs at once (${key})`);
     w.active.set(gen, (w.active.get(gen) ?? 0) + 1);
@@ -737,6 +740,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
     // I2: the router queues one retry step per sync, then one per step that answered true (O7 counts both;
     // O17 judges the writes).
+    retryPending: (since) => jobs.retryPending(since),
     retryNext: async (since) => {
       const more = await run("retry", { kind: "retry" }, () =>
         jobs.retryNext(since),

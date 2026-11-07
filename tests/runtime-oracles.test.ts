@@ -53,6 +53,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
   return {
     syncJob: async () => undefined,
     finishJob: async () => undefined,
+    retryPending: async () => true,
     retryNext: async () => false,
     setMode: async () => undefined,
     setSettings: async () => undefined,
