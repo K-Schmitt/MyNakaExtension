@@ -24,6 +24,7 @@ const SELECTORS = [
   ".mn-btn[aria-pressed=true]",
   ".mn-btn--primary",
   ".mn-btn--primary:hover",
+  ".mn-btn--ghost",
   ".mn-panel",
   ".mn-panel-head",
   ".mn-heading",
@@ -46,6 +47,19 @@ describe("BLOCK_SHEET", () => {
     expect(BLOCK_SHEET).toContain('content:"SensCritique"');
     expect(BLOCK_SHEET).toContain(
       "outline:2px solid var(--mn-color-accent-text)",
+    );
+  });
+
+  it("declares .mn-line before the classes that refine it", () => {
+    const at = (selector: string) => BLOCK_SHEET.indexOf(`${selector}{`);
+    expect(at(".mn-line")).toBeLessThan(at(".mn-title"));
+    expect(at(".mn-line")).toBeLessThan(at(".mn-warning"));
+    expect(at(".mn-line")).toBeLessThan(at(".mn-error"));
+  });
+
+  it("draws the ghost button transparent, in the accent text colour, borderless", () => {
+    expect(BLOCK_SHEET).toMatch(
+      /\.mn-btn--ghost\{[^}]*background:transparent[^}]*color:var\(--mn-color-accent-text\)[^}]*border-color:transparent/,
     );
   });
 

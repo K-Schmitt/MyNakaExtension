@@ -22,10 +22,6 @@ export type RatingHandlers = {
 
 export type Maker = Pick<DocLike, "createElement">;
 
-// Temporary (Task 5 migrates home-render): the text style of the home panel, kept for it alone.
-export const BLOCK_TEXT_CSS =
-  "font: 14px/1.4 system-ui, sans-serif; color: #fff;";
-
 export const BLOCK_CLASS = "mn-card";
 export const BUTTON_CLASS = "mn-btn";
 export const PRIMARY_CLASS = "mn-btn mn-btn--primary";
