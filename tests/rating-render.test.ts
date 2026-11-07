@@ -168,6 +168,38 @@ describe("the rating block", () => {
     expect(value.textContent).toBe("8/10");
   });
 
+  it("two marked choices show one value: the highest holds the check, the tab stop and the text", () => {
+    const { block, buttons, star } = setup();
+    const view = ratingView(episodeCard(), "saison", 8);
+    block.show({
+      ...view,
+      choices: view.choices.map((c) => ({
+        ...c,
+        marked: c.value === 6 || c.value === 8,
+      })),
+    });
+    const checked = buttons().filter(
+      (b) => b.attributes["aria-checked"] === "true",
+    );
+    expect(checked).toEqual([star(8)]);
+    expect(star(8).attributes.tabindex).toBe("0");
+    expect(star(6).attributes.tabindex).toBe("-1");
+    const group = star(8).parent as FakeElement;
+    const value = group.parent?.children[1] as FakeElement;
+    expect(value.textContent).toBe("8/10");
+  });
+
+  it.each(Array.from({ length: 10 }, (_, i) => i + 1))(
+    "a trusted click on star %i chooses exactly that value once",
+    (n) => {
+      const { block, handlers, star } = setup();
+      block.show(ratingView(episodeCard(), "saison", 8));
+      star(n).click(true);
+      expect(handlers.onChoose).toHaveBeenCalledTimes(1);
+      expect(handlers.onChoose).toHaveBeenCalledWith(n);
+    },
+  );
+
   it("with no marked value the first star takes the tab stop and the value is empty", () => {
     const { block, star } = setup();
     block.show({

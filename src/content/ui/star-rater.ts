@@ -10,17 +10,18 @@ type Maker = Pick<DocLike, "createElement">;
 
 const STAR_GLYPH = "★";
 
-function startIndex(stars: Star[]): number {
+// Two choices can be marked (the start and the current value): the stars show the highest one.
+function shownIndex(stars: Star[]): number {
   return Math.max(
     0,
-    stars.findIndex((s) => s.marked),
+    stars.findLastIndex((s) => s.marked),
   );
 }
 
 function starButton(
   doc: Maker,
   star: Star,
-  tabStop: boolean,
+  shown: boolean,
   onChoose: (value: number) => void,
 ): ElementLike {
   const el = doc.createElement("button");
@@ -28,9 +29,9 @@ function starButton(
   el.className = "mn-star";
   el.setAttribute("type", "button");
   el.setAttribute("role", "radio");
-  el.setAttribute("aria-checked", String(star.marked));
+  el.setAttribute("aria-checked", String(shown && star.marked));
   el.setAttribute("aria-label", `${star.value} sur 10`);
-  el.setAttribute("tabindex", tabStop ? "0" : "-1");
+  el.setAttribute("tabindex", shown ? "0" : "-1");
   onTrustedClick(el, () => onChoose(star.value));
   return el;
 }
@@ -44,15 +45,18 @@ function moveFocus(buttons: ElementLike[], from: number, to: number): number {
   return next;
 }
 
-function onArrows(buttons: ElementLike[], start: number): void {
+function onArrows(
+  group: ElementLike,
+  buttons: ElementLike[],
+  start: number,
+): void {
   let current = start;
   buttons.forEach((b, i) => {
     b.addEventListener("focus", () => {
       current = i;
     });
   });
-  const group = buttons[0]?.parentNode as ElementLike | null;
-  group?.addEventListener("keydown", (event) => {
+  group.addEventListener("keydown", (event) => {
     if (event.key === "ArrowRight")
       current = moveFocus(buttons, current, current + 1);
     if (event.key === "ArrowLeft")
@@ -66,7 +70,7 @@ export function starRater(
   stars: Star[],
   onChoose: (value: number) => void,
 ): ElementLike {
-  const start = startIndex(stars);
+  const start = shownIndex(stars);
   const group = doc.createElement("div");
   group.className = "mn-stars";
   group.setAttribute("role", "radiogroup");
@@ -75,8 +79,8 @@ export function starRater(
     starButton(doc, s, i === start, onChoose),
   );
   for (const b of buttons) group.appendChild(b);
-  onArrows(buttons, start);
-  const marked = stars.find((s) => s.marked);
+  onArrows(group, buttons, start);
+  const marked = stars[start]?.marked ? stars[start] : undefined;
   const value = doc.createElement("span");
   value.className = "mn-stars-value";
   value.textContent = marked === undefined ? "" : `${marked.value}/10`;
