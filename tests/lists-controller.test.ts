@@ -186,6 +186,21 @@ describe("answers", () => {
     expect(t.answered).toEqual(["answered"]);
   });
 
+  it("keeps polling after a failed first read of an accepted answer, and tells the page when it has run", async () => {
+    const t = setup();
+    await t.controller.load();
+    const row = t.question(AMBIGUITY.key);
+    t.world.lists = undefined;
+    await t.controller.act(row.key, row.buttons[1]?.action as never);
+    expect(t.answered).toEqual([]);
+    expect([...t.armed.values()].map((a) => a.ms)).toEqual([POLL_MS]);
+    t.world.lists = LISTS;
+    t.fire();
+    await settle();
+    expect(t.answered).toEqual(["answered"]);
+    expect(t.armed.size).toBe(0);
+  });
+
   it("tells the page at once when the answer already ran at the first reload", async () => {
     const t = setup();
     await t.controller.load();

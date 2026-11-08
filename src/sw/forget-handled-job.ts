@@ -4,7 +4,8 @@
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor, type RatingCard } from "../core/rating-cards";
-import { forgetHandled, holdsKey } from "../core/state";
+import { dropRetry, isWaiting } from "../core/retry-finishes";
+import { forgetHandled, holdsKey, type SyncState } from "../core/state";
 import { windowAt, withOneMore } from "../ext/finish-window";
 import { isForgetFull } from "../ext/forget-window";
 import type { ForgetHandledMessage } from "../ext/page-messages";
@@ -15,9 +16,15 @@ type ForgetStore = Pick<
   "loadState" | "saveState" | "loadRatings" | "saveRatings"
 >;
 
+// A finish waiting for a Naka tab (I2) is held too: once unticked, no retry may mark the title seen.
+function holds(state: SyncState, key: string): boolean {
+  return holdsKey(state, key) || isWaiting(state, key);
+}
+
 async function forgetKey(store: ForgetStore, key: string): Promise<void> {
   const state = await store.loadState();
-  if (holdsKey(state, key)) await store.saveState(forgetHandled(state, key));
+  if (!holds(state, key)) return;
+  await store.saveState(dropRetry(forgetHandled(state, key), key));
 }
 
 // An unwatched title is not « à noter »: its card goes, other cards stay.
@@ -36,15 +43,23 @@ export async function forgetHandledJob(
   await dropCard(store, key);
 }
 
-// Something is kept under the key: handled, a question's finish, or a card. A forged id holds nothing.
+// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds nothing.
 async function heldBy(store: ForgetStore, key: string): Promise<boolean> {
-  if (holdsKey(await store.loadState(), key)) return true;
+  if (holds(await store.loadState(), key)) return true;
   return cardFor(await store.loadRatings(), key) !== undefined;
 }
 
+// Over budget, only a finish waiting for a tab is dropped: a drop is never a write, and a kept entry would
+// let the next sync mark the title seen against the untick (owner's choice, 2026-11-07).
+async function dropWaiting(store: ForgetStore, key: string): Promise<void> {
+  const state = await store.loadState();
+  const dropped = dropRetry(state, key);
+  if (dropped !== state) await store.saveState(dropped);
+}
+
 // A forget a Naka tab asked for takes a slot of the hour's budget first (a naka.cx script can forge the
-// event), reserved before the forget so that a restart cannot give it back. Over budget: nothing changes.
-// A key nothing holds spends no slot, so forged ids cannot use up the owner's budget.
+// event), reserved before the forget so that a restart cannot give it back. Over budget: nothing else
+// changes. A key nothing holds spends no slot, so forged ids cannot use up the owner's budget.
 export async function forgetFromTabJob(
   store: ForgetStore & Pick<Store, "loadSettings" | "saveSettings">,
   now: () => number,
@@ -53,7 +68,7 @@ export async function forgetFromTabJob(
   if (!(await heldBy(store, contentKeyOf(msg)))) return;
   const settings = await store.loadSettings();
   const window = windowAt(settings.forgetWindow, now());
-  if (isForgetFull(window)) return;
+  if (isForgetFull(window)) return dropWaiting(store, contentKeyOf(msg));
   await store.saveSettings({ ...settings, forgetWindow: withOneMore(window) });
   await forgetHandledJob(store, msg);
 }

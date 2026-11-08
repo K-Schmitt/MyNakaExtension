@@ -428,6 +428,32 @@ SensCritique n'est pas marquée vue, et la fin est perdue. Elle est désormais g
 - Une relance peut tourner des heures après la réponse (D2, aucune limite d'âge) : la fiche est alors marquée vue
   à ce moment-là, non à la date du visionnage.
 
+## 2026-11-07 — I2 après audit
+
+Un audit d'I2 a trouvé un défaut important (A1) et deux mineurs (A2, A3), corrigés avec le propriétaire.
+
+- **Décocher « vu » sur Naka oublie la fin en attente** (A1) : sinon la synchro suivante marquait le titre vu sur
+  SensCritique contre ce geste. La liaison reste. Même quand le budget horaire des oublis venus de Naka est plein,
+  la fin en attente est retirée, et rien d'autre : retirer n'écrit jamais nulle part (choix du propriétaire). Un
+  script de Naka pourrait donc annuler des fins en attente, que la page cesserait de montrer.
+- **Une seule relance attend dans la file** (A2) : plusieurs onglets Naka chargés ensemble relançaient chacun la
+  même fin et prenaient chacun une place du budget. Une relance mise en file pendant qu'une autre attend la
+  remplace, après la dernière synchro, avec l'heure la plus ancienne. Rejeté : garder la première (elle passait
+  avant la deuxième synchro) ou la dernière avec son heure (une synchro date son passage à son début, donc la
+  dernière heure seule manquait le succès de la première). Le prix : si une synchro plus récente échoue, la fin
+  attend le succès suivant.
+- **« Annuler » défait aussi un « garder »** (A3) donné sur la paire pendant l'attente : la question revient
+  libre (choix du propriétaire). Une liaison antérieure à la réponse garde le sien.
+- **La simulation aléatoire avance son horloge d'1 ms par travail** : deux échecs identiques au même instant
+  laissaient des traces identiques, et un oracle prenait la note d'attente pour ancienne. Un test fixe l'égalité
+  de l'heure de la synchro et de la relance, que l'horloge ne produit plus.
+
+### Questions ouvertes
+
+- A3 retire toute marque « garder » de la paire, y compris une marque antérieure à la réponse si la paire était
+  réglée sans être liée. Personne n'a montré que cet état est atteignable ; sinon, il faudrait la retenir comme
+  `linkedBefore`.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit

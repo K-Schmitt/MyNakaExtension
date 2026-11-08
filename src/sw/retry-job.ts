@@ -39,6 +39,15 @@ async function retryOne(deps: JobDeps, entry: RetryFinish): Promise<boolean> {
   return error === undefined || !KEEPS_WAITING.includes(error);
 }
 
+/** true when a step would try an entry: the sync succeeded since `since` and a finish waits. Read-only. */
+export async function retryPendingJob(
+  deps: JobDeps,
+  since: number,
+): Promise<boolean> {
+  if (!(await syncedSince(deps, since))) return false;
+  return retriesOf(await deps.store.loadState()).length > 0;
+}
+
 /**
  * One step of the retry: the first waiting finish only, so that each finish is its own queued job (one job,
  * one tab). Answers true when another step should be queued: this one dropped its entry and others remain.
