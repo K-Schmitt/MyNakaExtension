@@ -10,7 +10,7 @@ const v = (name: string): string => `var(--mn-${name})`;
 const HEAD_RULES = [
   `.mn-head{display:flex;align-items:flex-end;justify-content:space-between;gap:${v("space-3")};font:${v("text-body")} ${v("font")};color:${v("color-text")};margin-bottom:${v("space-3")};}`,
   `.mn-head-text{min-width:0;}`,
-  `.mn-head-title{font:700 18px/24px ${v("font")};color:${v("color-text")};}`,
+  `.mn-head-title{margin:0;font:700 18px/24px ${v("font")};color:${v("color-text")};}`,
   `.mn-head-sub{font:13px/18px ${v("font")};color:${v("color-text-secondary")};}`,
   `.mn-arrows{display:flex;gap:${v("space-2")};flex:0 0 auto;}`,
   `.mn-arrow{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;font:400 22px/1 ${v("font")};color:${v("color-text")};background:${v("color-surface-raised")};border:1px solid ${v("color-border")};border-radius:${v("radius-pill")};cursor:pointer;transition:background ${v("motion")};}`,

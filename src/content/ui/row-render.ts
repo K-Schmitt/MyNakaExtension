@@ -31,10 +31,18 @@ function arrow(doc: Maker, glyph: string, label: string): ElementLike {
   return el;
 }
 
+// An h2, as Naka's own row titles (`h2.dc-h2`); the sheet resets its default margin.
+function title(doc: Maker): ElementLike {
+  const el = doc.createElement("h2");
+  el.textContent = ROW_TITLE;
+  el.className = TITLE_CLASS;
+  return el;
+}
+
 function header(doc: Maker, arrows: ElementLike[]): ElementLike {
   const text = doc.createElement("div");
   text.className = HEAD_TEXT_CLASS;
-  text.appendChild(textLine(doc, ROW_TITLE, TITLE_CLASS));
+  text.appendChild(title(doc));
   text.appendChild(textLine(doc, ROW_SUBTITLE, SUBTITLE_CLASS));
   const group = doc.createElement("div");
   group.className = ARROWS_CLASS;

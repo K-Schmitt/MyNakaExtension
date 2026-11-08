@@ -73,6 +73,15 @@ describe("renderRow", () => {
     expect(track?.className).toBe("mn-track");
   });
 
+  it("the title is an h2, like Naka's row titles, with the UA margin reset", () => {
+    const root = drawn();
+    const title = descendants(root.children[0] as FakeElement).find(
+      (d) => d.className === "mn-head-title",
+    );
+    expect(title?.tag).toBe("h2");
+    expect(ROW_SHEET).toMatch(/\.mn-head-title\{margin:0;/);
+  });
+
   it("puts the live card first, then the entries newest first, then the questions", () => {
     const [, track] = drawn().children as FakeElement[];
     const cards = (track as FakeElement).children as FakeElement[];
