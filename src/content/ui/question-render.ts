@@ -25,7 +25,7 @@ export type QuestionHandlers = {
   onAction(action: QuestionAction): void;
 };
 
-function lines(doc: Maker, view: QuestionView): ElementLike[] {
+export function questionLines(doc: Maker, view: QuestionView): ElementLike[] {
   return [
     textLine(doc, view.heading, TITLE_CLASS),
     ...(view.question === undefined ? [] : [textLine(doc, view.question)]),
@@ -62,7 +62,10 @@ export function buildQuestionBlock(
 ): ElementLike {
   const block = doc.createElement("div");
   block.className = BLOCK_CLASS;
-  for (const el of [...lines(doc, view), ...buttonRows(doc, view, handlers)]) {
+  for (const el of [
+    ...questionLines(doc, view),
+    ...buttonRows(doc, view, handlers),
+  ]) {
     block.appendChild(el);
   }
   return block;

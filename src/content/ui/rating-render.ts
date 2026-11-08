@@ -67,7 +67,7 @@ export function row(
   return el;
 }
 
-function lines(doc: Maker, view: RatingView): ElementLike[] {
+export function ratingLines(doc: Maker, view: RatingView): ElementLike[] {
   return [
     textLine(doc, view.heading, TITLE_CLASS),
     ...(view.current === undefined ? [] : [textLine(doc, view.current)]),
@@ -82,7 +82,7 @@ function lines(doc: Maker, view: RatingView): ElementLike[] {
   ];
 }
 
-function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
+export function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
   return row(doc, [
     button(doc, SEND_LABEL, PRIMARY_CLASS, () => handlers.onConfirm(true)),
     button(doc, CANCEL_LABEL, BUTTON_CLASS, () => handlers.onConfirm(false)),
@@ -123,7 +123,7 @@ export function buildBlock(
   const block = doc.createElement("div");
   block.className = BLOCK_CLASS;
   const rows = buttonRows(doc, view, handlers);
-  for (const el of [...lines(doc, view), ...rows]) block.appendChild(el);
+  for (const el of [...ratingLines(doc, view), ...rows]) block.appendChild(el);
   return block;
 }
 

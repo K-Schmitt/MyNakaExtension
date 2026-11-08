@@ -63,7 +63,9 @@ describe("renderRow", () => {
     const root = drawn();
     const [head, track] = root.children as FakeElement[];
     expect(root.children).toHaveLength(2);
-    const lines = descendants(head as FakeElement).map((d) => d.textContent);
+    const lines = descendants(head as FakeElement)
+      .filter((d) => ["mn-head-title", "mn-head-sub"].includes(d.className))
+      .map((d) => d.textContent);
     expect(lines.map(codePoints)).toEqual([
       codePoints("À traiter"),
       codePoints("Notes et questions pour SensCritique"),
@@ -79,6 +81,64 @@ describe("renderRow", () => {
     expect(texts(cards[1] as FakeElement)).toContain("Récent");
     expect(texts(cards[2] as FakeElement)).toContain("Ancien");
     expect(texts(cards[3] as FakeElement)).toContain("Question posée");
+  });
+
+  it("draws every card as a tile, an entry with its image on top", () => {
+    const doc = new FakeDoc();
+    const root = new FakeShadow();
+    const image = "https://image.tmdb.org/t/p/w780/back.jpg";
+    const view = homeView(
+      [
+        {
+          card: filmCard({
+            key: "movie:1",
+            image: { backdropPath: "/back.jpg" },
+          }),
+        },
+      ],
+      [{ key: AMBIG.key, view: questionView(AMBIG, ["ecarter"]) }],
+      { key: LIVE.key, view: questionView(LIVE, ["fermer"]) },
+    );
+    renderRow(doc, root, view, HANDLERS);
+    const [, track] = root.children as FakeElement[];
+    const cards = (track as FakeElement).children as FakeElement[];
+    expect(cards.map((c) => c.className)).toEqual([
+      "mn-tile",
+      "mn-tile",
+      "mn-tile",
+    ]);
+    const [, entry] = cards;
+    const [art] = (entry as FakeElement).children as FakeElement[];
+    expect((art?.children[0] as FakeElement | undefined)?.attributes.src).toBe(
+      image,
+    );
+  });
+
+  it("puts the arrows ‹ and › in the header, labelled, hidden before any layout", () => {
+    const [head] = drawn().children as FakeElement[];
+    const arrows = descendants(head as FakeElement).filter(
+      (d) => d.tag === "button",
+    );
+    expect(
+      arrows.map((a) => [a.textContent, a.attributes["aria-label"]]),
+    ).toEqual([
+      ["\u2039", "Précédent"],
+      ["\u203A", "Suivant"],
+    ]);
+    expect(arrows.map((a) => a.attributes.hidden)).toEqual(["", ""]);
+  });
+
+  it("a redraw keeps the track where the owner had scrolled it", () => {
+    const doc = new FakeDoc();
+    const root = new FakeShadow();
+    const view = homeView([{ card: filmCard({ key: "movie:1" }) }]);
+    renderRow(doc, root, view, HANDLERS);
+    const [, first] = root.children as FakeElement[];
+    (first as unknown as { scrollLeft: number }).scrollLeft = 624;
+    renderRow(doc, root, view, HANDLERS);
+    const [, second] = root.children as FakeElement[];
+    expect(second).not.toBe(first);
+    expect((second as unknown as { scrollLeft: number }).scrollLeft).toBe(624);
   });
 
   it("has no fold button", () => {
@@ -182,5 +242,17 @@ describe("ROW_SHEET", () => {
     expect(ROW_SHEET.startsWith(themeCss(":host"))).toBe(true);
     expect(ROW_SHEET).toContain(".mn-track{");
     expect(ROW_SHEET).toContain(".mn-card{");
+  });
+
+  it("holds the tile, art, choice list and track values of the layout", () => {
+    expect(ROW_SHEET).toContain("width:300px;height:420px;");
+    expect(ROW_SHEET).toContain("aspect-ratio:16 / 9;");
+    expect(ROW_SHEET).toContain("object-fit:cover;");
+    expect(ROW_SHEET).toContain("width:32px;height:48px;");
+    expect(ROW_SHEET).toContain("overflow-y:auto;overscroll-behavior:contain;");
+    expect(ROW_SHEET).toContain(
+      "overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;",
+    );
+    expect(ROW_SHEET).toContain("gap:12px;");
   });
 });
