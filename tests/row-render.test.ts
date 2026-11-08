@@ -254,10 +254,13 @@ describe("ROW_SHEET", () => {
   });
 
   it("holds the tile, art, choice list and track values of the layout", () => {
-    expect(ROW_SHEET).toContain("width:300px;height:420px;");
-    expect(ROW_SHEET).toContain("aspect-ratio:16 / 9;");
+    expect(ROW_SHEET).toContain("width:200px;height:280px;");
+    expect(ROW_SHEET).toContain("aspect-ratio:20 / 9;");
+    expect(ROW_SHEET).toContain("-webkit-line-clamp:2;");
+    expect(ROW_SHEET).toContain(".mn-tile{font-size:13px;line-height:18px;}");
     expect(ROW_SHEET).toContain("object-fit:cover;");
-    expect(ROW_SHEET).toContain("width:32px;height:48px;");
+    expect(ROW_SHEET).toContain("width:24px;height:36px;");
+    expect(ROW_SHEET).toContain(".mn-tile .mn-star{font-size:14px;");
     expect(ROW_SHEET).toContain("overflow-y:auto;overscroll-behavior:contain;");
     expect(ROW_SHEET).toContain(
       "overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;",
