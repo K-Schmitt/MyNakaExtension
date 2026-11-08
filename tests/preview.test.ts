@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pair } from "../src/core/list-diff";
-import type { Write } from "../src/core/sync-writes";
+import { MAX_WRITES_PER_RUN, type Write } from "../src/core/sync-writes";
 import type { Titled } from "../src/core/title-match";
 import { nextOf, previewOf } from "../src/sw/preview";
 import type { Describe, PlannedWrite } from "../src/sw/sync-ports";
@@ -37,33 +37,48 @@ describe("previewOf", () => {
   });
 
   it("uses the label of a simulated SensCritique write without a year or type", async () => {
-    const planned = [
+    const planned: PlannedWrite[] = [
       { side: "sc", id: 5, label: { title: "Heat" } },
-    ] as PlannedWrite[];
+    ];
     expect(await previewOf(planned, [pair], describeOf())).toEqual([
       { side: "sc", title: "Heat" },
     ]);
   });
 
+  it("keeps the label's year and the write's type", async () => {
+    const planned: PlannedWrite[] = [
+      { side: "sc", id: 5, label: { title: "Heat", year: 1995 }, type: "film" },
+    ];
+    expect(await previewOf(planned, [pair], describeOf())).toEqual([
+      { side: "sc", title: "Heat", year: 1995, type: "film" },
+    ]);
+  });
+
   it("keeps an empty title when the describe call throws", async () => {
-    const planned: PlannedWrite[] = [{ side: "naka", id: 1005 }];
+    const planned: PlannedWrite[] = [{ side: "naka", id: pair.nakaId }];
+    const asked: number[] = [];
     const describe = describeOf({
-      sc: async () => {
+      sc: async (id) => {
+        asked.push(id);
         throw new Error("down");
       },
     });
     expect(await previewOf(planned, [pair], describe)).toEqual([
       { side: "naka", title: "" },
     ]);
+    expect(asked).toEqual([pair.scId]);
   });
 });
 
 describe("nextOf", () => {
-  it("previews at most ten deferred writes, in order", async () => {
-    const deferred: Write[] = Array.from({ length: 12 }, (_, i) => ({
-      side: "naka" as const,
-      pair: { nakaId: i, scId: 1000 + i },
-    }));
+  it("previews at most the per-run maximum of deferred writes, in order", async () => {
+    const deferred: Write[] = Array.from(
+      { length: MAX_WRITES_PER_RUN + 2 },
+      (_, i) => ({
+        side: "naka" as const,
+        pair: { nakaId: i, scId: 1000 + i },
+      }),
+    );
     const seen: number[] = [];
     const describe = describeOf({
       sc: async (id) => {
@@ -72,10 +87,22 @@ describe("nextOf", () => {
       },
     });
     const items = await nextOf(deferred, describe);
-    expect(items).toHaveLength(10);
-    expect(seen).toEqual([
-      1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009,
-    ]);
+    expect(items).toHaveLength(MAX_WRITES_PER_RUN);
+    expect(seen).toEqual(
+      Array.from({ length: MAX_WRITES_PER_RUN }, (_, i) => 1000 + i),
+    );
     expect(items[0]).toEqual({ side: "naka", title: "T1000", type: "film" });
+  });
+
+  it("gives an empty title to a deferred write whose describe throws", async () => {
+    const deferred: Write[] = [{ side: "sc", pair }];
+    const describe = describeOf({
+      naka: async () => {
+        throw new Error("down");
+      },
+    });
+    expect(await nextOf(deferred, describe)).toEqual([
+      { side: "sc", title: "" },
+    ]);
   });
 });
