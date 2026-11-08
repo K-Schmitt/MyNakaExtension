@@ -147,12 +147,12 @@ export function createHomeBlock(ports: HomePorts) {
     ): void {
       live = { key, view };
       liveHandlers = handlers;
-      draw();
+      moved();
     },
     hideLive(): void {
       live = undefined;
       liveHandlers = undefined;
-      draw();
+      moved();
     },
     route(pathname: string): void {
       const home = HOME_PATHS.includes(pathname);
