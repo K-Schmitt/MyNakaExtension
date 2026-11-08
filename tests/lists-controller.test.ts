@@ -466,6 +466,30 @@ describe("the search", () => {
     );
   });
 
+  it("a repeated search of the same text while it runs sends nothing more (held Enter, double click)", async () => {
+    const t = await opened();
+    for (let i = 0; i < 5; i += 1)
+      void t.controller.act(KEY, { kind: "search" });
+    await settle();
+    expect(t.searches).toHaveLength(1);
+    t.searches[0]?.resolve({ candidates: [FOUND] });
+    await settle();
+    expect(t.unlinked(KEY).search?.results).toHaveLength(1);
+    void t.controller.act(KEY, { kind: "search" });
+    await settle();
+    expect(t.searches, "a new search once the first answered").toHaveLength(2);
+  });
+
+  it("a search of the same text after the row was closed and reopened is sent again", async () => {
+    const t = await opened();
+    void t.controller.act(KEY, { kind: "search" });
+    await settle();
+    await t.controller.act(KEY, { kind: "open-search" });
+    void t.controller.act(KEY, { kind: "search" });
+    await settle();
+    expect(t.searches).toHaveLength(2);
+  });
+
   it("an answer for a row no longer open is dropped", async () => {
     const t = await opened();
     void t.controller.act(KEY, { kind: "search" });
