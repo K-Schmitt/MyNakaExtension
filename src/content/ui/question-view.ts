@@ -22,6 +22,8 @@ export type QuestionChoice =
   | { kind: "keep" };
 export type QuestionAction = "plus-tard" | "ecarter" | "fermer";
 export type QuestionView = {
+  /** The offer's kind: a tile keeps its layout in every state, when a lock or a moot notice drops the choices. */
+  kind: QuestionOffer["kind"];
   heading: string;
   question?: string;
   /** The title's wide image (removals), as a URL; checked again when drawn. */
@@ -47,6 +49,7 @@ export function questionView(
 ): QuestionView {
   if (offer.kind === "removal") {
     return {
+      kind: "removal",
       heading: removalHeading(offer.removeFrom, titled(offer.title)),
       question: removalQuestion(offer.removeFrom),
       ...imageOfTitle(offer.image),
@@ -58,6 +61,7 @@ export function questionView(
     };
   }
   return {
+    kind: "ambiguity",
     heading: ambiguityHeading(offer.side, titled(offer.title)),
     choices: [
       ...offer.candidates.map((c) => ({
