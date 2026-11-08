@@ -1,9 +1,9 @@
-// The home block: on the Naka home page, a panel lists the cards still to rate (« À noter ») and the open
-// questions (« Questions »). Each entry is its own session (lock after a choice, re-ask counted from the
-// click, confirmation of a série, the unreachable line), so a locked entry never stops the others. The
-// panel asks the worker once per arrival on a home path, and takes itself down on leaving it. When an
-// entry leaves, the entries under it move up under the cursor: each remaining one, rating or question,
-// gets a fresh click grace from that redraw.
+// The home block: on the Naka home page, a row « À traiter » lists the cards still to rate and the open
+// questions. Each entry is its own session (lock after a choice, re-ask counted from the click,
+// confirmation of a série, the unreachable line), so a locked entry never stops the others. The row asks
+// the worker once per arrival on a home path, and takes itself down on leaving it or when its last entry
+// is gone. When an entry leaves, the entries after it slide under the cursor: each remaining one, rating
+// or question, gets a fresh click grace from that redraw.
 
 import type { QuestionKey } from "../../core/questions";
 import type { QuestionOffer } from "../../sw/question-offers";
@@ -24,7 +24,6 @@ export const HOME_PATHS = ["/"];
 export type HomeHandlers = {
   entry(key: string): RatingHandlers;
   question(key: QuestionKey): QuestionHandlers;
-  onFold(): void;
 };
 
 export type HomePorts = {
@@ -47,7 +46,6 @@ export type HomePorts = {
 
 export function createHomeBlock(ports: HomePorts) {
   let onHome = false;
-  let folded = false;
   let arrival = 0; // each arrival and each departure starts a new one: an older answer is dropped
   let opening = false;
   const ratings = createRatingSlots(ports, {
@@ -59,9 +57,9 @@ export function createHomeBlock(ports: HomePorts) {
     left: () => moved(),
   });
 
-  // An entry drew itself (a lock, an unlock, a failure line, the confirmation view): its height changed
-  // and the panel, anchored at the bottom, shifted the others under the cursor. Each other entry, rating
-  // or question, gets a fresh grace from this redraw.
+  // An entry drew itself (a lock, an unlock, a failure line, the confirmation view): its size changed and
+  // may have shifted the others under the cursor. Each other entry, rating or question, gets a fresh
+  // grace from this redraw.
   function redrawn(rating?: string, question?: QuestionKey): void {
     if (!opening) {
       ratings.regrace(rating);
@@ -77,20 +75,13 @@ export function createHomeBlock(ports: HomePorts) {
       ports.hide();
       return;
     }
-    ports.show(homeView(ratings.entries(), folded, asked), {
+    ports.show(homeView(ratings.entries(), asked), {
       question: (key) => questions.handlersOf(key) ?? NO_QUESTION_HANDLERS,
       entry: (key) => ratings.handlersOf(key) ?? NO_HANDLERS,
-      onFold: () => {
-        folded = !folded;
-        // Folding or unfolding moves the panel under the cursor (it is anchored at the bottom).
-        ratings.regrace();
-        questions.regrace();
-        draw();
-      },
     });
   }
 
-  // An entry left: the ones under it moved up, so each gets a fresh grace from this redraw.
+  // An entry left: the ones after it slid into its place, so each gets a fresh grace from this redraw.
   function moved(): void {
     ratings.regrace();
     questions.regrace();
@@ -148,7 +139,6 @@ export function createHomeBlock(ports: HomePorts) {
         leave();
         return;
       }
-      folded = false;
       arrival += 1;
       arrive(arrival).catch(() => {});
     },

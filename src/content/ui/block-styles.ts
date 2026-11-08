@@ -4,7 +4,8 @@ import { themeCss } from "../../ui/theme-tokens";
 
 const v = (name: string): string => `var(--mn-${name})`;
 
-const RULES = [
+/** The rules of the cards, shared by the player overlay and the home row. */
+export const BLOCK_RULES: string[] = [
   `.mn-card{display:block;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:color-mix(in srgb, ${v("color-surface")} calc(${v("surface-alpha")} * 100%), transparent);border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};padding:${v("space-4")};margin:${v("space-3")};box-shadow:${v("shadow")};}`,
   `.mn-card::before{content:"SensCritique";display:block;font:${v("text-small")} ${v("font")};color:${v("color-accent-text")};text-transform:uppercase;font-weight:600;letter-spacing:.04em;margin-bottom:${v("space-2")};}`,
   `.mn-line{color:${v("color-text-secondary")};}`,
@@ -27,13 +28,7 @@ const RULES = [
   `.mn-btn--primary{background:${v("color-accent")};color:${v("color-on-accent")};border-color:${v("color-accent")};font-weight:600;}`,
   `.mn-btn--primary:hover{background:${v("color-accent-hover")};}`,
   `.mn-btn--ghost{background:transparent;color:${v("color-accent-text")};border-color:transparent;}`,
-  `.mn-panel{display:block;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:color-mix(in srgb, ${v("color-surface")} calc(${v("surface-alpha")} * 100%), transparent);border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};padding:${v("space-3")};margin:${v("space-3")};box-shadow:${v("shadow")};}`,
-  `.mn-panel .mn-card{background:transparent;border:0;border-top:1px solid ${v("color-border")};border-radius:0;box-shadow:none;margin:0;padding:${v("space-3")} 0}`,
-  `.mn-panel .mn-card::before{content:none}`,
-  `.mn-panel-head{display:flex;align-items:center;justify-content:space-between;gap:${v("space-2")};margin-bottom:${v("space-2")};}`,
-  `.mn-heading{font:${v("text-title")} ${v("font")};font-weight:600;margin:0;}`,
-  `.mn-subheading{font:${v("text-small")} ${v("font")};color:${v("color-text-tertiary")};margin:${v("space-3")} 0 ${v("space-1")};}`,
   `@media (prefers-reduced-motion: reduce){.mn-btn{transition:none;}}`,
 ];
 
-export const BLOCK_SHEET: string = themeCss(":host") + RULES.join("");
+export const BLOCK_SHEET: string = themeCss(":host") + BLOCK_RULES.join("");

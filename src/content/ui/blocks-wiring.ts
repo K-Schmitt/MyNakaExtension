@@ -3,7 +3,7 @@
 // page's events. The end and pause blocks draw in one overlay, a card or a question, owned by one block at
 // a time: the end block closes the pause block before it opens, and the pause block neither draws nor
 // clears while the end block is shown (a question of the end block included). Every URL change closes the pause block; leaving the player closes the end block
-// too, while an episode change (autoplay) keeps its card. The home panel has its own overlay. The removal
+// too, while an episode change (autoplay) keeps its card. The home row has its own host among Naka's rows. The removal
 // block (after a removal on Naka, on any naka.cx path) draws in the player overlay but yields to both: it
 // shows only when neither is shown, and either one opening closes it.
 
