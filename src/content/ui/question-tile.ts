@@ -23,8 +23,7 @@ const LABEL_CLASS = "mn-choice-label";
 
 const isCandidate = ({ choice }: Choice): boolean =>
   choice.kind === "candidate";
-const isRemoval = (view: QuestionView): boolean =>
-  view.choices.some(({ choice }) => choice.kind === "remove");
+const isRemoval = (view: QuestionView): boolean => view.kind === "removal";
 
 function candidateButton(
   doc: Maker,

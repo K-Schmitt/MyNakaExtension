@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { NONE_LABEL } from "../src/content/ui/question-copy";
+import { viewOf } from "../src/content/ui/question-session-view";
 import { buildQuestionTile } from "../src/content/ui/question-tile";
 import {
   type QuestionView,
@@ -144,5 +145,24 @@ describe("buildQuestionTile, a removal", () => {
     expect(descendants(el).map((d) => d.textContent)).toContain(
       "Envoi de la réponse\u2026",
     );
+  });
+
+  it.each([
+    ["sending", { locked: true }],
+    ["moot", { mootNotice: true as const }],
+  ])("keeps its picture and its layout while %s", (_state, over) => {
+    const view = viewOf({
+      offer: REMOVAL,
+      actions: ["plus-tard"],
+      seq: 0,
+      locked: false,
+      shownAt: 0,
+      ...over,
+    });
+    const { el } = tile(view);
+    const [art] = el.children as FakeElement[];
+    expect(art?.className).toBe("mn-art");
+    expect(byClass(el, "mn-choices")).toBeUndefined();
+    expect(byClass(el, "mn-choices-foot")).toBeUndefined();
   });
 });
