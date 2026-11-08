@@ -88,6 +88,21 @@ describe("createRowKeeper", () => {
     expect(t.applied).toEqual(["top"]);
   });
 
+  it("a start after a stop places the row again in Naka's new list (a return to the home page)", () => {
+    const t = setup({ reprendre: 0, host: -1, age: 0 });
+    t.keeper.start();
+    t.keeper.stop();
+    expect(t.detached()).toBe(1);
+    t.set({ reprendre: -1, host: -1, age: 0 }); // the new list node, Reprendre not drawn yet
+    t.keeper.start();
+    expect(t.hasWatch()).toBe(true);
+    expect([...t.timers.values()].map((x) => x.ms)).toEqual([1000]);
+    t.set({ reprendre: 0, host: -1, age: 120 });
+    t.change();
+    expect(t.applied).toEqual(["after-reprendre", "after-reprendre"]);
+    expect(t.timers.size).toBe(0);
+  });
+
   it("applies nothing after stop and detaches once", () => {
     const t = setup({ reprendre: -1, host: -1, age: 0 });
     t.keeper.start();

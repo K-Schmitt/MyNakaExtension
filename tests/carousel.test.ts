@@ -117,4 +117,23 @@ describe("wireArrows", () => {
     expect(next.attributes.hidden).toBeUndefined();
     expect(disabled(next)).toEqual([undefined, "false"]);
   });
+
+  it("measures again when the track's size changes (drawn detached, placed later)", () => {
+    const track = new FakeTrack(0, 0);
+    const prev = new FakeElement("button");
+    const next = new FakeElement("button");
+    const watched: { target: TrackLike; fn: () => void }[] = [];
+    wireArrows(track, prev, next, (target, fn) => {
+      watched.push({ target, fn });
+      return () => {};
+    });
+    expect(next.attributes.hidden).toBe("");
+    expect(watched.map((w) => w.target)).toEqual([track]);
+    track.clientWidth = 300;
+    track.scrollWidth = 900;
+    watched[0]?.fn();
+    expect(prev.attributes.hidden).toBeUndefined();
+    expect(next.attributes.hidden).toBeUndefined();
+    expect(disabled(next)).toEqual([undefined, "false"]);
+  });
 });

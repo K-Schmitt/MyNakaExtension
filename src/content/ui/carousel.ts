@@ -1,6 +1,7 @@
 // The row's two arrows: each steps the track by one page (its visible width) and is disabled at its end
-// of the list; both hide when the list fits. The track is measured again on every scroll and whenever the
-// cursor enters it, since the first draw can come before the row is laid out (all zero: nothing moves).
+// of the list; both hide when the list fits. The track is measured again on every scroll, whenever the
+// cursor enters it and whenever its size changes: the row is drawn detached, before the keeper places it
+// (all zero: nothing moves), so the measure that counts comes once it is laid out.
 
 import type { ElementLike, TrackLike } from "./dom-like";
 import { onTrustedClick } from "./trusted";
@@ -35,11 +36,16 @@ function update(track: TrackLike, prev: ElementLike, next: ElementLike): void {
   showArrow(next, state.next, shown);
 }
 
+/** Calls `onResize` whenever the track's size changes (a ResizeObserver in the page); returns the stop. */
+export type SizeWatch = (track: TrackLike, onResize: () => void) => () => void;
+
+/** Returns the stop of the size watch. */
 export function wireArrows(
   track: TrackLike,
   prev: ElementLike,
   next: ElementLike,
-): void {
+  watchSize?: SizeWatch,
+): () => void {
   const step = (sign: number) => () =>
     track.scrollBy({ left: sign * track.clientWidth, behavior: "smooth" });
   onTrustedClick(prev, step(-1));
@@ -48,6 +54,7 @@ export function wireArrows(
   track.addEventListener("scroll", refresh);
   track.addEventListener("pointerenter", refresh);
   refresh();
+  return watchSize?.(track, refresh) ?? (() => {});
 }
 
 /** A redraw makes a new track: it opens where the old one was scrolled to (read before it left). */
