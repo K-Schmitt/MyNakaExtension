@@ -418,6 +418,24 @@ describe("a removal offer on the home page", () => {
     expect(w.asked.drawn).toBeUndefined();
   });
 
+  it("a block opened off the home page leaves nothing floating once the tab goes home", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/content/x");
+    w.blocks.removed(1);
+    await flush();
+    expect(w.asked.drawn).toBeDefined();
+    const shown = w.asked.drawn?.handlers;
+    w.blocks.pathChanged("/");
+    await w.clock.advance(GRACE_MS);
+    shown?.onChoose({ kind: "remove" });
+    await flush();
+    w.removal.answer = { offer: null };
+    await w.clock.advance(2000);
+    expect(w.asked.drawn).toBeUndefined();
+    expect(w.home.drawn?.view.live).toBeUndefined();
+  });
+
   it("still shows in the player overlay off the home page", async () => {
     const w = wiringWorld();
     w.removal.answer = { offer: REMOVAL };
