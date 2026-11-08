@@ -35,6 +35,11 @@ export function createListsController(ports: ListsPorts): ListsController {
   const awaiting = new Set<QuestionKey>();
   let loads = 0;
   let searches = 0;
+  // The search on its way: the same text for the same row, asked again meanwhile (a held Enter, a double
+  // click), sends nothing more. Any later search, open or close bumps `searches` and ends the match.
+  let running: { key: QuestionKey; text: string; seq: number } | undefined;
+  const isRunning = (key: QuestionKey, text: string) =>
+    running?.seq === searches && running.key === key && running.text === text;
 
   const redraw = () => ports.show(toListsView(answer, state));
   const change = (next: Partial<ListsState>) => {
@@ -112,10 +117,13 @@ export function createListsController(ports: ListsPorts): ListsController {
       change({ search: { ...open, phase: { kind: "empty-query" } } });
       return;
     }
+    if (isRunning(key, text)) return;
     searches += 1;
     const mine = searches;
+    running = { key, text, seq: mine };
     change({ search: { ...open, phase: { kind: "searching" } } });
     const phase = await askSearch(ports, item, text);
+    if (running?.seq === mine) running = undefined;
     const now = state.search;
     if (mine !== searches || now?.key !== key) return;
     change({ search: { ...now, phase } });
