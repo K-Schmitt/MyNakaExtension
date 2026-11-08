@@ -96,6 +96,87 @@ describe("renderRow", () => {
   });
 });
 
+// Handlers that record which key each click was routed to.
+function recording() {
+  const calls: string[] = [];
+  const handlers: HomeHandlers = {
+    entry: (key) => ({
+      onChoose: (value) => calls.push(`entry ${key} choose ${value}`),
+      onAction: (action) => calls.push(`entry ${key} ${action}`),
+      onOther: () => calls.push(`entry ${key} other`),
+      onConfirm: () => calls.push(`entry ${key} confirm`),
+    }),
+    question: (key) => ({
+      onChoose: (choice) => calls.push(`question ${key} choose ${choice.kind}`),
+      onAction: (action) => calls.push(`question ${key} ${action}`),
+    }),
+  };
+  return { calls, handlers };
+}
+
+function drawnWith(handlers: HomeHandlers) {
+  const root = new FakeShadow();
+  const view = homeView(
+    [{ card: filmCard({ key: "movie:7", title: "<b>Un film</b>", at: 100 }) }],
+    [{ key: AMBIG.key, view: questionView(AMBIG, ["ecarter"]) }],
+    { key: LIVE.key, view: questionView(LIVE, ["fermer"]) },
+  );
+  renderRow(new FakeDoc(), root, view, handlers);
+  const [, track] = root.children as FakeElement[];
+  return { root, cards: (track as FakeElement).children as FakeElement[] };
+}
+
+const buttonsOf = (card: FakeElement, text?: string): FakeElement[] =>
+  descendants(card).filter(
+    (el) =>
+      el.tag === "button" && (text === undefined || el.textContent === text),
+  );
+const starOf = (card: FakeElement, n: number): FakeElement | undefined =>
+  descendants(card).find((el) => el.attributes["aria-label"] === `${n} sur 10`);
+
+describe("renderRow routes each click to its own card's key", () => {
+  it("the live card: a forged click does nothing, a trusted one reaches the live key", () => {
+    const { calls, handlers } = recording();
+    const [live] = drawnWith(handlers).cards;
+    const [remove] = buttonsOf(live as FakeElement);
+    remove?.click(false);
+    expect(calls).toEqual([]);
+    remove?.click(true);
+    expect(calls).toEqual([`question ${LIVE.key} choose remove`]);
+  });
+
+  it("an entry: a forged star does nothing, a trusted one reaches the entry's key", () => {
+    const { calls, handlers } = recording();
+    const [, entry] = drawnWith(handlers).cards;
+    const eight = starOf(entry as FakeElement, 8);
+    eight?.click(false);
+    expect(calls).toEqual([]);
+    eight?.click(true);
+    expect(calls).toEqual(["entry movie:7 choose 8"]);
+  });
+
+  it("a question: a forged « Écarter » does nothing, a trusted one reaches the question's key", () => {
+    const { calls, handlers } = recording();
+    const [, , question] = drawnWith(handlers).cards;
+    const [skip] = buttonsOf(question as FakeElement, "Écarter");
+    skip?.click(false);
+    expect(calls).toEqual([]);
+    skip?.click(true);
+    expect(calls).toEqual([`question ${AMBIG.key} ecarter`]);
+  });
+
+  it("draws a title as text, never as markup", () => {
+    const { handlers } = recording();
+    const texts = descendants(drawnWith(handlers).root).map(
+      (d) => d.textContent,
+    );
+    expect(texts.some((t) => t?.includes("<b>Un film</b>"))).toBe(true);
+    expect(
+      descendants(drawnWith(handlers).root).some((d) => d.tag === "b"),
+    ).toBe(false);
+  });
+});
+
 describe("ROW_SHEET", () => {
   it("starts with the theme tokens scoped to the host, then holds the track's rule", () => {
     expect(ROW_SHEET.startsWith(themeCss(":host"))).toBe(true);
