@@ -16,7 +16,7 @@ import {
   stateWith,
   storeWith,
 } from "./question-fixtures";
-import { episodeCard } from "./rating-fixtures";
+import { episodeCard, filmCard } from "./rating-fixtures";
 
 const PAIR = { nakaId: 1, scId: 101 };
 
@@ -228,6 +228,24 @@ describe("answerPageLists", () => {
       pendingRemovals: 1,
     });
     expect(pageItems(state).unlinked).toEqual(lists.unlinked);
+  });
+});
+
+describe("statusSnapshot: the ratings waiting", () => {
+  it("counts the cards whose pending is not empty", async () => {
+    const { store } = await storeWith(stateWith({}));
+    await store.saveRatings([episodeCard(), filmCard({ pending: [] })]);
+    expect((await statusSnapshot(store)).pendingRatings).toBe(1);
+  });
+
+  it("is absent when the ratings cannot be read", async () => {
+    const { store } = await storeWith(stateWith({}));
+    store.loadRatings = async () => {
+      throw new Error("broken");
+    };
+    const snapshot = await statusSnapshot(store);
+    expect(snapshot.pendingRatings).toBeUndefined();
+    expect(snapshot.counts).toBeDefined();
   });
 });
 

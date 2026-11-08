@@ -74,6 +74,9 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
     record.pauseFromPercent,
     parsePauseFromPercent,
   );
+  const pendingRatings = whenPresent(record.pendingRatings, (v) =>
+    asInt(v, 0, "pendingRatings"),
+  );
   const pendingSettings = whenPresent(record.pendingSettings, parsePending);
   const pendingActions = whenPresent(record.pendingActions, parseActions);
   return {
@@ -84,6 +87,7 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),
     ...(counts === undefined ? {} : { counts }),
+    ...(pendingRatings === undefined ? {} : { pendingRatings }),
     ...(error === undefined ? {} : { error }),
     ...(running === undefined ? {} : { running }),
     ...(pendingMode === undefined ? {} : { pendingMode }),

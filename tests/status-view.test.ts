@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { JobError } from "../src/ext/job-error";
 import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { localFormat } from "../src/status/status-format";
+import { pendingRatingsLine } from "../src/status/status-lines";
 import { confirmText } from "../src/status/status-mode-copy";
 import {
   bindingLine,
@@ -53,6 +54,9 @@ function run(extra: Partial<RunRecord> = {}): RunRecord {
     ...extra,
   };
 }
+
+const LAQ = "\u00AB";
+const RAQ = "\u00BB";
 
 function ready(snapshot: StatusSnapshot, format = UTC) {
   const view = toStatusView(snapshot, format);
@@ -651,5 +655,27 @@ describe("the waiting-count labels", () => {
       pendingRemovals: "b",
     };
     expect(Object.keys(incomplete)).toHaveLength(2);
+  });
+});
+
+describe("toStatusView: the ratings waiting", () => {
+  it("shows the line, with zero and with some", () => {
+    expect(ready({ mode: "live", pendingRatings: 0 }).lines).toEqual([
+      `Notes à donner${NB}: aucune`,
+    ]);
+    expect(ready({ mode: "live", pendingRatings: 3 }).lines).toEqual([
+      `Notes à donner${NB}: 3, dans la rangée ${LAQ}${NB}À traiter${NB}${RAQ} de l\u2019accueil de Naka`,
+    ]);
+  });
+
+  it("words the two sentences exactly, by code point", () => {
+    expect(pendingRatingsLine(0)).toBe("Notes \u00E0 donner\u202F: aucune");
+    expect(pendingRatingsLine(3)).toBe(
+      "Notes \u00E0 donner\u202F: 3, dans la rang\u00E9e \u00AB\u202F\u00C0 traiter\u202F\u00BB de l\u2019accueil de Naka",
+    );
+  });
+
+  it("shows no line when the ratings were not read", () => {
+    expect(ready({ mode: "live" }).lines).toEqual([]);
   });
 });

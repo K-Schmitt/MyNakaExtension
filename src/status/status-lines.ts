@@ -109,3 +109,9 @@ export function previewLine(item: PreviewItem): string {
   const title = item.title === "" ? "(titre inconnu)" : item.title;
   return `${TARGETS[item.side]}\u202F: ${title}${details(item)}`;
 }
+
+// The cards waiting for a rating, whatever the home row shows: the line that stays if the row is lost.
+export function pendingRatingsLine(count: number): string {
+  if (count === 0) return "Notes \u00E0 donner\u202F: aucune";
+  return `Notes \u00E0 donner\u202F: ${count}, dans la rang\u00E9e \u00AB\u202F\u00C0 traiter\u202F\u00BB de l\u2019accueil de Naka`;
+}
