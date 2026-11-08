@@ -16,7 +16,7 @@ import { episodeCard, filmCard } from "./rating-fixtures";
 const film = (id: number, at: number): RatingCard =>
   filmCard({ key: `movie:${id}`, contentId: id, title: `Film ${id}`, at });
 
-// Stored out of order on purpose: the panel must sort by `at`.
+// Stored out of order on purpose: the row must sort by `at`.
 const A = film(1, 100);
 const B = film(2, 300);
 const C = film(3, 200);
@@ -57,7 +57,7 @@ describe("the home block's arrival", () => {
     expect(w.shown).toEqual([]);
   });
 
-  it("leaving the home path hides the panel", async () => {
+  it("leaving the home path hides the row", async () => {
     const w = await arrived(A);
     const before = w.hidden();
     w.block.route("/player");
@@ -191,7 +191,7 @@ describe("a choice in the panel", () => {
     expect(w.keys()).toEqual(["movie:2"]);
   });
 
-  it("hides the panel when its last entry is gone", async () => {
+  it("hides the row when its last entry is gone", async () => {
     const w = await arrived(A);
     await w.ready();
     w.handlersOf("movie:1").onChoose(8);
@@ -283,7 +283,7 @@ describe("the série confirmation in an entry", () => {
   });
 });
 
-describe("Ignorer and Réduire", () => {
+describe("Ignorer", () => {
   it("Ignorer dismisses the first pending label, locks, then drops the entry", async () => {
     const ep = episodeCard({ pending: ["saison", "série"], at: 500 });
     const w = await arrived(ep, A);
@@ -295,16 +295,6 @@ describe("Ignorer and Réduire", () => {
     w.state.answer = answerOf(A);
     await w.clock.advance(2000);
     expect(w.keys()).toEqual(["movie:1"]);
-  });
-
-  it("Réduire folds the panel to its heading and sends nothing, again unfolds", async () => {
-    const w = await arrived(A);
-    await w.ready();
-    w.last().handlers.onFold();
-    expect(w.last().view.folded).toBe(true);
-    w.last().handlers.onFold();
-    expect(w.last().view.folded).toBe(false);
-    expect(sendsOf(w.calls)).toEqual([]);
   });
 });
 

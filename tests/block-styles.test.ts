@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BLOCK_SHEET } from "../src/content/ui/block-styles";
 import { createEndUi } from "../src/content/ui/end-ui";
-import { createHomeUi } from "../src/content/ui/home-ui";
-import { homeView } from "../src/content/ui/home-view";
 import { ratingView } from "../src/content/ui/rating-view";
 import { themeCss } from "../src/ui/theme-tokens";
 import { filmCard } from "./rating-fixtures";
@@ -27,10 +25,6 @@ const SELECTORS = [
   ".mn-btn--primary",
   ".mn-btn--primary:hover",
   ".mn-btn--ghost",
-  ".mn-panel",
-  ".mn-panel-head",
-  ".mn-heading",
-  ".mn-subheading",
 ];
 
 describe("BLOCK_SHEET", () => {
@@ -65,12 +59,9 @@ describe("BLOCK_SHEET", () => {
     );
   });
 
-  it("flattens the cards inside the home panel", () => {
-    expect(BLOCK_SHEET).toContain(
-      ".mn-panel .mn-card{background:transparent;border:0;border-top:1px solid var(--mn-color-border);border-radius:0;box-shadow:none;margin:0;padding:var(--mn-space-3) 0}",
-    );
-    expect(BLOCK_SHEET).toContain(".mn-panel .mn-card::before{content:none}");
-    expect(BLOCK_SHEET).toMatch(/\.mn-panel\{[^}]*margin:var\(--mn-space-3\)/);
+  it("holds no rule of the removed home panel", () => {
+    expect(BLOCK_SHEET).not.toContain(".mn-panel");
+    expect(BLOCK_SHEET).not.toContain(".mn-subheading");
   });
 
   it("has no rule for a pressed button", () => {
@@ -112,22 +103,6 @@ describe("the overlays get the sheet", () => {
     });
     const style = doc.created[0]?.shadow.children[0];
     expect((style as { tag?: string }).tag).toBe("style");
-    expect((style as { textContent?: string }).textContent).toBe(BLOCK_SHEET);
-  });
-
-  it("the home panel's shadow root carries BLOCK_SHEET in a style node", () => {
-    const doc = new FakeDoc();
-    createHomeUi(doc).show(homeView([{ card: filmCard() }]), {
-      entry: () => ({
-        onChoose: () => {},
-        onAction: () => {},
-        onOther: () => {},
-        onConfirm: () => {},
-      }),
-      question: () => ({ onChoose: () => {}, onAction: () => {} }),
-      onFold: () => {},
-    });
-    const style = doc.created[0]?.shadow.children[0];
     expect((style as { textContent?: string }).textContent).toBe(BLOCK_SHEET);
   });
 });

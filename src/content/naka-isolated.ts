@@ -13,7 +13,7 @@ import { listenToPauses } from "./pause-events";
 import { createTitleLookup } from "./title-lookup";
 import { wireBlocks } from "./ui/blocks-wiring";
 import { createEndUi } from "./ui/end-ui";
-import { createHomeUi } from "./ui/home-ui";
+import { createHomeRowUi } from "./ui/home-row-ui";
 import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
 
@@ -48,7 +48,7 @@ const blocks = wireBlocks({
       clearTimeout(handle as ReturnType<typeof setTimeout>),
   },
   playerUi: createEndUi(document),
-  homeUi: createHomeUi(document),
+  homeUi: createHomeRowUi(document),
   now: () => Date.now(),
   titleOf: createTitleLookup((contentId) => client.contentById(contentId)),
 });

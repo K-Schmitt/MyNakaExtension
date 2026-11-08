@@ -59,18 +59,16 @@ async function arrived(cards: RatingCard[], questions: OpenQuestionsAnswer) {
   return { ...w, block };
 }
 
-describe("the questions part of the home panel", () => {
-  it("shows with only « Questions » when no card is to rate", async () => {
+describe("the questions of the home row", () => {
+  it("shows the row with questions only when no card is to rate", async () => {
     const w = await arrived([], questionsOf(Q1));
     expect(w.shown).toHaveLength(1);
-    expect(w.last().view.heading).toBe("Questions");
     expect(w.keys()).toEqual([]);
     expect(w.questionKeys()).toEqual([Q1.key]);
   });
 
-  it("shows « À noter » as in 4a when there is no question", async () => {
+  it("shows the cards only when there is no question", async () => {
     const w = await arrived([A, B], questionsOf());
-    expect(w.last().view.heading).toBe("À noter");
     expect(w.keys()).toEqual(["movie:2", "movie:1"]);
     expect(w.questionKeys()).toEqual([]);
   });
@@ -112,16 +110,9 @@ describe("the questions part of the home panel", () => {
     expect(view?.choices).toHaveLength(3);
     expect(view?.actions).toEqual(["ecarter"]);
   });
-
-  it("« Réduire » folds both parts", async () => {
-    const w = await arrived([A], questionsOf(Q1));
-    w.last().handlers.onFold();
-    expect(w.last().view.folded).toBe(true);
-    expect(sendsOf(w.calls)).toEqual([]);
-  });
 });
 
-describe("answers from the panel", () => {
+describe("answers from the row", () => {
   it("« Retirer… » sends answer-removal with its removeFrom, once", async () => {
     const w = await arrived([], questionsOf(REMOVAL));
     await w.ready();
@@ -447,7 +438,7 @@ describe("Ruling 28 and 29: a question the worker is answering", () => {
     w.state.questions = questionsOf();
     const before = w.hidden();
     await w.clock.advance(2000);
-    expect(w.hidden()).toBeGreaterThan(before); // the panel is empty: it is hidden
+    expect(w.hidden()).toBeGreaterThan(before); // the row is empty: it is hidden
   });
 
   it("stays locked while answering, whatever an older answer of the same key says, and again on a re-arrival after the schedule", async () => {
@@ -467,7 +458,7 @@ describe("Ruling 28 and 29: a question the worker is answering", () => {
     w.questionHandlersOf(Q1.key).onChoose({ kind: "candidate", id: 1001 });
     const hidden = w.hidden();
     await w.clock.advance(39999);
-    expect(w.hidden()).toBe(hidden); // the panel is still drawn: the older answer closed nothing
+    expect(w.hidden()).toBe(hidden); // the row is still drawn: the older answer closed nothing
     expect(w.questionKeys()).toEqual([Q1.key]);
     expect(w.questionViewOf(Q1.key)?.notice).toBe(SENDING_LINE);
     await w.clock.advance(5001); // the schedule is spent: the entry hides, the job is queued
@@ -503,39 +494,5 @@ describe("Ruling 30: a title lookup that never answers", () => {
     await flush();
     expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Un Job Mortel");
     expect(w.clock.count()).toBe(0);
-  });
-});
-
-describe("Ruling 32: folding and unfolding give every entry a fresh grace", () => {
-  it("a rating entry after unfolding: a click at 100 ms sends nothing, at 400 ms is taken", async () => {
-    const w = await arrived([A], questionsOf(REMOVAL));
-    await w.ready();
-    w.last().handlers.onFold();
-    w.last().handlers.onFold(); // unfolded again: the entries come back under the cursor
-    await w.clock.advance(100);
-    w.handlersOf("movie:1").onChoose(7);
-    await flush();
-    expect(sendsOf(w.calls)).toEqual([]);
-    await w.clock.advance(300);
-    w.handlersOf("movie:1").onChoose(7);
-    await flush();
-    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 7"]);
-  });
-
-  it("a removal's « Retirer aussi… » after unfolding: a click at 100 ms sends nothing, at 400 ms is taken", async () => {
-    const w = await arrived([A], questionsOf(REMOVAL));
-    await w.ready();
-    w.last().handlers.onFold();
-    w.last().handlers.onFold();
-    await w.clock.advance(100);
-    w.questionHandlersOf(REMOVAL.key).onChoose({ kind: "remove" });
-    await flush();
-    expect(sendsOf(w.calls)).toEqual([]);
-    await w.clock.advance(300);
-    w.questionHandlersOf(REMOVAL.key).onChoose({ kind: "remove" });
-    await flush();
-    expect(sendsOf(w.calls)).toEqual([
-      "answer-removal naka 21391 112240873 true",
-    ]);
   });
 });

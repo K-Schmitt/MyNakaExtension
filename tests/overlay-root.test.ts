@@ -76,22 +76,6 @@ describe("createOverlayRoot", () => {
     expect(css).toContain("color-scheme: dark !important");
   });
 
-  it("the bottom right placement keeps the reset, the z-index and the stopped events", () => {
-    const doc = new FakeDoc();
-    createOverlayRoot(doc, "bottom-right");
-    const css = hostOf(doc).style.cssText;
-    expect(css).toContain("all: initial");
-    expect(css).toContain("z-index: 2147483647");
-    expect(css).toContain("bottom: 0");
-    expect(css).toContain("width: 360px");
-    expect(css).toContain("max-height: 60vh");
-    expect(css).not.toContain("top: 0");
-    for (const d of css.split(";").filter((x) => x.trim() !== "")) {
-      expect(d, d).toMatch(/ !important$/);
-    }
-    expect(hostOf(doc).dispatch("click")).toBe(false);
-  });
-
   it("lists the input events it keeps from the page", () => {
     expect([...STOPPED_EVENTS].sort()).toEqual([...EXPECTED].sort());
   });

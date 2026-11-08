@@ -68,3 +68,39 @@ describe("questionView", () => {
     );
   });
 });
+
+describe("questionView images", () => {
+  it("gives a candidate with a poster a w92 thumbnail, « Aucun » none", () => {
+    const view = questionView(
+      ambiguity({
+        candidates: [
+          {
+            id: 30,
+            title: "Dune",
+            year: 2021,
+            type: "film",
+            image: { posterPath: "/a.jpg" },
+          },
+        ],
+      }),
+      [],
+    );
+    expect(view.choices[0]?.image).toBe("https://image.tmdb.org/t/p/w92/a.jpg");
+    expect(view.choices[1]?.choice).toEqual({ kind: "none" });
+    expect(view.choices[1]).not.toHaveProperty("image");
+  });
+
+  it("gives a candidate without image no image", () => {
+    const view = questionView(ambiguity(), []);
+    expect(view.choices[0]).not.toHaveProperty("image");
+  });
+
+  it("gives a removal with a backdrop the w780 image", () => {
+    const view = questionView(
+      removal({ image: { backdropPath: "/b.jpg" } }),
+      [],
+    );
+    expect(view.image).toBe("https://image.tmdb.org/t/p/w780/b.jpg");
+    expect(questionView(removal(), [])).not.toHaveProperty("image");
+  });
+});
