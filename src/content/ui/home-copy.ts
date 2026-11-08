@@ -1,6 +1,6 @@
-// The sentences of the home panel.
+// The sentences of the home row.
 
-export const HOME_HEADING = "À noter";
-export const FOLD_LABEL = "Réduire";
-export const UNFOLD_LABEL = "Développer";
-export const QUESTIONS_HEADING = "Questions";
+export const ROW_TITLE = "À traiter";
+export const ROW_SUBTITLE = "Notes et questions pour SensCritique";
+export const PREV_LABEL = "Précédent";
+export const NEXT_LABEL = "Suivant";

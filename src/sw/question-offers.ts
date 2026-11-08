@@ -8,6 +8,7 @@ import {
   type RemovalItem,
 } from "../core/questions";
 import type { QuestionCandidate, Side, UnlinkedItem } from "../core/state";
+import type { TitleImage } from "../core/title-image";
 import type { LastAnswer } from "../ext/answer-record";
 
 export type AmbiguityOffer = {
@@ -24,6 +25,7 @@ export type RemovalOffer = {
   removeFrom: Side;
   pair: Pair;
   title: string;
+  image?: TitleImage;
 };
 export type QuestionOffer = AmbiguityOffer | RemovalOffer;
 export type PageQuestion =
@@ -82,5 +84,6 @@ export function removalQuestion(item: RemovalItem): RemovalOffer {
     removeFrom: item.removeFrom,
     pair: item.pair,
     title: item.title ?? "",
+    ...(item.image === undefined ? {} : { image: item.image }),
   };
 }

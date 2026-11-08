@@ -11,6 +11,7 @@ import {
   SEND_LABEL,
 } from "./rating-copy";
 import type { RatingView } from "./rating-view";
+import { starRater } from "./star-rater";
 import { onTrustedClick } from "./trusted";
 
 export type RatingHandlers = {
@@ -22,37 +23,34 @@ export type RatingHandlers = {
 
 export type Maker = Pick<DocLike, "createElement">;
 
-// The text of a block, and of whatever the home panel draws around its blocks: buttons inherit it.
-export const BLOCK_TEXT_CSS =
-  "font: 14px/1.4 system-ui, sans-serif; color: #fff;";
-export const BLOCK_CSS = `${BLOCK_TEXT_CSS} background: rgba(20, 20, 24, 0.92); padding: 12px; margin: 12px; border-radius: 8px; display: block;`;
-const ROW_CSS = "display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;";
+export const BLOCK_CLASS = "mn-card";
+export const BUTTON_CLASS = "mn-btn";
+export const PRIMARY_CLASS = "mn-btn mn-btn--primary";
+export const ERROR_CLASS = "mn-line mn-error";
+export const WARNING_CLASS = "mn-line mn-warning";
+export const TITLE_CLASS = "mn-line mn-title";
+const ROW_CLASS = "mn-row";
 
-/** How the choices sit: on a wrapping row by default; a narrow panel can ask for a grid. */
-export type BlockLayout = { choicesRow: string };
-const ROW_LAYOUT: BlockLayout = { choicesRow: ROW_CSS };
-export const BUTTON_CSS =
-  "font: inherit; color: #fff; background: #3a3a44; border: 1px solid #666; border-radius: 4px; padding: 4px 8px; cursor: pointer;";
-const MARKED_CSS = `${BUTTON_CSS} background: #2f6fdb; border-color: #9cc0ff; font-weight: 700;`;
-const WARNING_CSS = "color: #ffd479; margin-top: 8px;";
-export const ERROR_CSS = "color: #ff9c9c; margin-top: 8px;";
-
-export function textLine(doc: Maker, text: string, css = ""): ElementLike {
+export function textLine(
+  doc: Maker,
+  text: string,
+  cls = "mn-line",
+): ElementLike {
   const line = doc.createElement("div");
   line.textContent = text;
-  line.style.cssText = css;
+  line.className = cls;
   return line;
 }
 
 export function button(
   doc: Maker,
   text: string,
-  css: string,
+  cls: string,
   fn: () => void,
 ): ElementLike {
   const el = doc.createElement("button");
   el.textContent = text;
-  el.style.cssText = css;
+  el.className = cls;
   el.setAttribute("type", "button");
   onTrustedClick(el, fn);
   return el;
@@ -61,46 +59,33 @@ export function button(
 export function row(
   doc: Maker,
   buttons: ElementLike[],
-  css: string = ROW_CSS,
+  cls: string = ROW_CLASS,
 ): ElementLike {
   const el = doc.createElement("div");
-  el.style.cssText = css;
+  el.className = cls;
   for (const b of buttons) el.appendChild(b);
   return el;
 }
 
-function choiceButton(
-  doc: Maker,
-  choice: RatingView["choices"][number],
-  handlers: RatingHandlers,
-): ElementLike {
-  const el = button(
-    doc,
-    String(choice.value),
-    choice.marked ? MARKED_CSS : BUTTON_CSS,
-    () => handlers.onChoose(choice.value),
-  );
-  el.setAttribute("aria-pressed", String(choice.marked));
-  return el;
-}
-
-function lines(doc: Maker, view: RatingView): ElementLike[] {
+export function ratingLines(doc: Maker, view: RatingView): ElementLike[] {
   return [
-    textLine(doc, view.heading, "font-weight: 700;"),
+    textLine(doc, view.heading, TITLE_CLASS),
     ...(view.current === undefined ? [] : [textLine(doc, view.current)]),
     ...(view.start === undefined ? [] : [textLine(doc, view.start)]),
     ...(view.notice === undefined ? [] : [textLine(doc, view.notice)]),
-    ...(view.error === undefined ? [] : [textLine(doc, view.error, ERROR_CSS)]),
+    ...(view.error === undefined
+      ? []
+      : [textLine(doc, view.error, ERROR_CLASS)]),
     ...(view.warning === undefined
       ? []
-      : [textLine(doc, view.warning, WARNING_CSS)]),
+      : [textLine(doc, view.warning, WARNING_CLASS)]),
   ];
 }
 
-function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
+export function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
   return row(doc, [
-    button(doc, SEND_LABEL, MARKED_CSS, () => handlers.onConfirm(true)),
-    button(doc, CANCEL_LABEL, BUTTON_CSS, () => handlers.onConfirm(false)),
+    button(doc, SEND_LABEL, PRIMARY_CLASS, () => handlers.onConfirm(true)),
+    button(doc, CANCEL_LABEL, BUTTON_CLASS, () => handlers.onConfirm(false)),
   ]);
 }
 
@@ -108,20 +93,22 @@ function buttonRows(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
-  layout: BlockLayout,
 ): ElementLike[] {
   if (view.confirm === true) return [confirmRow(doc, handlers)];
   const others = view.others.map((label) =>
-    button(doc, OTHER_LABELS[label], BUTTON_CSS, () => handlers.onOther(label)),
+    button(doc, OTHER_LABELS[label], BUTTON_CLASS, () =>
+      handlers.onOther(label),
+    ),
   );
   const actions = view.actions.map((action) =>
-    button(doc, ACTION_LABELS[action], BUTTON_CSS, () =>
+    button(doc, ACTION_LABELS[action], BUTTON_CLASS, () =>
       handlers.onAction(action),
     ),
   );
-  const choices = view.choices.map((c) => choiceButton(doc, c, handlers));
   return [
-    ...(choices.length > 0 ? [row(doc, choices, layout.choicesRow)] : []),
+    ...(view.choices.length > 0
+      ? [starRater(doc, view.choices, handlers.onChoose)]
+      : []),
     ...[others, actions]
       .filter((buttons) => buttons.length > 0)
       .map((buttons) => row(doc, buttons)),
@@ -132,12 +119,11 @@ export function buildBlock(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
-  layout: BlockLayout = ROW_LAYOUT,
 ): ElementLike {
   const block = doc.createElement("div");
-  block.style.cssText = BLOCK_CSS;
-  const rows = buttonRows(doc, view, handlers, layout);
-  for (const el of [...lines(doc, view), ...rows]) block.appendChild(el);
+  block.className = BLOCK_CLASS;
+  const rows = buttonRows(doc, view, handlers);
+  for (const el of [...ratingLines(doc, view), ...rows]) block.appendChild(el);
   return block;
 }
 

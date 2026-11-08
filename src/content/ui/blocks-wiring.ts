@@ -3,9 +3,11 @@
 // page's events. The end and pause blocks draw in one overlay, a card or a question, owned by one block at
 // a time: the end block closes the pause block before it opens, and the pause block neither draws nor
 // clears while the end block is shown (a question of the end block included). Every URL change closes the pause block; leaving the player closes the end block
-// too, while an episode change (autoplay) keeps its card. The home panel has its own overlay. The removal
+// too, while an episode change (autoplay) keeps its card. The home row has its own host among Naka's rows. The removal
 // block (after a removal on Naka, on any naka.cx path) draws in the player overlay but yields to both: it
-// shows only when neither is shown, and either one opening closes it.
+// shows only when neither is shown, and either one opening closes it. On the home page it is instead the
+// home row's first card, whatever the other blocks do, and it closes when the tab leaves the home path; a
+// block opened off the home page closes when the tab arrives there.
 
 import type { ContentIds } from "../../core/finish-event";
 import type { VideoSample } from "../naka-tab";
@@ -70,14 +72,27 @@ export function wireBlocks(ports: WiringPorts) {
     endShown: () => endBlock.isShown(),
     titleOf: ports.titleOf,
   });
+  // Where the shown removal offer draws: decided at its first draw, kept until it hides, so that a redraw
+  // (a lock, an error) never moves it and its hide clears the place it drew in.
+  let removalOn: "home" | "player" | undefined;
   const removalBlock = createRemovalBlock({
     port,
     timer,
     now: ports.now,
-    show: playerUi.showQuestion,
-    hide: playerUi.hide,
+    show: (view, handlers, key) => {
+      removalOn ??= homeBlock.isHome() ? "home" : "player";
+      if (removalOn === "home") homeBlock.showLive(key, view, handlers);
+      else playerUi.showQuestion(view, handlers);
+    },
+    hide: () => {
+      const was = removalOn;
+      removalOn = undefined;
+      if (was === "home") homeBlock.hideLive();
+      else playerUi.hide();
+    },
     titleOf: ports.titleOf,
-    ownerFree: () => !endBlock.isShown() && !pauseBlock.isShown(),
+    ownerFree: () =>
+      homeBlock.isHome() || (!endBlock.isShown() && !pauseBlock.isShown()),
   });
   const homeBlock = createHomeBlock({
     port,
@@ -95,7 +110,12 @@ export function wireBlocks(ports: WiringPorts) {
       pauseBlock.urlChanged(ports.now());
       if (ids === undefined) endBlock.leave();
     },
-    pathChanged: (pathname: string) => homeBlock.route(pathname),
+    pathChanged: (pathname: string) => {
+      homeBlock.route(pathname);
+      // Leaving home closes the row's card; arriving home closes a floating block (P13: none there).
+      const here = homeBlock.isHome() ? "home" : "player";
+      if (removalOn !== undefined && removalOn !== here) removalBlock.close();
+    },
     removed: (contentId: number) => removalBlock.removed(contentId),
     paused: (sample: VideoSample) => pauseBlock.paused(sample, playing),
     resumed: () => pauseBlock.resumed(),

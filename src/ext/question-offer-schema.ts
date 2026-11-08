@@ -28,6 +28,7 @@ import {
   onlyKeys,
   valuesOf,
 } from "./field-checks";
+import { optionalImage } from "./image-schema";
 import { parsePair } from "./pair-schema";
 
 export type { LastAnswer, QuestionKey };
@@ -48,6 +49,7 @@ const REMOVAL_KEYS = valuesOf<keyof RemovalOffer>({
   removeFrom: true,
   pair: true,
   title: true,
+  image: true,
 });
 const LEGACY_KEYS = valuesOf<keyof Extract<PageQuestion, { kind: "legacy" }>>({
   kind: true,
@@ -101,6 +103,7 @@ function parseRemoval(
     removeFrom,
     pair,
     title: asString(record.title, `${path}.title`),
+    ...optionalImage(record, path),
   };
 }
 

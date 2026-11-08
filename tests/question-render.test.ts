@@ -5,7 +5,7 @@ import {
   questionView,
 } from "../src/content/ui/question-view";
 import type { AmbiguityOffer, RemovalOffer } from "../src/sw/question-offers";
-import { descendants, FakeDoc, FakeShadow } from "./ui-fakes";
+import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
 
 const NB = "\u202F";
 const OFFER: AmbiguityOffer = {
@@ -95,5 +95,22 @@ describe("the question block", () => {
   it("draws the error line", () => {
     const view: QuestionView = { ...questionView(OFFER, []), error: "boom" };
     expect(setup(view).all.some((el) => el.textContent === "boom")).toBe(true);
+  });
+
+  it("draws a card, a title line and plain buttons in rows", () => {
+    const { root, buttons } = setup(questionView(OFFER, ["fermer"]));
+    const card = root.children[0] as FakeElement;
+    expect(card.className).toBe("mn-card");
+    expect((card.children[0] as FakeElement).className).toBe(
+      "mn-line mn-title",
+    );
+    expect(buttons.map((b) => b.className)).toEqual([
+      "mn-btn",
+      "mn-btn",
+      "mn-btn",
+    ]);
+    expect((buttons[0]?.parent as FakeElement | null)?.className).toBe(
+      "mn-row",
+    );
   });
 });

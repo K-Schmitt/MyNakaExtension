@@ -30,6 +30,7 @@ export class FakeNode implements NodeLike {
 
 export class FakeShadow extends FakeNode implements ShadowRootLike {
   host: FakeElement | null = null;
+  adoptedStyleSheets?: unknown[];
 
   replaceChildren(...nodes: NodeLike[]): void {
     for (const child of [...this.children]) this.drop(child);
@@ -39,11 +40,14 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
 
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
+  className = "";
   style = { cssText: "" };
   attributes: Record<string, string> = {};
   listeners: Record<string, ((event: EventLike) => void)[]> = {};
   shadowInit: { mode: string }[] = [];
   shadow = new FakeShadow();
+  focusCount = 0;
+  static focused: FakeElement | null = null;
 
   constructor(readonly tag: string) {
     super();
@@ -52,6 +56,10 @@ export class FakeElement extends FakeNode implements ElementLike {
 
   setAttribute(name: string, value: string): void {
     this.attributes[name] = value;
+  }
+
+  removeAttribute(name: string): void {
+    delete this.attributes[name];
   }
 
   addEventListener(type: string, listener: (event: EventLike) => void): void {
@@ -63,15 +71,21 @@ export class FakeElement extends FakeNode implements ElementLike {
     return this.shadow;
   }
 
+  focus(): void {
+    this.focusCount += 1;
+    FakeElement.focused = this;
+  }
+
   remove(): void {
     this.parent?.drop(this);
   }
 
   /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
-  dispatch(type: string, isTrusted: unknown = true): boolean {
+  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
     let stopped = false;
     const event = {
       isTrusted,
+      key,
       stopPropagation: () => {
         stopped = true;
       },
@@ -84,6 +98,10 @@ export class FakeElement extends FakeNode implements ElementLike {
       node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
     }
     return !stopped;
+  }
+
+  press(key: string): void {
+    this.dispatch("keydown", true, key);
   }
 
   click(isTrusted: boolean): void {

@@ -37,6 +37,24 @@ const UNLINKED = {
 };
 const LAST = { seq: 1, at: 2, target: "ambiguity:naka:5", outcome: "done" };
 
+describe("question offers with images", () => {
+  const image = { posterPath: "/a.jpg" };
+
+  it("a removal offer round-trips with an image", () => {
+    const offer = { ...REMOVAL, image };
+    expect(parseQuestionOffer(offer, "o")).toEqual(offer);
+  });
+  it("an ambiguity candidate round-trips with an image", () => {
+    const offer = { ...AMBIGUITY, candidates: [{ ...cand(50), image }] };
+    expect(parseQuestionOffer(offer, "o")).toEqual(offer);
+  });
+  it("rejects an image of the wrong shape", () => {
+    expect(() =>
+      parseQuestionOffer({ ...REMOVAL, image: { posterPath: "x" } }, "o"),
+    ).toThrow();
+  });
+});
+
 describe("question offers", () => {
   it("each offer round-trips", () => {
     expect(parseQuestionOffer(AMBIGUITY, "o")).toEqual(AMBIGUITY);

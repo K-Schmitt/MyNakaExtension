@@ -34,10 +34,18 @@ const middle = filmCard({
 });
 
 describe("homeView", () => {
-  it("is headed « À noter », unfolded by default", () => {
+  it("gives an entry whose card has a poster the w500 image", () => {
+    const card = filmCard({ ...old, image: { posterPath: "/a.jpg" } });
+    const [entry] = homeView([{ card }]).entries;
+    expect(entry?.image).toBe("https://image.tmdb.org/t/p/w500/a.jpg");
+    expect(homeView([{ card: old }]).entries[0]).not.toHaveProperty("image");
+  });
+
+  it("has no heading and no fold", () => {
     const view = homeView([{ card: old }]);
-    expect(view.heading).toBe("À noter");
-    expect(view.folded).toBe(false);
+    expect(view).not.toHaveProperty("heading");
+    expect(view).not.toHaveProperty("folded");
+    expect(view).not.toHaveProperty("questionsHeading");
   });
 
   it("lists the newest first, whatever the stored order", () => {
@@ -92,22 +100,32 @@ describe("homeView", () => {
     expect(homeView([{ card: done }]).entries).toEqual([]);
   });
 
-  it("tells when it is folded", () => {
-    expect(homeView([{ card: old }], true).folded).toBe(true);
-  });
-
-  it("carries the questions after the cards, headed « Questions » when no card comes first", () => {
+  it("carries the questions after the cards", () => {
     const q = {
       key: "ambiguity:naka:1",
       view: questionView(OFFER, ["ecarter"]),
     };
-    const both = homeView([{ card: old }], false, [q]);
-    expect(both.heading).toBe("À noter");
-    expect(both.questionsHeading).toBe("Questions");
-    expect(both.questions).toEqual([q]);
-    const only = homeView([], false, [q]);
-    expect(only.heading).toBe("Questions");
-    expect(only.entries).toEqual([]);
+    expect(homeView([{ card: old }], [q]).questions).toEqual([q]);
+    expect(homeView([], [q]).entries).toEqual([]);
     expect(homeView([{ card: old }]).questions).toEqual([]);
+  });
+
+  it("carries the live card and drops the question of the same key", () => {
+    const live = {
+      key: "removal:sc:1:2",
+      view: questionView(OFFER, []),
+    };
+    const same = {
+      key: "removal:sc:1:2",
+      view: questionView(OFFER, ["ecarter"]),
+    };
+    const other = {
+      key: "ambiguity:naka:1",
+      view: questionView(OFFER, ["ecarter"]),
+    };
+    const view = homeView([], [same, other], live);
+    expect(view.live).toEqual(live);
+    expect(view.questions).toEqual([other]);
+    expect(homeView([], [other])).not.toHaveProperty("live");
   });
 });
