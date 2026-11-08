@@ -33,6 +33,8 @@ export type StatusSnapshot = {
   lastFinish?: FinishRecord;
   /** Absent when the state cannot be read. */
   counts?: Counts;
+  /** The rating cards with a rating still to give. Absent when the ratings cannot be read. */
+  pendingRatings?: number;
   /** The end of a viewing per kind. Absent when the settings cannot be read. */
   thresholds?: Thresholds;
   /** The progress from which the pause block appears (0: at any time). Absent with the thresholds. */
@@ -50,7 +52,10 @@ export type StatusSnapshot = {
 };
 
 /** The store as the status reads it: no save. */
-export type StoreReader = Pick<Store, "loadSettings" | "loadState">;
+export type StoreReader = Pick<
+  Store,
+  "loadSettings" | "loadState" | "loadRatings"
+>;
 
 // The same items as the page lists (pageItems), so that the count line never disagrees with the page.
 function countsOf(state: SyncState): Counts {
@@ -75,6 +80,21 @@ function fromSettings(settings: Settings): StatusSnapshot {
   return snapshot;
 }
 
+// The ratings are shown on Naka's home row; this count keeps them visible if the row cannot be placed.
+async function addPendingRatings(
+  snapshot: StatusSnapshot,
+  store: StoreReader,
+): Promise<void> {
+  try {
+    const cards = await store.loadRatings();
+    snapshot.pendingRatings = cards.filter(
+      (card) => card.pending.length > 0,
+    ).length;
+  } catch {
+    // Absent: the page shows no line rather than a wrong zero.
+  }
+}
+
 export async function statusSnapshot(
   store: StoreReader,
 ): Promise<StatusSnapshot> {
@@ -90,5 +110,6 @@ export async function statusSnapshot(
   } catch (error) {
     snapshot.error = toJobError(error);
   }
+  await addPendingRatings(snapshot, store);
   return snapshot;
 }

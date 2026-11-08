@@ -67,3 +67,20 @@ describe("readSnapshot: the thresholds and the pause setting", () => {
     expect(readSnapshot({ mode: "live", ...bad })).toBeUndefined();
   });
 });
+
+describe("readSnapshot: the ratings waiting", () => {
+  it("keeps a non-negative integer", () => {
+    expect(readSnapshot({ mode: "live", pendingRatings: 0 })).toEqual({
+      mode: "live",
+      pendingRatings: 0,
+    });
+    expect(readSnapshot({ mode: "live", pendingRatings: 3 })).toEqual({
+      mode: "live",
+      pendingRatings: 3,
+    });
+  });
+
+  it.each([-1, 1.5, "3", null, Number.NaN])("refuses %j", (bad) => {
+    expect(readSnapshot({ mode: "live", pendingRatings: bad })).toBeUndefined();
+  });
+});

@@ -9,6 +9,7 @@ import type { StatusFormat } from "./status-format";
 import { readSnapshot } from "./status-input";
 import {
   finishLine,
+  pendingRatingsLine,
   previewLine,
   reportLines,
   runErrorLine,
@@ -82,7 +83,7 @@ function activityLines(
 }
 
 function viewLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
-  const { error, binding, lastFinish, counts } = snapshot;
+  const { error, binding, lastFinish, counts, pendingRatings } = snapshot;
   return present([
     error === undefined ? undefined : snapshotErrorLine(error),
     ...activityLines(snapshot, format),
@@ -90,6 +91,9 @@ function viewLines(snapshot: StatusSnapshot, format: StatusFormat): string[] {
     ...runLines(snapshot, format),
     lastFinish === undefined ? undefined : finishLine(lastFinish, format),
     ...(counts === undefined ? [] : countLines(counts)),
+    pendingRatings === undefined
+      ? undefined
+      : pendingRatingsLine(pendingRatings),
   ]);
 }
 

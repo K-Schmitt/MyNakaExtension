@@ -92,6 +92,8 @@ const SNAPSHOTS: StatusSnapshot[] = [
     pendingMode: "simulation",
   },
   { mode: "live", pendingActions: ["forget", "reset"] },
+  { mode: "live", pendingRatings: 0 },
+  { mode: "live", pendingRatings: 3 },
 ];
 
 function texts(view: StatusView): string[] {
