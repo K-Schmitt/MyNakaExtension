@@ -454,6 +454,30 @@ Un audit d'I2 a trouvé un défaut important (A1) et deux mineurs (A2, A3), corr
   réglée sans être liée. Personne n'a montré que cet état est atteignable ; sinon, il faudrait la retenir comme
   `linkedBefore`.
 
+## 2026-11-08 — Étape 6 : thème Naka et rangée « À traiter »
+
+Après l'essai de la refonte, le propriétaire a demandé les couleurs de Naka et l'accueil dans la page, pas en
+panneau. Décisions (spec du 2026-11-08, P1 à P13) :
+
+- **Une rangée à nous, qui imite Naka** : un `section` inséré dans `.discover-page .dc-sections` juste après
+  « Reprendre la lecture », racine fantôme fermée. Rejeté : reprendre les classes de Naka (`dc-head`, `dc-row`) ;
+  la moindre mise à jour de Naka la défigurerait, et son carrousel (Embla) ne s'attache pas à nos nœuds.
+- **Naka reconstruit la liste à chaque retour sur l'accueil** (sonde du 2026-11-08) : un gardien replace la
+  rangée. Il attend « Reprendre » une seconde au plus, car une autre rangée titrée arrive avant elle.
+- **Les couleurs sont lues en direct dans Naka** (`var(--color-…, copie)`), la page de l'extension garde la copie.
+  Trois teintes restent fixes, car celles de Naka ne passent pas le test de contraste : texte tertiaire, erreur et
+  fonds d'alerte.
+- **Les affiches ne viennent que des réponses déjà lues** : aucune requête n'est faite pour une affiche. Les
+  données stockées ne vérifient que la forme d'une adresse ; la liste des hôtes SensCritique s'applique à
+  l'entrée et au dessin. Elle est vide tant que la sonde du propriétaire n'a pas donné l'hôte, et les
+  candidats SensCritique montrent alors un cadre neutre.
+- **Naka voit les adresses des images** chargées par sa page, jamais le texte des cartes (accepté, P12).
+- **Un retrait fait sur l'accueil** devient la première carte de la rangée. Un bloc de retrait garde la place où
+  il s'est dessiné, et l'arrivée sur l'accueil ferme un bloc flottant.
+- **La rangée retient les clics et les touches** comme le faisait le panneau, mais pas la molette. Quand une
+  carte arrive ou part, les autres reçoivent un nouveau délai de grâce au clic.
+- **Les blocs du lecteur** ne prennent que les couleurs (P11).
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
