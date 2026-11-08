@@ -614,3 +614,51 @@ describe("parseState retryFinishes", () => {
     expect((error as Error).message).toMatch(/^stored state: retryFinishes/);
   });
 });
+
+describe("parseState images", () => {
+  const image = { posterPath: "/a.jpg", picture: "https://any.example/p.jpg" };
+  const candidate = { id: 90, title: "A", type: "film" as const };
+
+  it("round-trips a candidate and a removal with an image", () => {
+    const state = valid();
+    state.pending = [
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(3, 30),
+        asked: false,
+        title: "T",
+        image,
+      },
+      {
+        kind: "ambiguity",
+        side: "naka",
+        id: 9,
+        candidateIds: [90],
+        candidates: [{ ...candidate, image }],
+      },
+    ];
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+  });
+
+  it("reads items without an image exactly as before", () => {
+    const state = valid();
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+  });
+
+  it("rejects an image of the wrong shape", () => {
+    const state = valid();
+    state.pending = [
+      {
+        kind: "removal",
+        removeFrom: "sc",
+        pair: p(3, 30),
+        asked: false,
+        image: { posterPath: "nope" },
+      },
+    ];
+    expect(rejection(JSON.parse(JSON.stringify(state)))).toBeInstanceOf(
+      StoredStateError,
+    );
+  });
+});

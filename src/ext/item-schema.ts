@@ -13,6 +13,7 @@ import {
   valuesOf,
   whenPresent,
 } from "./field-checks";
+import { optionalImage } from "./image-schema";
 import { parsePair } from "./pair-schema";
 
 const SIDES = valuesOf<UnlinkedItem["side"]>({ naka: true, sc: true });
@@ -27,6 +28,7 @@ const REMOVAL_KEYS = valuesOf<keyof Extract<PendingItem, { kind: "removal" }>>({
   pair: true,
   asked: true,
   title: true,
+  image: true,
 });
 const AMBIGUITY_KEYS = valuesOf<
   keyof Extract<PendingItem, { kind: "ambiguity" }>
@@ -64,6 +66,7 @@ function parseRemoval(record: Record<string, unknown>, path: string) {
     pair: parsePair(record.pair, `${path}.pair`),
     asked: asBoolean(record.asked, `${path}.asked`),
     ...optionalTitle(record, path),
+    ...optionalImage(record, path),
   };
 }
 

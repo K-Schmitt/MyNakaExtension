@@ -4,6 +4,7 @@
 import type { NakaItem } from "../naka/naka-items";
 import { UNIVERSE } from "../sc/sc-queries";
 import type { ScWishItem } from "../sc/wishlist-page";
+import type { TitleImage } from "./title-image";
 import type { Candidate, MediaType, Titled } from "./title-match";
 
 const YEAR_PREFIX = /^\d{4}/;
@@ -54,12 +55,14 @@ function build(
   type: MediaType,
   originalTitle: string | undefined,
   year: number | undefined,
+  image: TitleImage | undefined,
 ): Titled {
   const titled: Titled = { title, type };
   if (originalTitle !== undefined && originalTitle !== "") {
     titled.originalTitle = originalTitle;
   }
   if (year !== undefined) titled.year = year;
+  if (image !== undefined) titled.image = image;
   return titled;
 }
 
@@ -69,6 +72,7 @@ export function nakaToTitled(item: NakaItem): Titled {
     nakaType(item.mediaType),
     item.originalTitle,
     yearOf(item.releaseDate),
+    item.image,
   );
 }
 
@@ -80,7 +84,7 @@ export function nakaToCandidate(item: NakaItem): Candidate {
 export function scToTitled(item: ScWishItem): Titled | undefined {
   const type = scType(item);
   if (type === undefined) return undefined;
-  return build(item.title, type, item.originalTitle, item.year);
+  return build(item.title, type, item.originalTitle, item.year, item.image);
 }
 
 export function scToCandidate(item: ScWishItem): Candidate | undefined {

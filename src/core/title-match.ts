@@ -1,4 +1,5 @@
 import { normalizeTitle } from "./normalize-title";
+import type { TitleImage } from "./title-image";
 
 export type MediaType = "film" | "serie";
 
@@ -7,6 +8,7 @@ export type Titled = {
   originalTitle?: string;
   year?: number;
   type: MediaType;
+  image?: TitleImage;
 };
 
 export type Candidate = Titled & { id: number };
