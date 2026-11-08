@@ -20,6 +20,7 @@ import {
   valuesOf,
   whenPresent,
 } from "./field-checks";
+import { optionalImage } from "./image-schema";
 import { parseContentKey } from "./item-schema";
 import { ERROR_CODES } from "./run-record-schema";
 
@@ -43,6 +44,7 @@ const CARD_KEYS = valuesOf<keyof RatingCard>({
   given: true,
   seriesFinished: true,
   failed: true,
+  image: true,
 });
 const TARGET_KEYS = valuesOf<keyof CardTarget>({
   label: true,
@@ -156,6 +158,7 @@ function parseCard(raw: unknown, path: string): RatingCard {
     given: parseGiven(record.given, `${path}.given`),
     seriesFinished: asBoolean(record.seriesFinished, `${path}.seriesFinished`),
     ...(failed === undefined ? {} : { failed }),
+    ...optionalImage(record, path),
   };
 }
 

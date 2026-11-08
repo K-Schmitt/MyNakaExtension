@@ -2354,6 +2354,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
         `Déjà vus sur SensCritique${NB}: 0`,
         `Pas encore examinés${NB}: 0`,
         "Rien en attente",
+        `Notes \u00E0 donner${NB}: aucune`,
       ],
       preview: [
         `Envies SensCritique${NB}: Film 1 (2001, film)`,

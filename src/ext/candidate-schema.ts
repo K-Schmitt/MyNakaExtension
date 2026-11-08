@@ -13,6 +13,7 @@ import {
   valuesOf,
   whenPresent,
 } from "./field-checks";
+import { optionalImage } from "./image-schema";
 
 const TYPES = valuesOf<MediaType>({ film: true, serie: true });
 const CANDIDATE_KEYS = valuesOf<keyof QuestionCandidate>({
@@ -20,6 +21,7 @@ const CANDIDATE_KEYS = valuesOf<keyof QuestionCandidate>({
   title: true,
   year: true,
   type: true,
+  image: true,
 });
 
 const MIN_YEAR = 1800;
@@ -39,6 +41,7 @@ function parseCandidate(raw: unknown, path: string): QuestionCandidate {
     title: asString(record.title, `${path}.title`),
     ...(year === undefined ? {} : { year }),
     type: asOneOf(record.type, TYPES, `${path}.type`),
+    ...optionalImage(record, path),
   };
 }
 

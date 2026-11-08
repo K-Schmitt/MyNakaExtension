@@ -29,6 +29,14 @@ describe("parseRatings", () => {
     const list = [full(), filmCard()];
     expect(parseRatings(JSON.parse(JSON.stringify(list)))).toEqual(list);
   });
+  it("round-trips a card with an image and one without", () => {
+    const withImage = filmCard({ image: { posterPath: "/a.jpg" } });
+    const list = [withImage, filmCard()];
+    expect(parseRatings(JSON.parse(JSON.stringify(list)))).toEqual(list);
+  });
+  it("rejects an image of the wrong shape", () => {
+    bad({ ...filmCard(), image: { picture: "http://x/p.jpg" } });
+  });
   it("rejects a non-list", () => {
     expect(() => parseRatings(null)).toThrow(StoredStateError);
     expect(() => parseRatings({})).toThrow(StoredStateError);

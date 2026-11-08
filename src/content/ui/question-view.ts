@@ -1,6 +1,8 @@
 // What a question looks like, whatever draws it: the Naka block and the status page share it. Pure: an
 // offer in, a view out. A title goes in as text; the draw puts it in with textContent.
 
+import { thumbUrl, wideUrl } from "../../core/image-urls";
+import type { TitleImage } from "../../core/title-image";
 import type { QuestionOffer } from "../../sw/question-offers";
 import {
   ambiguityHeading,
@@ -20,9 +22,13 @@ export type QuestionChoice =
   | { kind: "keep" };
 export type QuestionAction = "plus-tard" | "ecarter" | "fermer";
 export type QuestionView = {
+  /** The offer's kind: a tile keeps its layout in every state, when a lock or a moot notice drops the choices. */
+  kind: QuestionOffer["kind"];
   heading: string;
   question?: string;
-  choices: { choice: QuestionChoice; label: string }[];
+  /** The title's wide image (removals), as a URL; checked again when drawn. */
+  image?: string;
+  choices: { choice: QuestionChoice; label: string; image?: string }[];
   actions: QuestionAction[];
   sending?: true;
   notice?: string;
@@ -32,14 +38,21 @@ export type QuestionView = {
 const titled = (title: string): string =>
   title === "" ? UNKNOWN_TITLE : title;
 
+const withImage = (url: string | undefined): { image?: string } =>
+  url === undefined ? {} : { image: url };
+
+const imageOfTitle = (image?: TitleImage) => withImage(wideUrl(image));
+
 export function questionView(
   offer: QuestionOffer,
   actions: QuestionAction[],
 ): QuestionView {
   if (offer.kind === "removal") {
     return {
+      kind: "removal",
       heading: removalHeading(offer.removeFrom, titled(offer.title)),
       question: removalQuestion(offer.removeFrom),
+      ...imageOfTitle(offer.image),
       choices: [
         { choice: { kind: "remove" }, label: removeLabel(offer.removeFrom) },
         { choice: { kind: "keep" }, label: KEEP_LABEL },
@@ -48,11 +61,13 @@ export function questionView(
     };
   }
   return {
+    kind: "ambiguity",
     heading: ambiguityHeading(offer.side, titled(offer.title)),
     choices: [
       ...offer.candidates.map((c) => ({
         choice: { kind: "candidate", id: c.id } as const,
         label: candidateLabel(c),
+        ...withImage(thumbUrl(c.image)),
       })),
       { choice: { kind: "none" }, label: NONE_LABEL },
     ],

@@ -31,7 +31,7 @@ export const answerOf = (...cards: RatingCard[]): CardsAnswer => ({
   cards: cards.map((card) => entryOf(card)),
 });
 
-// The worker as the home panel sees it: `answer` is what the next askCards returns (the test changes it
+// The worker as the home row sees it: `answer` is what the next askCards returns (the test changes it
 // to play the worker's progress); sends are recorded and succeed unless `fail.send` is set.
 export function homeWorld() {
   const clock = fakeClock();

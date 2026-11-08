@@ -41,8 +41,14 @@ export function linkKey(side: Side, id: number): QuestionKey {
 }
 
 function toCandidate(found: Candidate): QuestionCandidate {
-  const { id, title, year, type } = found;
-  return year === undefined ? { id, title, type } : { id, title, year, type };
+  const { id, title, year, type, image } = found;
+  return {
+    id,
+    title,
+    ...(year === undefined ? {} : { year }),
+    type,
+    ...(image === undefined ? {} : { image }),
+  };
 }
 
 // In the order of `ids` (the match's order), not of the search; an id the search did not list is skipped.

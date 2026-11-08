@@ -94,6 +94,12 @@ describe("toCandidates", () => {
     expect(first).toStrictEqual({ id: 1, title: "A", type: "film" });
   });
 
+  it("keeps the image when the search gave one", () => {
+    const image = { posterPath: "/a.jpg" };
+    const [first] = toCandidates([{ ...A, image }], [1]);
+    expect(first?.image).toEqual(image);
+  });
+
   it("keeps at most MAX_CANDIDATES", () => {
     const many = Array.from({ length: 25 }, (_, i) => ({
       ...A,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { GRACE_MS } from "../src/content/ui/click-grace";
 import { createHomeBlock, HOME_PATHS } from "../src/content/ui/home-block";
+import { questionView } from "../src/content/ui/question-view";
 import {
   chosenLine,
   errorLine,
@@ -8,15 +10,18 @@ import {
   UNREACHABLE_LINE,
   WAIT_LINE,
 } from "../src/content/ui/rating-copy";
+import { renderRow } from "../src/content/ui/row-render";
 import type { RatingCard } from "../src/core/rating-cards";
+import type { QuestionOffer } from "../src/sw/question-offers";
 import { flush } from "./end-block-fakes";
 import { answerOf, asksOf, entryOf, homeWorld, sendsOf } from "./home-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
+import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
 
 const film = (id: number, at: number): RatingCard =>
   filmCard({ key: `movie:${id}`, contentId: id, title: `Film ${id}`, at });
 
-// Stored out of order on purpose: the panel must sort by `at`.
+// Stored out of order on purpose: the row must sort by `at`.
 const A = film(1, 100);
 const B = film(2, 300);
 const C = film(3, 200);
@@ -57,7 +62,7 @@ describe("the home block's arrival", () => {
     expect(w.shown).toEqual([]);
   });
 
-  it("leaving the home path hides the panel", async () => {
+  it("leaving the home path hides the row", async () => {
     const w = await arrived(A);
     const before = w.hidden();
     w.block.route("/player");
@@ -191,7 +196,7 @@ describe("a choice in the panel", () => {
     expect(w.keys()).toEqual(["movie:2"]);
   });
 
-  it("hides the panel when its last entry is gone", async () => {
+  it("hides the row when its last entry is gone", async () => {
     const w = await arrived(A);
     await w.ready();
     w.handlersOf("movie:1").onChoose(8);
@@ -283,7 +288,7 @@ describe("the série confirmation in an entry", () => {
   });
 });
 
-describe("Ignorer and Réduire", () => {
+describe("Ignorer", () => {
   it("Ignorer dismisses the first pending label, locks, then drops the entry", async () => {
     const ep = episodeCard({ pending: ["saison", "série"], at: 500 });
     const w = await arrived(ep, A);
@@ -295,16 +300,6 @@ describe("Ignorer and Réduire", () => {
     w.state.answer = answerOf(A);
     await w.clock.advance(2000);
     expect(w.keys()).toEqual(["movie:1"]);
-  });
-
-  it("Réduire folds the panel to its heading and sends nothing, again unfolds", async () => {
-    const w = await arrived(A);
-    await w.ready();
-    w.last().handlers.onFold();
-    expect(w.last().view.folded).toBe(true);
-    w.last().handlers.onFold();
-    expect(w.last().view.folded).toBe(false);
-    expect(sendsOf(w.calls)).toEqual([]);
   });
 });
 
@@ -347,5 +342,121 @@ describe("a home entry ignores a click right after it appears", () => {
       "rate 5:1:1 épisode 8",
       "rate 5:1:1 saison 6",
     ]);
+  });
+});
+
+// Review Focus 4: a card leaves while the cursor is over the row, and the next tile slides under it.
+describe("a tile that slides under the cursor after a card leaves", () => {
+  // The star of that value on the row's only tile, drawn from what the block showed last.
+  function starOnRow(w: Awaited<ReturnType<typeof arrived>>, n: number) {
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const star = descendants(root).find(
+      (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
+    );
+    if (star === undefined) throw new Error(`no star ${n}`);
+    return star;
+  }
+
+  it("a trusted click within the grace sends nothing, one after it sends", async () => {
+    const w = await arrived(A, B);
+    await w.ready();
+    w.handlersOf("movie:2").onChoose(8);
+    w.state.answer = answerOf(A);
+    await w.clock.advance(2000);
+    expect(w.keys()).toEqual(["movie:1"]); // the first card left, the second took its place
+    starOnRow(w, 6).click(true);
+    await w.clock.advance(GRACE_MS - 1);
+    starOnRow(w, 6).click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
+    await w.clock.advance(1);
+    starOnRow(w, 6).click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);
+  });
+});
+
+const REMOVAL: QuestionOffer = {
+  kind: "removal",
+  key: "removal:sc:1:2",
+  removeFrom: "sc",
+  pair: { nakaId: 1, scId: 2 },
+  title: "Un titre",
+};
+
+describe("the live card of the home block", () => {
+  function liveHandlers() {
+    const chosen: unknown[] = [];
+    return {
+      chosen,
+      handlers: {
+        onChoose: (c: unknown) => chosen.push(c),
+        onAction: () => {},
+      },
+    };
+  }
+  const liveView = () => questionView(REMOVAL, ["plus-tard"]);
+
+  it("is drawn before the entries", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    expect(w.last().view.live?.key).toBe(REMOVAL.key);
+    expect(w.keys()).toEqual(["movie:1"]);
+  });
+
+  it("makes the row appear alone, and hideLive takes it down", async () => {
+    const w = await arrived();
+    expect(w.shown).toHaveLength(0);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    expect(w.last().view.entries).toEqual([]);
+    const before = w.hidden();
+    w.block.hideLive();
+    expect(w.hidden()).toBeGreaterThan(before);
+  });
+
+  it("leaving the home path clears it", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    w.block.route("/player");
+    w.block.route("/");
+    await flush();
+    expect(w.last().view.live).toBeUndefined();
+  });
+
+  it("a choice reaches the handler only on a trusted click", async () => {
+    const w = await arrived();
+    const { chosen, handlers } = liveHandlers();
+    w.block.showLive(REMOVAL.key, liveView(), handlers);
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const keep = descendants(root).find((el: FakeElement) =>
+      el.textContent?.startsWith("Non"),
+    );
+    if (keep === undefined) throw new Error("no keep button");
+    keep.click(false);
+    expect(chosen).toEqual([]);
+    keep.click(true);
+    expect(chosen).toEqual([{ kind: "keep" }]);
+  });
+
+  it("when the live card goes, a trusted click within the grace on the next card sends nothing", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    await w.ready();
+    w.block.hideLive();
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const star = (n: number) =>
+      descendants(root).find(
+        (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
+      );
+    star(6)?.click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    await w.clock.advance(GRACE_MS);
+    star(6)?.click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 6"]);
   });
 });

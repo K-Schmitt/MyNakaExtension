@@ -92,6 +92,7 @@ export async function buildCard(input: CardInput): Promise<RatingCard> {
     pending: pending.filter((label) => !unread.includes(label)),
     given: {},
     seriesFinished: end.seriesFinished,
+    ...(item.image === undefined ? {} : { image: item.image }),
   };
 }
 

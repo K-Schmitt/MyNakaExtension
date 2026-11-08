@@ -10,12 +10,13 @@ import type {
   QuestionView,
 } from "./question-view";
 import {
-  BLOCK_CSS,
-  BUTTON_CSS,
+  BLOCK_CLASS,
+  BUTTON_CLASS,
   button,
-  ERROR_CSS,
+  ERROR_CLASS,
   type Maker,
   row,
+  TITLE_CLASS,
   textLine,
 } from "./rating-render";
 
@@ -24,12 +25,14 @@ export type QuestionHandlers = {
   onAction(action: QuestionAction): void;
 };
 
-function lines(doc: Maker, view: QuestionView): ElementLike[] {
+export function questionLines(doc: Maker, view: QuestionView): ElementLike[] {
   return [
-    textLine(doc, view.heading, "font-weight: 700;"),
+    textLine(doc, view.heading, TITLE_CLASS),
     ...(view.question === undefined ? [] : [textLine(doc, view.question)]),
     ...(view.notice === undefined ? [] : [textLine(doc, view.notice)]),
-    ...(view.error === undefined ? [] : [textLine(doc, view.error, ERROR_CSS)]),
+    ...(view.error === undefined
+      ? []
+      : [textLine(doc, view.error, ERROR_CLASS)]),
   ];
 }
 
@@ -40,10 +43,10 @@ function buttonRows(
 ): ElementLike[] {
   if (view.sending === true) return [];
   const choices = view.choices.map(({ choice, label }) =>
-    button(doc, label, BUTTON_CSS, () => handlers.onChoose(choice)),
+    button(doc, label, BUTTON_CLASS, () => handlers.onChoose(choice)),
   );
   const actions = view.actions.map((action) =>
-    button(doc, ACTION_LABELS[action], BUTTON_CSS, () =>
+    button(doc, ACTION_LABELS[action], BUTTON_CLASS, () =>
       handlers.onAction(action),
     ),
   );
@@ -58,8 +61,11 @@ export function buildQuestionBlock(
   handlers: QuestionHandlers,
 ): ElementLike {
   const block = doc.createElement("div");
-  block.style.cssText = BLOCK_CSS;
-  for (const el of [...lines(doc, view), ...buttonRows(doc, view, handlers)]) {
+  block.className = BLOCK_CLASS;
+  for (const el of [
+    ...questionLines(doc, view),
+    ...buttonRows(doc, view, handlers),
+  ]) {
     block.appendChild(el);
   }
   return block;

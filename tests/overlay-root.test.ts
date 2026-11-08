@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  createOverlayRoot,
-  STOPPED_EVENTS,
-} from "../src/content/ui/overlay-root";
+import { STOPPED_EVENTS } from "../src/content/ui/input-stop";
+import { createOverlayRoot } from "../src/content/ui/overlay-root";
 import { renderRating } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
@@ -73,22 +71,7 @@ describe("createOverlayRoot", () => {
     expect(css).toContain("right: 0");
     expect(css).toContain("max-width: 40%");
     expect(css).toContain("max-height: 80%");
-  });
-
-  it("the bottom right placement keeps the reset, the z-index and the stopped events", () => {
-    const doc = new FakeDoc();
-    createOverlayRoot(doc, "bottom-right");
-    const css = hostOf(doc).style.cssText;
-    expect(css).toContain("all: initial");
-    expect(css).toContain("z-index: 2147483647");
-    expect(css).toContain("bottom: 0");
-    expect(css).toContain("width: 360px");
-    expect(css).toContain("max-height: 60vh");
-    expect(css).not.toContain("top: 0");
-    for (const d of css.split(";").filter((x) => x.trim() !== "")) {
-      expect(d, d).toMatch(/ !important$/);
-    }
-    expect(hostOf(doc).dispatch("click")).toBe(false);
+    expect(css).toContain("color-scheme: dark !important");
   });
 
   it("lists the input events it keeps from the page", () => {
@@ -113,7 +96,7 @@ describe("createOverlayRoot", () => {
       onConfirm: vi.fn(),
     });
     const eight = descendants(hostOf(doc).shadow).find(
-      (el) => el.tag === "button" && el.textContent === "8",
+      (el) => el.tag === "button" && el.attributes["aria-label"] === "8 sur 10",
     );
     expect(eight?.dispatch("click", true)).toBe(false);
     expect(onChoose).toHaveBeenCalledTimes(1);
@@ -140,5 +123,25 @@ describe("createOverlayRoot", () => {
       .filter((d) => d !== "");
     expect(declarations.length).toBeGreaterThan(5);
     for (const d of declarations) expect(d, d).toMatch(/ !important$/);
+  });
+
+  it("keeps the sheet when the host moves", () => {
+    const doc = new FakeDoc();
+    const player = new FakeNode();
+    const { root } = createOverlayRoot(
+      doc,
+      "top-right",
+      ".mn-card { color: red; }",
+    );
+    root.replaceChildren(new FakeNode());
+    doc.enterFullscreen(player);
+    root.replaceChildren(new FakeNode());
+    doc.enterFullscreen(null);
+    root.replaceChildren(new FakeNode());
+    const style = hostOf(doc).shadow.children[0] as FakeElement;
+    expect(style.tag).toBe("style");
+    expect(style.textContent).toBe(".mn-card { color: red; }");
+    expect(hostOf(doc).shadow.children).toHaveLength(2);
+    expect(hostOf(doc).parent).toBe(doc.body);
   });
 });

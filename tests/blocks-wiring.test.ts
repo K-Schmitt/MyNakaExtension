@@ -10,6 +10,11 @@ import type { RatingView } from "../src/content/ui/rating-view";
 import type { WorkerPort } from "../src/content/ui/worker-port";
 import type { ContentIds } from "../src/core/finish-event";
 import type { RatingCard, RatingLabel } from "../src/core/rating-cards";
+import type {
+  QuestionOffer,
+  RemovalOffer,
+  RemovalOfferAnswer,
+} from "../src/sw/question-offers";
 import type { CardAnswer } from "../src/sw/rating-answers";
 import { fakeClock, flush, questionAnswer } from "./end-block-fakes";
 import { episodeCard } from "./rating-fixtures";
@@ -46,6 +51,10 @@ function wiringWorld() {
   const home = {
     drawn: undefined as { view: HomeView; handlers: HomeHandlers } | undefined,
   };
+  const removal = {
+    answer: undefined as RemovalOfferAnswer | undefined,
+    questions: [] as QuestionOffer[],
+  };
   const answerOf = (ids: ContentIds): CardAnswer =>
     answers.get(keyOf(ids)) ?? { card: null, pauseFromPercent: 0 };
   const port: WorkerPort = {
@@ -58,8 +67,11 @@ function wiringWorld() {
       calls.push("askCards");
       return { cards: [] };
     },
-    askQuestions: async () => undefined,
-    askRemovalOffer: async () => undefined,
+    askQuestions: async () =>
+      removal.questions.length === 0
+        ? undefined
+        : { questions: removal.questions },
+    askRemovalOffer: async () => removal.answer,
     rate: async (ids, label, rating) => {
       calls.push(`rate ${keyOf(ids)} ${label} ${rating}`);
       return true;
@@ -110,6 +122,7 @@ function wiringWorld() {
     asked,
     home,
     held,
+    removal,
     drawn,
     set(
       ids: ContentIds,
@@ -345,5 +358,91 @@ describe("leaving the player closes the player's blocks", () => {
     for (const go of w.held.release) go();
     await flush();
     expect(w.player.drawn).toBeUndefined();
+  });
+});
+
+const REMOVAL: RemovalOffer = {
+  kind: "removal",
+  key: "removal:sc:1:2",
+  removeFrom: "sc",
+  pair: { nakaId: 1, scId: 2 },
+  title: "Un titre",
+};
+
+describe("a removal offer on the home page", () => {
+  it("is the row's first card, never the player overlay", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/");
+    await flush();
+    w.blocks.removed(1);
+    await flush();
+    expect(w.home.drawn?.view.live?.key).toBe(REMOVAL.key);
+    expect(w.asked.drawn).toBeUndefined();
+  });
+
+  it("makes the row appear for the live card alone", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/");
+    await flush();
+    expect(w.home.drawn).toBeUndefined();
+    w.blocks.removed(1);
+    await flush();
+    expect(w.home.drawn?.view.entries).toEqual([]);
+    expect(w.home.drawn?.view.questions).toEqual([]);
+    expect(w.home.drawn?.view.live).toBeDefined();
+  });
+
+  it("is one card with a stored question of the same key", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.removal.questions = [REMOVAL];
+    w.blocks.pathChanged("/");
+    await flush();
+    w.blocks.removed(1);
+    await flush();
+    expect(w.home.drawn?.view.live?.key).toBe(REMOVAL.key);
+    expect(w.home.drawn?.view.questions).toEqual([]);
+  });
+
+  it("closes when the tab leaves the home page", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/");
+    await flush();
+    w.blocks.removed(1);
+    await flush();
+    w.blocks.pathChanged("/player");
+    expect(w.home.drawn).toBeUndefined();
+    expect(w.asked.drawn).toBeUndefined();
+  });
+
+  it("a block opened off the home page leaves nothing floating once the tab goes home", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/content/x");
+    w.blocks.removed(1);
+    await flush();
+    expect(w.asked.drawn).toBeDefined();
+    const shown = w.asked.drawn?.handlers;
+    w.blocks.pathChanged("/");
+    await w.clock.advance(GRACE_MS);
+    shown?.onChoose({ kind: "remove" });
+    await flush();
+    w.removal.answer = { offer: null };
+    await w.clock.advance(2000);
+    expect(w.asked.drawn).toBeUndefined();
+    expect(w.home.drawn?.view.live).toBeUndefined();
+  });
+
+  it("still shows in the player overlay off the home page", async () => {
+    const w = wiringWorld();
+    w.removal.answer = { offer: REMOVAL };
+    w.blocks.pathChanged("/player");
+    w.blocks.removed(1);
+    await flush();
+    expect(w.asked.drawn).toBeDefined();
+    expect(w.home.drawn).toBeUndefined();
   });
 });

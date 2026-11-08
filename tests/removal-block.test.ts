@@ -74,7 +74,10 @@ function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   });
   const all = (): FakeElement[] => {
     const host = doc.created.find((el) => el.shadow.children.length >= 0);
-    return host === undefined ? [] : descendants(host.shadow);
+    // The stylesheet's <style> node is not content the block draws.
+    return host === undefined
+      ? []
+      : descendants(host.shadow).filter((el) => el.tag !== "style");
   };
   const texts = (): string[] => all().map((el) => el.textContent ?? "");
   const button = (label: string): FakeElement => {

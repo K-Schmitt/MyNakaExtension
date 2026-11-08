@@ -2024,6 +2024,7 @@ describe("status snapshot", () => {
       lastRun: settings.lastRun,
       lastFinish: settings.lastFinish,
       counts: { pendingRemovals: 2, openQuestions: 1, unlinked: 1 },
+      pendingRatings: 0,
       thresholds: { film: 0.9, episode: 0.8 },
       pauseFromPercent: 0,
     });
@@ -2034,6 +2035,7 @@ describe("status snapshot", () => {
     expect(await w.jobs.statusSnapshot()).toEqual({
       mode: "simulation",
       counts: { pendingRemovals: 0, openQuestions: 0, unlinked: 0 },
+      pendingRatings: 0,
       thresholds: { film: 0.9, episode: 0.8 },
       pauseFromPercent: 0,
     });
@@ -2064,6 +2066,7 @@ describe("status snapshot", () => {
     w.area.data.set("state", { version: 2 });
     expect(await w.jobs.statusSnapshot()).toEqual({
       mode: "live",
+      pendingRatings: 0,
       thresholds: { film: 0.9, episode: 0.8 },
       pauseFromPercent: 0,
       error: "stored-state",
@@ -2089,6 +2092,7 @@ describe("status snapshot", () => {
         "lastRun",
         "mode",
         "pauseFromPercent",
+        "pendingRatings",
         "thresholds",
       ].sort(),
     );

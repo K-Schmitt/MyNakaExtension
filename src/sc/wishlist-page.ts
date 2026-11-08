@@ -3,6 +3,8 @@
 // An item is dropped only when it lacks a positive safe integer id, a string title or a string url;
 // the reader (sc-wishlist.ts) rejects a page with a dropped item, so a dropped item never shortens a list.
 
+import { imageOf, type TitleImage } from "../core/title-image";
+
 export type ScWishItem = {
   productId: number;
   title: string;
@@ -11,6 +13,8 @@ export type ScWishItem = {
   year?: number;
   /** Absent when SensCritique gives none (missing or null); "" for a value neither number nor string. */
   universe?: number | string;
+  /** The SensCritique picture, when its host is on the allowlist. */
+  image?: TitleImage;
 };
 
 type WishlistPage = { items: ScWishItem[]; total: number };
@@ -67,6 +71,10 @@ function universeOf(value: unknown): number | string | undefined {
   return typeof value === "number" || typeof value === "string" ? value : "";
 }
 
+function pictureOf(value: Fields): unknown {
+  return isRecord(value.medias) ? value.medias.picture : undefined;
+}
+
 function isProductId(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
@@ -84,6 +92,8 @@ export function parseWishItem(value: unknown): ScWishItem | undefined {
   }
   const year = yearOf(value);
   if (year !== undefined) item.year = year;
+  const image = imageOf({ picture: pictureOf(value) });
+  if (image) item.image = image;
   return item;
 }
 
