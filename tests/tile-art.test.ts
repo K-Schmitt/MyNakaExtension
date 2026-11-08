@@ -32,6 +32,12 @@ describe("artFrame", () => {
     expect(img?.parentNode).toBeNull();
   });
 
+  it("holds an image for a SensCritique picture (host from the owner's probe)", () => {
+    const url = "https://media.senscritique.com/media/000012345678/300/x.jpg";
+    const [img] = framed(url).children as FakeElement[];
+    expect(img?.attributes.src).toBe(url);
+  });
+
   it("no URL gives the neutral frame", () => {
     const frame = framed(undefined);
     expect(frame.className).toBe("mn-art");
@@ -43,7 +49,8 @@ describe("artFrame", () => {
     "http://image.tmdb.org/t/p/w500/abc.jpg",
     "javascript:alert(1)",
     "https://evil.example/t/p/w500/abc.jpg",
-    "https://media.senscritique.com/media/x.jpg", // no SensCritique host allowed yet
+    "https://media.senscritique.com.evil.example/media/x.jpg",
+    "http://media.senscritique.com/media/x.jpg",
     "//image.tmdb.org/t/p/w500/abc.jpg",
     "data:image/png;base64,AAAA",
     "",
