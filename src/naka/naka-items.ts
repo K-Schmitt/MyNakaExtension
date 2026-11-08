@@ -1,5 +1,6 @@
 // Mapping of Naka catalogue entries and of the playlist id list. Both fail closed or drop what they cannot trust.
 
+import { imageOf, type TitleImage } from "../core/title-image";
 import { NakaUnavailableError } from "./naka-errors";
 import { isPositiveId } from "./naka-input";
 import { isRecord } from "./naka-transport";
@@ -15,6 +16,8 @@ export type NakaItem = {
   numberOfSeasons?: number;
   /** The episodes Naka announces for a series, unreleased ones included: a positive safe integer, else absent. */
   numberOfEpisodes?: number;
+  /** Poster and backdrop paths when Naka gives valid ones. */
+  image?: TitleImage;
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -39,6 +42,11 @@ export function toItem(entry: unknown): NakaItem | undefined {
   }
   if (isPositiveId(numberOfSeasons)) item.numberOfSeasons = numberOfSeasons;
   if (isPositiveId(numberOfEpisodes)) item.numberOfEpisodes = numberOfEpisodes;
+  const image = imageOf({
+    posterPath: entry.posterPath,
+    backdropPath: entry.backdropPath,
+  });
+  if (image) item.image = image;
   return item;
 }
 
