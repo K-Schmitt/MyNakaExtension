@@ -1,7 +1,8 @@
 import type { TitleImage } from "./title-image";
 
-// Filled from the owner's H2 probe; empty until it has run.
-export const SC_IMAGE_HOSTS: readonly string[] = [];
+// From the owner's H2 probe of 2026-11-08: SensCritique's `medias.picture` is a full
+// https://media.senscritique.com/media/…/300/… address. Lowercase hosts only (URL.hostname is lowercased).
+export const SC_IMAGE_HOSTS: readonly string[] = ["media.senscritique.com"];
 
 const TMDB_HOST = "image.tmdb.org";
 const TMDB_BASE = `https://${TMDB_HOST}/t/p`;
