@@ -1,6 +1,6 @@
 // The stylesheet of the home row: the theme tokens, the cards' rules (lines, stars, buttons), then the
 // header with its arrows, the track and the tiles. Sizes are the plan's starting values (spec §6.2):
-// tiles 300×420 like Naka's `--cw`, 12 px apart like its `pl-3`, a 16:9 picture, 32×48 choice posters.
+// tiles 200×280 (the owner found 300×420 a third too big), 12 px apart like its `pl-3`, a 20:9 picture, 13px text, two-line titles, 24×36 choice posters.
 
 import { themeCss } from "../../ui/theme-tokens";
 import { BLOCK_RULES } from "./block-styles";
@@ -26,14 +26,17 @@ const TRACK_RULES = [
 ];
 
 const TILE_RULES = [
-  `.mn-tile{flex:0 0 auto;width:300px;height:420px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;scroll-snap-align:start;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:${v("color-surface")};border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};}`,
-  `.mn-art{flex:0 0 auto;width:100%;aspect-ratio:16 / 9;overflow:hidden;background:${v("color-surface-raised")};}`,
+  `.mn-tile{flex:0 0 auto;width:200px;height:280px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;scroll-snap-align:start;font:${v("text-body")} ${v("font")};color:${v("color-text")};background:${v("color-surface")};border:1px solid ${v("color-border")};border-radius:${v("radius-lg")};}`,
+  `.mn-art{flex:0 0 auto;width:100%;aspect-ratio:20 / 9;overflow:hidden;background:${v("color-surface-raised")};}`,
   `.mn-art img,.mn-thumb img{display:block;width:100%;height:100%;object-fit:cover;}`,
-  `.mn-tile-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:${v("space-1")};padding:${v("space-3")};overflow:hidden;}`,
-  `.mn-tile .mn-title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;flex:0 0 auto;}`,
-  `.mn-tile .mn-row{margin-top:${v("space-2")};}`,
+  `.mn-tile-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:${v("space-1")};padding:${v("space-2")};overflow:hidden;}`,
+  `.mn-tile{font-size:13px;line-height:18px;}`,
+  `.mn-tile .mn-title{font-size:14px;line-height:19px;}`,
+  `.mn-tile .mn-btn{font-size:12px;line-height:16px;padding:3px 8px;}`,
+  `.mn-tile .mn-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:0 0 auto;}`,
+  `.mn-tile .mn-row{margin-top:${v("space-1")};gap:${v("space-1")};}`,
   `.mn-tile-body>.mn-row:last-child{margin-top:auto;}`,
-  `.mn-tile .mn-star{font-size:20px;min-width:0;padding:2px 1px;}`,
+  `.mn-tile .mn-star{font-size:14px;min-width:0;padding:1px 0;}`,
   `.mn-btn--small{font:${v("text-small")} ${v("font")};padding:2px 8px;}`,
 ];
 
@@ -41,7 +44,7 @@ const CHOICE_RULES = [
   `.mn-choices{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:${v("space-1")};margin-top:${v("space-2")};overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}`,
   `.mn-choice{display:flex;align-items:center;gap:${v("space-2")};width:100%;flex:0 0 auto;padding:${v("space-1")};text-align:left;}`,
   `.mn-choice-label{min-width:0;overflow-wrap:anywhere;}`,
-  `.mn-thumb{flex:0 0 auto;width:32px;height:48px;overflow:hidden;border-radius:4px;background:${v("color-surface-hover")};}`,
+  `.mn-thumb{flex:0 0 auto;width:24px;height:36px;overflow:hidden;border-radius:4px;background:${v("color-surface-hover")};}`,
   `.mn-choices-foot{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:${v("space-2")};padding-top:${v("space-2")};border-top:1px solid ${v("color-border")};}`,
 ];
 
