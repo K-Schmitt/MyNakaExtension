@@ -5,7 +5,8 @@
 // clears while the end block is shown (a question of the end block included). Every URL change closes the pause block; leaving the player closes the end block
 // too, while an episode change (autoplay) keeps its card. The home row has its own host among Naka's rows. The removal
 // block (after a removal on Naka, on any naka.cx path) draws in the player overlay but yields to both: it
-// shows only when neither is shown, and either one opening closes it.
+// shows only when neither is shown, and either one opening closes it. On the home page it is instead the
+// home row's first card, whatever the other blocks do, and it closes when the tab leaves the home path.
 
 import type { ContentIds } from "../../core/finish-event";
 import type { VideoSample } from "../naka-tab";
@@ -70,14 +71,27 @@ export function wireBlocks(ports: WiringPorts) {
     endShown: () => endBlock.isShown(),
     titleOf: ports.titleOf,
   });
+  let liveOnHome = false; // the removal offer is a card of the home row, not the player overlay
   const removalBlock = createRemovalBlock({
     port,
     timer,
     now: ports.now,
-    show: playerUi.showQuestion,
-    hide: playerUi.hide,
+    show: (view, handlers, key) => {
+      liveOnHome = homeBlock.isHome();
+      if (liveOnHome) homeBlock.showLive(key, view, handlers);
+      else playerUi.showQuestion(view, handlers);
+    },
+    hide: () => {
+      if (!liveOnHome) {
+        playerUi.hide();
+        return;
+      }
+      liveOnHome = false;
+      homeBlock.hideLive();
+    },
     titleOf: ports.titleOf,
-    ownerFree: () => !endBlock.isShown() && !pauseBlock.isShown(),
+    ownerFree: () =>
+      homeBlock.isHome() || (!endBlock.isShown() && !pauseBlock.isShown()),
   });
   const homeBlock = createHomeBlock({
     port,
@@ -95,7 +109,10 @@ export function wireBlocks(ports: WiringPorts) {
       pauseBlock.urlChanged(ports.now());
       if (ids === undefined) endBlock.leave();
     },
-    pathChanged: (pathname: string) => homeBlock.route(pathname),
+    pathChanged: (pathname: string) => {
+      homeBlock.route(pathname);
+      if (liveOnHome && !homeBlock.isHome()) removalBlock.close();
+    },
     removed: (contentId: number) => removalBlock.removed(contentId),
     paused: (sample: VideoSample) => pauseBlock.paused(sample, playing),
     resumed: () => pauseBlock.resumed(),

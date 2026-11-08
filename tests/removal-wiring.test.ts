@@ -95,18 +95,17 @@ const clickRemove = async (w: ReturnType<typeof scripted>): Promise<void> => {
 };
 
 describe("the removal block, wired", () => {
-  it.each([
-    "/",
-    "/content/tv/2004",
-    "/player?id=21391&type=movie",
-    "/playlist",
-  ])("shows on %s, not only on the player", async (path) => {
-    const w = scripted();
-    w.blocks.pathChanged(path);
-    w.blocks.removed(21391);
-    await flush();
-    expect(w.asked.drawn?.view.heading).toContain("Un Job Mortel");
-  });
+  // "/" is the home page: there the offer is the row's first card (tests/blocks-wiring.test.ts).
+  it.each(["/content/tv/2004", "/player?id=21391&type=movie", "/playlist"])(
+    "shows on %s, not only on the player",
+    async (path) => {
+      const w = scripted();
+      w.blocks.pathChanged(path);
+      w.blocks.removed(21391);
+      await flush();
+      expect(w.asked.drawn?.view.heading).toContain("Un Job Mortel");
+    },
+  );
 
   it("shows nothing without an offer", async () => {
     const w = scripted(null);
