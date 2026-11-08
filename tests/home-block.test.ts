@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GRACE_MS } from "../src/content/ui/click-grace";
 import { createHomeBlock, HOME_PATHS } from "../src/content/ui/home-block";
+import { questionView } from "../src/content/ui/question-view";
 import {
   chosenLine,
   errorLine,
@@ -11,6 +12,7 @@ import {
 } from "../src/content/ui/rating-copy";
 import { renderRow } from "../src/content/ui/row-render";
 import type { RatingCard } from "../src/core/rating-cards";
+import type { QuestionOffer } from "../src/sw/question-offers";
 import { flush } from "./end-block-fakes";
 import { answerOf, asksOf, entryOf, homeWorld, sendsOf } from "./home-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
@@ -372,5 +374,89 @@ describe("a tile that slides under the cursor after a card leaves", () => {
     starOnRow(w, 6).click(true);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);
+  });
+});
+
+const REMOVAL: QuestionOffer = {
+  kind: "removal",
+  key: "removal:sc:1:2",
+  removeFrom: "sc",
+  pair: { nakaId: 1, scId: 2 },
+  title: "Un titre",
+};
+
+describe("the live card of the home block", () => {
+  function liveHandlers() {
+    const chosen: unknown[] = [];
+    return {
+      chosen,
+      handlers: {
+        onChoose: (c: unknown) => chosen.push(c),
+        onAction: () => {},
+      },
+    };
+  }
+  const liveView = () => questionView(REMOVAL, ["plus-tard"]);
+
+  it("is drawn before the entries", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    expect(w.last().view.live?.key).toBe(REMOVAL.key);
+    expect(w.keys()).toEqual(["movie:1"]);
+  });
+
+  it("makes the row appear alone, and hideLive takes it down", async () => {
+    const w = await arrived();
+    expect(w.shown).toHaveLength(0);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    expect(w.last().view.entries).toEqual([]);
+    const before = w.hidden();
+    w.block.hideLive();
+    expect(w.hidden()).toBeGreaterThan(before);
+  });
+
+  it("leaving the home path clears it", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    w.block.route("/player");
+    w.block.route("/");
+    await flush();
+    expect(w.last().view.live).toBeUndefined();
+  });
+
+  it("a choice reaches the handler only on a trusted click", async () => {
+    const w = await arrived();
+    const { chosen, handlers } = liveHandlers();
+    w.block.showLive(REMOVAL.key, liveView(), handlers);
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const keep = descendants(root).find((el: FakeElement) =>
+      el.textContent?.startsWith("Non"),
+    );
+    if (keep === undefined) throw new Error("no keep button");
+    keep.click(false);
+    expect(chosen).toEqual([]);
+    keep.click(true);
+    expect(chosen).toEqual([{ kind: "keep" }]);
+  });
+
+  it("when the live card goes, a trusted click within the grace on the next card sends nothing", async () => {
+    const w = await arrived(A);
+    w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    await w.ready();
+    w.block.hideLive();
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const star = (n: number) =>
+      descendants(root).find(
+        (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
+      );
+    star(6)?.click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual([]);
+    await w.clock.advance(GRACE_MS);
+    star(6)?.click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 1:: film 6"]);
   });
 });
