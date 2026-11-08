@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  createOverlayRoot,
-  STOPPED_EVENTS,
-} from "../src/content/ui/overlay-root";
+import { STOPPED_EVENTS } from "../src/content/ui/input-stop";
+import { createOverlayRoot } from "../src/content/ui/overlay-root";
 import { renderRating } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
