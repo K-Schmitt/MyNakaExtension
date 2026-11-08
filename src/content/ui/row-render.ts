@@ -3,7 +3,7 @@
 // as a tile. Texts go through textContent; every button acts on a trusted click only (the tiles' own
 // buttons).
 
-import { carryScroll, wireArrows } from "./carousel";
+import { carryScroll, type SizeWatch, wireArrows } from "./carousel";
 import type { ElementLike, ShadowRootLike, TrackLike } from "./dom-like";
 import type { HomeHandlers } from "./home-block";
 import { ROW_SUBTITLE, ROW_TITLE } from "./home-copy";
@@ -77,23 +77,30 @@ function track(
 // test fakes have none, so their arrows stay hidden (an unmeasured track moves nothing).
 const asTrack = (el: ElementLike): TrackLike => el as unknown as TrackLike;
 
-// The track each root shows now, so that a redraw (a lock, a card leaving) keeps the scroll position.
-const shownTracks = new WeakMap<ShadowRootLike, TrackLike>();
+// The track each root shows now, so that a redraw (a lock, a card leaving) keeps the scroll position, and
+// the stop of its size watch, so that a redraw stops watching the track it replaces.
+const shownTracks = new WeakMap<
+  ShadowRootLike,
+  { track: TrackLike; unwatch: () => void }
+>();
 
-/** Replaces whatever the root holds with the row. */
+/** Replaces whatever the root holds with the row; `watchSize` re-measures the arrows on a resize. */
 export function renderRow(
   doc: Maker,
   root: ShadowRootLike,
   view: HomeView,
   handlers: HomeHandlers,
+  watchSize?: SizeWatch,
 ): void {
   const prev = arrow(doc, PREV_GLYPH, "Précédent");
   const next = arrow(doc, NEXT_GLYPH, "Suivant");
   const cards = track(doc, view, handlers);
+  const shown = shownTracks.get(root);
+  shown?.unwatch();
   // Read before the old track leaves: a detached element scrolls nowhere.
-  const left = shownTracks.get(root)?.scrollLeft;
+  const left = shown?.track.scrollLeft;
   root.replaceChildren(header(doc, [prev, next]), cards);
   carryScroll(left, asTrack(cards));
-  shownTracks.set(root, asTrack(cards));
-  wireArrows(asTrack(cards), prev, next);
+  const unwatch = wireArrows(asTrack(cards), prev, next, watchSize);
+  shownTracks.set(root, { track: asTrack(cards), unwatch });
 }
