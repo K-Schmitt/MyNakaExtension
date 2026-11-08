@@ -103,6 +103,13 @@ describe("retryNextJob", () => {
     });
   }
 
+  it("answers false and writes nothing when the sync succeeded but no finish waits", async () => {
+    const w = waitingWorld([]);
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
+    expect(w.writes()).toEqual([]);
+    expect(w.network()).toEqual([]);
+  });
+
   it("does nothing when no run was ever recorded", async () => {
     const w = waitingWorld([entry(5)], { settings: { mode: "live" } });
     await steps(w);
