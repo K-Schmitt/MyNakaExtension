@@ -4,23 +4,24 @@
 // held at the last run), and the removal itself needs a trusted click on the block, which the worker then
 // verifies again against « Ma liste » before its one write. The block only shows when the overlay is free.
 
+import type { QuestionKey } from "../../core/questions";
 import type { RemovalOffer } from "../../sw/question-offers";
 import { titleOrNothing } from "./offer-title";
+import type { QuestionHandlers } from "./question-render";
 import { createQuestionSession, type QuestionPorts } from "./question-session";
-import type { QuestionChoice } from "./question-view";
+import type { QuestionChoice, QuestionView } from "./question-view";
 import type { WorkerPort } from "./worker-port";
 
-export type RemovalPorts = Pick<
-  QuestionPorts,
-  "timer" | "now" | "show" | "hide"
-> & {
+export type RemovalPorts = Pick<QuestionPorts, "timer" | "now" | "hide"> & {
+  /** `key` names the offer being drawn: the home row needs it to tell a stored question of the same pair. */
+  show(view: QuestionView, h: QuestionHandlers, key: QuestionKey): void;
   port: Pick<WorkerPort, "askRemovalOffer" | "answerRemoval">;
   titleOf(contentId: number): Promise<string | undefined>;
   /** True when no end or pause block owns the overlay. */
   ownerFree(): boolean;
 };
 
-type Open = { contentId: number; pair: RemovalOffer["pair"] };
+type Open = { contentId: number; key: QuestionKey; pair: RemovalOffer["pair"] };
 
 export function createRemovalBlock(ports: RemovalPorts) {
   let open: Open | undefined;
@@ -55,7 +56,11 @@ export function createRemovalBlock(ports: RemovalPorts) {
     {
       timer: ports.timer,
       now: ports.now,
-      show: ports.show,
+      show: (view, handlers) => {
+        if (open !== undefined) {
+          ports.show(view, handlers, open.key);
+        }
+      },
       hide: ports.hide,
       ask,
       send,
@@ -77,7 +82,7 @@ export function createRemovalBlock(ports: RemovalPorts) {
         ? await titleOrNothing(ports.titleOf, ports.timer, contentId)
         : offer.title;
     if (mine !== epoch || session.isOpen() || !ports.ownerFree()) return;
-    open = { contentId, pair: offer.pair };
+    open = { contentId, key: offer.key, pair: offer.pair };
     session.open(
       { ...offer, title },
       ["plus-tard"],

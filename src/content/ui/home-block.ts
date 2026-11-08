@@ -15,6 +15,7 @@ import { type HomeView, homeView } from "./home-view";
 import { NO_HANDLERS, NO_QUESTION_HANDLERS } from "./idle-handlers";
 import { titledOffer } from "./offer-title";
 import type { QuestionHandlers } from "./question-render";
+import type { QuestionView } from "./question-view";
 import type { RatingHandlers } from "./rating-render";
 import type { WorkerPort } from "./worker-port";
 
@@ -48,6 +49,8 @@ export function createHomeBlock(ports: HomePorts) {
   let onHome = false;
   let arrival = 0; // each arrival and each departure starts a new one: an older answer is dropped
   let opening = false;
+  let live: { key: QuestionKey; view: QuestionView } | undefined;
+  let liveHandlers: QuestionHandlers | undefined;
   const ratings = createRatingSlots(ports, {
     redraw: (key) => redrawn(key, undefined),
     left: () => moved(),
@@ -71,12 +74,14 @@ export function createHomeBlock(ports: HomePorts) {
   function draw(): void {
     if (opening) return;
     const asked = questions.views();
-    if (ratings.count() === 0 && asked.length === 0) {
+    if (ratings.count() === 0 && asked.length === 0 && live === undefined) {
       ports.hide();
       return;
     }
-    ports.show(homeView(ratings.entries(), asked), {
-      question: (key) => questions.handlersOf(key) ?? NO_QUESTION_HANDLERS,
+    ports.show(homeView(ratings.entries(), asked, live), {
+      question: (key) =>
+        (key === live?.key ? liveHandlers : questions.handlersOf(key)) ??
+        NO_QUESTION_HANDLERS,
       entry: (key) => ratings.handlersOf(key) ?? NO_HANDLERS,
     });
   }
@@ -125,12 +130,30 @@ export function createHomeBlock(ports: HomePorts) {
 
   function leave(): void {
     arrival += 1;
+    live = undefined;
+    liveHandlers = undefined;
     ratings.closeAll();
     questions.closeAll();
     ports.hide();
   }
 
   return {
+    isHome: (): boolean => onHome,
+    /** The removal offer just made on this page: the row's first card, until it closes. */
+    showLive(
+      key: QuestionKey,
+      view: QuestionView,
+      handlers: QuestionHandlers,
+    ): void {
+      live = { key, view };
+      liveHandlers = handlers;
+      draw();
+    },
+    hideLive(): void {
+      live = undefined;
+      liveHandlers = undefined;
+      draw();
+    },
     route(pathname: string): void {
       const home = HOME_PATHS.includes(pathname);
       if (home === onHome) return;
