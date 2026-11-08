@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scToTitled } from "../src/core/adapt-titles";
+import { SC_IMAGE_HOSTS } from "../src/core/image-urls";
 import { nextOffset, parseWishlistPage } from "../src/sc/wishlist-page";
 
 type Fields = Record<string, unknown>;
@@ -418,5 +419,36 @@ describe("nextOffset", () => {
     expect(nextOffset(Number.NaN, 18, 40)).toBeUndefined();
     expect(nextOffset(0, Number.POSITIVE_INFINITY, 40)).toBeUndefined();
     expect(nextOffset(0, 18, Number.NaN)).toBeUndefined();
+  });
+});
+
+describe("parseWishlistPage images", () => {
+  function itemOf(fields: Fields) {
+    const json = {
+      data: { user: { collection: { total: 1, products: [product(fields)] } } },
+    };
+    return parseWishlistPage(json).items[0];
+  }
+
+  it("drops a picture from a host outside the list, keeps the item", () => {
+    const item = itemOf({
+      medias: { picture: "https://not-sc.example/x.jpg" },
+    });
+    expect(item).toBeDefined();
+    expect(item).not.toHaveProperty("image");
+  });
+
+  it.skipIf(SC_IMAGE_HOSTS.length === 0)(
+    "keeps a picture from a listed host",
+    () => {
+      const picture = `https://${SC_IMAGE_HOSTS[0]}/m/1/300/x.jpg`;
+      expect(itemOf({ medias: { picture } })?.image).toEqual({ picture });
+    },
+  );
+
+  it("keeps the item when medias is null or absent", () => {
+    expect(itemOf({ medias: null })).toBeDefined();
+    expect(itemOf({})).toBeDefined();
+    expect(itemOf({})).not.toHaveProperty("image");
   });
 });
