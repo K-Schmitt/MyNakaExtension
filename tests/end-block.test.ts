@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createEndBlock } from "../src/content/ui/end-block";
-import { SENDING_LINE as QUESTION_SENDING_LINE } from "../src/content/ui/question-copy";
+import {
+  ambiguityHeading,
+  SENDING_LINE as QUESTION_SENDING_LINE,
+} from "../src/content/ui/question-copy";
 import {
   chosenLine,
   errorLine,
@@ -1133,6 +1136,25 @@ describe("the end block asks a question before the rating", () => {
     w.lastQuestion().handlers.onAction("plus-tard");
     await flush();
     expect(w.shown).toHaveLength(1);
+  });
+
+  it("a title that finds a question behind a shown card waits, then asks it when the card closes", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard({ pending: ["épisode"] })));
+    w.script(FILM_IDS, filmQuestion());
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(FILM_IDS);
+    await w.clock.advance(2000);
+    expect(w.shown).toHaveLength(1);
+    expect(w.questions).toEqual([]);
+    await w.ready();
+    w.last().handlers.onAction("plus-tard");
+    await flush();
+    expect(w.questions).toHaveLength(1);
+    expect(w.lastQuestion().view).toMatchObject({
+      heading: ambiguityHeading("naka", FILM_QUESTION.title),
+    });
   });
 
   it("leaving the player closes the question", async () => {
