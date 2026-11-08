@@ -236,6 +236,33 @@ describe("the retry of a finish, end to end", () => {
     expect(w.violations).toEqual([]);
   });
 
+  // A2: two Naka tabs that load together queue two syncs; their retries make one step, one slot.
+  it("two naka-ready at once retry a waiting finish once", async () => {
+    const w = calmWorld();
+    let armed = false;
+    const h = startHarness(w, () => {
+      if (armed) w.nakaLoggedIn = false;
+    });
+    await h.send({ type: "naka-ready" }, "tab");
+    w.time += MINUTE;
+    await answerWithoutTab(h);
+    const spent = windowCount(w);
+    const before = h.retrySteps();
+
+    armed = true;
+    w.time += 15 * MINUTE;
+    await Promise.all([
+      h.send({ type: "naka-ready" }, "tab"),
+      h.send({ type: "naka-ready" }, "tab"),
+    ]);
+
+    expect(h.retrySteps() - before).toBe(1);
+    expect(windowCount(w)).toBe((spent ?? 0) + 1);
+    expect(state(w).retryFinishes).toHaveLength(1);
+    expect(finishWrites(w)).toEqual([]);
+    expect(w.violations).toEqual([]);
+  });
+
   it("a throttled sync runs no retry and spends no slot", async () => {
     const h = startHarness(calmWorld());
     const { w } = h;

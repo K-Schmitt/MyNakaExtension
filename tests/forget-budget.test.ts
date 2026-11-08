@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RetryFinish } from "../src/core/retry-finishes";
 import {
   emptyState,
   type PendingItem,
@@ -222,6 +223,69 @@ describe("forgetting clears the finish waiting on that title", () => {
     await w.jobs.forgetHandledFromTab(forget(21));
     expect(w.state().pending[0]).toEqual(ambiguity(21));
     expect(w.network()).toEqual([]);
+  });
+
+  // I2: an answer sent with no Naka tab moved the question's finish into `retryFinishes`; an untick of
+  // « vu » on Naka must forget it there too, or the next successful sync marks the title seen (B8b).
+  const entryOf = (id: number): RetryFinish => ({
+    key: keyOf(id),
+    pair: { nakaId: id, scId: 1000 + id },
+    evicted: [],
+    question: {
+      kind: "ambiguity",
+      side: "naka",
+      id,
+      candidateIds: [1000 + id],
+    },
+    at: NOW - 1000,
+  });
+  const waiting = (...ids: number[]): SyncState => ({
+    ...many(0),
+    mapping: ids.map((id) => entryOf(id).pair),
+    retryFinishes: ids.map(entryOf),
+  });
+
+  it("an untick on Naka forgets a finish waiting for a tab; the link stays and one slot is spent", async () => {
+    const w = answerWorld({ state: waiting(21) });
+    await w.jobs.forgetHandledFromTab(forget(21));
+    expect(w.state().retryFinishes).toBeUndefined();
+    expect(w.state().mapping).toEqual([{ nakaId: 21, scId: 1021 }]);
+    expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 1 });
+    expect(w.network()).toEqual([]);
+  });
+
+  // M-2: a drop is never a write; keeping the entry would let the next sync mark the title seen.
+  it("over the hour's budget an untick still drops the waiting finish, and only that", async () => {
+    const w = answerWorld({
+      state: { ...waiting(21, 22), handled: [keyOf(21)] },
+      settings: { mode: "live", forgetWindow: { from: NOW, count: 10 } },
+    });
+    await w.jobs.forgetHandledFromTab(forget(21));
+    expect(w.state().retryFinishes).toEqual([entryOf(22)]);
+    expect(w.state().handled).toEqual([keyOf(21)]);
+    expect(w.state().mapping).toEqual([
+      { nakaId: 21, scId: 1021 },
+      { nakaId: 22, scId: 1022 },
+    ]);
+    expect(w.settings().forgetWindow).toEqual({ from: NOW, count: 10 });
+    expect(w.network()).toEqual([]);
+  });
+
+  it("over the budget, a key with no waiting finish saves nothing", async () => {
+    const w = answerWorld({
+      state: waiting(22),
+      settings: { mode: "live", forgetWindow: { from: NOW, count: 10 } },
+    });
+    w.area.data.set("ratings", [filmCard({ key: keyOf(21), contentId: 21 })]);
+    await w.jobs.forgetHandledFromTab(forget(21));
+    expect(w.stateSaves()).toBe(0);
+    expect(w.cards()).toHaveLength(1);
+  });
+
+  it("the page's forget of that key drops the waiting finish too, and only that one", async () => {
+    const w = answerWorld({ state: waiting(21, 22) });
+    await w.jobs.forgetHandled(forget(21));
+    expect(w.state().retryFinishes).toEqual([entryOf(22)]);
   });
 
   it("a settings file with a forgetWindow parses, a count above the budget does not", () => {
