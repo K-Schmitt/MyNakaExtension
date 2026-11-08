@@ -58,6 +58,10 @@ export class FakeElement extends FakeNode implements ElementLike {
     this.attributes[name] = value;
   }
 
+  removeAttribute(name: string): void {
+    delete this.attributes[name];
+  }
+
   addEventListener(type: string, listener: (event: EventLike) => void): void {
     this.listeners[type] = [...(this.listeners[type] ?? []), listener];
   }

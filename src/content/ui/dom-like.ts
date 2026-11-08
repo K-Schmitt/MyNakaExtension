@@ -17,6 +17,7 @@ export interface ElementLike extends NodeLike {
   readonly parentNode: NodeLike | null;
   style: { cssText: string };
   setAttribute(name: string, value: string): void;
+  removeAttribute(name: string): void;
   addEventListener(type: string, listener: (event: EventLike) => void): void;
   attachShadow(init: { mode: "closed" }): ShadowRootLike;
   focus(): void;
@@ -34,3 +35,12 @@ export interface DocLike {
   createElement(tag: string): ElementLike;
   addEventListener(type: "fullscreenchange", listener: () => void): void;
 }
+
+/** The carousel's track: what the arrows read and move. A real `div` has all of it. */
+export type TrackLike = {
+  scrollLeft: number;
+  readonly clientWidth: number;
+  readonly scrollWidth: number;
+  scrollBy(o: { left: number; behavior: "smooth" }): void;
+  addEventListener(type: "scroll" | "pointerenter", fn: () => void): void;
+};

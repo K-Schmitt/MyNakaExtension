@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { GRACE_MS } from "../src/content/ui/click-grace";
 import { createHomeBlock, HOME_PATHS } from "../src/content/ui/home-block";
 import {
   chosenLine,
@@ -8,10 +9,12 @@ import {
   UNREACHABLE_LINE,
   WAIT_LINE,
 } from "../src/content/ui/rating-copy";
+import { renderRow } from "../src/content/ui/row-render";
 import type { RatingCard } from "../src/core/rating-cards";
 import { flush } from "./end-block-fakes";
 import { answerOf, asksOf, entryOf, homeWorld, sendsOf } from "./home-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
+import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
 
 const film = (id: number, at: number): RatingCard =>
   filmCard({ key: `movie:${id}`, contentId: id, title: `Film ${id}`, at });
@@ -337,5 +340,37 @@ describe("a home entry ignores a click right after it appears", () => {
       "rate 5:1:1 épisode 8",
       "rate 5:1:1 saison 6",
     ]);
+  });
+});
+
+// Review Focus 4: a card leaves while the cursor is over the row, and the next tile slides under it.
+describe("a tile that slides under the cursor after a card leaves", () => {
+  // The star of that value on the row's only tile, drawn from what the block showed last.
+  function starOnRow(w: Awaited<ReturnType<typeof arrived>>, n: number) {
+    const root = new FakeShadow();
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    const star = descendants(root).find(
+      (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
+    );
+    if (star === undefined) throw new Error(`no star ${n}`);
+    return star;
+  }
+
+  it("a trusted click within the grace sends nothing, one after it sends", async () => {
+    const w = await arrived(A, B);
+    await w.ready();
+    w.handlersOf("movie:2").onChoose(8);
+    w.state.answer = answerOf(A);
+    await w.clock.advance(2000);
+    expect(w.keys()).toEqual(["movie:1"]); // the first card left, the second took its place
+    starOnRow(w, 6).click(true);
+    await w.clock.advance(GRACE_MS - 1);
+    starOnRow(w, 6).click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
+    await w.clock.advance(1);
+    starOnRow(w, 6).click(true);
+    await flush();
+    expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);
   });
 });

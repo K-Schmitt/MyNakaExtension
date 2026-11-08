@@ -1,0 +1,52 @@
+// A rating card of the home row as a tile: the title's picture on top, then the player block's lines,
+// the ten stars and « Ignorer » in small; the série confirmation (warning, « Envoyer », « Annuler »)
+// stays in the tile. Texts go through textContent; every button acts on a trusted click only.
+
+import type { ElementLike } from "./dom-like";
+import { ACTION_LABELS } from "./rating-copy";
+import {
+  button,
+  confirmRow,
+  type Maker,
+  type RatingHandlers,
+  ratingLines,
+  row,
+} from "./rating-render";
+import type { RatingView } from "./rating-view";
+import { starRater } from "./star-rater";
+import { artFrame } from "./tile-art";
+import { ART_CLASS, SMALL_BUTTON_CLASS, tile } from "./tile-shell";
+
+function choosing(
+  doc: Maker,
+  view: RatingView,
+  handlers: RatingHandlers,
+): ElementLike[] {
+  const actions = view.actions.map((action) =>
+    button(doc, ACTION_LABELS[action], SMALL_BUTTON_CLASS, () =>
+      handlers.onAction(action),
+    ),
+  );
+  return [
+    ...(view.choices.length > 0
+      ? [starRater(doc, view.choices, handlers.onChoose)]
+      : []),
+    ...(actions.length > 0 ? [row(doc, actions)] : []),
+  ];
+}
+
+export function buildRatingTile(
+  doc: Maker,
+  view: RatingView,
+  image: string | undefined,
+  handlers: RatingHandlers,
+): ElementLike {
+  const controls =
+    view.confirm === true
+      ? [confirmRow(doc, handlers)]
+      : choosing(doc, view, handlers);
+  return tile(doc, artFrame(doc, image, ART_CLASS), [
+    ...ratingLines(doc, view),
+    ...controls,
+  ]);
+}
