@@ -1,6 +1,7 @@
 import type { Pair } from "./list-diff";
 import type { Presence } from "./presence";
 import type { RetryFinish } from "./retry-finishes";
+import type { TitleImage } from "./title-image";
 import type { MediaType } from "./title-match";
 import { DEFAULT_THRESHOLD } from "./watch-trigger";
 
@@ -12,6 +13,7 @@ export type QuestionCandidate = {
   title: string;
   year?: number;
   type: MediaType;
+  image?: TitleImage;
 };
 
 export type PendingItem =
@@ -22,6 +24,7 @@ export type PendingItem =
       /** Dismissed from the home panel. */
       asked: boolean;
       title?: string;
+      image?: TitleImage;
     }
   | {
       kind: "ambiguity";

@@ -2,24 +2,34 @@ import type { Removal } from "./list-diff";
 import { findRemoval } from "./questions";
 import type { ResolverPorts } from "./resolver";
 import type { SyncState } from "./state";
+import type { TitleImage } from "./title-image";
 
 export const MAX_TITLED_REMOVALS = 10;
 
-export type TitledRemoval = Removal & { title?: string };
+export type TitledRemoval = Removal & {
+  title?: string;
+  image?: TitleImage;
+};
 
 type DescribePorts = Pick<ResolverPorts, "describeNaka" | "describeSc">;
 
-// The title of the side the removal is made from; a failed read leaves it out.
-async function titleOf(
+type Described = { title: string; image?: TitleImage };
+
+// The title and image of the side the removal is made from, one read; a failed read leaves them out.
+async function describedOf(
   removal: Removal,
   ports: DescribePorts,
-): Promise<string | undefined> {
+): Promise<Described | undefined> {
   try {
     const found =
       removal.removeFrom === "sc"
         ? await ports.describeSc(removal.pair.scId)
         : await ports.describeNaka(removal.pair.nakaId);
-    return found?.title || undefined;
+    if (!found?.title) return undefined;
+    return {
+      title: found.title,
+      ...(found.image === undefined ? {} : { image: found.image }),
+    };
   } catch {
     return undefined;
   }
@@ -42,8 +52,10 @@ export async function titleNewRemovals(
       continue;
     }
     if (fromNaka) reads += 1;
-    const title = await titleOf(removal, ports);
-    result.push(title === undefined ? removal : { ...removal, title });
+    const described = await describedOf(removal, ports);
+    result.push(
+      described === undefined ? removal : { ...removal, ...described },
+    );
   }
   return result;
 }

@@ -248,3 +248,24 @@ describe("scToCandidate", () => {
     ]);
   });
 });
+
+describe("images through the adapters", () => {
+  const image = { posterPath: "/a.jpg", picture: "https://x.example/p.jpg" };
+
+  it("nakaToTitled and nakaToCandidate copy the image", () => {
+    expect(nakaToTitled(naka({ image })).image).toEqual(image);
+    expect(nakaToCandidate(naka({ image })).image).toEqual(image);
+  });
+
+  it("scToTitled and scToCandidate copy the image", () => {
+    expect(scToTitled(sc({ image }))?.image).toEqual(image);
+    expect(scToCandidate(sc({ image }))?.image).toEqual(image);
+  });
+
+  it("omit the key when the item has no image", () => {
+    expect("image" in nakaToTitled(naka())).toBe(false);
+    expect("image" in nakaToCandidate(naka())).toBe(false);
+    expect("image" in (scToTitled(sc()) ?? {})).toBe(false);
+    expect("image" in (scToCandidate(sc()) ?? {})).toBe(false);
+  });
+});

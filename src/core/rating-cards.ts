@@ -2,6 +2,7 @@
 
 import type { JobError } from "../ext/job-error";
 import type { RatingTarget } from "./finish-handler";
+import type { TitleImage } from "./title-image";
 
 export type RatingLabel = RatingTarget["label"];
 export type CardTarget = {
@@ -20,6 +21,7 @@ export type RatingCard = {
   pending: RatingLabel[]; // still asked, chain order, a subset of targets' labels
   given: Partial<Record<RatingLabel, number>>; // ratings sent through the extension
   seriesFinished: boolean;
+  image?: TitleImage;
   failed?: { label: RatingLabel; error: JobError; at: number };
 };
 
