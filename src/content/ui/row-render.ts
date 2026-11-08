@@ -6,7 +6,7 @@
 import { carryScroll, type SizeWatch, wireArrows } from "./carousel";
 import type { ElementLike, ShadowRootLike, TrackLike } from "./dom-like";
 import type { HomeHandlers } from "./home-block";
-import { ROW_SUBTITLE, ROW_TITLE } from "./home-copy";
+import { NEXT_LABEL, PREV_LABEL, ROW_SUBTITLE, ROW_TITLE } from "./home-copy";
 import type { HomeQuestion, HomeView } from "./home-view";
 import { buildQuestionTile } from "./question-tile";
 import { type Maker, textLine } from "./rating-render";
@@ -92,8 +92,8 @@ export function renderRow(
   handlers: HomeHandlers,
   watchSize?: SizeWatch,
 ): void {
-  const prev = arrow(doc, PREV_GLYPH, "Précédent");
-  const next = arrow(doc, NEXT_GLYPH, "Suivant");
+  const prev = arrow(doc, PREV_GLYPH, PREV_LABEL);
+  const next = arrow(doc, NEXT_GLYPH, NEXT_LABEL);
   const cards = track(doc, view, handlers);
   const shown = shownTracks.get(root);
   shown?.unwatch();
