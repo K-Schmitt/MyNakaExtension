@@ -24,10 +24,17 @@ export function asIdList(value: unknown): number[] {
   return [...new Set(ids as number[])];
 }
 
+// The poster the tab's client kept, as `toItem` reads it from Naka: TMDB paths only, re-validated there.
+function posterFields(value: Record<string, unknown>) {
+  const image = isRecord(value.image) ? value.image : {};
+  return { posterPath: image.posterPath, backdropPath: image.backdropPath };
+}
+
 // The same rules as the Plan 2 client: the required fields must be valid. The key is `contentId` here, `id` there.
 export function asItem(value: unknown): NakaItem {
   if (!isRecord(value)) return unexpected();
   const item = toItem({
+    ...posterFields(value),
     id: value.contentId,
     tmdbId: value.tmdbId,
     mediaType: value.mediaType,
