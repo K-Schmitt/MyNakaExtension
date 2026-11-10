@@ -113,7 +113,7 @@ describe("renderRow", () => {
     const cards = (track as FakeElement).children as FakeElement[];
     expect(cards.map((c) => c.className)).toEqual([
       "mn-tile",
-      "mn-tile",
+      "mn-tile mn-tile--poster",
       "mn-tile",
     ]);
     const [, entry] = cards;
@@ -251,6 +251,16 @@ describe("ROW_SHEET", () => {
     expect(ROW_SHEET.startsWith(themeCss(":host"))).toBe(true);
     expect(ROW_SHEET).toContain(".mn-track{");
     expect(ROW_SHEET).toContain(".mn-card{");
+  });
+
+  it("lays a rating tile's poster over the whole tile, its lines on a dark fade at the bottom", () => {
+    expect(ROW_SHEET).toContain(".mn-tile--poster{position:relative;}");
+    expect(ROW_SHEET).toContain(
+      ".mn-tile--poster .mn-art{position:absolute;inset:0;aspect-ratio:auto;height:100%;}",
+    );
+    expect(ROW_SHEET).toContain(
+      ".mn-tile--poster .mn-tile-body{position:relative;flex:0 0 auto;margin-top:auto;",
+    );
   });
 
   it("holds the tile, art, choice list and track values of the layout", () => {

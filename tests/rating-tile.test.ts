@@ -54,7 +54,7 @@ describe("buildRatingTile", () => {
   it("is a tile whose first child is the art frame", () => {
     const { el } = tile(FULL, POSTER);
     const [art] = el.children as FakeElement[];
-    expect(el.className).toBe("mn-tile");
+    expect(el.className).toBe("mn-tile mn-tile--poster");
     expect(art?.className).toBe("mn-art");
     expect((art?.children[0] as FakeElement | undefined)?.tag).toBe("img");
   });
