@@ -15,7 +15,12 @@ import {
 import type { RatingView } from "./rating-view";
 import { starRater } from "./star-rater";
 import { artFrame } from "./tile-art";
-import { ART_CLASS, SMALL_BUTTON_CLASS, tile } from "./tile-shell";
+import {
+  ART_CLASS,
+  POSTER_TILE_CLASS,
+  SMALL_BUTTON_CLASS,
+  tile,
+} from "./tile-shell";
 
 function choosing(
   doc: Maker,
@@ -45,8 +50,10 @@ export function buildRatingTile(
     view.confirm === true
       ? [confirmRow(doc, handlers)]
       : choosing(doc, view, handlers);
-  return tile(doc, artFrame(doc, image, ART_CLASS), [
-    ...ratingLines(doc, view),
-    ...controls,
-  ]);
+  return tile(
+    doc,
+    artFrame(doc, image, ART_CLASS),
+    [...ratingLines(doc, view), ...controls],
+    POSTER_TILE_CLASS,
+  );
 }
