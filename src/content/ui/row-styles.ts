@@ -46,6 +46,10 @@ const CHOICE_RULES = [
   `.mn-choice-label{min-width:0;overflow-wrap:anywhere;}`,
   `.mn-thumb{flex:0 0 auto;width:24px;height:36px;overflow:hidden;border-radius:4px;background:${v("color-surface-hover")};}`,
   `.mn-choices-foot{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:${v("space-2")};padding-top:${v("space-2")};border-top:1px solid ${v("color-border")};}`,
+  // A rating tile (owner's choice B, 2026-11-10): the poster fills the tile, its lines sit on a dark fade at the bottom.
+  `.mn-tile--poster{position:relative;}`,
+  `.mn-tile--poster .mn-art{position:absolute;inset:0;aspect-ratio:auto;height:100%;}`,
+  `.mn-tile--poster .mn-tile-body{position:relative;flex:0 0 auto;margin-top:auto;padding-top:40px;background:linear-gradient(to bottom, transparent, color-mix(in srgb, ${v("color-bg")} 94%, transparent) 45%);}`,
 ];
 
 const ROW_RULES = [
