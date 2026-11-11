@@ -2,10 +2,14 @@
 // It crosses a message boundary in Plan 3, so the types are not trusted at runtime: a bad event
 // rejects with a fixed message (never one built from its values) before any port is called.
 
+import { valuesOf } from "../ext/field-checks";
 import type { Titled } from "./title-match";
 
+/** Where the end of viewing came from: a progress mark, Naka's « vu », or the start of the credits. */
+export type FinishSource = "threshold" | "explicit" | "credits";
+
 export type FinishEvent = {
-  source: "threshold" | "explicit";
+  source: FinishSource;
   progress: number;
   /** contentId is the FILM's id, or for "tv" the SERIES' id. */
   naka: {
@@ -19,7 +23,7 @@ export type FinishEvent = {
 };
 
 type Checked = {
-  source: "threshold" | "explicit";
+  source: FinishSource;
   progress: number;
   contentId: number;
   titled: Titled;
@@ -28,6 +32,12 @@ type Checked = {
 export type CheckedEvent =
   | (Checked & { kind: "film" })
   | (Checked & { kind: "episode"; season: number; episode: number });
+
+const SOURCES: readonly unknown[] = valuesOf<FinishSource>({
+  threshold: true,
+  explicit: true,
+  credits: true,
+});
 
 function reject(message: string): never {
   throw new RangeError(`finish event: ${message}`);
@@ -72,7 +82,7 @@ function checkCommon(event: FinishEvent): Checked {
     reject("malformed event");
   }
   const { source, progress, naka, titled } = event;
-  if (source !== "threshold" && source !== "explicit") reject("unknown source");
+  if (!SOURCES.includes(source)) reject("unknown source");
   if (!isPositiveId(naka.contentId)) {
     reject("contentId must be a positive safe integer");
   }
