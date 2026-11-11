@@ -478,6 +478,22 @@ panneau. Décisions (spec du 2026-11-08, P1 à P13) :
   carte arrive ou part, les autres reçoivent un nouveau délai de grâce au clic.
 - **Les blocs du lecteur** ne prennent que les couleurs (P11).
 
+## 2026-11-11 — Fin de visionnage au début du générique
+
+Naka charge lui-même `GET /api/v1/skip-segments` pour chaque épisode (sonde du propriétaire, 2026-11-11 : début du
+générique à 95,7 % d'un épisode ; `hit: false` pour un film). Décisions (« construis direct », choix de l'agent) :
+
+- **Aucune requête en plus** : le relais de la page lit une **copie** de cette seule réponse, si elle est ok, et
+  n'en transmet que le début du générique, la saison et l'épisode. Jamais un en-tête, jamais le `tmdbId`. C'est la
+  première réponse que le relais lit : la règle « la requête et la réponse ne sont jamais touchées » reste vraie
+  pour la page (même promesse, même réponse, corps intact).
+- **Une fin « générique »** compte comme terminée, quel que soit le seuil réglé, à partir de 80 % de la durée
+  seulement (le seuil le plus bas qu'on peut choisir), dans l'onglet et dans le worker. Un générique inventé par
+  un script de la page ne fait donc pas mieux qu'un « vu » inventé, risque déjà accepté.
+- **Le générique est lié au contenu qui joue** quand il arrive (l'id de la série, saison et épisode ; l'id du
+  film) : une autre série ou un autre film n'en hérite jamais. Reçu sans contexte, il est ignoré.
+- Sans générique connu, le seuil en pourcentage s'applique comme avant.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit

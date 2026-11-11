@@ -53,7 +53,7 @@ function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
   };
 }
 
-// Each finished the tab sends, threshold or explicit, is also told to the end block.
+// Each finished the tab sends, threshold, credits or explicit, is also told to the end block.
 function sendFinished(env: TabEnv, msg: FinishedMessage): void {
   env.send(msg);
   env.finished(idsOf(msg));
@@ -68,6 +68,10 @@ function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "unwatched") {
     tracker.unwatched(event);
     env.send({ type: "forget-handled", ...idsOf(event) });
+    return;
+  }
+  if (event.kind === "credits") {
+    tracker.credits(event);
     return;
   }
   const finished = tracker.watched(event);
