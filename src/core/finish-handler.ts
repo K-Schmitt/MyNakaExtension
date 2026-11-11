@@ -29,7 +29,11 @@ import {
   upsertMapping,
 } from "./state";
 import type { Candidate } from "./title-match";
-import { isWatchComplete, type Thresholds } from "./watch-trigger";
+import {
+  CREDITS_FLOOR,
+  isWatchComplete,
+  type Thresholds,
+} from "./watch-trigger";
 
 export type { FinishEvent } from "./finish-event";
 
@@ -61,16 +65,19 @@ export type FinishOutcome =
 
 type Found = { state: SyncState; key: string; pair: Pair; title: string };
 
-// An explicit "seen" completes whatever the progress; a bad threshold throws for both sources.
+// An explicit "seen" completes whatever the progress, and so does the start of the credits from
+// CREDITS_FLOOR up (below it the threshold decides); a bad threshold throws for every source.
 // The threshold is the one of the event's kind. Exported for the worker's local pre-check (Ruling 18):
 // one rule decides, before and in the handler.
 export function isComplete(
   event: Pick<CheckedEvent, "source" | "progress" | "kind">,
   thresholds: Thresholds,
 ): boolean {
+  const atCredits =
+    event.source === "credits" && event.progress >= CREDITS_FLOOR;
   const signal = {
     progress: event.progress,
-    markedWatched: event.source === "explicit",
+    markedWatched: event.source === "explicit" || atCredits,
   };
   return isWatchComplete(signal, thresholds[event.kind]);
 }

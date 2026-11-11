@@ -465,3 +465,33 @@ describe("the video sample", () => {
     expect(readVideo(doc)).toBeUndefined();
   });
 });
+
+describe("the Naka tab at the credits", () => {
+  it("a credits start from the page ends the film there, once, sends nothing by itself", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "credits", startMs: 5_400_000 });
+    expect(t.sent.slice(1)).toEqual([]);
+    t.page.video = { currentTime: 5401, duration: 6000, src: "blob:a" };
+    t.tick(5000);
+    t.tick(5000);
+    expect(t.sent.slice(1)).toEqual([
+      {
+        type: "finished",
+        source: "credits",
+        progress: 5401 / 6000,
+        contentId: 3,
+      },
+    ]);
+    expect(t.ended).toEqual([{ contentId: 3 }]);
+  });
+
+  it("a credits event from another window is ignored", () => {
+    const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "credits", startMs: 5_400_000 }, {});
+    t.page.video = { currentTime: 5401, duration: 6000, src: "blob:a" };
+    t.tick(5000);
+    expect(t.sent.slice(1)).toEqual([
+      { type: "finished", source: "threshold", progress: 0.9, contentId: 3 },
+    ]);
+  });
+});

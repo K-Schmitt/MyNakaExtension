@@ -2,7 +2,7 @@
 // Every message from another context is untrusted: a parser takes `unknown`, never throws, and returns a
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
-import type { ContentIds } from "../core/finish-event";
+import type { ContentIds, FinishSource } from "../core/finish-event";
 import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
@@ -11,6 +11,7 @@ import {
   asRecord,
   asString,
   fail,
+  onlyKeys,
   valuesOf,
 } from "./field-checks";
 import {
@@ -43,7 +44,7 @@ export type ToWorker =
   | { type: "playlist-changed" }
   | {
       type: "finished";
-      source: "threshold" | "explicit";
+      source: FinishSource;
       progress: number;
       contentId: number;
       season?: number;
@@ -87,7 +88,15 @@ export type NakaReply =
 export type PageEvent =
   | { channel: typeof PAGE_CHANNEL; kind: "playlist"; removed?: number }
   | ({ channel: typeof PAGE_CHANNEL; kind: "watched" } & ContentIds)
-  | ({ channel: typeof PAGE_CHANNEL; kind: "unwatched" } & ContentIds);
+  | ({ channel: typeof PAGE_CHANNEL; kind: "unwatched" } & ContentIds)
+  | {
+      channel: typeof PAGE_CHANNEL;
+      kind: "credits";
+      /** Where Naka says the credits start, in ms from the start of the video. */
+      startMs: number;
+      season?: number;
+      episode?: number;
+    };
 
 export type Sender = {
   id?: string;
@@ -115,7 +124,11 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   ...QUESTION_TYPE_FLAGS,
   ...PAGE_TYPE_FLAGS,
 });
-const SOURCES = valuesOf<FinishedSource>({ threshold: true, explicit: true });
+const SOURCES = valuesOf<FinishedSource>({
+  threshold: true,
+  explicit: true,
+  credits: true,
+});
 const MODE_VALUES = valuesOf<Mode>({ simulation: true, live: true });
 const TAB_TYPES = valuesOf<ToNakaTab["type"]>({
   "naka-call": true,
@@ -140,7 +153,18 @@ const PAGE_KINDS = valuesOf<PageEvent["kind"]>({
   playlist: true,
   watched: true,
   unwatched: true,
+  credits: true,
 });
+type CreditsEvent = Extract<PageEvent, { kind: "credits" }>;
+const CREDITS_KEYS = valuesOf<keyof CreditsEvent>({
+  channel: true,
+  kind: true,
+  startMs: true,
+  season: true,
+  episode: true,
+});
+// A credits start is inside a day of video.
+const CREDITS_MAX_MS = 86_400_000;
 const NAKA_ORIGIN = "https://naka.cx/";
 
 // Runs a throwing parser. Any failure (a bad field, or a hostile getter) becomes undefined.
@@ -235,10 +259,27 @@ export function parseNakaReply(raw: unknown): NakaReply | undefined {
   return safely(() => parseNakaReplyRecord(asRecord(raw, "reply")));
 }
 
+function asStartMs(raw: unknown): number {
+  const startMs = asId(raw, "startMs");
+  return startMs < CREDITS_MAX_MS ? startMs : fail("startMs");
+}
+
+// The page posts exactly these keys: anything more refuses the event.
+function creditsEvent(record: Record<string, unknown>): CreditsEvent {
+  onlyKeys(record, CREDITS_KEYS, "event");
+  return {
+    channel: PAGE_CHANNEL,
+    kind: "credits",
+    startMs: asStartMs(record.startMs),
+    ...playbackContext(record),
+  };
+}
+
 function parsePageEventRecord(record: Record<string, unknown>): PageEvent {
   asOneOf(record.channel, [PAGE_CHANNEL], "channel");
   const kind = asOneOf(record.kind, PAGE_KINDS, "kind");
   if (kind === "playlist") return playlistEvent(PAGE_CHANNEL, record);
+  if (kind === "credits") return creditsEvent(record);
   return {
     channel: PAGE_CHANNEL,
     kind,
