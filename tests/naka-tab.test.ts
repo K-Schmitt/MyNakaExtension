@@ -469,6 +469,7 @@ describe("the video sample", () => {
 describe("the Naka tab at the credits", () => {
   it("a credits start from the page ends the film there, once, sends nothing by itself", () => {
     const t = tab();
+    t.tick(1000); // the URL poll: the film is playing when the page learns its credits
     t.post({ channel: PAGE_CHANNEL, kind: "credits", startMs: 5_400_000 });
     expect(t.sent.slice(1)).toEqual([]);
     t.page.video = { currentTime: 5401, duration: 6000, src: "blob:a" };

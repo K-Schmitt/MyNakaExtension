@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_CREDITS_STARTS } from "../src/content/credits-starts";
 import {
   createPlaybackTracker,
   type PlaybackTracker,
@@ -136,5 +137,78 @@ describe("the end of viewing at the credits", () => {
     t.context(FILM);
     t.credits({ channel: PAGE_CHANNEL, kind: "playlist" });
     expect(play(t, 6001, 7000)?.source).toBe("threshold");
+  });
+});
+
+describe("credits are bound to the content that was playing", () => {
+  it("the same season and episode of another series do nothing", () => {
+    const t = createPlaybackTracker();
+    t.context({ ...S23E17, contentId: 77 });
+    t.credits(creditsOf(START_MS, { season: 23, episode: 17 }));
+    t.context(S23E17);
+    expect(play(t, 1215)?.source).toBe("threshold");
+    expect(play(t, 1230)).toBeUndefined();
+  });
+
+  it("film A's credits do nothing for film B", () => {
+    const t = createPlaybackTracker();
+    t.context(FILM);
+    t.credits(creditsOf(5_700_000, {}));
+    t.context({ contentId: 6, mediaType: "movie" });
+    expect(
+      t.sample({ currentTime: 5701, duration: 7000, src: "B" })?.source,
+    ).toBe("threshold");
+    expect(
+      t.sample({ currentTime: 5800, duration: 7000, src: "B" }),
+    ).toBeUndefined();
+  });
+
+  it("credits with no context are ignored", () => {
+    const t = createPlaybackTracker();
+    t.credits(creditsOf(5_700_000, {}));
+    t.context(FILM);
+    expect(play(t, 5701, 7000)?.source).toBe("threshold");
+    expect(play(t, 5800, 7000)).toBeUndefined();
+  });
+
+  it("a tv context without season or episode never takes a film's credits", () => {
+    const t = createPlaybackTracker();
+    t.context({ contentId: SERIES, mediaType: "tv" });
+    t.credits(creditsOf(5_700_000, {}));
+    expect(play(t, 5701, 7000)?.source).toBe("threshold");
+    expect(play(t, 5800, 7000)).toBeUndefined();
+  });
+
+  it("an episode's credits do nothing for a film of the same id", () => {
+    const t = createPlaybackTracker();
+    t.context({ contentId: SERIES, mediaType: "movie" });
+    t.credits(creditsOf(START_MS, { season: 23, episode: 17 }));
+    expect(play(t, 1215)?.source).toBe("threshold");
+    expect(play(t, 1230)).toBeUndefined();
+  });
+});
+
+describe("credits bounds", () => {
+  it("a start exactly at the floor fires", () => {
+    const t = createPlaybackTracker();
+    t.context(FILM);
+    t.credits(creditsOf(800_000, {}));
+    expect(play(t, 799.9, 1000)).toBeUndefined();
+    expect(play(t, 800, 1000)?.source).toBe("credits");
+  });
+
+  it(`keeps the last ${MAX_CREDITS_STARTS} starts: an older one is dropped`, () => {
+    const remembered = (others: number) => {
+      const t = createPlaybackTracker();
+      t.context({ ...S23E17, season: 1, episode: 1 });
+      t.credits(creditsOf(START_MS, { season: 1, episode: 1 }));
+      for (let e = 2; e < 2 + others; e += 1) {
+        t.credits(creditsOf(START_MS, { season: 1, episode: e }));
+      }
+      return play(t, 1230)?.source;
+    };
+    expect(MAX_CREDITS_STARTS).toBe(8);
+    expect(remembered(MAX_CREDITS_STARTS - 1)).toBe("credits");
+    expect(remembered(MAX_CREDITS_STARTS)).toBe("threshold");
   });
 });
