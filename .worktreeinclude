@@ -1,0 +1,5 @@
+# Untracked agent context copied into each new worktree (gitignore syntax; only ignored files are copied).
+# Never .superpowers/sdd/: the session start already reads every worktree's ledgers.
+CLAUDE.md
+BACKLOG.md
+docs/superpowers/
