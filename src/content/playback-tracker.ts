@@ -8,13 +8,16 @@
 //
 // When Naka's page has learnt where the credits start (credits events), a counted sample at or past that
 // start offers one "credits" finish per key, with its real progress, provided the start is at or past
-// CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither.
+// CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither,
+// so a start is bound to the content playing when it arrives (none playing: it is ignored).
 
 import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import {
   type CreditsStarts,
+  contextKey,
   createCreditsStarts,
+  eventKey,
   pastCredits,
 } from "./credits-starts";
 import type { PlayerContext } from "./page-events";
@@ -92,6 +95,7 @@ export function createPlaybackTracker(): PlaybackTracker {
   const states = new Map<string, KeyState>();
   const starts: CreditsStarts = createCreditsStarts();
   let current: Playing | undefined;
+  let creditsKey: string | undefined;
   let previousSrc: string | undefined;
   let lastSrc: string | undefined;
   let reference: Reference | undefined;
@@ -145,6 +149,7 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (sameKey(current, next)) return;
       leaveContext();
       current = next;
+      creditsKey = ctx === undefined ? undefined : contextKey(ctx);
     },
     sample(s) {
       if (current === undefined || !isCurrentSrc(s.src)) return undefined;
@@ -153,7 +158,9 @@ export function createPlaybackTracker(): PlaybackTracker {
       const state = stateOf(current);
       const progress = s.currentTime / s.duration;
       const reached = newMarks(state, progress);
-      if (!state.credits && pastCredits(starts.of(current), s)) {
+      const startS =
+        creditsKey === undefined ? undefined : starts.of(creditsKey);
+      if (!state.credits && pastCredits(startS, s)) {
         state.credits = true;
         return finishedAt(current, "credits", progress);
       }
@@ -162,7 +169,8 @@ export function createPlaybackTracker(): PlaybackTracker {
       return finishedAt(current, "threshold", highest);
     },
     credits(ev) {
-      if (ev.kind === "credits") starts.remember(ev);
+      if (ev.kind !== "credits" || current === undefined) return;
+      starts.remember(eventKey(current.contentId, ev), ev.startMs);
     },
     unwatched(ev) {
       if (ev.kind !== "unwatched") return;

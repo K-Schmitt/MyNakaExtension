@@ -2,6 +2,7 @@
 // It crosses a message boundary in Plan 3, so the types are not trusted at runtime: a bad event
 // rejects with a fixed message (never one built from its values) before any port is called.
 
+import { valuesOf } from "../ext/field-checks";
 import type { Titled } from "./title-match";
 
 /** Where the end of viewing came from: a progress mark, Naka's « vu », or the start of the credits. */
@@ -32,7 +33,11 @@ export type CheckedEvent =
   | (Checked & { kind: "film" })
   | (Checked & { kind: "episode"; season: number; episode: number });
 
-const SOURCES: readonly unknown[] = ["threshold", "explicit", "credits"];
+const SOURCES: readonly unknown[] = valuesOf<FinishSource>({
+  threshold: true,
+  explicit: true,
+  credits: true,
+});
 
 function reject(message: string): never {
   throw new RangeError(`finish event: ${message}`);
