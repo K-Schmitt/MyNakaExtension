@@ -4,6 +4,9 @@ export const DEFAULT_THRESHOLD = 0.9;
 export type Thresholds = { film: number; episode: number };
 export const THRESHOLD_CHOICES = [0.8, 0.85, 0.9, 0.95, 0.99] as const;
 export const DEFAULT_THRESHOLDS: Thresholds = { film: 0.9, episode: 0.8 };
+// A finish at the credits completes from here up, whatever the threshold: the lowest threshold the owner
+// can choose, so a page script inventing an early credits start gains nothing over a threshold finish.
+export const CREDITS_FLOOR = THRESHOLD_CHOICES[0];
 
 export type WatchSignal = {
   progress: number;
