@@ -88,10 +88,12 @@ export function answerWorld(o: WorldOpts = {}) {
   };
   // chrome.storage.session: the registry of the title page products.
   const session = memoryArea();
-  const jobs = createJobs(jobDeps, createFicheRegistry(session));
+  const registry = createFicheRegistry(session);
+  const jobs = createJobs(jobDeps, registry);
   return {
     jobs,
     session,
+    registry,
     jobDeps,
     area,
     nk,
