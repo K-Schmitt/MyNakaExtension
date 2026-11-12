@@ -6,6 +6,12 @@ import type { ContentIds, FinishSource } from "../core/finish-event";
 import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
+  type FicheEvent,
+  ficheEvent,
+  type SeasonEvent,
+  seasonEvent,
+} from "./fiche-page-events";
+import {
   asId,
   asOneOf,
   asRecord,
@@ -96,7 +102,9 @@ export type PageEvent =
       startMs: number;
       season?: number;
       episode?: number;
-    };
+    }
+  | FicheEvent<typeof PAGE_CHANNEL>
+  | SeasonEvent<typeof PAGE_CHANNEL>;
 
 export type Sender = {
   id?: string;
@@ -154,6 +162,8 @@ const PAGE_KINDS = valuesOf<PageEvent["kind"]>({
   watched: true,
   unwatched: true,
   credits: true,
+  fiche: true,
+  season: true,
 });
 type CreditsEvent = Extract<PageEvent, { kind: "credits" }>;
 const CREDITS_KEYS = valuesOf<keyof CreditsEvent>({
@@ -280,6 +290,8 @@ function parsePageEventRecord(record: Record<string, unknown>): PageEvent {
   const kind = asOneOf(record.kind, PAGE_KINDS, "kind");
   if (kind === "playlist") return playlistEvent(PAGE_CHANNEL, record);
   if (kind === "credits") return creditsEvent(record);
+  if (kind === "fiche") return ficheEvent(PAGE_CHANNEL, record);
+  if (kind === "season") return seasonEvent(PAGE_CHANNEL, record);
   return {
     channel: PAGE_CHANNEL,
     kind,
