@@ -1,14 +1,19 @@
 // I2: after a sync that ran and succeeded, the finishes that wait for a Naka tab are retried in stored
 // order, each through the one finish job (pre-check, budget, binding). Only `state.retryFinishes` decides
-// what is retried. A failure that keeps waiting stops the chain; any other end drops the entry.
+// what is retried. A failure that keeps waiting stops the chain; any other end drops the entry. A content
+// Naka no longer knows is recorded as the last finish, under the title the waiting list showed, before the
+// entry goes.
 
 import { idsOfKey } from "../core/finish-event";
+import { waitingTitleOf } from "../core/handled-titles";
+import type { RatingCard } from "../core/rating-cards";
 import { dropRetry, type RetryFinish, retriesOf } from "../core/retry-finishes";
 import { samePair } from "../core/state";
 import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
 import { KEEPS_WAITING } from "./retry-rules";
+import type { Replay } from "./unknown-content";
 
 async function syncedSince(deps: JobDeps, since: number): Promise<boolean> {
   const { lastRun } = await deps.store.loadSettings();
@@ -29,13 +34,21 @@ async function remaining(deps: JobDeps): Promise<boolean> {
   return retriesOf(await deps.store.loadState()).length > 0;
 }
 
+// The title the waiting list showed. The card only names the record: an unreadable card store leaves it
+// without a title, and the replay goes on.
+async function replayOf(deps: JobDeps, entry: RetryFinish): Promise<Replay> {
+  const cards = await deps.store.loadRatings().catch((): RatingCard[] => []);
+  return { title: waitingTitleOf(entry, cards) };
+}
+
 // true when the entry is spent; false when it keeps waiting.
 async function retryOne(deps: JobDeps, entry: RetryFinish): Promise<boolean> {
   const ids = idsOfKey(entry.key);
   const state = await deps.store.loadState();
   const linked = state.mapping.some((p) => samePair(p, entry.pair));
   if (ids === undefined || !linked) return true;
-  const error = await finishJob(deps, explicitFinish(ids));
+  const replay = await replayOf(deps, entry);
+  const error = await finishJob(deps, explicitFinish(ids), replay);
   return error === undefined || !KEEPS_WAITING.includes(error);
 }
 
