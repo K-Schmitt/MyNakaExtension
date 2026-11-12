@@ -17,23 +17,17 @@ import type { FicheOutcome } from "./fiche-view";
 type Ending = { sent: boolean; outcome?: FicheOutcome };
 type RatePlace = { season: number; episode: number };
 
-// An {error} answer does not say whether the rating went out (the film's list removal comes after it):
-// the owner's rating, read again, does.
-async function endingOf(
-  scope: FicheScope,
-  msg: FicheRateMessage,
-  answer: RateAnswer | undefined,
-): Promise<Ending> {
+// The worker's answer says whether the rating went out: `{ sent: true, error }` when a later step failed.
+function endingOf(answer: RateAnswer | undefined): Ending {
   if (answer === undefined) return { sent: false, outcome: { kind: "failed" } };
   if ("ok" in answer) return { sent: true };
-  const read = await scope.ports.mine({
-    type: "fiche-mine",
-    contentId: msg.contentId,
-    productId: msg.productId,
-  });
-  const sent = read?.mine === msg.rating;
-  const kind = sent ? "sent-with-error" : "not-sent";
-  return { sent, outcome: { kind, error: answer.error } };
+  if ("sent" in answer) {
+    return {
+      sent: true,
+      outcome: { kind: "sent-with-error", error: answer.error },
+    };
+  }
+  return { sent: false, outcome: { kind: "not-sent", error: answer.error } };
 }
 
 async function sendRate(
@@ -45,7 +39,7 @@ async function sendRate(
   page.pending = "rating";
   page.outcome = undefined;
   scope.show();
-  const ending = await endingOf(scope, msg, await scope.ports.rate(msg));
+  const ending = endingOf(await scope.ports.rate(msg));
   if (!scope.live()) return;
   page.pending = undefined;
   page.outcome = ending.outcome;

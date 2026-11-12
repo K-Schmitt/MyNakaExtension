@@ -39,7 +39,14 @@ export type SeasonEpisode = {
 };
 export type SeasonAnswer = { episodes: SeasonEpisode[] };
 export type MineAnswer = { mine: number | null };
-export type RateAnswer = { ok: true } | { error: JobError };
+/**
+ * `{ error }`: the rating did not go out. `{ sent: true, error }`: it went out and a later step failed
+ * (a film's removal from « Ma liste »).
+ */
+export type RateAnswer =
+  | { ok: true }
+  | { error: JobError }
+  | { sent: true; error: JobError };
 
 const MAX_AVERAGE = 10;
 const MAX_EPISODES = 500;
@@ -150,8 +157,13 @@ export function parseRateAnswer(raw: unknown): RateAnswer {
     onlyKeys(record, ["ok"], "answer");
     return { ok: true };
   }
-  onlyKeys(record, ["error"], "answer");
-  return { error: asOneOf(record.error, ERROR_CODES, "error") };
+  const error = asOneOf(record.error, ERROR_CODES, "error");
+  if (record.sent === undefined) {
+    onlyKeys(record, ["error"], "answer");
+    return { error };
+  }
+  onlyKeys(record, ["sent", "error"], "answer");
+  return record.sent === true ? { sent: true, error } : fail("sent");
 }
 
 export function parseLinkAnswer(raw: unknown): { ok: true } {
