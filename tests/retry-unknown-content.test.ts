@@ -9,6 +9,7 @@ import type { NakaItem } from "../src/naka/naka-client";
 import { retryNextJob } from "../src/sw/retry-job";
 import { answerWorld, BOUND, NOW } from "./answer-world";
 import { cand, stateWith } from "./question-fixtures";
+import { filmCard } from "./rating-fixtures";
 
 const SINCE = NOW - 1000;
 const entry = (id: number, title?: string): RetryFinish => ({
@@ -25,6 +26,11 @@ const entry = (id: number, title?: string): RetryFinish => ({
   },
   at: NOW - 5000,
 });
+// A question saved before 4b: no title and no candidates.
+const legacy = (id: number): RetryFinish => {
+  const { candidates: _gone, ...question } = entry(id).question;
+  return { ...entry(id), question };
+};
 const film = (id: number): NakaItem => ({
   contentId: id,
   tmdbId: 9000 + id,
@@ -95,8 +101,30 @@ describe("retryNextJob: a content Naka no longer knows", () => {
     expect(w.writes()).toEqual([]);
   });
 
-  it("records no title when the question had none", async () => {
+  it("without a question title, names the record after the chosen candidate", async () => {
     const w = waitingWorld([entry(5)], unknown);
+    await retryNextJob(w.jobDeps, SINCE);
+    expect(w.settings().lastFinish?.title).toBe("T1005");
+  });
+
+  it("without a question title or candidates, names it after the rating card", async () => {
+    const w = waitingWorld([legacy(5)], unknown);
+    const card = filmCard({ key: "movie:5", contentId: 5, title: "Le film" });
+    w.area.data.set("ratings", [card]);
+    await retryNextJob(w.jobDeps, SINCE);
+    expect(w.settings().lastFinish?.title).toBe("Le film");
+  });
+
+  it("an unreadable card store does not stop a replay", async () => {
+    const w = waitingWorld([legacy(5)], async (id) => film(id));
+    w.area.data.set("ratings", "broken");
+    expect(await retryNextJob(w.jobDeps, SINCE)).toBe(false);
+    expect(doneCalls(w)).toEqual(["markDone:1005:2026-11-05"]);
+    expect(w.state().retryFinishes).toBeUndefined();
+  });
+
+  it("records no title when nothing names the content", async () => {
+    const w = waitingWorld([legacy(5)], unknown);
     await retryNextJob(w.jobDeps, SINCE);
     expect(w.settings().lastFinish).toEqual({
       at: NOW,

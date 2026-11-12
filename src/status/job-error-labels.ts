@@ -15,5 +15,5 @@ export const JOB_ERROR_LABELS: Record<JobError, string> = {
   "naka-list-empty": "Ma liste Naka lue vide\u202F: rien n'a été retiré",
   "naka-tab-changed":
     "L'onglet Naka a changé de page ou a été rechargé\u202F: la suite au prochain passage",
-  "naka-content-unknown": "Contenu inconnu de Naka ou d\u2019un autre genre",
+  "naka-content-unknown": "Contenu inconnu de Naka ou d\u2019un autre type",
 };
