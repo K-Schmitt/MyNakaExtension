@@ -7,7 +7,8 @@ export type JobError =
   | "unavailable"
   | "finish-limit"
   | "naka-list-empty"
-  | "naka-tab-changed";
+  | "naka-tab-changed"
+  | "naka-content-unknown";
 
 const MESSAGES: Record<JobError, string> = {
   "no-naka-tab": "no Naka tab",
@@ -19,6 +20,7 @@ const MESSAGES: Record<JobError, string> = {
   "finish-limit": "too many finishes this hour",
   "naka-list-empty": "Naka playlist read empty",
   "naka-tab-changed": "Naka tab changed page",
+  "naka-content-unknown": "content unknown to Naka",
 };
 
 // A job refused before it ran. One fixed message per code: no value from the page or the account.

@@ -55,6 +55,8 @@ export const RATING_ERROR_LABELS: Record<JobError, string> = {
     "trop de fins de visionnage en une heure, réessayez plus tard",
   "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
   "naka-tab-changed": "l'onglet Naka a changé de page, réessayez",
+  "naka-content-unknown":
+    "ce contenu est inconnu de Naka ou d\u2019un autre type",
 };
 
 export function errorLine(error: JobError): string {
