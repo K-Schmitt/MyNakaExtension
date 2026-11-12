@@ -80,8 +80,9 @@ describe("fiche-rate: a film", () => {
     expect(w.nk.calls).toContain("removeFromPlaylist:5");
   });
 
-  it("a full budget: its error answered, no rate, no list removal", async () => {
+  it("a full budget: its error answered, no rate, no list removal, the mapping kept", async () => {
     const w = filmWorld({
+      state: emptyState(),
       settings: { ...LIVE, finishWindow: { from: NOW, count: 30 } },
     });
     await w.registry.open(TAB, 5, 2005, []);
@@ -89,7 +90,63 @@ describe("fiche-rate: a film", () => {
       error: "finish-limit",
     });
     expect(w.writes()).toEqual([]);
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
   });
+
+  it("an unlinked entry of the title: linked by hand's way, the entry gone", async () => {
+    const w = filmWorld({
+      state: {
+        ...emptyState(),
+        unlinked: [
+          { side: "naka", id: 5, title: "Titre 5", reason: "no-match" },
+        ],
+      },
+    });
+    await w.registry.open(TAB, 5, 2005, []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(w.state().unlinked).toEqual([]);
+  });
+
+  it("an open question on the title: linked by hand's way, the question resolved", async () => {
+    const w = filmWorld({
+      state: {
+        ...emptyState(),
+        pending: [
+          {
+            kind: "ambiguity",
+            side: "naka",
+            id: 5,
+            candidateIds: [2005, 2006],
+          },
+        ],
+      },
+    });
+    await w.registry.open(TAB, 5, 2005, []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(w.state().pending).toEqual([]);
+  });
+
+  it.each([
+    ["mapped to another content", { mapping: [{ nakaId: 9, scId: 2005 }] }],
+    ["held by another settled pair", { settled: [{ nakaId: 5, scId: 2006 }] }],
+    [
+      "held by a settled pair of another content",
+      { settled: [{ nakaId: 9, scId: 2005 }] },
+    ],
+  ])(
+    "the product %s: refused, zero requests, nothing saved",
+    async (_n, over) => {
+      const state = { ...emptyState(), ...over };
+      const w = filmWorld({ state });
+      await w.registry.open(TAB, 5, 2005, []);
+      await expect(w.jobs.ficheRate(TAB, rate())).rejects.toThrow();
+      expect(w.network()).toEqual([]);
+      expect(w.state()).toEqual(state);
+      expect(w.settings().finishWindow).toBeUndefined();
+    },
+  );
 
   it("a failed rate: its error answered, stored on the card, no list removal", async () => {
     const w = filmWorld({
@@ -151,6 +208,21 @@ describe("fiche-rate: a series", () => {
     expect(first?.given).toEqual({ série: 8 });
     expect(film).toEqual(filmCard());
   });
+
+  it.each([
+    ["mapped to another content", { mapping: [{ nakaId: 9, scId: 13 }] }],
+    ["held by another settled pair", { settled: [{ nakaId: 9, scId: 13 }] }],
+  ])(
+    "the series' product %s: refused, zero requests, nothing settled",
+    async (_n, over) => {
+      const state = { ...emptyState(), ...over };
+      const w = filmWorld({ state });
+      await w.registry.open(TAB, 5, 13, []);
+      await expect(w.jobs.ficheRate(TAB, seriesRate())).rejects.toThrow();
+      expect(w.network()).toEqual([]);
+      expect(w.state()).toEqual(state);
+    },
+  );
 
   it("unlinked: linked first, then rated and settled", async () => {
     const w = filmWorld({ state: emptyState() });

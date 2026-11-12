@@ -100,6 +100,42 @@ describe("fiche-link: a title the extension knows", () => {
   });
 });
 
+describe("fiche-link: the link-title path answers from its ending", () => {
+  const unlinked: SyncState = {
+    ...emptyState(),
+    unlinked: [{ side: "naka", id: 5, title: "Titre 5", reason: "no-match" }],
+  };
+
+  it("refused (the pair held by a settled one): rejected, nothing linked", async () => {
+    const state = { ...unlinked, settled: [{ nakaId: 9, scId: 11 }] };
+    const w = await chosenWorld(state);
+    await expect(w.jobs.ficheLink(TAB, link())).rejects.toThrow();
+    expect(w.state()).toEqual(state);
+  });
+
+  it("mismatch (a series product for a film): rejected, nothing linked", async () => {
+    const w = await chosenWorld(unlinked);
+    w.jobDeps.sc.productState = async () => ({
+      isDone: false,
+      isWished: false,
+      universe: 4,
+      rating: null,
+      average: null,
+    });
+    await expect(w.jobs.ficheLink(TAB, link())).rejects.toThrow();
+    expect(w.state()).toEqual(unlinked);
+  });
+
+  it("failed (a read throws): rejected, nothing linked", async () => {
+    const w = await chosenWorld(unlinked);
+    w.jobDeps.sc.productState = async () => {
+      throw new Error("down");
+    };
+    await expect(w.jobs.ficheLink(TAB, link())).rejects.toThrow();
+    expect(w.state()).toEqual(unlinked);
+  });
+});
+
 describe("fiche-link: only a product issued to that tab for that content", () => {
   it.each([
     ["never issued", link({ productId: 13 })],

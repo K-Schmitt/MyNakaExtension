@@ -1,7 +1,9 @@
 // A series or an episode rated from its title page (Q10): no finish, no slot of the hour's budget. The
 // binding is checked before the one ProductRate (sendRating); a failure is answered with its code. Then
 // the stored cards that name this very product are updated: a series' rating goes to the série target of
-// every card of the content, an episode's to the épisode target of that episode's card.
+// every card of the content, an episode's to the épisode target of that episode's card. A series' pair is
+// settled only after linkForRating's checks passed in this same queued job (no conflicting mapping, no
+// settled pair holding either side), so settlePair never makes a pair the sync would skip.
 
 import { contentKeyOf } from "../core/finish-event";
 import {

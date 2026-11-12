@@ -186,7 +186,10 @@ export function createJobs(
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
     answerRemoval: (msg) => quietly(() => answerRemovalJob(deps, msg)),
     hideQuestion: (msg) => quietly(() => hideQuestionJob(deps.store, msg)),
-    linkTitle: (msg) => quietly(() => linkTitleJob(deps, msg)),
+    linkTitle: (msg) =>
+      quietly(async () => {
+        await linkTitleJob(deps, msg);
+      }),
     requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
     forget: () => quietly(() => forgetJob(deps.store)),
     reset: () => quietly(() => resetJob(deps.store)),
