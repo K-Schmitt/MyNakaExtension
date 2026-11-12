@@ -6,6 +6,7 @@ import type { FicheInfoMessage } from "../ext/fiche-messages";
 import type { TitlePath } from "./fiche-path";
 import type { FichePorts } from "./fiche-ports";
 import type { ReadQueue } from "./fiche-read-queue";
+import type { SeenSeasons } from "./fiche-seen-seasons";
 import type {
   FicheEpisode,
   FicheOutcome,
@@ -22,11 +23,13 @@ export type FichePage = {
   outcome?: FicheOutcome;
   pending?: FichePending;
   seriesRating?: number;
-  /** `contentId:season` of the season events the page sent. */
-  readonly seen: Set<string>;
+  /** The seasons the page's season events named. */
+  readonly seen: SeenSeasons;
   season?: number;
   /** A token of the season opened last: a step of an older one is stale. */
   turn?: object;
+  /** The shown season's read failed; `retried` once a new season event asked it again. */
+  seasonFailure?: { season: number; retried: boolean };
   episodes: Episodes;
   /** The seasons read during the visit. */
   readonly read: Map<number, Episodes>;
@@ -41,7 +44,7 @@ export type FicheScope = {
 };
 
 export function newPage(title: TitlePath): FichePage {
-  return { title, seen: new Set(), episodes: new Map(), read: new Map() };
+  return { title, seen: new Map(), episodes: new Map(), read: new Map() };
 }
 
 export function viewOf(page: FichePage): FicheView {

@@ -130,6 +130,7 @@ function tab(start = PLAYER(3)) {
   const removals: number[] = [];
   const fichePaths: string[] = [];
   const ficheEvents: TitlePageEvent[] = [];
+  const ficheLog: string[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -170,9 +171,11 @@ function tab(start = PLAYER(3)) {
     fiche: {
       path: (pathname) => {
         fichePaths.push(pathname);
+        ficheLog.push(`path ${pathname}`);
       },
       event: (event) => {
         ficheEvents.push(event);
+        ficheLog.push(`event ${event.kind}`);
       },
     },
   };
@@ -195,6 +198,7 @@ function tab(start = PLAYER(3)) {
     removals,
     fichePaths,
     ficheEvents,
+    ficheLog,
     timers,
     page,
     tick,
@@ -546,6 +550,18 @@ describe("the title page events", () => {
       { channel: PAGE_CHANNEL, kind: "season", contentId: 6, season: 2 },
     ]);
     expect(t.sent).toEqual([{ type: "naka-ready" }]);
+  });
+
+  it("hands the address before an event posted before the next poll", () => {
+    const t = tab(PLAYER(3));
+    t.tick(1000);
+    t.page.href = "https://naka.cx/content/tv/9006";
+    t.post(fiche);
+    expect(t.ficheLog).toEqual([
+      "path /player",
+      "path /content/tv/9006",
+      "event fiche",
+    ]);
   });
 
   it("hands over no fiche event from another window", () => {
