@@ -3,12 +3,15 @@
 // answered), when the product is mapped to another content, or when a settled pair holds either side
 // (heldBySettled: the sync would skip both pairs forever). A title already linked to that product is
 // kept as it is. A title that is unlinked or has an open question takes linkByHand's transition (the
-// entry goes, the question is resolved); any other gets the bare mapping pair.
+// entry goes, the question is resolved); any other gets the bare mapping pair. Like the status page's
+// link (link-job.ts), it hands back the finish that waited on the resolved question, for the caller to run.
 
+import type { FinishedMessage } from "../content/playback-tracker";
 import type { Pair } from "../core/list-diff";
-import { heldBySettled, linkByHand } from "../core/questions";
+import { heldBySettled, linkByHand, openAmbiguity } from "../core/questions";
 import { type SyncState, samePair, upsertMapping } from "../core/state";
 import type { Store } from "../ext/store";
+import { finishWaitingOn } from "./answer-jobs";
 
 export class LinkRefusedError extends Error {
   constructor() {
@@ -33,9 +36,10 @@ function linked(state: SyncState, pair: Pair): SyncState {
 export async function linkForRating(
   store: Pick<Store, "loadState" | "saveState">,
   pair: Pair,
-): Promise<void> {
+): Promise<FinishedMessage | undefined> {
   const state = await store.loadState();
   if (conflicts(state, pair)) throw new LinkRefusedError();
-  if (state.mapping.some((known) => samePair(known, pair))) return;
+  if (state.mapping.some((known) => samePair(known, pair))) return undefined;
   await store.saveState(linked(state, pair));
+  return finishWaitingOn(openAmbiguity(state, "naka", pair.nakaId));
 }
