@@ -21,6 +21,8 @@ import { toJobError } from "./to-job-error";
 
 type Kind = "movie" | "tv";
 type Ending = "done" | "refused" | "mismatch";
+/** How a link by hand ended, as recorded: `failed` when a read or the save threw. */
+export type LinkEnding = Ending | "failed";
 type Linked = { ending: Ending; finish?: FinishedMessage };
 
 const SC_KINDS: Partial<Record<number, Kind>> = {
@@ -60,7 +62,7 @@ async function linked(deps: JobDeps, msg: LinkTitleMessage): Promise<Linked> {
 export async function linkTitleJob(
   deps: JobDeps,
   msg: LinkTitleMessage,
-): Promise<void> {
+): Promise<LinkEnding> {
   const target = `link:${msg.side}:${msg.id}`;
   let result: Linked;
   try {
@@ -73,10 +75,11 @@ export async function linkTitleJob(
       deps.now(),
       toJobError(error),
     );
-    return;
+    return "failed";
   }
   await recordAnswer(deps.store, target, result.ending, deps.now());
   if (result.finish !== undefined) await finishJob(deps, result.finish);
+  return result.ending;
 }
 
 async function dropped(
