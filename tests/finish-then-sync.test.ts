@@ -120,6 +120,7 @@ function world(o: Opts) {
       isWished: w.sc.has(id),
       universe: universeOf(id),
       rating: null,
+      average: null,
     }),
     unwish: async (id) => {
       w.writes.push(`unwish:${id}`);
@@ -140,6 +141,7 @@ function world(o: Opts) {
         season,
         episode: e,
         title: `Épisode ${e}`,
+        average: null,
       })),
     }),
     today: () => TODAY,

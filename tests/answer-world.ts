@@ -54,6 +54,7 @@ export function answerWorld(o: WorldOpts = {}) {
       isWished: true,
       universe: 1,
       rating: null,
+      average: null,
       ...o.product?.(id),
     }),
     ...o.sc,

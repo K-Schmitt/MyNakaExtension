@@ -76,6 +76,7 @@ function catalogueSc(over: Partial<ScClient> = {}): Partial<ScClient> {
       isWished: id === 1002,
       universe: id >= 5000 ? 32 : id === 1007 ? 4 : 1,
       rating: null,
+      average: null,
     }),
     seasonInfo: async (id, season) => ({
       seasonProductId: 4000 + id,
@@ -84,6 +85,7 @@ function catalogueSc(over: Partial<ScClient> = {}): Partial<ScClient> {
         season,
         episode: e,
         title: `Episode ${e}`,
+        average: null,
       })),
     }),
     ...over,
@@ -192,6 +194,7 @@ describe("sync job: simulation, then live", () => {
           isWished: false,
           universe: 1,
           rating: null,
+          average: null,
         }),
       }),
     });
@@ -303,6 +306,7 @@ describe("sync job: year, type and the product label in the preview", () => {
       isWished: false,
       universe: 1,
       rating: null,
+      average: null,
       ...(id === 1001 ? { label: { title: "Enemy", year: 2013 } } : {}),
     }),
   };
@@ -340,6 +344,7 @@ describe("sync job: year, type and the product label in the preview", () => {
           isWished: false,
           universe: 4,
           rating: null,
+          average: null,
           label: { title: "Dark" },
         }),
       }),
@@ -776,6 +781,7 @@ describe("sync job: a run that a breaker stopped says so (Ruling 17)", () => {
             isWished: false,
             universe: id === 1007 ? 4 : 1,
             rating: null,
+            average: null,
           };
         },
       }),
@@ -1512,6 +1518,7 @@ describe("finish job: only finishes that need the network count (Ruling 18)", ()
           season,
           episode: i + 1,
           title: `Episode ${i + 1}`,
+          average: null,
         })),
       }),
     });

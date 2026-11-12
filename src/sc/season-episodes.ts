@@ -1,3 +1,5 @@
+import { readAverage } from "./average-rating";
+
 // Parses the Apollo cache that SensCritique embeds in a season page (<script id="__NEXT_DATA__">).
 // Pure: no network. Any unreadable page gives an empty result, never a throw.
 // Only the requested series and season are read: the episodes are the refs listed by that season's own entry.
@@ -7,6 +9,8 @@ export type ScEpisode = {
   season: number;
   episode: number;
   title: string;
+  /** The episode's public average (0 to 10, one decimal), null when absent or unreadable. */
+  average: number | null;
 };
 
 type ApolloState = Record<string, unknown>;
@@ -120,6 +124,7 @@ function toEpisode(
     season,
     episode: Number(number),
     title: entry.title,
+    average: readAverage(entry.fields),
   };
 }
 

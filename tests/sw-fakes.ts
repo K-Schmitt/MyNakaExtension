@@ -55,6 +55,7 @@ export function fakeSc(over: Partial<ScClient> = {}) {
       isWished: false,
       universe: 1,
       rating: null,
+      average: null,
     }),
     readWishlist: async () => [],
     search: async () => [],
