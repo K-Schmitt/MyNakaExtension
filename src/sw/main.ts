@@ -38,6 +38,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) =>
   router.handle(msg, sender, sendResponse),
 );
 
+// A closed tab can write nothing more: the products issued to its title page are forgotten.
+chrome.tabs.onRemoved.addListener((tabId) => router.dropTab(tabId));
+
 function ignore(): void {}
 
 // The toolbar button has no popup: a click opens the status page, the extension's options page. A page

@@ -118,7 +118,7 @@ export type Sender = {
   id?: string;
   url?: string;
   frameId?: number;
-  tab?: { url?: string };
+  tab?: { id?: number; url?: string };
 };
 export type SenderRole = "naka-tab" | "status-page";
 
