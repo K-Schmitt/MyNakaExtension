@@ -1,6 +1,7 @@
 // I2: after a sync that ran and succeeded, the finishes that wait for a Naka tab are retried in stored
 // order, each through the one finish job (pre-check, budget, binding). Only `state.retryFinishes` decides
-// what is retried. A failure that keeps waiting stops the chain; any other end drops the entry.
+// what is retried. A failure that keeps waiting stops the chain; any other end drops the entry. A content
+// Naka no longer knows is recorded as the last finish, under the question's title, before it goes.
 
 import { idsOfKey } from "../core/finish-event";
 import { dropRetry, type RetryFinish, retriesOf } from "../core/retry-finishes";
@@ -35,7 +36,8 @@ async function retryOne(deps: JobDeps, entry: RetryFinish): Promise<boolean> {
   const state = await deps.store.loadState();
   const linked = state.mapping.some((p) => samePair(p, entry.pair));
   if (ids === undefined || !linked) return true;
-  const error = await finishJob(deps, explicitFinish(ids));
+  const replay = { title: entry.question.title };
+  const error = await finishJob(deps, explicitFinish(ids), replay);
   return error === undefined || !KEEPS_WAITING.includes(error);
 }
 

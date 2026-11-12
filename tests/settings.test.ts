@@ -192,6 +192,7 @@ describe("parseSettings accepts", () => {
     "finish-limit",
     "naka-list-empty",
     "naka-tab-changed",
+    "naka-content-unknown",
   ])("a failed finish with its reason %s", (error) => {
     const lastFinish = { at: 1, key: "movie:1", outcome: "failed", error };
     expect(parseSettings({ mode: "live", lastFinish })).toEqual({
@@ -288,6 +289,7 @@ describe("parseSettings accepts", () => {
     "finish-limit",
     "naka-list-empty",
     "naka-tab-changed",
+    "naka-content-unknown",
   ])("run error %s", (error) => {
     const lastRun = {
       at: 1,
