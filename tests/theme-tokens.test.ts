@@ -61,4 +61,16 @@ describe("themeCss", () => {
     );
     expect(themeCss(":root")).toContain("--mn-font:Inter, system-ui");
   });
+
+  it("keeps Naka's font variable out of the extension page", () => {
+    expect(themeCss(":root")).not.toContain("var(--font-sans");
+  });
+
+  it.each(["warningBg", "errorText", "errorBg", "successBg"] as const)(
+    "keeps %s fixed inside the page",
+    (key) => {
+      const css = themeCss(":host");
+      expect(css).toContain(`--mn-color-${kebab(key)}:${THEME.color[key]};`);
+    },
+  );
 });
