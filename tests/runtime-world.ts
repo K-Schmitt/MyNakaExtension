@@ -518,6 +518,7 @@ function scReads(
         isWished: w.wishlist.has(id),
         universe: universeOf(id),
         rating: null,
+        average: null,
       };
     },
     seasonInfo: async (series, season) => {
@@ -530,6 +531,7 @@ function scReads(
           season,
           episode: i + 1,
           title: `Episode ${i + 1}`,
+          average: null,
         })),
       };
     },
