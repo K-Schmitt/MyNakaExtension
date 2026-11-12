@@ -6,17 +6,25 @@ import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
 import { ROW_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import { attachSheet } from "./sheet";
 
-const HOST_STYLE = ["all: initial", "display: block", "margin: 0 0 24px"]
-  .map((d) => `${d} !important;`)
-  .join(" ");
+const ROW_DECLARATIONS = ["all: initial", "display: block", "margin: 0 0 24px"];
+
+/** A detached host of this tag and these declarations (each made !important), its closed root holding the sheet. */
+export function createClosedHost(
+  doc: Pick<DocLike, "createElement">,
+  tag: string,
+  declarations: readonly string[],
+  sheet: string,
+): { host: ElementLike; root: ShadowRootLike } {
+  const host = doc.createElement(tag);
+  host.style.cssText = declarations.map((d) => `${d} !important;`).join(" ");
+  stopAtHost(host, ROW_STOPPED_EVENTS);
+  const root = attachSheet(doc, host.attachShadow({ mode: "closed" }), sheet);
+  return { host, root };
+}
 
 export function createRowHost(
   doc: DocLike,
   sheet: string,
 ): { host: ElementLike; root: ShadowRootLike } {
-  const host = doc.createElement("section");
-  host.style.cssText = HOST_STYLE;
-  stopAtHost(host, ROW_STOPPED_EVENTS);
-  const root = attachSheet(doc, host.attachShadow({ mode: "closed" }), sheet);
-  return { host, root };
+  return createClosedHost(doc, "section", ROW_DECLARATIONS, sheet);
 }
