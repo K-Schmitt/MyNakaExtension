@@ -3,7 +3,8 @@
 // network call, so that no kill loses the count; the event built from Naka's catalogue (a read); the
 // binding, before any network call after that read and before any write; Plan 2's handleFinish; the
 // record, saved with the reserved slot. A finish writes in both modes (spec §8quinquies). A content Naka
-// does not know, or of the wrong kind, records nothing, though its slot stays spent.
+// does not know, or of the wrong kind, keeps its slot spent: a page's message records nothing, a replayed
+// waiting finish records naka-content-unknown (unknown-content.ts).
 
 import type { FinishedMessage } from "../content/playback-tracker";
 import { contentKeyOf } from "../core/finish-event";
@@ -28,6 +29,7 @@ import { buildCard, type CardInput, storeCard } from "./rating-card-builder";
 import { readNakaItem } from "./read-ports";
 import { readSeasons, type SeasonsRead } from "./season-read";
 import { toJobError } from "./to-job-error";
+import { type Replay, unknownContent } from "./unknown-content";
 
 type Done = {
   outcome: FinishRecord["outcome"];
@@ -93,7 +95,7 @@ async function counted(
   deps: JobDeps,
   settings: Settings,
   msg: FinishedMessage,
-  { at, key }: { at: number; key: string },
+  { at, key, replay }: { at: number; key: string; replay?: Replay },
 ): Promise<JobError | undefined> {
   const window = windowAt(settings.finishWindow, at);
   if (isFull(window)) {
@@ -109,7 +111,8 @@ async function counted(
   }
   const reserved: Settings = { ...settings, finishWindow: withOneMore(window) };
   await deps.store.saveSettings(reserved);
-  const attempted = await attempt(deps, settings, msg);
+  const attempted: Attempted | undefined =
+    (await attempt(deps, settings, msg)) ?? unknownContent(replay);
   if (attempted === undefined) return undefined;
   const { card, seasons, ...done } = attempted;
   await record(deps, reserved, { at, key, ...done });
@@ -133,16 +136,18 @@ async function keepCard(
   }
 }
 
+/** `replay`: a waiting finish played again (retry-job.ts), which records a content Naka does not know. */
 export async function finishJob(
   deps: JobDeps,
   msg: FinishedMessage,
+  replay?: Replay,
 ): Promise<JobError | undefined> {
   const settings = await deps.store.loadSettings();
   const at = deps.now();
   const key = contentKeyOf(msg);
   const check = await preCheck(deps.store, msg, key, thresholdsOf(settings));
   if (check === "free") return undefined;
-  if (check === "go") return counted(deps, settings, msg, { at, key });
+  if (check === "go") return counted(deps, settings, msg, { at, key, replay });
   await record(deps, settings, { at, key, outcome: "failed", ...check });
   return check.error;
 }
