@@ -1,9 +1,11 @@
 // The Naka tab's own work, from what the entry file binds: it says the tab is ready, follows the player
 // URL, samples the <video>, and relays what the MAIN world saw. Everything it sends is rebuilt by the
-// tracker or the parsers: ids and marks only, never page text.
+// tracker or the parsers: ids and marks only, never page text. The title page events go to the fiche
+// controller, which sends only the parsed (capped) title of the title its own address names.
 
 import { type ContentIds, contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
+import type { FicheInput } from "./fiche-ports";
 import {
   acceptPageEvent,
   type PlayerContext,
@@ -41,6 +43,8 @@ export type TabEnv = {
   pathChanged(pathname: string): void;
   /** Naka just answered a removal of this title from « Ma liste » (an id the page reported). */
   removed(contentId: number): void;
+  /** The title page controller: the pathname at every URL poll, and the page's fiche and season events. */
+  fiche: FicheInput;
 };
 
 type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
@@ -60,6 +64,10 @@ function sendFinished(env: TabEnv, msg: FinishedMessage): void {
 }
 
 function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
+  if (event.kind === "fiche" || event.kind === "season") {
+    env.fiche.event(event);
+    return;
+  }
   if (event.kind === "playlist") {
     env.send({ type: "playlist-changed" });
     if (event.removed !== undefined) env.removed(event.removed);
@@ -105,7 +113,9 @@ export function startNakaTab(env: TabEnv): void {
   // The tracker ignores a context it already follows, so the URL is handed over at every poll.
   const follow = (): void => {
     const href = env.href();
-    env.pathChanged(pathOf(href));
+    const pathname = pathOf(href);
+    env.pathChanged(pathname);
+    env.fiche.path(pathname);
     const ctx = parsePlayerUrl(href);
     tracker.context(ctx);
     const ids = idsOfContext(ctx);

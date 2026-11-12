@@ -1,0 +1,155 @@
+// The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once,
+// a series after its confirmation, an episode of the shown season, a link to a candidate the worker
+// offered. One write at a time; an answer that comes once the visit is over changes nothing.
+
+import type { RateAnswer } from "../ext/fiche-answers";
+import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
+import { askInfo } from "./fiche-info-reader";
+import {
+  contentOf,
+  type FicheScope,
+  storeEpisodes,
+  withMine,
+} from "./fiche-page";
+import { forgetSeasons } from "./fiche-season-reader";
+import type { FicheOutcome } from "./fiche-view";
+
+type Ending = { sent: boolean; outcome?: FicheOutcome };
+type RatePlace = { season: number; episode: number };
+
+// An {error} answer does not say whether the rating went out (the film's list removal comes after it):
+// the owner's rating, read again, does.
+async function endingOf(
+  scope: FicheScope,
+  msg: FicheRateMessage,
+  answer: RateAnswer | undefined,
+): Promise<Ending> {
+  if (answer === undefined) return { sent: false, outcome: { kind: "failed" } };
+  if ("ok" in answer) return { sent: true };
+  const read = await scope.ports.mine({
+    type: "fiche-mine",
+    contentId: msg.contentId,
+    productId: msg.productId,
+  });
+  const sent = read?.mine === msg.rating;
+  const kind = sent ? "sent-with-error" : "not-sent";
+  return { sent, outcome: { kind, error: answer.error } };
+}
+
+async function sendRate(
+  scope: FicheScope,
+  msg: FicheRateMessage,
+  apply: (rating: number) => void,
+): Promise<void> {
+  const { page } = scope;
+  page.pending = "rating";
+  page.outcome = undefined;
+  scope.show();
+  const ending = await endingOf(scope, msg, await scope.ports.rate(msg));
+  if (!scope.live()) return;
+  page.pending = undefined;
+  page.outcome = ending.outcome;
+  if (ending.sent) apply(msg.rating);
+  scope.show();
+}
+
+function rateMessage(
+  contentId: number,
+  target: FicheTarget,
+  productId: number,
+  rating: number,
+  place?: RatePlace,
+): FicheRateMessage {
+  return { type: "fiche-rate", contentId, target, productId, rating, ...place };
+}
+
+function sendTitleRate(scope: FicheScope, rating: number): void {
+  const { page } = scope;
+  const product = page.info?.product;
+  const contentId = contentOf(page);
+  if (product === undefined || contentId === undefined) return;
+  const target = page.title.mediaType === "tv" ? "série" : "film";
+  const msg = rateMessage(contentId, target, product.id, rating);
+  void sendRate(scope, msg, (mine) => {
+    if (page.info?.product?.id !== product.id) return;
+    page.info = { ...page.info, product: { ...product, mine } };
+  });
+}
+
+export function rateTitle(scope: FicheScope, rating: number): void {
+  const { page } = scope;
+  if (page.pending !== undefined || page.info?.product === undefined) return;
+  if (page.title.mediaType === "movie") {
+    sendTitleRate(scope, rating);
+    return;
+  }
+  page.pending = "confirm-series";
+  page.seriesRating = rating;
+  scope.show();
+}
+
+export function confirmSeries(scope: FicheScope): void {
+  const { page } = scope;
+  const rating = page.seriesRating;
+  if (page.pending !== "confirm-series" || rating === undefined) return;
+  page.pending = undefined;
+  page.seriesRating = undefined;
+  sendTitleRate(scope, rating);
+}
+
+export function cancelSeries(scope: FicheScope): void {
+  const { page } = scope;
+  if (page.pending !== "confirm-series") return;
+  page.pending = undefined;
+  page.seriesRating = undefined;
+  scope.show();
+}
+
+export function rateEpisode(
+  scope: FicheScope,
+  episode: number,
+  rating: number,
+): void {
+  const { page } = scope;
+  const known = page.episodes.get(episode);
+  const { season } = page;
+  const contentId = contentOf(page);
+  if (page.pending !== undefined || known === undefined) return;
+  if (season === undefined || contentId === undefined) return;
+  const place = { season, episode };
+  const msg = rateMessage(contentId, "épisode", known.productId, rating, place);
+  void sendRate(scope, msg, (mine) => {
+    const episodes = page.read.get(season) ?? new Map();
+    storeEpisodes(page, season, withMine(episodes, episode, mine));
+  });
+}
+
+function offered(scope: FicheScope, productId: number): boolean {
+  const { info } = scope.page;
+  if (info?.state !== "choose") return false;
+  return (info.candidates ?? []).some((known) => known.id === productId);
+}
+
+export async function link(scope: FicheScope, productId: number) {
+  const { page } = scope;
+  const contentId = contentOf(page);
+  if (page.pending !== undefined || contentId === undefined) return;
+  if (!offered(scope, productId)) return;
+  page.pending = "link";
+  page.outcome = undefined;
+  scope.show();
+  const answer = await scope.ports.link({
+    type: "fiche-link",
+    contentId,
+    productId,
+  });
+  if (!scope.live()) return;
+  page.pending = undefined;
+  if (answer === undefined) {
+    page.outcome = { kind: "failed" };
+    scope.show();
+    return;
+  }
+  forgetSeasons(scope);
+  await askInfo(scope);
+}
