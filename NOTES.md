@@ -494,6 +494,23 @@ générique à 95,7 % d'un épisode ; `hit: false` pour un film). Décisions («
   film) : une autre série ou un autre film n'en hérite jamais. Reçu sans contexte, il est ignoré.
 - Sans générique connu, le seuil en pourcentage s'applique comme avant.
 
+## 2026-11-12 — Fin en attente dont Naka ne connaît plus le contenu
+
+À la relance d'une fin en attente (I2), Naka peut ne plus connaître le contenu : `/browse/{id}` répond 404, ou le
+contenu est d'un autre type (un film montré avec des saisons, une série sans épisode). La fin disparaissait alors
+sans trace : rien d'enregistré, l'entrée retirée, plus rien à montrer sur la page. Cas rare (un film retiré du
+catalogue entre la fin et la relance). Décision du propriétaire (D1, option b, 2026-11-08, confirmée le 2026-11-12) :
+
+- **La relance l'inscrit comme dernière fin**, en échec, avec le code `naka-content-unknown` (« Contenu inconnu de
+  Naka ou d'un autre type »), sous le titre que montrait la liste d'attente : celui de la question, sinon celui du
+  candidat choisi, sinon celui de la fiche de note. L'entrée quitte `retryFinishes` (le code n'est pas dans
+  `KEEPS_WAITING`) et la fin suivante en attente est relancée. La fin suivante efface cette trace.
+- **Les relances seulement** : un message `finished` de la page peut être inventé par un script, il n'enregistre
+  toujours rien pour un contenu inconnu. Une relance vient de l'état du worker lui-même.
+- **La place du budget reste prise** : la lecture du catalogue Naka a bien eu lieu, et la place est réservée avant
+  tout appel réseau pour qu'un arrêt ne perde pas le compte.
+- Les données ne vont que vers l'avant : une version plus ancienne lit ce code comme un état illisible.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
