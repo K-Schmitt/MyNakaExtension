@@ -11,6 +11,7 @@ import { allowedFor, parseToWorker } from "../src/ext/messages";
 const INFO = {
   type: "fiche-info",
   contentId: 5,
+  tmdbId: 1434,
   mediaType: "tv",
   title: "Les Griffin",
   originalTitle: "Family Guy",
@@ -44,6 +45,7 @@ describe("title page messages", () => {
     expect(parseToWorker(bare)).toEqual({
       type: "fiche-info",
       contentId: 5,
+      tmdbId: 1434,
       mediaType: "tv",
       title: "Les Griffin",
     });
@@ -68,6 +70,9 @@ describe("title page messages", () => {
     ["an extra key on season", { ...SEASON, x: 1 }],
     ["a 201 character title", { ...INFO, title: "x".repeat(201) }],
     ["a bad media type", { ...INFO, mediaType: "film" }],
+    ["an info without a TMDB id", { ...INFO, tmdbId: undefined }],
+    ["a TMDB id of 0", { ...INFO, tmdbId: 0 }],
+    ["a text TMDB id", { ...INFO, tmdbId: "1434" }],
     ["season 0", { ...SEASON, season: 0 }],
   ])("rejects %s", (_name, msg) => {
     expect(parseToWorker(msg)).toBeUndefined();
@@ -92,6 +97,21 @@ describe("title page answers", () => {
       product: { id: 3, average: 7.4, mine: null },
     };
     expect(parseFicheInfo(info)).toEqual(info);
+    const labelled = {
+      state: "matched",
+      product: {
+        id: 3,
+        average: null,
+        mine: 8,
+        label: { title: "Solaris", year: 1972 },
+      },
+    };
+    expect(parseFicheInfo(labelled)).toEqual(labelled);
+    const yearless = { ...labelled.product, label: { title: "Solaris" } };
+    expect(parseFicheInfo({ state: "linked", product: yearless })).toEqual({
+      state: "linked",
+      product: yearless,
+    });
     const choose = { state: "choose", candidates: [cand] };
     expect(parseFicheInfo(choose)).toEqual(choose);
     expect(parseFicheInfo({ state: "notfound" })).toEqual({
@@ -106,6 +126,37 @@ describe("title page answers", () => {
     { state: "linked", product: { id: 1, average: 11, mine: null } },
     { state: "linked", product: { id: 1, average: null, mine: 0 } },
     { state: "linked", product: { id: 1, average: null } },
+    {
+      state: "linked",
+      product: { id: 1, average: null, mine: null, label: { title: "" } },
+    },
+    {
+      state: "linked",
+      product: {
+        id: 1,
+        average: null,
+        mine: null,
+        label: { title: "x".repeat(201) },
+      },
+    },
+    {
+      state: "linked",
+      product: {
+        id: 1,
+        average: null,
+        mine: null,
+        label: { title: "A", year: 1500 },
+      },
+    },
+    {
+      state: "linked",
+      product: {
+        id: 1,
+        average: null,
+        mine: null,
+        label: { title: "A", x: 1 },
+      },
+    },
     { state: "choose", candidates: [{ ...cand, x: 1 }] },
     { state: "choose", candidates: Array.from({ length: 50 }, () => cand) },
     null,

@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
 import { answerWorld } from "./answer-world";
-import { info, linkedTo, mine, season, solaris, TAB } from "./fiche-fixtures";
+import {
+  info,
+  linkedTo,
+  mine,
+  nakaSays,
+  season,
+  solaris,
+  TAB,
+} from "./fiche-fixtures";
 
 const episode = (n: number, average: number | null = 7.4): ScEpisode => ({
   productId: 3100 + n,
@@ -14,6 +23,8 @@ const episode = (n: number, average: number | null = 7.4): ScEpisode => ({
 const seriesWorld = (episodes: ScEpisode[]) =>
   answerWorld({
     state: linkedTo(3000),
+    naka: nakaSays({ mediaType: "tv" }),
+    product: () => ({ universe: UNIVERSE.serie }),
     sc: { seasonInfo: async () => ({ seasonProductId: 3099, episodes }) },
   });
 
@@ -36,7 +47,7 @@ describe("fiche-season", () => {
       ],
     });
     expect(w.sk.calls).toEqual(["productState:3000", "seasonInfo:3000:2"]);
-    expect(w.limited).toEqual(["limit:sc", "limit:sc"]);
+    expect(w.limited).toEqual(["limit:naka", "limit:sc", "limit:sc"]);
     expect(w.writes()).toEqual([]);
   });
 
@@ -51,6 +62,7 @@ describe("fiche-season", () => {
 
   it("a choice issues no title: no season read", async () => {
     const w = answerWorld({
+      naka: nakaSays({ releaseDate: undefined }),
       sc: { search: async () => [solaris(11, 1972), solaris(12, 2002)] },
     });
     await w.jobs.ficheInfo(TAB, info());

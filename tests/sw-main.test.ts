@@ -20,6 +20,7 @@ const opened = { count: 0, fail: false };
 const queries: unknown[] = [];
 const sends: unknown[][] = [];
 const stored = new Map<string, unknown>();
+const sessionReads: string[] = [];
 const fetched: string[] = [];
 
 const fakeChrome = {
@@ -48,6 +49,13 @@ const fakeChrome = {
     },
   },
   storage: {
+    session: {
+      get: async (key: string) => {
+        sessionReads.push(key);
+        return {};
+      },
+      set: async () => undefined,
+    },
     local: {
       get: async (key: string) =>
         stored.has(key) ? { [key]: stored.get(key) } : {},
@@ -77,6 +85,18 @@ afterAll(() => {
 describe("service worker entry", () => {
   it("listens to runtime messages once", () => {
     expect(listeners).toHaveLength(1);
+  });
+
+  it("keeps the title page registry in chrome.storage.session", async () => {
+    const listener = listeners[0] as Listener;
+    const tab = { ...NAKA_TAB, tab: { id: 9, url: PLAYER } };
+    const answers: unknown[] = [];
+    const mine = { type: "fiche-mine", contentId: 5, productId: 77 };
+    expect(listener(mine, tab, (a) => answers.push(a))).toBe(true);
+    await settle();
+    await settle();
+    expect(sessionReads).toContain("ficheRegistry");
+    expect(answers).toEqual([undefined]);
   });
 
   it("listens to closed tabs once, and a closed tab is no error", () => {

@@ -80,7 +80,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     ficheInfo: async () => ({ state: "notfound" }),
     ficheSeason: async () => ({ episodes: [] }),
     ficheMine: async () => ({ mine: null }),
-    dropFicheTab: () => undefined,
+    dropFicheTab: async () => undefined,
     ...over,
   };
 }

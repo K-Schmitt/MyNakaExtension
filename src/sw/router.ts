@@ -240,7 +240,8 @@ export function createRouter(deps: RouterDeps): Router {
       return dispatch(msg, respond, role, sender.tab?.id);
     },
     dropTab(tabId) {
-      jobs.dropFicheTab(tabId);
+      // A session area that cannot be written leaves the entry until it is replaced: no error of the worker.
+      jobs.dropFicheTab(tabId).catch(ignore);
     },
   };
 }

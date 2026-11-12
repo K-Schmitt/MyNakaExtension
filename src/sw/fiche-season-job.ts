@@ -23,7 +23,7 @@ export async function ficheSeasonJob(
   asker: FicheAsker,
   msg: FicheSeasonMessage,
 ): Promise<SeasonAnswer> {
-  const series = asker.registry.titleOf(asker.tabId, msg.contentId);
+  const series = await asker.registry.titleOf(asker.tabId, msg.contentId);
   if (series === undefined) return { episodes: [] };
   const read = await deps.limiters.sc.run(() =>
     deps.sc.seasonInfo(series, msg.season),
@@ -32,6 +32,6 @@ export async function ficheSeasonJob(
     .slice(0, MAX_SEASON_EPISODES)
     .map(toSeasonEpisode);
   const ids = episodes.map((found) => found.productId);
-  asker.registry.issue(asker.tabId, msg.contentId, ids);
+  await asker.registry.issue(asker.tabId, msg.contentId, ids);
   return { episodes };
 }

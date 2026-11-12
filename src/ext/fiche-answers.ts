@@ -2,7 +2,9 @@
 // so each is checked field by field: a parser returns a fresh object with only the known keys, or throws.
 
 import type { QuestionCandidate } from "../core/state";
+import type { ProductLabel } from "../sc/product-label";
 import { parseOfferCandidates } from "./candidate-schema";
+import { asText, asYear } from "./fiche-page-events";
 import {
   asId,
   asInt,
@@ -22,6 +24,8 @@ export type FicheProduct = {
   id: number;
   average: number | null;
   mine: number | null;
+  /** SensCritique's own title and year of the product: the block shows what a star will rate. */
+  label?: ProductLabel;
 };
 export type FicheInfo = {
   state: "linked" | "matched" | "choose" | "notfound";
@@ -54,7 +58,9 @@ const PRODUCT_KEYS = valuesOf<keyof FicheProduct>({
   id: true,
   average: true,
   mine: true,
+  label: true,
 });
+const LABEL_KEYS = valuesOf<keyof ProductLabel>({ title: true, year: true });
 const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
   episode: true,
   productId: true,
@@ -78,14 +84,28 @@ function nullableRating(raw: unknown, path: string): number | null {
   return orNull(raw, (v) => asRating(v, path));
 }
 
+function parseLabel(raw: unknown): ProductLabel {
+  const record = asRecord(raw, "product.label");
+  onlyKeys(record, LABEL_KEYS, "product.label");
+  const label: ProductLabel = {
+    title: asText(record.title, "product.label.title"),
+  };
+  const year = whenPresent(record.year, asYear);
+  if (year !== undefined) label.year = year;
+  return label;
+}
+
 function parseProduct(raw: unknown): FicheProduct {
   const record = asRecord(raw, "product");
   onlyKeys(record, PRODUCT_KEYS, "product");
-  return {
+  const product: FicheProduct = {
     id: asId(record.id, "product.id"),
     average: nullableAverage(record.average, "product.average"),
     mine: nullableRating(record.mine, "product.mine"),
   };
+  const label = whenPresent(record.label, parseLabel);
+  if (label !== undefined) product.label = label;
+  return product;
 }
 
 export function parseFicheInfo(raw: unknown): FicheInfo {

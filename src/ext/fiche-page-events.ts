@@ -51,7 +51,7 @@ const MEDIA_TYPES = valuesOf<FicheEvent<string>["mediaType"]>({
   movie: true,
   tv: true,
 });
-const MAX_TEXT = 200;
+export const MAX_TEXT = 200;
 export const MIN_YEAR = 1800;
 export const MAX_YEAR = 2100;
 
