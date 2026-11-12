@@ -409,6 +409,7 @@ describe("the live card of the home block", () => {
     const w = await arrived();
     expect(w.shown).toHaveLength(0);
     w.block.showLive(REMOVAL.key, liveView(), liveHandlers().handlers);
+    expect(w.shown).toHaveLength(1);
     expect(w.last().view.entries).toEqual([]);
     const before = w.hidden();
     w.block.hideLive();
