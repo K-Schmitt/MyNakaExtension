@@ -45,7 +45,7 @@ describe("the home block's arrival", () => {
     expect(HOME_PATHS).toEqual(["/"]);
   });
 
-  it("shows the panel on a home path", async () => {
+  it("shows the row on a home path", async () => {
     const w = await arrived(A);
     expect(w.shown).toHaveLength(1);
     expect(w.keys()).toEqual(["movie:1"]);
@@ -69,7 +69,7 @@ describe("the home block's arrival", () => {
     expect(w.hidden()).toBeGreaterThan(before);
   });
 
-  it("after leaving, a choice from the old panel sends nothing", async () => {
+  it("after leaving, a choice from the old row sends nothing", async () => {
     const w = await arrived(A);
     await w.ready();
     const handlers = w.handlersOf("movie:1");
@@ -101,7 +101,7 @@ describe("the home block's arrival", () => {
     expect(asksOf(w.calls)).toHaveLength(2);
   });
 
-  it("no card, or no answer, gives no panel", async () => {
+  it("no card, or no answer, gives no row", async () => {
     const none = await arrived();
     expect(none.shown).toEqual([]);
     const w = homeWorld();
@@ -138,7 +138,7 @@ describe("the home block's arrival", () => {
   });
 });
 
-describe("a choice in the panel", () => {
+describe("a choice in the row", () => {
   it("sends one rate for that entry's first pending label and locks it", async () => {
     const w = await arrived(A, B);
     await w.ready();
@@ -157,7 +157,7 @@ describe("a choice in the panel", () => {
     locked.onChoose(9);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
-    await w.ready(); // Ruling 27: the lock redrew the panel, the neighbour has a fresh grace
+    await w.ready(); // Ruling 27: the lock redrew the row, the neighbour has a fresh grace
     w.handlersOf("movie:1").onChoose(6);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);

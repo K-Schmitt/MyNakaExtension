@@ -1,6 +1,6 @@
-// The question entries of the home panel. Each one is its own question session (lock after a choice,
+// The question entries of the home row. Each one is its own question session (lock after a choice,
 // re-ask counted from the click, the unreachable line), so a locked question never stops the others.
-// « Écarter » hides the question from the panel; a removal sends `answer-removal` with its `removeFrom`,
+// « Écarter » hides the question from the row; a removal sends `answer-removal` with its `removeFrom`,
 // an ambiguity `answer-question`. Entries keep the worker's order.
 
 import type { QuestionKey } from "../../core/questions";

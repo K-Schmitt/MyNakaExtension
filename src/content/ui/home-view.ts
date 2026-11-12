@@ -19,18 +19,18 @@ export type HomeView = {
 };
 
 /** The row offers no « Plus tard », no « Fermer » and no other target: choices and « Ignorer ». */
-export const panelView = (view: RatingView): RatingView => ({
+export const rowView = (view: RatingView): RatingView => ({
   ...view,
   actions: view.actions.filter((action) => action === "ignorer"),
   others: [],
 });
 
 function viewOfEntry({ card, start, view }: HomeEntry): RatingView | undefined {
-  if (view !== undefined) return panelView(view);
+  if (view !== undefined) return rowView(view);
   const label = labelOf(card);
   return label === undefined
     ? undefined
-    : panelView(ratingView(card, label, start));
+    : rowView(ratingView(card, label, start));
 }
 
 const newestFirst = (a: HomeEntry, b: HomeEntry): number =>

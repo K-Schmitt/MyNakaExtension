@@ -1,4 +1,4 @@
-// The handlers of an entry that is no longer on the panel: a late click on a drawn button does nothing.
+// The handlers of an entry that is no longer on the row: a late click on a drawn button does nothing.
 
 import type { QuestionHandlers } from "./question-render";
 import type { RatingHandlers } from "./rating-render";
