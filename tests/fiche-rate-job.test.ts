@@ -70,6 +70,21 @@ describe("fiche-rate: a film", () => {
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
   });
 
+  it("« Ma liste » unreadable after the rate: answered as sent, with the list's error", async () => {
+    const w = filmWorld({
+      playlist: () => {
+        throw new Error("down");
+      },
+    });
+    await w.registry.open(TAB, 5, 2005, []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
+      sent: true,
+      error: "unavailable",
+    });
+    expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
+    expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
+  });
+
   it("unlinked: the mapping is written first, then the same path", async () => {
     const w = filmWorld({ state: emptyState() });
     await w.registry.open(TAB, 5, 2005, []);

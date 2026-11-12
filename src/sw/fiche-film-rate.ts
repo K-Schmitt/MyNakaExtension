@@ -1,7 +1,8 @@
 // A film rated from its title page (Q9, Q11, Q12): linked first when it has no pair, then the pause path
 // of the rating (rateJob: the card, or the explicit finish with its pre-check, its slot of the hour's
 // budget and its binding, then the ProductRate), then out of « Ma liste » (live mode only). An error of
-// the rate path is answered and stops there: no list removal. A finish that waited on the film's
+// the rate path is answered and stops there: no list removal; an error of the list removal is answered
+// `{ sent: true, error }` (the rating went out). A finish that waited on the film's
 // question is not run: rateJob's explicit finish is of the same key. A stored card that would rate another
 // product than the one issued refuses the write before any request.
 

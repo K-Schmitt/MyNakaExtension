@@ -363,21 +363,18 @@ describe("the ratings the owner sends", () => {
     expect(t.last()?.info?.product?.mine).toBeNull();
   });
 
-  it("tells a sent rating whose list removal failed from a rating not sent", async () => {
+  it("shows a rating that went out before an error as sent, without reading it again", async () => {
     const t = await filmShown();
     t.controller.rateTitle(8);
-    t.ofType("fiche-rate")[0]?.answer({ error: "naka-session" });
+    t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
     await settle();
-    expect(mineIds(t)).toEqual([
-      { type: "fiche-mine", contentId: 5, productId: 55 },
-    ]);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 8 });
-    await settle();
+    expect(t.ofType("fiche-mine")).toEqual([]);
     expect(t.last()?.outcome).toEqual({
       kind: "sent-with-error",
       error: "naka-session",
     });
     expect(t.last()?.info?.product?.mine).toBe(8);
+    expect(t.last()?.pending).toBeUndefined();
   });
 
   it("shows a rating the worker did not send with its error", async () => {
@@ -385,12 +382,12 @@ describe("the ratings the owner sends", () => {
     t.controller.rateTitle(8);
     t.ofType("fiche-rate")[0]?.answer({ error: "finish-limit" });
     await settle();
-    t.ofType("fiche-mine")[0]?.answer({ mine: null });
-    await settle();
+    expect(t.ofType("fiche-mine")).toEqual([]);
     expect(t.last()?.outcome).toEqual({
       kind: "not-sent",
       error: "finish-limit",
     });
+    expect(t.last()?.info?.product?.mine).toBeNull();
     expect(t.last()?.pending).toBeUndefined();
   });
 });

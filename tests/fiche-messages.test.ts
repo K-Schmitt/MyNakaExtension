@@ -173,6 +173,10 @@ describe("title page answers", () => {
     expect(parseRateAnswer({ error: "sc-session" })).toEqual({
       error: "sc-session",
     });
+    expect(parseRateAnswer({ sent: true, error: "naka-session" })).toEqual({
+      sent: true,
+      error: "naka-session",
+    });
     expect(parseLinkAnswer({ ok: true })).toEqual({ ok: true });
   });
 
@@ -188,6 +192,10 @@ describe("title page answers", () => {
     () => parseRateAnswer({ error: "nope" }),
     () => parseRateAnswer({ ok: true, error: "sc-session" }),
     () => parseRateAnswer({ ok: false }),
+    () => parseRateAnswer({ sent: true }),
+    () => parseRateAnswer({ sent: false, error: "sc-session" }),
+    () => parseRateAnswer({ sent: true, error: "nope" }),
+    () => parseRateAnswer({ sent: true, error: "sc-session", ok: true }),
     () => parseLinkAnswer({ ok: false }),
   ])("rejects a bad answer %#", (parse) => {
     expect(parse).toThrow();

@@ -1,6 +1,7 @@
 // After a film rated from its title page (Q9): the film leaves « Ma liste » on Naka. A list write, so live
 // mode only (« Le mode simulation ne concerne que les listes »): in simulation the list is not even read.
-// The binding is checked first; a film not in the list (or an empty list) is left alone.
+// The binding is checked first; a film not in the list (or an empty list) is left alone. The rating has
+// gone out by then: a failure here is answered `{ sent: true, error }`.
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import { checkBinding } from "./binding";
@@ -26,6 +27,6 @@ export async function leaveNakaList(
     await removeListed(deps, contentId);
     return OK;
   } catch (error) {
-    return { error: toJobError(error) };
+    return { sent: true, error: toJobError(error) };
   }
 }
