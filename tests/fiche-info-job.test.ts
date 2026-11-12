@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MAX_CANDIDATES } from "../src/core/questions";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import { answerWorld, type WorldOpts } from "./answer-world";
-import { info, linkedTo, mine, nakaSays, solaris, TAB } from "./fiche-fixtures";
+import {
+  info,
+  linkedTo,
+  mine,
+  nakaSays,
+  nakaSolaris,
+  solaris,
+  TAB,
+} from "./fiche-fixtures";
 import { seriesItem } from "./sw-fakes";
 
 const LABEL = { title: "Solaris", year: 1972 };
@@ -27,13 +35,18 @@ describe("fiche-info", () => {
     expect(w.writes()).toEqual([]);
   });
 
-  it("a product with no label is answered without one", async () => {
+  it.each([
+    ["no label", undefined],
+    ["an empty title", { title: "" }],
+  ])("a product with %s: notfound, not issued", async (_n, label) => {
     const w = world({
       state: linkedTo(2005),
-      product: () => ({ universe: UNIVERSE.film }),
+      product: () => ({ universe: UNIVERSE.film, label }),
     });
-    const answer = await w.jobs.ficheInfo(TAB, info());
-    expect(answer.product).toEqual({ id: 2005, average: null, mine: null });
+    expect(await w.jobs.ficheInfo(TAB, info())).toEqual({
+      state: "notfound",
+    });
+    await expect(w.jobs.ficheMine(TAB, mine())).rejects.toThrow();
   });
 
   it("a label longer than an answer may carry is cut to 200 characters", async () => {
@@ -200,6 +213,31 @@ describe("fiche-info", () => {
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 11 })),
     ).resolves.toEqual({ mine: 7 });
+  });
+
+  it("a new fiche-info forgets the tab's products before its Naka read", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let hold = false;
+    const w = world({
+      state: linkedTo(2005),
+      naka: {
+        contentById: async () => {
+          if (hold) await held;
+          return nakaSolaris();
+        },
+      },
+    });
+    await w.jobs.ficheInfo(TAB, info());
+    hold = true;
+    const second = w.jobs.ficheInfo(TAB, info());
+    await vi.waitFor(() => expect(w.nk.calls).toHaveLength(2));
+    expect(await w.registry.has(TAB, 5, 2005)).toBe(false);
+    release();
+    await second;
+    expect(await w.registry.has(TAB, 5, 2005)).toBe(true);
   });
 
   it("a failed product read rejects, and issues nothing", async () => {

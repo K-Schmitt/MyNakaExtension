@@ -3,8 +3,9 @@
 // takes them from its address); everything after uses Naka's item, never the message's words. Then the
 // linked product (mapping, then display links), or a search and matchTitle: a sure match is shown without
 // being saved (the list sync stays as it was), an ambiguous one offers its candidates, none is notfound.
-// Read-only. The tab's issued products are reset by every fiche-info, then hold what the answer named; a
-// failed read rejects (the tab shows its error line) and leaves the tab with nothing issued.
+// Read-only. The tab's issued products are reset at the start of every fiche-info (nothing of the earlier
+// page stays writable during the reads), then hold what the answer named; a failed read rejects (the tab
+// shows its error line) and leaves the tab with nothing issued.
 
 import { nakaToTitled } from "../core/adapt-titles";
 import { toCandidates } from "../core/questions";
@@ -80,6 +81,7 @@ export async function ficheInfoJob(
   msg: FicheInfoMessage,
 ): Promise<FicheInfo> {
   let outcome: Resolved = NOT_FOUND;
+  await registry.open(tabId, msg.contentId, undefined, []);
   try {
     outcome = await resolved(deps, msg);
     return outcome.info;

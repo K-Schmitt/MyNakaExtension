@@ -15,7 +15,7 @@ const linkedWorld = () =>
   answerWorld({
     state: linkedTo(2005),
     naka: nakaSays(),
-    product: () => ({ rating: 8, average: 7.1 }),
+    product: () => ({ rating: 8, average: 7.1, label: { title: "Solaris" } }),
   });
 
 describe("fiche-mine", () => {

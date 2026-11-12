@@ -24,7 +24,7 @@ const seriesWorld = (episodes: ScEpisode[]) =>
   answerWorld({
     state: linkedTo(3000),
     naka: nakaSays({ mediaType: "tv" }),
-    product: () => ({ universe: UNIVERSE.serie }),
+    product: () => ({ universe: UNIVERSE.serie, label: { title: "Dark" } }),
     sc: { seasonInfo: async () => ({ seasonProductId: 3099, episodes }) },
   });
 

@@ -1,7 +1,8 @@
 // One SensCritique product as the title page shows it: its public average, the owner's own rating and
 // SensCritique's own title and year (so the block shows what a star will rate), read once through the SC
 // limiter (an authenticated read, never a write). undefined when the product is of another universe than
-// the title (a film's page shows no series): such a product is never shown, nor issued.
+// the title (a film's page shows no series), or has no title to show: such a product is never shown, nor
+// issued (a star must never rate a product the owner cannot name).
 
 import { universeType } from "../core/adapt-titles";
 import type { MediaType } from "../core/title-match";
@@ -23,11 +24,11 @@ export async function readFicheProduct(
     deps.sc.productState(productId),
   );
   if (universeType(state.universe) !== type) return undefined;
-  const product: FicheProduct = {
+  if (state.label === undefined || state.label.title === "") return undefined;
+  return {
     id: productId,
     average: state.average,
     mine: state.rating,
+    label: capped(state.label),
   };
-  if (state.label !== undefined) product.label = capped(state.label);
-  return product;
 }
