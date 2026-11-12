@@ -15,6 +15,7 @@ type Listener = (
 
 const listeners: Listener[] = [];
 const clicks: ((tab: unknown) => void)[] = [];
+const removedListeners: ((tabId: number) => void)[] = [];
 const opened = { count: 0, fail: false };
 const queries: unknown[] = [];
 const sends: unknown[][] = [];
@@ -34,6 +35,9 @@ const fakeChrome = {
     onClicked: { addListener: (fn: (tab: unknown) => void) => clicks.push(fn) },
   },
   tabs: {
+    onRemoved: {
+      addListener: (fn: (tabId: number) => void) => removedListeners.push(fn),
+    },
     query: async (info: unknown) => {
       queries.push(info);
       return [{ url: "https://naka.cx/" }, { id: 5, url: "https://naka.cx/" }];
@@ -73,6 +77,11 @@ afterAll(() => {
 describe("service worker entry", () => {
   it("listens to runtime messages once", () => {
     expect(listeners).toHaveLength(1);
+  });
+
+  it("listens to closed tabs once, and a closed tab is no error", () => {
+    expect(removedListeners).toHaveLength(1);
+    expect(() => removedListeners[0]?.(5)).not.toThrow();
   });
 
   it("asks the top frame of the first Naka tab that has an id and is not discarded", async () => {

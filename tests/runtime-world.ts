@@ -765,6 +765,11 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     removalOffer: (contentId, answering) =>
       jobs.removalOffer(contentId, answering),
     pageLists: (answering) => jobs.pageLists(answering),
+    // The fuzz sends no title page message (step 7 has its own tests): these pass through unobserved.
+    ficheInfo: (tabId, msg) => jobs.ficheInfo(tabId, msg),
+    ficheSeason: (tabId, msg) => jobs.ficheSeason(tabId, msg),
+    ficheMine: (tabId, msg) => jobs.ficheMine(tabId, msg),
+    dropFicheTab: (tabId) => jobs.dropFicheTab(tabId),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)

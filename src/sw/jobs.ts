@@ -5,6 +5,12 @@
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
+import type { FicheInfo, MineAnswer, SeasonAnswer } from "../ext/fiche-answers";
+import type {
+  FicheInfoMessage,
+  FicheMineMessage,
+  FicheSeasonMessage,
+} from "../ext/fiche-messages";
 import type {
   CancelRetryMessage,
   ForgetHandledMessage,
@@ -26,6 +32,10 @@ import type { Mode } from "../ext/settings";
 import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { cancelRetryJob } from "./cancel-retry-job";
+import { ficheInfoJob } from "./fiche-info-job";
+import { ficheMineJob } from "./fiche-mine-job";
+import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
+import { ficheSeasonJob } from "./fiche-season-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -104,6 +114,13 @@ export type Jobs = {
   pageLists(answering: QuestionKey[]): Promise<PageListsAnswer>;
   /** A search on the other site: read-only, never rejects (a failure is an answer with its code). */
   searchTitles(msg: SearchTitlesMessage): Promise<SearchAnswer>;
+  /** The title page's reads, for the tab `tabId`: read-only, they reject when a read fails. */
+  ficheInfo(tabId: number, msg: FicheInfoMessage): Promise<FicheInfo>;
+  ficheSeason(tabId: number, msg: FicheSeasonMessage): Promise<SeasonAnswer>;
+  /** Rejects, with no request, for a product not issued to that tab for that content. */
+  ficheMine(tabId: number, msg: FicheMineMessage): Promise<MineAnswer>;
+  /** A closed tab: the products issued to it are forgotten. */
+  dropFicheTab(tabId: number): void;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -120,7 +137,11 @@ async function setMode(store: Store, mode: Mode): Promise<void> {
   await store.saveSettings({ ...settings, mode });
 }
 
-export function createJobs(deps: JobDeps): Jobs {
+export function createJobs(
+  deps: JobDeps,
+  registry: FicheRegistry = createFicheRegistry(),
+): Jobs {
+  const asker = (tabId: number) => ({ registry, tabId });
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
@@ -166,5 +187,9 @@ export function createJobs(deps: JobDeps): Jobs {
     removalOffer: (contentId, answering) =>
       answerRemovalOffer(deps.store, contentId, answering),
     pageLists: (answering) => answerPageLists(deps.store, answering),
+    ficheInfo: (tabId, msg) => ficheInfoJob(deps, asker(tabId), msg),
+    ficheSeason: (tabId, msg) => ficheSeasonJob(deps, asker(tabId), msg),
+    ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
+    dropFicheTab: (tabId) => registry.drop(tabId),
   };
 }
