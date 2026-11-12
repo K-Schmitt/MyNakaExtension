@@ -326,6 +326,21 @@ describe("the panel between two views", () => {
     expect(t.built()).toBe(3);
   });
 
+  it("builds it again when the season changes, its line staying", () => {
+    const t = panel();
+    t.shown.show({ ...filmView(7), season: 2, seasonFailed: true }, handlers);
+    t.shown.show({ ...filmView(7), season: 3, seasonFailed: true }, handlers);
+    expect(t.built()).toBe(2);
+  });
+
+  it("compares a field of the view it does not name yet", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    const later = { ...filmView(7), later: "drawn" } as FicheView;
+    t.shown.show(later, handlers);
+    expect(t.built()).toBe(2);
+  });
+
   it("builds it again after it was taken down", () => {
     const t = panel();
     t.shown.show(filmView(7), handlers);
