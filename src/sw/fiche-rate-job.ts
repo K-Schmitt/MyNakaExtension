@@ -1,0 +1,27 @@
+// A star clicked on the title page (fiche-rate), queued like every write. Only a product issued to the
+// asking tab for that content is written; any other rejects before any request (answered undefined).
+// Ratings go out in both modes; only the film's list removal is skipped in simulation.
+
+import type { RateAnswer } from "../ext/fiche-answers";
+import type { FicheRateMessage } from "../ext/fiche-messages";
+import { rateFilm } from "./fiche-film-rate";
+import type { FicheAsker } from "./fiche-info-job";
+import { assertIssued } from "./fiche-issued";
+import { rateEpisode, rateSeries } from "./fiche-series-rate";
+import type { JobDeps } from "./job-deps";
+
+export async function ficheRateJob(
+  deps: JobDeps,
+  asker: FicheAsker,
+  msg: FicheRateMessage,
+): Promise<RateAnswer> {
+  await assertIssued(asker, msg.contentId, msg.productId);
+  switch (msg.target) {
+    case "film":
+      return rateFilm(deps, msg);
+    case "série":
+      return rateSeries(deps, msg);
+    case "épisode":
+      return rateEpisode(deps, msg);
+  }
+}

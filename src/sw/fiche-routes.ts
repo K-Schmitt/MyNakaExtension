@@ -1,13 +1,16 @@
 // The title page family of the router. Every fiche message names the tab that sent it (a Naka tab with
 // no tab id is ignored): the worker answers and later writes per tab. The three reads are answered
-// outside the queue (answerRead: a rejection is answered undefined). fiche-rate and fiche-link are not
-// routed yet: no answer, never a write.
+// outside the queue (answerRead: a rejection is answered undefined). The two writes, fiche-rate and
+// fiche-link, run on the worker's one queue (`run`) and are answered when their job ends: the job's answer,
+// or undefined when it rejected (a product not issued, the store down).
 
 import type { FicheMessage } from "../ext/fiche-messages";
 import { answerRead, type Respond } from "./answer-read";
+import type { JobQueue } from "./job-queue";
 import type { Jobs } from "./jobs";
 
 export function routeFiche(
+  run: JobQueue["run"],
   jobs: Jobs,
   msg: FicheMessage,
   tabId: number | undefined,
@@ -25,7 +28,10 @@ export function routeFiche(
       answerRead(() => jobs.ficheMine(tabId, msg), respond);
       return true;
     case "fiche-rate":
+      answerRead(() => run(() => jobs.ficheRate(tabId, msg)), respond);
+      return true;
     case "fiche-link":
-      return false;
+      answerRead(() => run(() => jobs.ficheLink(tabId, msg)), respond);
+      return true;
   }
 }

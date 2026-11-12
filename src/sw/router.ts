@@ -227,7 +227,7 @@ export function createRouter(deps: RouterDeps): Router {
       case "fiche-mine":
       case "fiche-rate":
       case "fiche-link":
-        return routeFiche(jobs, msg, tabId, respond);
+        return routeFiche((job) => queue.run(job), jobs, msg, tabId, respond);
     }
   }
 

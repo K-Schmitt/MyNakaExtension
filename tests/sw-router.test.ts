@@ -227,6 +227,14 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
       return { mine: 6 };
     },
+    ficheRate: async (tabId, msg) => {
+      calls.push(`fiche-rate:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true };
+    },
+    ficheLink: async (tabId, msg) => {
+      calls.push(`fiche-link:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true };
+    },
     dropFicheTab: async (tabId) => {
       calls.push(`drop-fiche-tab:${tabId}`);
     },
@@ -2557,21 +2565,65 @@ describe("router: the title page messages", () => {
     expect(r.calls).toEqual([]);
   });
 
-  it("fiche-rate and fiche-link stay unanswered until their task", async () => {
+  const FICHE_RATE = {
+    type: "fiche-rate",
+    contentId: 5,
+    target: "film",
+    productId: 2005,
+    rating: 7,
+  };
+  const FICHE_LINK = { type: "fiche-link", contentId: 5, productId: 2005 };
+
+  it("fiche-rate and fiche-link run for the sending tab and are answered with their job's answer", async () => {
+    const r = router({
+      ficheRate: async () => ({ error: "finish-limit" }),
+    });
+    expect(r.send(FICHE_RATE, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_LINK, FICHE_TAB)).toBe(true);
+    await settle();
+    expect(r.calls).toEqual([`fiche-link:42:${JSON.stringify(FICHE_LINK)}`]);
+    expect(r.answers).toEqual([{ error: "finish-limit" }, { ok: true }]);
+  });
+
+  it("the fiche writes wait on the one queue: they start after the job before them ends", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    r.send(FICHE_RATE, FICHE_TAB);
+    r.send(FICHE_LINK, FICHE_TAB);
+    await settle();
+    expect(r.answers).toEqual([]);
+    expect(r.calls).toEqual([]);
+    release();
+    await settle();
+    expect(r.calls).toEqual([
+      `fiche-rate:42:${JSON.stringify(FICHE_RATE)}`,
+      `fiche-link:42:${JSON.stringify(FICHE_LINK)}`,
+    ]);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+  });
+
+  it("a fiche write that rejects is answered undefined", async () => {
+    const r = router({
+      ficheLink: async () => {
+        throw new Error("not issued");
+      },
+    });
+    r.send(FICHE_LINK, FICHE_TAB);
+    await settle();
+    expect(r.answers).toEqual([undefined]);
+  });
+
+  it("the fiche writes from the status page are ignored", async () => {
     const r = router();
-    const rate = {
-      type: "fiche-rate",
-      contentId: 5,
-      target: "film",
-      productId: 2005,
-      rating: 7,
-    };
-    const link = { type: "fiche-link", contentId: 5, productId: 2005 };
-    expect(r.send(rate, FICHE_TAB)).toBe(false);
-    expect(r.send(link, FICHE_TAB)).toBe(false);
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    expect(r.send(FICHE_RATE, page)).toBe(false);
+    expect(r.send(FICHE_LINK, page)).toBe(false);
     await settle();
     expect(r.calls).toEqual([]);
-    expect(r.answers).toEqual([]);
   });
 
   it("a removed tab drops its issued products", () => {
