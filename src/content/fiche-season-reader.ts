@@ -21,8 +21,10 @@ export function noteSeason(
   noteSeen(page.seen, contentOf(page), contentId, season);
 }
 
-// No dropdown (a series of one season?): the one season the page fetched, when its episode grid is there.
+// No dropdown: the one season the page fetched, only when Naka says the series has one season and its
+// episode grid is there (a series of several seasons prefetches others).
 function onlySeason(scope: FicheScope, contentId: number): number | undefined {
+  if (scope.page.numberOfSeasons !== 1) return undefined;
   if (!scope.ports.hasEpisodeGrid()) return undefined;
   const seasons = seasonsOf(scope.page.seen, contentId);
   return seasons.length === 1 ? seasons[0] : undefined;
@@ -38,14 +40,18 @@ function seasonToOpen(scope: FicheScope): number | undefined {
   return seasonsOf(page.seen, contentId).includes(shown) ? shown : undefined;
 }
 
-/** A new season event for the shown season whose read failed asks it once more. */
-export function retrySeason(scope: FicheScope, season: number): boolean {
+/** A new season event of this content for the shown season whose read failed asks it once more. */
+export function retrySeason(
+  scope: FicheScope,
+  contentId: number,
+  season: number,
+): boolean {
   const { page } = scope;
-  const failure = page.seasonFailure;
-  if (failure === undefined || failure.retried) return false;
-  if (failure.season !== season || page.season !== season) return false;
-  page.seasonFailure = { season, retried: true };
-  page.outcome = undefined;
+  if (contentId !== contentOf(page) || page.season !== season) return false;
+  if (page.failedSeason !== season || page.retriedSeason === season) {
+    return false;
+  }
+  page.retriedSeason = season;
   openSeason(scope, season);
   return true;
 }
@@ -60,6 +66,7 @@ function openSeason(scope: FicheScope, season: number): void {
   const turn = {};
   page.turn = turn;
   page.season = season;
+  page.failedSeason = undefined;
   page.episodes = page.read.get(season) ?? new Map();
   scope.reads.cancel();
   scope.show();
@@ -100,10 +107,7 @@ async function fetchSeason(
 }
 
 function failSeason(scope: FicheScope, season: number): void {
-  const { page } = scope;
-  const retried = page.seasonFailure?.season === season;
-  page.seasonFailure = { season, retried };
-  page.outcome = { kind: "failed" };
+  scope.page.failedSeason = season;
   scope.show();
 }
 
@@ -163,7 +167,8 @@ export function forgetSeasons(scope: FicheScope): void {
   const { page } = scope;
   page.turn = undefined;
   page.season = undefined;
-  page.seasonFailure = undefined;
+  page.failedSeason = undefined;
+  page.retriedSeason = undefined;
   page.episodes = new Map();
   page.read.clear();
   scope.reads.cancel();

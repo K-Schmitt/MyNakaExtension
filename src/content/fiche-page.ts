@@ -28,8 +28,12 @@ export type FichePage = {
   season?: number;
   /** A token of the season opened last: a step of an older one is stale. */
   turn?: object;
-  /** The shown season's read failed; `retried` once a new season event asked it again. */
-  seasonFailure?: { season: number; retried: boolean };
+  /** Naka's season count, from the fiche event. */
+  numberOfSeasons?: number;
+  /** The season whose last read failed (until a read of a season starts again). */
+  failedSeason?: number;
+  /** The season a new season event already asked again after a failure: one retry per visit. */
+  retriedSeason?: number;
   episodes: Episodes;
   /** The seasons read during the visit. */
   readonly read: Map<number, Episodes>;
@@ -56,6 +60,9 @@ export function viewOf(page: FichePage): FicheView {
   if (page.season !== undefined) view.season = page.season;
   if (page.pending !== undefined) view.pending = page.pending;
   if (page.outcome !== undefined) view.outcome = page.outcome;
+  if (page.season !== undefined && page.failedSeason === page.season) {
+    view.seasonFailed = true;
+  }
   return view;
 }
 

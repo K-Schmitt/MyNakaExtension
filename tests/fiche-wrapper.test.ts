@@ -78,6 +78,7 @@ describe("by-tmdb, wrapped", () => {
         title: "Les Griffin",
         originalTitle: "Family Guy",
         year: 1999,
+        numberOfSeasons: 23,
       },
     ]);
   });

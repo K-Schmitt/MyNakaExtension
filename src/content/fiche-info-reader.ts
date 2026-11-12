@@ -24,6 +24,9 @@ export function onFiche(scope: FicheScope, event: FicheEventOf): void {
       : { originalTitle: event.originalTitle }),
     ...(event.year === undefined ? {} : { year: event.year }),
   };
+  if (event.numberOfSeasons !== undefined) {
+    page.numberOfSeasons = event.numberOfSeasons;
+  }
   keepContent(page.seen, event.contentId);
   void askInfo(scope);
 }

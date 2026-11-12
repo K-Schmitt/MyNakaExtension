@@ -28,12 +28,15 @@ async function filmShown(mine: number | null = null) {
   return t;
 }
 
-async function series(shown = 1) {
+async function series(
+  shown: number | "no dropdown" = 1,
+  over: Parameters<typeof seriesEvent>[0] = {},
+) {
   const fake = fakePorts();
-  fake.page.shown = shown;
+  fake.page.shown = shown === "no dropdown" ? undefined : shown;
   const controller = createFicheController(fake.ports);
   controller.path(SERIES_PATH);
-  controller.event(seriesEvent());
+  controller.event(seriesEvent(over));
   fake.ofType("fiche-info")[0]?.answer(linked(66));
   await settle();
   return { ...fake, controller };
@@ -448,58 +451,122 @@ describe("the events sent as the page opens", () => {
 });
 
 describe("a series page with no season dropdown", () => {
-  it("opens the one season the page fetched when the episode grid is there", async () => {
-    const t = await series(1);
-    t.page.shown = undefined;
+  const ONE = { numberOfSeasons: 1 };
+  const seasonsAsked = (t: ReturnType<typeof fakePorts>) =>
+    t.ofType("fiche-season").map((call) => call.msg);
+
+  it("opens the lone season when Naka says the series has one and the grid is there", async () => {
+    const t = await series("no dropdown", ONE);
     t.controller.event(seasonEvent(1));
-    expect(t.ofType("fiche-season").map((call) => call.msg)).toEqual([
+    expect(seasonsAsked(t)).toEqual([
       { type: "fiche-season", contentId: 6, season: 1 },
     ]);
   });
 
-  it("opens none when the page fetched two seasons", async () => {
-    const t = await series(1);
-    t.page.shown = undefined;
+  it("opens none when Naka gives no season count", async () => {
+    const t = await series("no dropdown");
     t.controller.event(seasonEvent(1));
+    expect(seasonsAsked(t)).toEqual([]);
+  });
+
+  it("opens none from events one by one after the info, numberOfSeasons 2", async () => {
+    const t = await series("no dropdown", { numberOfSeasons: 2 });
     t.controller.event(seasonEvent(2));
-    expect(t.ofType("fiche-season")).toHaveLength(1);
-    const u = await series(1);
-    u.page.shown = undefined;
-    u.controller.event(seasonEvent(2));
-    u.controller.event(seasonEvent(1));
-    u.controller.path(SERIES_PATH);
-    expect(u.ofType("fiche-season").map((call) => call.msg)).toEqual([
+    t.controller.path(SERIES_PATH);
+    t.controller.event(seasonEvent(1));
+    t.controller.path(SERIES_PATH);
+    expect(seasonsAsked(t)).toEqual([]);
+  });
+
+  it("opens none when two seasons were seen before the info", async () => {
+    const fake = fakePorts();
+    const controller = createFicheController(fake.ports);
+    controller.path(SERIES_PATH);
+    controller.event(seriesEvent({ numberOfSeasons: 2 }));
+    controller.event(seasonEvent(1));
+    controller.event(seasonEvent(2));
+    fake.ofType("fiche-info")[0]?.answer(linked(66));
+    await settle();
+    expect(seasonsAsked(fake)).toEqual([]);
+  });
+
+  it("keeps the lone season it opened when the page fetches another", async () => {
+    const t = await series("no dropdown", ONE);
+    t.controller.event(seasonEvent(2));
+    t.controller.event(seasonEvent(1));
+    t.controller.path(SERIES_PATH);
+    expect(seasonsAsked(t)).toEqual([
       { type: "fiche-season", contentId: 6, season: 2 },
     ]);
   });
 
   it("opens none without the episode grid", async () => {
-    const t = await series(1);
-    t.page.shown = undefined;
+    const t = await series("no dropdown", ONE);
     t.page.grid = false;
     t.controller.event(seasonEvent(1));
-    expect(t.ofType("fiche-season")).toEqual([]);
+    expect(seasonsAsked(t)).toEqual([]);
   });
 });
 
 describe("a season read that fails", () => {
-  it("shows the failure, and retries once on a new event for that season", async () => {
+  async function failedSeason1() {
     const t = await series(1);
     t.controller.event(seasonEvent(1));
     t.ofType("fiche-season")[0]?.answer(undefined);
     await settle();
-    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+    return t;
+  }
+
+  it("shows the failure apart from the outcome, and retries once on a new event for that season", async () => {
+    const t = await failedSeason1();
+    expect(t.last()?.seasonFailed).toBe(true);
+    expect(t.last()?.outcome).toBeUndefined();
     t.controller.path(SERIES_PATH);
     expect(t.ofType("fiche-season")).toHaveLength(1);
     t.controller.event(seasonEvent(1));
     expect(t.ofType("fiche-season")).toHaveLength(2);
-    expect(t.last()?.outcome).toBeUndefined();
+    expect(t.last()?.seasonFailed).toBeUndefined();
     t.ofType("fiche-season")[1]?.answer(undefined);
     await settle();
     t.controller.event(seasonEvent(1));
     t.controller.path(SERIES_PATH);
     expect(t.ofType("fiche-season")).toHaveLength(2);
-    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+    expect(t.last()?.seasonFailed).toBe(true);
+  });
+
+  it("retries on no event of another content", async () => {
+    const t = await failedSeason1();
+    t.controller.event(seasonEvent(1, 99));
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+    t.controller.event(seasonEvent(1));
+    expect(t.ofType("fiche-season")).toHaveLength(2);
+  });
+
+  it("shows no failure once another season is read", async () => {
+    const t = await failedSeason1();
+    t.page.shown = 2;
+    t.controller.event(seasonEvent(2));
+    expect(t.last()?.seasonFailed).toBeUndefined();
+    t.ofType("fiche-season")[1]?.answer(seasonOf(1));
+    await settle();
+    expect(t.last()?.seasonFailed).toBeUndefined();
+    expect(t.last()?.outcome).toBeUndefined();
+  });
+
+  it("keeps a write's outcome through a season failure and its retry", async () => {
+    const t = await series(1);
+    t.controller.rateTitle(7);
+    t.controller.confirmSeries();
+    t.ofType("fiche-rate")[0]?.answer({ error: "sc-session" });
+    await settle();
+    const refused = { kind: "not-sent", error: "sc-session" };
+    expect(t.last()?.outcome).toEqual(refused);
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-season")[0]?.answer(undefined);
+    await settle();
+    expect(t.last()?.outcome).toEqual(refused);
+    t.controller.event(seasonEvent(1));
+    expect(t.last()?.outcome).toEqual(refused);
   });
 });
 

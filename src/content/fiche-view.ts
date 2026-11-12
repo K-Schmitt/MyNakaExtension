@@ -28,5 +28,8 @@ export type FicheView = {
   season?: number;
   episodes: Map<number, FicheEpisode>;
   pending?: FichePending;
+  /** The info's or the last write's ending; a season read has its own flag. */
   outcome?: FicheOutcome;
+  /** The shown season's episodes could not be read. */
+  seasonFailed?: true;
 };
