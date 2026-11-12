@@ -218,6 +218,12 @@ export function createRouter(deps: RouterDeps): Router {
       case "link-title":
       case "requeue-question":
         return questions.route(msg, respond);
+      case "fiche-info":
+      case "fiche-season":
+      case "fiche-mine":
+      case "fiche-rate":
+      case "fiche-link":
+        return false; // answered from Task 5 on: no answer, never a write
     }
   }
 

@@ -6,6 +6,13 @@ import type { ContentIds, FinishSource } from "../core/finish-event";
 import type { Thresholds } from "../core/watch-trigger";
 import { checkQuery } from "../naka/naka-input";
 import {
+  FICHE_SENDERS,
+  FICHE_TYPE_FLAGS,
+  type FicheMessage,
+  isFicheType,
+  parseFicheMessage,
+} from "./fiche-messages";
+import {
   type FicheEvent,
   ficheEvent,
   type SeasonEvent,
@@ -66,6 +73,7 @@ export type ToWorker =
     }
   | RatingMessage
   | QuestionMessage
+  | FicheMessage
   | PageMessage;
 
 export type ToNakaTab =
@@ -130,6 +138,7 @@ const WORKER_TYPES = valuesOf<ToWorker["type"]>({
   rate: true,
   "dismiss-rating": true,
   ...QUESTION_TYPE_FLAGS,
+  ...FICHE_TYPE_FLAGS,
   ...PAGE_TYPE_FLAGS,
 });
 const SOURCES = valuesOf<FinishedSource>({
@@ -222,6 +231,7 @@ function parseToWorkerRecord(record: Record<string, unknown>): ToWorker {
   }
   if (isRatingType(type)) return parseRatingMessage(type, record);
   if (isQuestionType(type)) return parseQuestionMessage(type, record);
+  if (isFicheType(type)) return parseFicheMessage(type, record);
   if (isPageType(type)) return parsePageMessage(type, record);
   return { type };
 }
@@ -350,6 +360,7 @@ const SENDERS: Record<ToWorker["type"], readonly SenderRole[]> = {
   rate: ["naka-tab"],
   "dismiss-rating": ["naka-tab"],
   ...QUESTION_SENDERS,
+  ...FICHE_SENDERS,
   ...PAGE_SENDERS,
 };
 

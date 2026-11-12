@@ -55,12 +55,12 @@ const MAX_TEXT = 200;
 export const MIN_YEAR = 1800;
 export const MAX_YEAR = 2100;
 
-function asText(raw: unknown, path: string): string {
+export function asText(raw: unknown, path: string): string {
   const text = asString(raw, path);
   return text.length >= 1 && text.length <= MAX_TEXT ? text : fail(path);
 }
 
-function asYear(raw: unknown): number {
+export function asYear(raw: unknown): number {
   const year = asInt(raw, MIN_YEAR, "year");
   return year <= MAX_YEAR ? year : fail("year");
 }
