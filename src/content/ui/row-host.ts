@@ -1,6 +1,7 @@
 // The element the home row lives in: a section among Naka's rows, with a closed shadow root so that the
-// page's scripts cannot reach the cards through the DOM, and input on the cards stays out of the page. Made detached; the row keeper puts it in place.
-// Every declaration is !important: an author rule marked !important must not hide or restyle the host.
+// page's scripts cannot reach the cards through the DOM, and input on the cards stays out of the page.
+// Made detached; the row keeper puts it in place. Every declaration is !important: an author rule
+// marked !important must not hide or restyle the host.
 
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
 import { ROW_STOPPED_EVENTS, stopAtHost } from "./input-stop";

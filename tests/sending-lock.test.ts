@@ -60,7 +60,7 @@ describe("the pause block with a rating still being sent", () => {
   });
 });
 
-describe("the home panel with a rating still being sent", () => {
+describe("the home row with a rating still being sent", () => {
   const EP = episodeCard({ pending: ["épisode", "saison"], at: 500 });
   const FILM = filmCard();
 
