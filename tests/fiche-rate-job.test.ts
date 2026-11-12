@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyState } from "../src/core/state";
+import { emptyState, type SyncState } from "../src/core/state";
 import type { FicheRateMessage } from "../src/ext/fiche-messages";
 import type { Settings } from "../src/ext/settings";
 import { ScUnavailableError } from "../src/sc/sc-errors";
@@ -245,6 +245,110 @@ describe("fiche-rate: a series", () => {
 
 const episodeRate = () =>
   rate({ target: "épisode", productId: 11, season: 1, episode: 1 });
+
+// Content 5 as a series on Naka, product 13 on SC; its season 1 holds episodes 1301 and 1302.
+const question = (finish?: string): SyncState => ({
+  ...emptyState(),
+  pending: [
+    {
+      kind: "ambiguity",
+      side: "naka",
+      id: 5,
+      candidateIds: [13, 14],
+      ...(finish === undefined ? {} : { finish }),
+    },
+  ],
+});
+
+function seriesWorld(state: SyncState, sc: WorldOpts["sc"] = {}) {
+  return filmWorld({
+    state,
+    naka: {
+      contentById: async () => ({
+        contentId: 5,
+        tmdbId: 9005,
+        mediaType: "tv",
+        title: "Titre 5",
+        releaseDate: "2005-01-01",
+      }),
+    },
+    product: (id) => ({ universe: id === 13 ? 4 : 32, isWished: false }),
+    sc: {
+      seasonInfo: async (_id, season) => ({
+        seasonProductId: 1300,
+        episodes: [1, 2].map((episode) => ({
+          productId: 1300 + episode,
+          season,
+          episode,
+          title: `Épisode ${episode}`,
+          average: null,
+        })),
+      }),
+      ...sc,
+    },
+  });
+}
+
+describe("fiche-rate: a linked title's waiting finish", () => {
+  it("a series whose open question holds an episode finish: rated, settled, then that episode finished once", async () => {
+    const w = seriesWorld(question("tv:5:S1E2"));
+    await w.registry.open(TAB, 5, 13, []);
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(rates(w.sk.calls)).toEqual(["rate:13:8"]);
+    expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
+    expect(w.sk.calls.indexOf("rate:13:8")).toBeLessThan(
+      w.sk.calls.indexOf("markDone:1302:2026-11-05"),
+    );
+    expect(w.state().settled).toContainEqual({ nakaId: 5, scId: 13 });
+    expect(w.state().pending).toEqual([]);
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "tv:5:S1E2",
+      outcome: "done",
+    });
+  });
+
+  it("a series whose question holds no finish: rated and settled, no finish", async () => {
+    const w = seriesWorld(question());
+    await w.registry.open(TAB, 5, 13, []);
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(markDones(w.sk.calls)).toEqual([]);
+    expect(w.settings().finishWindow).toBeUndefined();
+  });
+
+  it("a series rate that fails: its error answered, and the waiting finish still runs (the link was made)", async () => {
+    const w = seriesWorld(question("tv:5:S1E2"), {
+      rate: async () => {
+        throw new ScUnavailableError("x");
+      },
+    });
+    await w.registry.open(TAB, 5, 13, []);
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({
+      error: "unavailable",
+    });
+    expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
+  });
+
+  it("a film whose question holds its own finish: exactly one finish", async () => {
+    const w = filmWorld({
+      state: {
+        ...emptyState(),
+        pending: [
+          {
+            kind: "ambiguity",
+            side: "naka",
+            id: 5,
+            candidateIds: [2005, 2006],
+            finish: "movie:5",
+          },
+        ],
+      },
+    });
+    await w.registry.open(TAB, 5, 2005, []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
+    expect(w.settings().finishWindow?.count).toBe(1);
+  });
+});
 
 describe("fiche-rate: an episode", () => {
   it("rated only; the card of that episode gets its épisode rated; no finish, no slot, no link", async () => {

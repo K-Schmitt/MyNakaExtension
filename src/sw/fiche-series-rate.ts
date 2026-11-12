@@ -3,7 +3,9 @@
 // the stored cards that name this very product are updated: a series' rating goes to the série target of
 // every card of the content, an episode's to the épisode target of that episode's card. A series' pair is
 // settled only after linkForRating's checks passed in this same queued job (no conflicting mapping, no
-// settled pair holding either side), so settlePair never makes a pair the sync would skip.
+// settled pair holding either side), so settlePair never makes a pair the sync would skip. A finish that
+// waited on the series' resolved question (an episode's) then runs, as after the status page's link,
+// whether the rating went out or not: the link is made either way.
 
 import { contentKeyOf } from "../core/finish-event";
 import {
@@ -15,6 +17,7 @@ import { settlePair } from "../core/state";
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import { linkForRating } from "./fiche-link-pair";
+import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
 import { sendRating } from "./rating-jobs";
 import { toJobError } from "./to-job-error";
@@ -63,7 +66,17 @@ export async function rateSeries(
   msg: FicheRateMessage,
 ): Promise<RateAnswer> {
   const pair = { nakaId: msg.contentId, scId: msg.productId };
-  await linkForRating(deps.store, pair);
+  const waiting = await linkForRating(deps.store, pair);
+  const answer = await ratedSeries(deps, msg, pair);
+  if (waiting !== undefined) await finishJob(deps, waiting);
+  return answer;
+}
+
+async function ratedSeries(
+  deps: JobDeps,
+  msg: FicheRateMessage,
+  pair: { nakaId: number; scId: number },
+): Promise<RateAnswer> {
   const failed = await sent(deps, msg);
   if (failed !== undefined) return failed;
   await deps.store.saveState(settlePair(await deps.store.loadState(), pair));
