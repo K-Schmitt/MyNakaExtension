@@ -22,6 +22,8 @@ export type FicheEvent<C extends string> = {
   title: string;
   originalTitle?: string;
   year?: number;
+  /** Naka's season count of a series (absent for a film): an unreadable one is left out, not refused. */
+  numberOfSeasons?: number;
 };
 
 export type SeasonEvent<C extends string> = {
@@ -40,6 +42,7 @@ const FICHE_KEYS = valuesOf<keyof FicheEvent<string>>({
   title: true,
   originalTitle: true,
   year: true,
+  numberOfSeasons: true,
 });
 const SEASON_KEYS = valuesOf<keyof SeasonEvent<string>>({
   channel: true,
@@ -54,6 +57,7 @@ const MEDIA_TYPES = valuesOf<FicheEvent<string>["mediaType"]>({
 export const MAX_TEXT = 200;
 export const MIN_YEAR = 1800;
 export const MAX_YEAR = 2100;
+export const MAX_SEASON_COUNT = 100;
 
 export function asText(raw: unknown, path: string): string {
   const text = asString(raw, path);
@@ -63,6 +67,11 @@ export function asText(raw: unknown, path: string): string {
 export function asYear(raw: unknown): number {
   const year = asInt(raw, MIN_YEAR, "year");
   return year <= MAX_YEAR ? year : fail("year");
+}
+
+function seasonCountOf(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || !Number.isInteger(raw)) return undefined;
+  return raw >= 1 && raw <= MAX_SEASON_COUNT ? raw : undefined;
 }
 
 export function ficheEvent<C extends string>(
@@ -83,7 +92,9 @@ export function ficheEvent<C extends string>(
   );
   const year = whenPresent(record.year, asYear);
   if (originalTitle !== undefined) event.originalTitle = originalTitle;
+  const numberOfSeasons = seasonCountOf(record.numberOfSeasons);
   if (year !== undefined) event.year = year;
+  if (numberOfSeasons !== undefined) event.numberOfSeasons = numberOfSeasons;
   return event;
 }
 

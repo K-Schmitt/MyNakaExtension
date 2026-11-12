@@ -1,5 +1,5 @@
 // Reads which title page is open from Naka's own requests: the content the page loads
-// (GET /api/v1/browse/by-tmdb/{movie|tv}/{n}, read from its answer) and the season it opens
+// (GET /api/v1/browse/by-tmdb/{movie|tv}/{n}, read from its answer, with a series' season count) and the season it opens
 // (GET /api/v1/browse/{id}/season/{n}, read from the url alone). Pure: it reads a method, a url and an
 // already-parsed JSON value, and touches no `fetch`, no `chrome.*` and no DOM. Anything it cannot read is
 // "no event"; the bounds are the parser's.
@@ -76,6 +76,7 @@ function readFiche(answer: unknown): PageEvent | undefined {
     title: content.title,
     originalTitle: originalTitleOf(content.originalTitle),
     year: yearOf(content.releaseDate),
+    numberOfSeasons: content.numberOfSeasons,
   });
 }
 

@@ -22,6 +22,18 @@ describe("fiche page event", () => {
     );
   });
 
+  it("keeps a season count from 1 to 100, and drops any other, not the event", () => {
+    for (const numberOfSeasons of [1, 100]) {
+      expect(parsePageEvent({ ...fiche, numberOfSeasons })).toEqual({
+        ...fiche,
+        numberOfSeasons,
+      });
+    }
+    for (const numberOfSeasons of [0, 101, 1.5, "2", null, -1]) {
+      expect(parsePageEvent({ ...fiche, numberOfSeasons })).toEqual(fiche);
+    }
+  });
+
   it("accepts the bounds: 1 and 200 characters, years 1800 and 2100", () => {
     const long = "é".repeat(200);
     for (const raw of [

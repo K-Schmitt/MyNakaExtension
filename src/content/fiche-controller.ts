@@ -30,7 +30,9 @@ function onSeason(
   event: Extract<TitlePageEvent, { kind: "season" }>,
 ): void {
   noteSeason(scope.page, event.contentId, event.season);
-  if (!retrySeason(scope, event.season)) considerSeason(scope);
+  if (!retrySeason(scope, event.contentId, event.season)) {
+    considerSeason(scope);
+  }
 }
 
 export function createFicheController(ports: FichePorts): FicheController {

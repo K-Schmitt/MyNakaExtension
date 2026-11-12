@@ -55,7 +55,17 @@ describe("ficheEvent", () => {
       title: "Les Griffin",
       originalTitle: "Family Guy",
       year: 1999,
+      numberOfSeasons: 23,
     });
+  });
+
+  it("leaves out a season count Naka does not give, or one out of bounds", () => {
+    const { numberOfSeasons: _, ...film } = PROBE;
+    expect(ficheEvent(film)).not.toHaveProperty("numberOfSeasons");
+    expect(ficheEvent({ ...PROBE, numberOfSeasons: 0 })).not.toHaveProperty(
+      "numberOfSeasons",
+    );
+    expect(ficheEvent({ ...PROBE, numberOfSeasons: 0 })?.kind).toBe("fiche");
   });
 
   it("leaves out an absent original title and an unreadable release date", () => {
@@ -67,6 +77,7 @@ describe("ficheEvent", () => {
       tmdbId: 1434,
       mediaType: "tv",
       title: "Les Griffin",
+      numberOfSeasons: 23,
     };
     for (const releaseDate of [undefined, null, "", "soon", "0999-01-01"]) {
       expect(ficheEvent({ ...bare, releaseDate })).toEqual(expected);
