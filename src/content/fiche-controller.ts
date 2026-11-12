@@ -8,7 +8,7 @@ import { type FicheScope, newPage, viewOf } from "./fiche-page";
 import { parseTitlePath, type TitlePath } from "./fiche-path";
 import type { FicheInput, FichePorts, TitlePageEvent } from "./fiche-ports";
 import { createReadQueue, type ReadQueue } from "./fiche-read-queue";
-import { considerSeason, noteSeason } from "./fiche-season-reader";
+import { considerSeason, noteSeason, retrySeason } from "./fiche-season-reader";
 import {
   cancelSeries,
   confirmSeries,
@@ -30,7 +30,7 @@ function onSeason(
   event: Extract<TitlePageEvent, { kind: "season" }>,
 ): void {
   noteSeason(scope.page, event.contentId, event.season);
-  considerSeason(scope);
+  if (!retrySeason(scope, event.season)) considerSeason(scope);
 }
 
 export function createFicheController(ports: FichePorts): FicheController {

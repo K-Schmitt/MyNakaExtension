@@ -60,6 +60,7 @@ export function fakePorts() {
   const page = {
     shown: undefined as number | undefined,
     visible: [] as number[],
+    grid: true,
   };
   const ask = (msg: FicheMessage) =>
     new Promise<never>((resolve) => {
@@ -72,6 +73,7 @@ export function fakePorts() {
     rate: ask,
     link: ask,
     shownSeason: () => page.shown,
+    hasEpisodeGrid: () => page.grid,
     visibleFirst: (numbers) => [
       ...numbers.filter((n) => page.visible.includes(n)),
       ...numbers.filter((n) => !page.visible.includes(n)),

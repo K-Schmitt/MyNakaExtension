@@ -169,13 +169,6 @@ describe("the season it reads", () => {
     ]);
   });
 
-  it("reads nothing while the dropdown names no season", async () => {
-    const t = await series(1);
-    t.page.shown = undefined;
-    t.controller.event(seasonEvent(2));
-    expect(t.ofType("fiche-season")).toEqual([]);
-  });
-
   it("shows the averages as soon as the season answers", async () => {
     const t = await seasonShown(1, 1, 2);
     expect(t.last()?.season).toBe(1);
@@ -443,5 +436,119 @@ describe("a link chosen among the candidates", () => {
     await settle();
     expect(t.last()?.outcome).toEqual({ kind: "failed" });
     expect(t.ofType("fiche-info")).toHaveLength(1);
+  });
+});
+
+describe("the events sent as the page opens", () => {
+  it("follows a fiche event sent right after the address changed", () => {
+    const t = fakePorts();
+    const controller = createFicheController(t.ports);
+    controller.path("/");
+    controller.path(SERIES_PATH);
+    controller.event(seriesEvent());
+    expect(t.ofType("fiche-info")).toHaveLength(1);
+  });
+});
+
+describe("a series page with no season dropdown", () => {
+  it("opens the one season the page fetched when the episode grid is there", async () => {
+    const t = await series(1);
+    t.page.shown = undefined;
+    t.controller.event(seasonEvent(1));
+    expect(t.ofType("fiche-season").map((call) => call.msg)).toEqual([
+      { type: "fiche-season", contentId: 6, season: 1 },
+    ]);
+  });
+
+  it("opens none when the page fetched two seasons", async () => {
+    const t = await series(1);
+    t.page.shown = undefined;
+    t.controller.event(seasonEvent(1));
+    t.controller.event(seasonEvent(2));
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+    const u = await series(1);
+    u.page.shown = undefined;
+    u.controller.event(seasonEvent(2));
+    u.controller.event(seasonEvent(1));
+    u.controller.path(SERIES_PATH);
+    expect(u.ofType("fiche-season").map((call) => call.msg)).toEqual([
+      { type: "fiche-season", contentId: 6, season: 2 },
+    ]);
+  });
+
+  it("opens none without the episode grid", async () => {
+    const t = await series(1);
+    t.page.shown = undefined;
+    t.page.grid = false;
+    t.controller.event(seasonEvent(1));
+    expect(t.ofType("fiche-season")).toEqual([]);
+  });
+});
+
+describe("a season read that fails", () => {
+  it("shows the failure, and retries once on a new event for that season", async () => {
+    const t = await series(1);
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-season")[0]?.answer(undefined);
+    await settle();
+    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+    t.controller.path(SERIES_PATH);
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+    t.controller.event(seasonEvent(1));
+    expect(t.ofType("fiche-season")).toHaveLength(2);
+    expect(t.last()?.outcome).toBeUndefined();
+    t.ofType("fiche-season")[1]?.answer(undefined);
+    await settle();
+    t.controller.event(seasonEvent(1));
+    t.controller.path(SERIES_PATH);
+    expect(t.ofType("fiche-season")).toHaveLength(2);
+    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+  });
+});
+
+describe("a flood of season events", () => {
+  it("still reads the shown season after a flood for other contents", async () => {
+    const t = await series(1);
+    for (let id = 1000; id < 3000; id++) t.controller.event(seasonEvent(1, id));
+    t.controller.event(seasonEvent(1));
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+  });
+
+  it("still reads the shown season after a flood sent before the fiche event", async () => {
+    const fake = fakePorts();
+    fake.page.shown = 1;
+    const controller = createFicheController(fake.ports);
+    controller.path(SERIES_PATH);
+    for (let id = 1000; id < 3000; id++) controller.event(seasonEvent(1, id));
+    controller.event(seasonEvent(1));
+    controller.event(seriesEvent());
+    fake.ofType("fiche-info")[0]?.answer(linked(66));
+    await settle();
+    expect(fake.ofType("fiche-season").map((call) => call.msg)).toEqual([
+      { type: "fiche-season", contentId: 6, season: 1 },
+    ]);
+  });
+});
+
+describe("leaving the page with a write on its way", () => {
+  it("shows nothing of a rating answered after the page was left", async () => {
+    const t = await filmShown();
+    t.controller.rateTitle(8);
+    t.controller.path("/");
+    const shown = t.views.length;
+    t.ofType("fiche-rate")[0]?.answer({ ok: true });
+    await settle();
+    expect(t.views).toHaveLength(shown);
+    expect(t.last()).toBeUndefined();
+  });
+
+  it("loses a series confirmation on navigation", async () => {
+    const t = await series(1);
+    t.controller.rateTitle(7);
+    t.controller.path("/");
+    t.controller.path(SERIES_PATH);
+    t.controller.confirmSeries();
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    expect(t.last()?.pending).toBeUndefined();
   });
 });

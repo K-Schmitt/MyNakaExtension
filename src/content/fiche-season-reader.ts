@@ -11,17 +11,21 @@ import {
   storeEpisodes,
   withMine,
 } from "./fiche-page";
-
-const MAX_SEEN = 100;
-
-const seenKey = (contentId: number, season: number) => `${contentId}:${season}`;
+import { noteSeen, seasonsOf } from "./fiche-seen-seasons";
 
 export function noteSeason(
   page: FichePage,
   contentId: number,
   season: number,
 ): void {
-  if (page.seen.size < MAX_SEEN) page.seen.add(seenKey(contentId, season));
+  noteSeen(page.seen, contentOf(page), contentId, season);
+}
+
+// No dropdown (a series of one season?): the one season the page fetched, when its episode grid is there.
+function onlySeason(scope: FicheScope, contentId: number): number | undefined {
+  if (!scope.ports.hasEpisodeGrid()) return undefined;
+  const seasons = seasonsOf(scope.page.seen, contentId);
+  return seasons.length === 1 ? seasons[0] : undefined;
 }
 
 function seasonToOpen(scope: FicheScope): number | undefined {
@@ -29,9 +33,21 @@ function seasonToOpen(scope: FicheScope): number | undefined {
   const contentId = contentOf(page);
   if (page.title.mediaType !== "tv" || contentId === undefined) return;
   if (page.info?.product === undefined) return;
-  const shown = ports.shownSeason();
+  const shown = ports.shownSeason() ?? onlySeason(scope, contentId);
   if (shown === undefined || shown === page.season) return;
-  return page.seen.has(seenKey(contentId, shown)) ? shown : undefined;
+  return seasonsOf(page.seen, contentId).includes(shown) ? shown : undefined;
+}
+
+/** A new season event for the shown season whose read failed asks it once more. */
+export function retrySeason(scope: FicheScope, season: number): boolean {
+  const { page } = scope;
+  const failure = page.seasonFailure;
+  if (failure === undefined || failure.retried) return false;
+  if (failure.season !== season || page.season !== season) return false;
+  page.seasonFailure = { season, retried: true };
+  page.outcome = undefined;
+  openSeason(scope, season);
+  return true;
 }
 
 export function considerSeason(scope: FicheScope): void {
@@ -73,10 +89,22 @@ async function fetchSeason(
     contentId,
     season,
   });
-  if (!live() || answer === undefined) return;
+  if (!live()) return;
+  if (answer === undefined) {
+    failSeason(scope, season);
+    return;
+  }
   storeEpisodes(scope.page, season, episodesOf(answer));
   scope.show();
   readMine(scope, season, live);
+}
+
+function failSeason(scope: FicheScope, season: number): void {
+  const { page } = scope;
+  const retried = page.seasonFailure?.season === season;
+  page.seasonFailure = { season, retried };
+  page.outcome = { kind: "failed" };
+  scope.show();
 }
 
 function readMine(
@@ -135,6 +163,7 @@ export function forgetSeasons(scope: FicheScope): void {
   const { page } = scope;
   page.turn = undefined;
   page.season = undefined;
+  page.seasonFailure = undefined;
   page.episodes = new Map();
   page.read.clear();
   scope.reads.cancel();

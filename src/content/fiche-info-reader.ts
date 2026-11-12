@@ -4,6 +4,7 @@
 import type { FicheScope } from "./fiche-page";
 import type { TitlePageEvent } from "./fiche-ports";
 import { considerSeason } from "./fiche-season-reader";
+import { keepContent } from "./fiche-seen-seasons";
 
 type FicheEventOf = Extract<TitlePageEvent, { kind: "fiche" }>;
 
@@ -23,6 +24,7 @@ export function onFiche(scope: FicheScope, event: FicheEventOf): void {
       : { originalTitle: event.originalTitle }),
     ...(event.year === undefined ? {} : { year: event.year }),
   };
+  keepContent(page.seen, event.contentId);
   void askInfo(scope);
 }
 

@@ -65,6 +65,8 @@ function sendFinished(env: TabEnv, msg: FinishedMessage): void {
 
 function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "fiche" || event.kind === "season") {
+    // Naka sends them right after a navigation: the controller follows the address before the next poll.
+    env.fiche.path(pathOf(env.href()));
     env.fiche.event(event);
     return;
   }
