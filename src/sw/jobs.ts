@@ -5,10 +5,17 @@
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
-import type { FicheInfo, MineAnswer, SeasonAnswer } from "../ext/fiche-answers";
+import type {
+  FicheInfo,
+  MineAnswer,
+  RateAnswer,
+  SeasonAnswer,
+} from "../ext/fiche-answers";
 import type {
   FicheInfoMessage,
+  FicheLinkMessage,
   FicheMineMessage,
+  FicheRateMessage,
   FicheSeasonMessage,
 } from "../ext/fiche-messages";
 import type {
@@ -33,7 +40,9 @@ import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { cancelRetryJob } from "./cancel-retry-job";
 import { ficheInfoJob } from "./fiche-info-job";
+import { ficheLinkJob, type LinkAnswer } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
+import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
 import { ficheSeasonJob } from "./fiche-season-job";
 import { finishJob } from "./finish-job";
@@ -120,6 +129,9 @@ export type Jobs = {
   ficheSeason(tabId: number, msg: FicheSeasonMessage): Promise<SeasonAnswer>;
   /** Rejects, with no request, for a product not issued to that tab for that content. */
   ficheMine(tabId: number, msg: FicheMineMessage): Promise<MineAnswer>;
+  /** The title page's writes, queued: they reject, with no request, for a product not issued to that tab. */
+  ficheRate(tabId: number, msg: FicheRateMessage): Promise<RateAnswer>;
+  ficheLink(tabId: number, msg: FicheLinkMessage): Promise<LinkAnswer>;
   /** A closed tab: the products issued to it are forgotten. */
   dropFicheTab(tabId: number): Promise<void>;
 };
@@ -166,7 +178,10 @@ export function createJobs(
     setMode: (mode) => quietly(() => setMode(deps.store, mode)),
     setSettings: (thresholds, pause) =>
       quietly(() => settingsJob(deps.store, thresholds, pause)),
-    rate: (msg) => quietly(() => rateJob(deps, msg)),
+    rate: (msg) =>
+      quietly(async () => {
+        await rateJob(deps, msg);
+      }),
     dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
     answerRemoval: (msg) => quietly(() => answerRemovalJob(deps, msg)),
@@ -191,6 +206,8 @@ export function createJobs(
     ficheInfo: (tabId, msg) => ficheInfoJob(deps, asker(tabId), msg),
     ficheSeason: (tabId, msg) => ficheSeasonJob(deps, asker(tabId), msg),
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
+    ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
+    ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),
     dropFicheTab: (tabId) => registry.drop(tabId),
   };
 }

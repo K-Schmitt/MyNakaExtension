@@ -769,6 +769,8 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     ficheInfo: (tabId, msg) => jobs.ficheInfo(tabId, msg),
     ficheSeason: (tabId, msg) => jobs.ficheSeason(tabId, msg),
     ficheMine: (tabId, msg) => jobs.ficheMine(tabId, msg),
+    ficheRate: (tabId, msg) => jobs.ficheRate(tabId, msg),
+    ficheLink: (tabId, msg) => jobs.ficheLink(tabId, msg),
     dropFicheTab: (tabId) => jobs.dropFicheTab(tabId),
     statusSnapshot: () => {
       checkInvoked(w, "status");
