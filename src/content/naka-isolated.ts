@@ -74,4 +74,6 @@ startNakaTab({
   urlChanged: blocks.urlChanged,
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
+  // The title page controller and its blocks are wired with their UI (plan 7, task 9).
+  fiche: { path: ignore, event: ignore },
 });
