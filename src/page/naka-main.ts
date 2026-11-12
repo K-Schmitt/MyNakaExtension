@@ -1,6 +1,7 @@
 // Naka tab, MAIN world (the page's own environment): wraps the page's fetch to see "Ma liste" changes,
-// explicit "vu" and where the credits start, and posts them to this window for the isolated script. It
-// holds nothing secret: it never reads the page's storage, and the events it posts carry ids only.
+// explicit "vu", where the credits start, and the title page and season open, and posts them to this window
+// for the isolated script. It holds nothing secret: it never reads the page's storage, and the events it
+// posts carry ids, plus the title page's public titles and year.
 
 import type { PageEvent } from "../ext/messages";
 import { wrapFetch } from "./fetch-wrapper";
