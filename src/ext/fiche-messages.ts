@@ -20,6 +20,8 @@ export type FicheMessage =
   | {
       type: "fiche-info";
       contentId: number;
+      /** From the tab's address (/content/{movie|tv}/{tmdbId}): the worker checks it against Naka's item. */
+      tmdbId: number;
       mediaType: "movie" | "tv";
       title: string;
       originalTitle?: string;
@@ -78,6 +80,7 @@ const MEDIA_TYPES = valuesOf<FicheInfoMessage["mediaType"]>({
 const INFO_KEYS = valuesOf<keyof FicheInfoMessage>({
   type: true,
   contentId: true,
+  tmdbId: true,
   mediaType: true,
   title: true,
   originalTitle: true,
@@ -112,6 +115,7 @@ function parseInfo(record: Record<string, unknown>): FicheInfoMessage {
   const message: FicheInfoMessage = {
     type: "fiche-info",
     contentId: asId(record.contentId, "contentId"),
+    tmdbId: asId(record.tmdbId, "tmdbId"),
     mediaType: asOneOf(record.mediaType, MEDIA_TYPES, "mediaType"),
     title: asText(record.title, "title"),
   };

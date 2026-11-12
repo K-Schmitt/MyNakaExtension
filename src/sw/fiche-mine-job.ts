@@ -18,7 +18,7 @@ export async function ficheMineJob(
   msg: FicheMineMessage,
 ): Promise<MineAnswer> {
   const { registry, tabId } = asker;
-  if (!registry.has(tabId, msg.contentId, msg.productId)) {
+  if (!(await registry.has(tabId, msg.contentId, msg.productId))) {
     throw new NotIssuedError();
   }
   const state = await deps.limiters.sc.run(() =>

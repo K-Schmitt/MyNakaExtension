@@ -44,6 +44,7 @@ import {
 } from "./handled-titles-answer";
 import type { JobDeps } from "./job-deps";
 import { linkTitleJob, requeueJob } from "./link-job";
+import { memorySession } from "./memory-session";
 import {
   answerOpenQuestions,
   answerPageLists,
@@ -120,7 +121,7 @@ export type Jobs = {
   /** Rejects, with no request, for a product not issued to that tab for that content. */
   ficheMine(tabId: number, msg: FicheMineMessage): Promise<MineAnswer>;
   /** A closed tab: the products issued to it are forgotten. */
-  dropFicheTab(tabId: number): void;
+  dropFicheTab(tabId: number): Promise<void>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -139,7 +140,7 @@ async function setMode(store: Store, mode: Mode): Promise<void> {
 
 export function createJobs(
   deps: JobDeps,
-  registry: FicheRegistry = createFicheRegistry(),
+  registry: FicheRegistry = createFicheRegistry(memorySession()),
 ): Jobs {
   const asker = (tabId: number) => ({ registry, tabId });
   return {

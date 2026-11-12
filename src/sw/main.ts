@@ -27,6 +27,10 @@ const router = createWorker({
     get: (key) => chrome.storage.local.get(key),
     set: (items) => chrome.storage.local.set(items),
   },
+  session: {
+    get: (key) => chrome.storage.session.get(key),
+    set: (items) => chrome.storage.session.set(items),
+  },
   tabs,
   fetch: workerFetch,
   timer,

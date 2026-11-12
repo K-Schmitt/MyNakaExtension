@@ -227,7 +227,7 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
       return { mine: 6 };
     },
-    dropFicheTab: (tabId) => {
+    dropFicheTab: async (tabId) => {
       calls.push(`drop-fiche-tab:${tabId}`);
     },
     ...over,
@@ -1822,6 +1822,7 @@ function worker(loggedIn = true, start = "2026-11-04T12:00:00Z") {
   const answers: unknown[] = [];
   const r = createWorker({
     extensionId: EXT,
+    session: memoryArea(),
     storage,
     tabs,
     fetch: sc.fetch,
@@ -1870,6 +1871,7 @@ describe("worker end to end: a SensCritique request that never answers", () => {
       const answers: unknown[] = [];
       const r = createWorker({
         extensionId: EXT,
+        session: memoryArea(),
         storage,
         tabs: tabRunning(client, () => "77").tabs,
         fetch: hanging,
@@ -1959,6 +1961,7 @@ function stallingWorker(stuck: string, hangs: (answered: Call[]) => boolean) {
   const clock: Clock = { time: Date.parse("2026-11-04T12:00:00Z") };
   const r = createWorker({
     extensionId: EXT,
+    session: memoryArea(),
     storage,
     tabs: tabRunning(client, () => "77").tabs,
     fetch,
@@ -2248,6 +2251,7 @@ describe("worker end to end: searches read no session", () => {
     });
     const r = createWorker({
       extensionId: EXT,
+      session: memoryArea(),
       storage: memoryArea(),
       tabs: tabRunning(client, () => "77").tabs,
       fetch: sc.fetch,
@@ -2501,6 +2505,7 @@ describe("router: the title page messages", () => {
   const FICHE_INFO = {
     type: "fiche-info",
     contentId: 5,
+    tmdbId: 9005,
     mediaType: "movie",
     title: "Solaris",
   };

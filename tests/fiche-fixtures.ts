@@ -6,6 +6,7 @@ import type {
   FicheMineMessage,
   FicheSeasonMessage,
 } from "../src/ext/fiche-messages";
+import type { NakaItem } from "../src/naka/naka-client";
 import type { ScWishItem } from "../src/sc/wishlist-page";
 
 export const TAB = 7;
@@ -16,9 +17,24 @@ export const info = (
 ): FicheInfoMessage => ({
   type: "fiche-info",
   contentId: 5,
+  tmdbId: 9005,
   mediaType: "movie",
   title: "Solaris",
   ...over,
+});
+
+/** What Naka itself says of content 5: Solaris, a 1972 film, TMDB 9005. */
+export const nakaSolaris = (over: Partial<NakaItem> = {}): NakaItem => ({
+  contentId: 5,
+  tmdbId: 9005,
+  mediaType: "movie",
+  title: "Solaris",
+  releaseDate: "1972-03-20",
+  ...over,
+});
+
+export const nakaSays = (over: Partial<NakaItem> = {}) => ({
+  contentById: async () => nakaSolaris(over),
 });
 
 export const season = (
