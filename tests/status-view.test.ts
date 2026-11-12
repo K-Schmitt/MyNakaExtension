@@ -30,7 +30,7 @@ const LABELS: Record<JobError, string> = {
   "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessayez plus tard`,
   "naka-list-empty": `Ma liste Naka lue vide${NB}: rien n'a été retiré`,
   "naka-tab-changed": `L'onglet Naka a changé de page ou a été rechargé${NB}: la suite au prochain passage`,
-  "naka-content-unknown": "Contenu inconnu de Naka ou d\u2019un autre genre",
+  "naka-content-unknown": "Contenu inconnu de Naka ou d\u2019un autre type",
 };
 const CODES = Object.keys(LABELS) as JobError[];
 
@@ -298,7 +298,7 @@ describe("toStatusView: the last run, by its own mode", () => {
       title: "Titre 5",
     };
     expect(ready({ mode: "live", lastFinish }).lines).toContain(
-      `Dernière fin de visionnage${NB}: «${NB}Titre 5${NB}», 04/11/2026 14:05, échec${NB}: Contenu inconnu de Naka ou d\u2019un autre genre`,
+      `Dernière fin de visionnage${NB}: «${NB}Titre 5${NB}», 04/11/2026 14:05, échec${NB}: Contenu inconnu de Naka ou d\u2019un autre type`,
     );
   });
 
