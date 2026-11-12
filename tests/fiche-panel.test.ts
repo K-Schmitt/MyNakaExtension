@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { FicheView } from "../src/content/fiche-view";
+import type { FicheHandlers } from "../src/content/ui/fiche-handlers";
+import { createFichePanel } from "../src/content/ui/fiche-panel";
 import type { FicheInfo } from "../src/ext/fiche-answers";
 import {
   FILM_PATH,
@@ -13,11 +16,12 @@ import {
   buttonNamed,
   checked,
   fakeUi,
+  idleKeeper,
   panelParts,
   starsOf,
   texts,
 } from "./fiche-ui-world";
-import type { FakeElement } from "./ui-fakes";
+import { FakeDoc, type FakeElement } from "./ui-fakes";
 
 const NB = "\u202F";
 
@@ -252,5 +256,99 @@ describe("the title page panel", () => {
     t.controller.path("/");
     expect(panelParts(t.kept)).toEqual([]);
     expect(t.kept.detached).toBe(1);
+  });
+});
+
+describe("the panel between two views", () => {
+  const noop = () => {};
+  const handlers: FicheHandlers = {
+    rateTitle: noop,
+    confirmSeries: noop,
+    cancelSeries: noop,
+    rateEpisode: noop,
+    link: noop,
+  };
+  // A fresh object every time: equal views are equal by value, never the same object.
+  const filmView = (mine: number | null, episodes = 0): FicheView => ({
+    mediaType: "movie",
+    info: linked(55, mine),
+    episodes: new Map(
+      Array.from({ length: episodes }, (_, i) => [
+        i + 1,
+        { productId: 100 + i, average: 7 },
+      ]),
+    ),
+  });
+
+  function panel() {
+    const doc = new FakeDoc();
+    const shown = createFichePanel({ doc, keeper: idleKeeper });
+    const built = () =>
+      doc.created.filter((el) => el.className === "mn-fiche").length;
+    return { shown, built };
+  }
+
+  it("builds the block once for two equal views, whatever the episodes", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show(filmView(7, 3), handlers);
+    expect(t.built()).toBe(1);
+  });
+
+  it("builds it again when the shown rating changes", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show(filmView(8), handlers);
+    expect(t.built()).toBe(2);
+  });
+
+  it("builds it again when a write starts, ends or fails", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show({ ...filmView(7), pending: "rating" }, handlers);
+    t.shown.show(
+      { ...filmView(7), outcome: { kind: "not-sent", error: "sc-session" } },
+      handlers,
+    );
+    expect(t.built()).toBe(3);
+  });
+
+  it("builds it again for a season line, or other handlers", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show({ ...filmView(7), season: 2, seasonFailed: true }, handlers);
+    t.shown.show(
+      { ...filmView(7), season: 2, seasonFailed: true },
+      {
+        ...handlers,
+      },
+    );
+    expect(t.built()).toBe(3);
+  });
+
+  it("builds it again after it was taken down", () => {
+    const t = panel();
+    t.shown.show(filmView(7), handlers);
+    t.shown.hide();
+    t.shown.show(filmView(7), handlers);
+    expect(t.built()).toBe(2);
+  });
+
+  it("keeps the series' stars (and the focus on them) while the episode ratings come in", async () => {
+    const t = fakeUi(SERIES_PATH);
+    t.page.shown = 1;
+    t.controller.event(seriesEvent());
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-info")[0]?.answer(linked(66));
+    await settle();
+    t.ofType("fiche-season")[0]?.answer({
+      episodes: [{ episode: 1, productId: 101, average: 7 }],
+    });
+    await settle();
+    const before = starsOf(panelParts(t.kept))[4];
+    t.ofType("fiche-mine")[0]?.answer({ mine: 6 });
+    await settle();
+    expect(t.last()?.episodes.get(1)?.mine).toBe(6);
+    expect(starsOf(panelParts(t.kept))[4]).toBe(before);
   });
 });

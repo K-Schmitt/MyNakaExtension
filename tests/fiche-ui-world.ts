@@ -38,7 +38,7 @@ export function fakeBox(code: string | undefined) {
 
 export type FakeBox = ReturnType<typeof fakeBox>;
 
-const idleKeeper = (): KeeperPorts => ({
+export const idleKeeper = (): KeeperPorts => ({
   snapshot: () => undefined,
   apply: () => {},
   detach: () => {},

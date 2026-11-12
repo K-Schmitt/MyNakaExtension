@@ -169,6 +169,19 @@ function bodyParts(
   return [textLine(doc, NOT_FOUND_LINE)];
 }
 
+/** What the block shows, as one string: two views with equal inputs draw the same block. */
+export function panelInputs(view: FicheView): string {
+  const { mediaType, info, pending, outcome, season, seasonFailed } = view;
+  return JSON.stringify([
+    mediaType,
+    info ?? null,
+    pending ?? null,
+    outcome ?? null,
+    season ?? null,
+    seasonFailed ?? null,
+  ]);
+}
+
 export function buildFichePanel(
   doc: Maker,
   view: FicheView,

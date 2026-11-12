@@ -5,21 +5,11 @@
 // cannot loop on its own insertion.
 
 import type { EndTimer } from "./end-poll";
+import { watchPage } from "./fiche-page-watch";
 import type { KeeperPorts } from "./row-keeper";
 import { REPRENDRE_WAIT_MS } from "./row-place";
 
 const INFO_PANEL = "aside.dcf-aside div.dca-panel";
-
-/** Watches the page for a redraw: a box's rewritten code is a text change. */
-export function watchPage(doc: Document, onChange: () => void): () => void {
-  const observer = new MutationObserver(() => onChange());
-  observer.observe(doc.body, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  });
-  return () => observer.disconnect();
-}
 
 export function createPanelPorts(
   doc: Document,
