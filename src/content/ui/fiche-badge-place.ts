@@ -1,5 +1,6 @@
 // Where an episode's badge sits in its thumb: the top-right corner, or just left of a control of Naka's
-// that is already there. Pure: the thumb and its other children come in as page rectangles.
+// that is already there. Pure: the thumb and its other children come in as page rectangles, read only when
+// the badge goes in.
 
 export type Rect = { top: number; left: number; right: number };
 
@@ -20,4 +21,19 @@ export function badgeRight(thumb: Rect, children: readonly Rect[]): number {
     .map((child) => child.left);
   if (lefts.length === 0) return BADGE_INSET_PX;
   return Math.round(thumb.right - Math.min(...lefts)) + BADGE_INSET_PX;
+}
+
+/** A thumb as the badge's placement sees it: whether it holds the badge already, and its layout. */
+export type ThumbLayout = {
+  holdsBadge: boolean;
+  rect(): Rect;
+  children(): Rect[];
+};
+
+/** The offset to put the badge in at; undefined without a thumb, or when the thumb holds it already. */
+export function badgeInsertOffset(
+  thumb: ThumbLayout | undefined,
+): number | undefined {
+  if (thumb === undefined || thumb.holdsBadge) return undefined;
+  return badgeRight(thumb.rect(), thumb.children());
 }

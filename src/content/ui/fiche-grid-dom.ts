@@ -3,9 +3,10 @@
 // writes are our own hosts, put in a box's thumb and after its title.
 
 import type { FichePorts } from "../fiche-ports";
-import { badgeRight } from "./fiche-badge-place";
+import { badgeInsertOffset, type ThumbLayout } from "./fiche-badge-place";
 import type { EpisodeBox } from "./fiche-episodes";
 import { episodeNumber, seasonNumber } from "./fiche-numbers";
+import { visibleFirstOrder } from "./fiche-visible-order";
 
 const BOX = "div.dcf-ep";
 const CODE = "span.dcf-ep-code";
@@ -14,11 +15,18 @@ const TITLE = "p.dcf-ep-title";
 const GRID = "div.dcf-ep-grid";
 const SEASON_DROPDOWN = "button.dcf-season-dd";
 
+const layoutOf = (thumb: Element, host: HTMLElement): ThumbLayout => ({
+  holdsBadge: host.parentNode === thumb,
+  rect: () => thumb.getBoundingClientRect(),
+  children: () => [...thumb.children].map((c) => c.getBoundingClientRect()),
+});
+
 function placeBadge(box: Element, host: HTMLElement): void {
   const thumb = box.querySelector(THUMB);
-  if (thumb === null || host.parentNode === thumb) return;
-  const others = [...thumb.children].map((c) => c.getBoundingClientRect());
-  const right = badgeRight(thumb.getBoundingClientRect(), others);
+  const right = badgeInsertOffset(
+    thumb === null ? undefined : layoutOf(thumb, host),
+  );
+  if (thumb === null || right === undefined) return;
   host.style.setProperty("right", `${right}px`, "important");
   thumb.append(host);
 }
@@ -60,8 +68,7 @@ export function gridPorts(
       const visible = [...doc.querySelectorAll(BOX)]
         .filter((box) => onScreen(box, height))
         .map((box) => episodeNumber(box.querySelector(CODE)?.textContent));
-      const first = numbers.filter((n) => visible.includes(n));
-      return [...first, ...numbers.filter((n) => !first.includes(n))];
+      return visibleFirstOrder(numbers, visible);
     },
   };
 }

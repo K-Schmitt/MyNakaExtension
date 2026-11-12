@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { badgeRight } from "../src/content/ui/fiche-badge-place";
+import {
+  badgeInsertOffset,
+  badgeRight,
+} from "../src/content/ui/fiche-badge-place";
 import {
   episodeNumber,
   frenchAverage,
   seasonNumber,
 } from "../src/content/ui/fiche-numbers";
+import { visibleFirstOrder } from "../src/content/ui/fiche-visible-order";
 import {
   linked,
   SERIES_PATH,
@@ -90,6 +94,73 @@ describe("the badge's place in the thumb", () => {
   it("moves left of Naka's control in that corner", () => {
     const control = { top: 108, left: 321, right: 370 };
     expect(badgeRight(thumb, [control])).toBe(65);
+  });
+
+  it("counts a child in the corner only when it starts past the thumb's middle", () => {
+    expect(badgeRight(thumb, [{ top: 100, left: 189, right: 378 }])).toBe(8);
+    expect(badgeRight(thumb, [{ top: 100, left: 190, right: 378 }])).toBe(196);
+  });
+
+  it("counts a child in the corner only when its top is less than 40 px from the thumb's", () => {
+    expect(badgeRight(thumb, [{ top: 139, left: 330, right: 378 }])).toBe(56);
+    expect(badgeRight(thumb, [{ top: 140, left: 330, right: 378 }])).toBe(8);
+  });
+
+  it("counts a child in the corner only when its right edge is less than 40 px from the thumb's", () => {
+    expect(badgeRight(thumb, [{ top: 100, left: 300, right: 339 }])).toBe(86);
+    expect(badgeRight(thumb, [{ top: 100, left: 300, right: 338 }])).toBe(8);
+  });
+
+  it("moves left of the leftmost of several controls in the corner", () => {
+    const toggle = { top: 104, left: 321, right: 370 };
+    const download = { top: 104, left: 290, right: 340 };
+    expect(badgeRight(thumb, [toggle, download])).toBe(96);
+  });
+});
+
+describe("putting the badge in the thumb", () => {
+  const thumbRect = { top: 0, left: 0, right: 378 };
+  const control = { top: 8, left: 321, right: 370 };
+
+  it("puts nothing in a box without a thumb", () => {
+    expect(badgeInsertOffset(undefined)).toBeUndefined();
+  });
+
+  it("leaves a badge already in the thumb where it is, reading no layout", () => {
+    const read = () => {
+      throw new Error("layout read");
+    };
+    expect(
+      badgeInsertOffset({ holdsBadge: true, rect: read, children: read }),
+    ).toBeUndefined();
+  });
+
+  it("puts a badge the thumb does not hold at the offset of its corner", () => {
+    const thumb = { rect: () => thumbRect, children: () => [control] };
+    expect(badgeInsertOffset({ holdsBadge: false, ...thumb })).toBe(65);
+    expect(
+      badgeInsertOffset({
+        holdsBadge: false,
+        rect: () => thumbRect,
+        children: () => [],
+      }),
+    ).toBe(8);
+  });
+});
+
+describe("the episodes on screen first", () => {
+  it("puts the asked episodes on screen first, each group in the asked order", () => {
+    expect(visibleFirstOrder([3, 4, 5, 6], [5, undefined, 3])).toEqual([
+      3, 5, 4, 6,
+    ]);
+  });
+
+  it("keeps the asked order when no box is on screen", () => {
+    expect(visibleFirstOrder([2, 1], [])).toEqual([2, 1]);
+  });
+
+  it("ignores boxes on screen whose episode was not asked", () => {
+    expect(visibleFirstOrder([1, 2], [7, 8, 2])).toEqual([2, 1]);
   });
 });
 
