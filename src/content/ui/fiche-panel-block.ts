@@ -169,17 +169,13 @@ function bodyParts(
   return [textLine(doc, NOT_FOUND_LINE)];
 }
 
-/** What the block shows, as one string: two views with equal inputs draw the same block. */
+/**
+ * What the block shows, as one string: two views with equal inputs draw the same block. Every field counts
+ * but the episodes (the boxes draw them), so a field added to the view is compared by default.
+ */
 export function panelInputs(view: FicheView): string {
-  const { mediaType, info, pending, outcome, season, seasonFailed } = view;
-  return JSON.stringify([
-    mediaType,
-    info ?? null,
-    pending ?? null,
-    outcome ?? null,
-    season ?? null,
-    seasonFailed ?? null,
-  ]);
+  const { episodes: _drawnByTheBoxes, ...shown } = view;
+  return JSON.stringify(shown);
 }
 
 export function buildFichePanel(
