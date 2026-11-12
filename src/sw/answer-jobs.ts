@@ -1,4 +1,4 @@
-// The owner's answer to a title question, and the dismissal of a question from the home panel. The worker
+// The owner's answer to a title question, and the dismissal of a question from the home row. The worker
 // takes nothing from the message for a site write: the choice must be one of the STORED candidates of an
 // OPEN question (core/questions), else the answer is refused and nothing is saved. A candidate choice then
 // runs the one finish the question waited on (D4), through the finish job: its pre-check, its budget and

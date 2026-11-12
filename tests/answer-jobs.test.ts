@@ -326,7 +326,7 @@ describe("answer-question", () => {
 });
 
 describe("hide-question", () => {
-  it("dismisses an ambiguity from the home panel: one save, no record, no network", async () => {
+  it("dismisses an ambiguity from the home row: one save, no record, no network", async () => {
     const w = answerWorld({ state: asked(), settings: LIVE });
     await w.jobs.hideQuestion({
       type: "hide-question",

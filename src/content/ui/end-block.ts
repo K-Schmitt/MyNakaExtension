@@ -2,7 +2,7 @@
 // and walks the chain (épisode, saison, série). The send itself (lock, re-ask, move-on) is the shared
 // rating session; this file owns the wait for the card and the queue of cards behind the shown one.
 // A title waiting on an ambiguity gets its question first (the question host), then its card.
-// Leaving the player closes the shown card and drops the waits: the cards stay pending, for the home panel.
+// Leaving the player closes the shown card and drops the waits: the cards stay pending, for the home row.
 
 import { type ContentIds, contentKeyOf } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";

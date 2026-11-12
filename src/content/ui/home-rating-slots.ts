@@ -1,4 +1,4 @@
-// The rating entries of the home panel. Each one is its own rating session (lock after a choice, re-ask
+// The rating entries of the home row. Each one is its own rating session (lock after a choice, re-ask
 // counted from the click, confirmation of a série, the unreachable line), so a locked entry never stops
 // the others. A card missing from the worker's list has nothing left to ask (`absentIsDone`).
 
