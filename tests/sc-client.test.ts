@@ -1786,6 +1786,30 @@ describe("search", () => {
     });
   });
 
+  describe("pictures", () => {
+    const withPicture = (id: number, picture: unknown) => ({
+      ...ENTRY(id, 1),
+      medias: { picture },
+    });
+
+    it("keeps an allowed picture, drops a foreign one, keeps both items", async () => {
+      const ok = "https://media.senscritique.com/media/m/1/300/x.jpg";
+      const { client } = setup(
+        LOGGED_IN,
+        found(
+          withPicture(1, ok),
+          withPicture(2, "https://not-sc.example/x.jpg"),
+          withPicture(3, 42),
+        ),
+      );
+      const got = await client.search("x", "movie");
+      expect(got.map((item) => item.productId)).toEqual([1, 2, 3]);
+      expect(got[0]?.image).toEqual({ picture: ok });
+      expect(got[1]).not.toHaveProperty("image");
+      expect(got[2]).not.toHaveProperty("image");
+    });
+  });
+
   describe("the query checks", () => {
     const BAD: [string, unknown][] = [
       ["an empty string", ""],

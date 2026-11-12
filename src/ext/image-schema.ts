@@ -2,7 +2,7 @@
 // applies when an image enters from a site and when it is drawn, never here, so a later change of the
 // list cannot make stored state unreadable.
 
-import type { TitleImage } from "../core/title-image";
+import { type TitleImage, tmdbPathOf } from "../core/title-image";
 import {
   asRecord,
   asString,
@@ -17,11 +17,9 @@ const IMAGE_KEYS = valuesOf<keyof TitleImage>({
   backdropPath: true,
   picture: true,
 });
-const TMDB_PATH = /^\/[A-Za-z0-9_-]{1,80}\.(jpg|jpeg|png|webp)$/;
 
 function asTmdbPath(raw: unknown, path: string): string {
-  const value = asString(raw, path);
-  return TMDB_PATH.test(value) ? value : fail(path);
+  return tmdbPathOf(asString(raw, path)) ?? fail(path);
 }
 
 function asHttpsUrl(raw: unknown, path: string): string {
