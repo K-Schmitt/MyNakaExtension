@@ -1,8 +1,10 @@
 // The season the page shows: read once the title has its product, the one its dropdown names (with no
-// dropdown, the lone season the page fetched). Its averages show at once; then the owner's own
-// ratings (fiche-own-ratings). Opening another season, or leaving, stops the reads.
+// dropdown, the lone season the page fetched), and only a season the title can have. Its averages show
+// at once; then the owner's own ratings (fiche-own-ratings). Opening another season, or leaving, stops
+// the reads.
 
 import type { SeasonAnswer } from "../ext/fiche-answers";
+import { MAX_SEASON_COUNT } from "../ext/fiche-page-events";
 import { readMine } from "./fiche-own-ratings";
 import {
   contentOf,
@@ -30,6 +32,12 @@ function onlySeason(scope: FicheScope, contentId: number): number | undefined {
   return seasons.length === 1 ? seasons[0] : undefined;
 }
 
+// From 1 to Naka's season count, or to MAX_SEASON_COUNT when Naka gave none: a page rewriting its
+// dropdown to « Saison N » would otherwise cost one SensCritique read per N.
+function canHaveSeason(page: FichePage, season: number): boolean {
+  return season >= 1 && season <= (page.numberOfSeasons ?? MAX_SEASON_COUNT);
+}
+
 function seasonToOpen(scope: FicheScope): number | undefined {
   const { page, ports } = scope;
   const contentId = contentOf(page);
@@ -38,6 +46,7 @@ function seasonToOpen(scope: FicheScope): number | undefined {
   // The worker reads a season from the content and its number alone: the dropdown's season opens even
   // when the page fetched it before the tab listened.
   const shown = ports.shownSeason() ?? onlySeason(scope, contentId);
+  if (shown === undefined || !canHaveSeason(page, shown)) return undefined;
   return shown === page.season ? undefined : shown;
 }
 

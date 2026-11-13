@@ -151,6 +151,33 @@ describe("the season it reads", () => {
     ]);
   });
 
+  it("reads no season the dropdown names above the title's season count", async () => {
+    const t = await series(3, { numberOfSeasons: 2 });
+    t.controller.event(seasonEvent(3));
+    expect(t.ofType("fiche-season")).toEqual([]);
+  });
+
+  it("reads the dropdown's season at the title's season count", async () => {
+    const t = await series(2, { numberOfSeasons: 2 });
+    expect(t.ofType("fiche-season").map((call) => call.msg)).toEqual([
+      { type: "fiche-season", contentId: 6, season: 2 },
+    ]);
+  });
+
+  it.each([
+    [101, []],
+    [100, [100]],
+  ])(
+    "with no season count, the dropdown's season %s reads %j",
+    async (shown, read) => {
+      const t = await series(shown);
+      const seasons = t.ofType("fiche-season").map((call) => call.msg);
+      expect(seasons).toEqual(
+        read.map((season) => ({ type: "fiche-season", contentId: 6, season })),
+      );
+    },
+  );
+
   it("reads a season seen before the info once the info is answered", async () => {
     const fake = fakePorts();
     fake.page.shown = 1;
@@ -502,6 +529,12 @@ describe("a series page with no season dropdown", () => {
     ]);
   });
 
+  it("opens none when the lone season the page fetched is not season 1", async () => {
+    const t = await series("no dropdown", ONE);
+    t.controller.event(seasonEvent(2));
+    expect(seasonsAsked(t)).toEqual([]);
+  });
+
   it("opens none before the page fetched the lone season", async () => {
     const t = await series("no dropdown", ONE);
     t.controller.path(SERIES_PATH);
@@ -537,11 +570,11 @@ describe("a series page with no season dropdown", () => {
 
   it("keeps the lone season it opened when the page fetches another", async () => {
     const t = await series("no dropdown", ONE);
-    t.controller.event(seasonEvent(2));
     t.controller.event(seasonEvent(1));
+    t.controller.event(seasonEvent(2));
     t.controller.path(SERIES_PATH);
     expect(seasonsAsked(t)).toEqual([
-      { type: "fiche-season", contentId: 6, season: 2 },
+      { type: "fiche-season", contentId: 6, season: 1 },
     ]);
   });
 
