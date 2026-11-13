@@ -277,4 +277,11 @@ describe("ROW_SHEET", () => {
     );
     expect(ROW_SHEET).toContain("gap:12px;");
   });
+
+  it("ends with the reduced-motion rule, so it overrides the buttons' and arrows' own transitions", () => {
+    const rule =
+      "@media (prefers-reduced-motion: reduce){.mn-btn,.mn-arrow{transition:none;}}";
+    expect(ROW_SHEET.endsWith(rule)).toBe(true);
+    expect(ROW_SHEET.indexOf(rule)).toBe(ROW_SHEET.lastIndexOf(rule));
+  });
 });

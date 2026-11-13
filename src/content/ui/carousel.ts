@@ -39,15 +39,24 @@ function update(track: TrackLike, prev: ElementLike, next: ElementLike): void {
 /** Calls `onResize` whenever the track's size changes (a ResizeObserver in the page); returns the stop. */
 export type SizeWatch = (track: TrackLike, onResize: () => void) => () => void;
 
+/** The page's parts the arrows use; `reducedMotion` is read at each click, the setting can change live. */
+export type ArrowPorts = {
+  watchSize?: SizeWatch;
+  reducedMotion?: () => boolean;
+};
+
 /** Returns the stop of the size watch. */
 export function wireArrows(
   track: TrackLike,
   prev: ElementLike,
   next: ElementLike,
-  watchSize?: SizeWatch,
+  { watchSize, reducedMotion }: ArrowPorts = {},
 ): () => void {
   const step = (sign: number) => () =>
-    track.scrollBy({ left: sign * track.clientWidth, behavior: "smooth" });
+    track.scrollBy({
+      left: sign * track.clientWidth,
+      behavior: reducedMotion?.() ? "auto" : "smooth",
+    });
   onTrustedClick(prev, step(-1));
   onTrustedClick(next, step(1));
   const refresh = () => update(track, prev, next);
