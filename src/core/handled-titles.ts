@@ -36,6 +36,19 @@ function chosenTitle(entry: RetryFinish): string | undefined {
     ?.title;
 }
 
+/** What names a waiting finish, before its Naka id: the question's title, the chosen candidate's, the card's
+ * title. */
+export function waitingTitleOf(
+  entry: RetryFinish,
+  cards: readonly RatingCard[],
+): string | undefined {
+  return (
+    entry.question.title ??
+    chosenTitle(entry) ??
+    cardFor([...cards], entry.key)?.title
+  );
+}
+
 /** The finishes that wait for a Naka tab, in stored order; the question's title names each. */
 export function waitingTitles(
   state: SyncState,
@@ -44,11 +57,7 @@ export function waitingTitles(
   return retriesOf(state).flatMap((entry) => {
     const ids = idsOfKey(entry.key);
     if (ids === undefined || state.handled.includes(entry.key)) return [];
-    const title =
-      entry.question.title ??
-      chosenTitle(entry) ??
-      cardFor([...cards], entry.key)?.title ??
-      unknownTitle(ids.contentId);
+    const title = waitingTitleOf(entry, cards) ?? unknownTitle(ids.contentId);
     return [{ key: entry.key, label: withPlace(ids, title) }];
   });
 }

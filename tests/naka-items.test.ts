@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toItem } from "../src/naka/naka-items";
+import { toItem, toItems } from "../src/naka/naka-items";
 
 const entry = { id: 7, tmdbId: 9, mediaType: "movie", title: "T" };
 
@@ -26,5 +26,23 @@ describe("toItem images", () => {
     const item = toItem(entry);
     expect(item).toBeDefined();
     expect("image" in (item ?? {})).toBe(false);
+  });
+});
+
+describe("toItems images", () => {
+  it("keeps every item and the image of the valid ones only", () => {
+    const items = toItems({
+      data: [
+        { ...entry, id: 1, posterPath: "/a.jpg" },
+        { ...entry, id: 2, posterPath: "/../a.jpg" },
+        { ...entry, id: 3, posterPath: "/c.gif", backdropPath: "/c.png" },
+        { ...entry, id: 4 },
+      ],
+    });
+    expect(items.map((item) => item.contentId)).toEqual([1, 2, 3, 4]);
+    expect(items[0]?.image).toEqual({ posterPath: "/a.jpg" });
+    expect(items[1]).not.toHaveProperty("image");
+    expect(items[2]?.image).toEqual({ backdropPath: "/c.png" });
+    expect(items[3]).not.toHaveProperty("image");
   });
 });

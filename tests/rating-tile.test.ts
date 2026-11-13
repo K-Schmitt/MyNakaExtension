@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { panelView } from "../src/content/ui/home-view";
+import { rowView } from "../src/content/ui/home-view";
 import {
   CANCEL_LABEL,
   SEND_LABEL,
@@ -31,7 +31,7 @@ function tile(view: RatingView, image: string | undefined) {
 
 // Every line of the view: heading, current, start, notice, error and warning.
 const FULL: RatingView = {
-  ...panelView(
+  ...rowView(
     ratingView(
       episodeCard({
         pending: ["série"],

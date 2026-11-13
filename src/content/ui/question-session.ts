@@ -10,7 +10,7 @@
 // still present is "not yet".
 //
 // Where the question of a `rating-card` answer comes from (the end and pause blocks): that question
-// IGNORES `asked`. A dismissal (« Écarter ») hides a question from the home panel only; the title's own
+// IGNORES `asked`. A dismissal (« Écarter ») hides a question from the home row only; the title's own
 // end block still asks it.
 
 import type { LastAnswer } from "../../ext/question-offer-schema";
@@ -177,7 +177,7 @@ export function createQuestionSession(
     closeShown(): void {
       if (current !== undefined) close(current, "closed");
     },
-    /** The panel moved under the cursor: the grace counts again from now. */
+    /** The row moved under the cursor: the grace counts again from now. */
     regrace(): void {
       if (current !== undefined) startGrace(current, ports.now);
     },

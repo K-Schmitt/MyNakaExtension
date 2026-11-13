@@ -94,7 +94,7 @@ export function findRemoval(
   return undefined;
 }
 
-// Dismissed from the home panel; the question stays on the page.
+// Dismissed from the home row; the question stays on the page.
 export function hideQuestion(state: SyncState, key: QuestionKey): SyncState {
   const item = state.pending.find((p) => questionKey(p) === key);
   if (!item) return state;

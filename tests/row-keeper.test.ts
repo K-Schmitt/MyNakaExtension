@@ -103,6 +103,16 @@ describe("createRowKeeper", () => {
     expect(t.timers.size).toBe(0);
   });
 
+  it("restarts the wait for a list rebuilt while waiting", () => {
+    const t = setup({ reprendre: -1, host: -1, age: 300 });
+    t.keeper.start();
+    expect([...t.timers.values()].map((x) => x.ms)).toEqual([700]);
+    t.set({ reprendre: -1, host: -1, age: 0 }); // Naka rebuilt the list node
+    t.change();
+    expect([...t.timers.values()].map((x) => x.ms)).toEqual([1000]);
+    expect(t.applied).toEqual([]);
+  });
+
   it("applies nothing after stop and detaches once", () => {
     const t = setup({ reprendre: -1, host: -1, age: 0 });
     t.keeper.start();

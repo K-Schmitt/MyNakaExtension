@@ -1,4 +1,4 @@
-// The panel asks for the whole list, an entry's wait wants one card: this narrows the list's answer to the
+// The row asks for the whole list, an entry's wait wants one card: this narrows the list's answer to the
 // card of a key. A card the list no longer holds comes as `card: null`; no answer stays no answer.
 
 import type { CardAnswer, CardsAnswer } from "../../sw/rating-answers";
