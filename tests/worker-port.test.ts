@@ -88,6 +88,14 @@ describe("askCards", () => {
     expect(await createWorkerPort(ok({})).askCards()).toBeUndefined();
   });
 
+  it("an entry without a card makes the whole answer undefined", async () => {
+    expect(
+      await createWorkerPort(
+        ok({ cards: [{ card: filmCard() }, { card: null }] }),
+      ).askCards(),
+    ).toBeUndefined();
+  });
+
   it("a rejected send is undefined", async () => {
     const send = vi.fn(() => Promise.reject(new Error("gone")));
     expect(await createWorkerPort(send).askCards()).toBeUndefined();
@@ -300,6 +308,18 @@ describe("an answer without a card", () => {
         undefined,
       );
     }
+  });
+
+  it("refuses every sending label for ids with a season and no episode", async () => {
+    const half = { contentId: 5, season: 1 };
+    for (const sending of [["épisode"], ["film"], ["saison"]]) {
+      const got = await createWorkerPort(ok(cardless({ sending }))).askCard(
+        half,
+      );
+      expect(got, JSON.stringify(sending)).toBeUndefined();
+    }
+    const none = await createWorkerPort(ok(cardless({}))).askCard(half);
+    expect(none).toEqual(cardless({}));
   });
 
   it("keeps the last finish of the title: a failure with its code, or another outcome alone", async () => {

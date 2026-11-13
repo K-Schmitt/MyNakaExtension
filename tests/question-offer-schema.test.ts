@@ -224,4 +224,16 @@ describe("the answers", () => {
       expect(() => parseRemovalOfferAnswer(raw)).toThrow();
     }
   });
+
+  it("takes 20 questions and 50 answering keys, and refuses a 51st key", () => {
+    const keys = (n: number) =>
+      Array.from({ length: n }, (_, i) => `ambiguity:naka:${i + 1}`);
+    const questions = Array.from({ length: 20 }, () => AMBIGUITY);
+    expect(
+      parseOpenQuestionsAnswer({ questions, answering: keys(50) }),
+    ).toEqual({ questions, answering: keys(50) });
+    expect(() =>
+      parseOpenQuestionsAnswer({ questions: [], answering: keys(51) }),
+    ).toThrow();
+  });
 });
