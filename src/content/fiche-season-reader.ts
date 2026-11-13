@@ -1,15 +1,15 @@
 // The season the page shows: read once the title has its product, the one its dropdown names (with no
 // dropdown, the lone season the page fetched). Its averages show at once; then the owner's own
-// ratings, one read at a time, visible boxes first. Opening another season, or leaving, stops the reads.
+// ratings (fiche-own-ratings). Opening another season, or leaving, stops the reads.
 
 import type { SeasonAnswer } from "../ext/fiche-answers";
+import { readMine } from "./fiche-own-ratings";
 import {
   contentOf,
   type Episodes,
   type FichePage,
   type FicheScope,
   storeEpisodes,
-  withMine,
 } from "./fiche-page";
 import { noteSeen, seasonsOf } from "./fiche-seen-seasons";
 
@@ -109,57 +109,6 @@ async function fetchSeason(
 
 function failSeason(scope: FicheScope, season: number): void {
   scope.page.failedSeason = season;
-  scope.show();
-}
-
-function readMine(
-  scope: FicheScope,
-  season: number,
-  live: () => boolean,
-): void {
-  const tried = new Set<number>();
-  scope.reads.run(() => {
-    if (!live()) return undefined;
-    const episode = nextUnread(scope, tried);
-    if (episode === undefined) return undefined;
-    tried.add(episode);
-    return (queueLive) =>
-      readOne(scope, season, episode, () => live() && queueLive());
-  });
-}
-
-function nextUnread(
-  scope: FicheScope,
-  tried: ReadonlySet<number>,
-): number | undefined {
-  const unread = [...scope.page.episodes]
-    .filter(([n, known]) => known.mine === undefined && !tried.has(n))
-    .map(([n]) => n);
-  return scope.ports.visibleFirst(unread).find((n) => unread.includes(n));
-}
-
-async function readOne(
-  scope: FicheScope,
-  season: number,
-  episode: number,
-  live: () => boolean,
-): Promise<void> {
-  const { page } = scope;
-  const known = page.episodes.get(episode);
-  const contentId = contentOf(page);
-  if (known === undefined || contentId === undefined) return;
-  const answer = await scope.ports.mine({
-    type: "fiche-mine",
-    contentId,
-    productId: known.productId,
-  });
-  if (!live() || answer === undefined) return;
-  const episodes = page.read.get(season);
-  // A rating the owner sent meanwhile is newer than this read.
-  if (episodes === undefined || episodes.get(episode)?.mine !== undefined) {
-    return;
-  }
-  storeEpisodes(page, season, withMine(episodes, episode, answer.mine));
   scope.show();
 }
 
