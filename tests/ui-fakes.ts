@@ -80,28 +80,41 @@ export class FakeElement extends FakeNode implements ElementLike {
     this.parent?.drop(this);
   }
 
-  /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
-  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
-    let stopped = false;
+  /** Bubbles an event from here, through the shadow boundary; whether a listener stopped it or prevented its default. */
+  private fire(
+    type: string,
+    isTrusted: unknown,
+    key?: string,
+  ): { stopped: boolean; prevented: boolean } {
+    const seen = { stopped: false, prevented: false };
     const event = {
       isTrusted,
       key,
       stopPropagation: () => {
-        stopped = true;
+        seen.stopped = true;
+      },
+      preventDefault: () => {
+        seen.prevented = true;
       },
     } as EventLike;
     let node: FakeNode | null = this;
-    while (node !== null && !stopped) {
+    while (node !== null && !seen.stopped) {
       if (node instanceof FakeElement) {
         for (const listener of node.listeners[type] ?? []) listener(event);
       }
       node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
     }
-    return !stopped;
+    return seen;
   }
 
-  press(key: string): void {
-    this.dispatch("keydown", true, key);
+  /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
+  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
+    return !this.fire(type, isTrusted, key).stopped;
+  }
+
+  /** A trusted keydown; true when a listener prevented its default action (a scroll, for an arrow). */
+  press(key: string): boolean {
+    return this.fire("keydown", true, key).prevented;
   }
 
   click(isTrusted: boolean): void {
