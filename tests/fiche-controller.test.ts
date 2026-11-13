@@ -157,6 +157,53 @@ describe("the season it reads", () => {
     expect(t.ofType("fiche-season")).toEqual([]);
   });
 
+  it("closes the shown season when the dropdown turns to one above the count, and reads it back", async () => {
+    const t = await series(2, { numberOfSeasons: 2 });
+    t.ofType("fiche-season")[0]?.answer(seasonOf(1, 2));
+    await settle();
+    t.page.shown = 3;
+    t.controller.path(SERIES_PATH);
+    expect(t.last()?.season).toBeUndefined();
+    expect(t.last()?.episodes.size).toBe(0);
+    t.ofType("fiche-mine")[0]?.answer({ mine: 9 });
+    await settle();
+    expect(t.last()?.episodes.size).toBe(0);
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+    expect(t.ofType("fiche-mine")).toHaveLength(1);
+    t.page.shown = 2;
+    t.controller.path(SERIES_PATH);
+    await settle();
+    expect(t.last()?.season).toBe(2);
+    expect(t.last()?.episodes.get(1)).toEqual({ productId: 101, average: 7 });
+    expect(t.ofType("fiche-season")).toHaveLength(1);
+    expect(minedIds(t.calls)).toEqual([101, 101]);
+  });
+
+  it.each([0, 101])(
+    "with no season count, closes the shown season when the dropdown turns to %s",
+    async (shown) => {
+      const t = await series(1);
+      t.ofType("fiche-season")[0]?.answer(seasonOf(1));
+      await settle();
+      t.page.shown = shown;
+      t.controller.path(SERIES_PATH);
+      expect(t.last()?.season).toBeUndefined();
+      expect(t.last()?.episodes.size).toBe(0);
+      expect(t.ofType("fiche-season")).toHaveLength(1);
+    },
+  );
+
+  it("drops the answer of a season closed before it came", async () => {
+    const t = await series(2, { numberOfSeasons: 2 });
+    t.page.shown = 3;
+    t.controller.path(SERIES_PATH);
+    t.ofType("fiche-season")[0]?.answer(seasonOf(1, 2));
+    await settle();
+    expect(t.last()?.season).toBeUndefined();
+    expect(t.last()?.episodes.size).toBe(0);
+    expect(t.ofType("fiche-mine")).toEqual([]);
+  });
+
   it("reads the dropdown's season at the title's season count", async () => {
     const t = await series(2, { numberOfSeasons: 2 });
     expect(t.ofType("fiche-season").map((call) => call.msg)).toEqual([
@@ -568,14 +615,12 @@ describe("a series page with no season dropdown", () => {
     expect(seasonsAsked(fake)).toEqual([]);
   });
 
-  it("keeps the lone season it opened when the page fetches another", async () => {
+  it("opens none when the page fetched a season above the count before season 1", async () => {
     const t = await series("no dropdown", ONE);
-    t.controller.event(seasonEvent(1));
     t.controller.event(seasonEvent(2));
+    t.controller.event(seasonEvent(1));
     t.controller.path(SERIES_PATH);
-    expect(seasonsAsked(t)).toEqual([
-      { type: "fiche-season", contentId: 6, season: 1 },
-    ]);
+    expect(seasonsAsked(t)).toEqual([]);
   });
 
   it("opens none without the episode grid", async () => {

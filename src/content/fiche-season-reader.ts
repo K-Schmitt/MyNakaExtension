@@ -1,7 +1,7 @@
 // The season the page shows: read once the title has its product, the one its dropdown names (with no
-// dropdown, the lone season the page fetched), and only a season the title can have. Its averages show
-// at once; then the owner's own ratings (fiche-own-ratings). Opening another season, or leaving, stops
-// the reads.
+// dropdown, the lone season the page fetched), and only a season the title can have: one it cannot have
+// closes the shown season. Its averages show at once; then the owner's own ratings (fiche-own-ratings).
+// Opening another season, closing it, or leaving, stops the reads.
 
 import type { SeasonAnswer } from "../ext/fiche-answers";
 import { MAX_SEASON_COUNT } from "../ext/fiche-page-events";
@@ -38,16 +38,14 @@ function canHaveSeason(page: FichePage, season: number): boolean {
   return season >= 1 && season <= (page.numberOfSeasons ?? MAX_SEASON_COUNT);
 }
 
-function seasonToOpen(scope: FicheScope): number | undefined {
+function seasonShown(scope: FicheScope): number | undefined {
   const { page, ports } = scope;
   const contentId = contentOf(page);
   if (page.title.mediaType !== "tv" || contentId === undefined) return;
   if (page.info?.product === undefined) return;
   // The worker reads a season from the content and its number alone: the dropdown's season opens even
   // when the page fetched it before the tab listened.
-  const shown = ports.shownSeason() ?? onlySeason(scope, contentId);
-  if (shown === undefined || !canHaveSeason(page, shown)) return undefined;
-  return shown === page.season ? undefined : shown;
+  return ports.shownSeason() ?? onlySeason(scope, contentId);
 }
 
 /** A new season event of this content for the shown season whose read failed asks it once more. */
@@ -67,8 +65,10 @@ export function retrySeason(
 }
 
 export function considerSeason(scope: FicheScope): void {
-  const season = seasonToOpen(scope);
-  if (season !== undefined) openSeason(scope, season);
+  const season = seasonShown(scope);
+  if (season === undefined) return;
+  if (!canHaveSeason(scope.page, season)) closeSeason(scope);
+  else if (season !== scope.page.season) openSeason(scope, season);
 }
 
 function openSeason(scope: FicheScope, season: number): void {
@@ -118,14 +118,27 @@ function failSeason(scope: FicheScope, season: number): void {
   scope.show();
 }
 
-/** The visit's seasons forgotten (a new info resets what the worker issued to the tab). */
-export function forgetSeasons(scope: FicheScope): void {
+/** No season shown: its reads stop and its late answers change nothing. */
+function dropShownSeason(scope: FicheScope): void {
   const { page } = scope;
   page.turn = undefined;
   page.season = undefined;
   page.failedSeason = undefined;
-  page.retriedSeason = undefined;
   page.episodes = new Map();
-  page.read.clear();
   scope.reads.cancel();
+}
+
+// A dropdown naming a season the title cannot have shows no season: no box keeps another season's
+// episodes. The seasons read stay for the visit.
+function closeSeason(scope: FicheScope): void {
+  if (scope.page.season === undefined) return;
+  dropShownSeason(scope);
+  scope.show();
+}
+
+/** The visit's seasons forgotten (a new info resets what the worker issued to the tab). */
+export function forgetSeasons(scope: FicheScope): void {
+  dropShownSeason(scope);
+  scope.page.retriedSeason = undefined;
+  scope.page.read.clear();
 }
