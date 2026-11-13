@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { tmdbPathOf } from "../src/core/title-image";
 import { parseTitleImage } from "../src/ext/image-schema";
 
-// The TMDB path pattern is read by the Naka entry (core) and by the stored schema (ext): both must accept
-// exactly the same strings.
+// The TMDB path pattern is read by the Naka entry (core) and by the stored schema (ext): the schema keeps
+// exactly the strings the entry accepts and drops the others.
 const ACCEPTED = [
   "/a.jpg",
   "/a.jpeg",
@@ -31,23 +31,17 @@ const REJECTED = [
   `/${"a".repeat(81)}.jpg`,
 ];
 
-function schemaAccepts(value: string): boolean {
-  try {
-    parseTitleImage({ posterPath: value }, "x");
-    return true;
-  } catch {
-    return false;
-  }
-}
+const schemaKeeps = (value: string): string | undefined =>
+  parseTitleImage({ posterPath: value }, "x")?.posterPath;
 
 describe("the TMDB path pattern, in both callers", () => {
   it.each(ACCEPTED)("both accept %s", (value) => {
     expect(tmdbPathOf(value)).toBe(value);
-    expect(schemaAccepts(value)).toBe(true);
+    expect(schemaKeeps(value)).toBe(value);
   });
 
-  it.each(REJECTED)("both reject %j", (value) => {
+  it.each(REJECTED)("the entry rejects and the schema drops %j", (value) => {
     expect(tmdbPathOf(value)).toBeUndefined();
-    expect(schemaAccepts(value)).toBe(false);
+    expect(schemaKeeps(value)).toBeUndefined();
   });
 });
