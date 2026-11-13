@@ -4,6 +4,7 @@ import {
   badgeRight,
 } from "../src/content/ui/fiche-badge-place";
 import {
+  codeSeason,
   episodeNumber,
   frenchAverage,
   seasonNumber,
@@ -64,6 +65,28 @@ describe("the episode number of a box", () => {
     expect(episodeNumber("Bonus")).toBeUndefined();
     expect(episodeNumber("E0")).toBeUndefined();
     expect(episodeNumber("E99999999999999999999")).toBeUndefined();
+  });
+});
+
+describe("the season a box's code carries", () => {
+  it("reads S<n> in both forms, in any case", () => {
+    expect(codeSeason("S1 E3")).toBe(1);
+    expect(codeSeason("S01E03")).toBe(1);
+    expect(codeSeason("s2 e5")).toBe(2);
+    expect(codeSeason("S12E1")).toBe(12);
+  });
+
+  it("reads no season from a code without one", () => {
+    expect(codeSeason(undefined)).toBeUndefined();
+    expect(codeSeason(null)).toBeUndefined();
+    expect(codeSeason("")).toBeUndefined();
+    expect(codeSeason("E3")).toBeUndefined();
+    expect(codeSeason("3")).toBeUndefined();
+    expect(codeSeason("Bonus")).toBeUndefined();
+  });
+
+  it("reads S0 as season 0, which no shown season matches", () => {
+    expect(codeSeason("S0 E1")).toBe(0);
   });
 });
 
@@ -217,6 +240,36 @@ describe("the episode boxes", () => {
       expect(hostsIn(b.body)).toEqual([]);
     }
     expect(texts(shadowParts(badgeOf(four)))).toEqual(["6,8"]);
+  });
+
+  it("leaves bare a box whose code names another season than the shown one", async () => {
+    const two = fakeBox("S2 E3");
+    const zero = fakeBox("S0 E3");
+    const packed = fakeBox("S02E03");
+    await seasonOne([two, zero, packed]);
+    for (const b of [two, zero, packed]) {
+      expect(hostsIn(b.thumb)).toEqual([]);
+      expect(hostsIn(b.body)).toEqual([]);
+    }
+  });
+
+  it("decorates a box whose code names the shown season, in either form", async () => {
+    const spaced = fakeBox("s1 e3");
+    const packed = fakeBox("S01E03");
+    await seasonOne([spaced, packed]);
+    for (const b of [spaced, packed]) {
+      expect(texts(shadowParts(badgeOf(b)))).toEqual(["7,4"]);
+      expect(starsOf(shadowParts(starsHostOf(b)))).toHaveLength(10);
+    }
+  });
+
+  it("takes a box's decorations off when Naka rewrites its code for another season", async () => {
+    const box = fakeBox("S1 E3");
+    const t = await seasonOne([box]);
+    box.codeSpan.textContent = "S2 E3";
+    t.pageChanged();
+    expect(hostsIn(box.thumb)).toEqual([]);
+    expect(hostsIn(box.body)).toEqual([]);
   });
 
   it("leaves bare a box whose episode SensCritique does not list", async () => {

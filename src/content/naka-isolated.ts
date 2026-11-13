@@ -6,6 +6,7 @@ import type { ToWorker } from "../ext/messages";
 import { createNakaClient } from "../naka/naka-client";
 import type { Fetch } from "../sc/sc-client";
 import { createFicheController } from "./fiche-controller";
+import { guardFicheInput } from "./fiche-input-guard";
 import { createFicheWorkerPort } from "./fiche-worker-port";
 import { readAccount } from "./naka-bridge";
 import { startNakaTab } from "./naka-tab";
@@ -65,6 +66,7 @@ const ficheUi = createFicheUi(fichePagePorts(document, pageTimer));
 const fiche = createFicheController({
   ...createFicheWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
   ...gridPorts(document, () => window.innerHeight),
+  // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
 });
 
@@ -88,5 +90,5 @@ startNakaTab({
   urlChanged: blocks.urlChanged,
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
-  fiche,
+  fiche: guardFicheInput(fiche),
 });
