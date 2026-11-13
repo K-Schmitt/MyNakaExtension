@@ -5,6 +5,7 @@ export type ClickEvent = { isTrusted: boolean };
 export type EventLike = ClickEvent & {
   key?: string;
   stopPropagation(): void;
+  preventDefault(): void;
 };
 
 export interface NodeLike {

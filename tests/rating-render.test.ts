@@ -232,6 +232,23 @@ describe("the rating block", () => {
     expect(handlers.onChoose).not.toHaveBeenCalled();
   });
 
+  it("an arrow key the stars handle never scrolls the row's track: its default is prevented, at the ends too", () => {
+    const { block, star } = setup();
+    block.show(ratingView(episodeCard(), "saison", 10));
+    const group = star(10).parent as FakeElement;
+    expect(group.press("ArrowLeft")).toBe(true);
+    expect(group.press("ArrowRight")).toBe(true);
+    expect(group.press("ArrowRight")).toBe(true);
+  });
+
+  it("other keys keep their default: Tab leaves the stars, Enter clicks the focused one", () => {
+    const { block, star } = setup();
+    block.show(ratingView(episodeCard(), "saison", 8));
+    const group = star(8).parent as FakeElement;
+    expect(group.press("Tab")).toBe(false);
+    expect(group.press("Enter")).toBe(false);
+  });
+
   it("arrow keys stop at both ends", () => {
     const { block, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 10));

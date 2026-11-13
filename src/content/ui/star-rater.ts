@@ -45,6 +45,15 @@ function moveFocus(buttons: ElementLike[], from: number, to: number): number {
   return next;
 }
 
+// The focus step of an arrow key; 0 for any other key.
+function arrowStep(key: string | undefined): number {
+  if (key === "ArrowRight") return 1;
+  if (key === "ArrowLeft") return -1;
+  return 0;
+}
+
+// The stars take the arrows: their default action would also scroll the scroller around them (the home
+// row's track, which then snaps to the next card).
 function onArrows(
   group: ElementLike,
   buttons: ElementLike[],
@@ -57,10 +66,10 @@ function onArrows(
     });
   });
   group.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowRight")
-      current = moveFocus(buttons, current, current + 1);
-    if (event.key === "ArrowLeft")
-      current = moveFocus(buttons, current, current - 1);
+    const step = arrowStep(event.key);
+    if (step === 0) return;
+    event.preventDefault();
+    current = moveFocus(buttons, current, current + step);
   });
 }
 
