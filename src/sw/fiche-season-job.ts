@@ -1,5 +1,5 @@
 // The episodes of one season of the title page (fiche-season): only for the series product issued to
-// the asking tab for that content (none yet: no episodes, no request). One public season page read
+// the asking tab for that content (none yet, or a film's: no episodes, no request). One public season page read
 // through the SC limiter; each episode product is issued to the tab, at most MAX_SEASON_EPISODES.
 
 import type { SeasonAnswer, SeasonEpisode } from "../ext/fiche-answers";
@@ -23,10 +23,10 @@ export async function ficheSeasonJob(
   asker: FicheAsker,
   msg: FicheSeasonMessage,
 ): Promise<SeasonAnswer> {
-  const series = await asker.registry.titleOf(asker.tabId, msg.contentId);
-  if (series === undefined) return { episodes: [] };
+  const title = await asker.registry.titleOf(asker.tabId, msg.contentId);
+  if (title?.type !== "serie") return { episodes: [] };
   const read = await deps.limiters.sc.run(() =>
-    deps.sc.seasonInfo(series, msg.season),
+    deps.sc.seasonInfo(title.productId, msg.season),
   );
   const episodes = read.episodes
     .slice(0, MAX_SEASON_EPISODES)

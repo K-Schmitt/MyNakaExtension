@@ -3,7 +3,7 @@ import { emptyState, type SyncState } from "../src/core/state";
 import { MAX_FICHE_LINKS } from "../src/ext/fiche-links-schema";
 import type { FicheLinkMessage } from "../src/ext/fiche-messages";
 import { answerWorld } from "./answer-world";
-import { OTHER_TAB, TAB } from "./fiche-fixtures";
+import { filmTitle, OTHER_TAB, seriesTitle, TAB } from "./fiche-fixtures";
 
 const link = (over: Partial<FicheLinkMessage> = {}): FicheLinkMessage => ({
   type: "fiche-link",
@@ -146,6 +146,31 @@ describe("fiche-link: only a product issued to that tab for that content", () =>
     expect(w.area.data.has("ficheLinks")).toBe(false);
     expect(w.state()).toEqual(STATE);
   });
+
+  it.each([
+    [
+      "the title's product",
+      (w: ReturnType<typeof answerWorld>) =>
+        w.registry.open(TAB, 5, filmTitle(11), []),
+    ],
+    [
+      "an episode",
+      async (w: ReturnType<typeof answerWorld>) => {
+        await w.registry.open(TAB, 5, seriesTitle(13), []);
+        await w.registry.issue(TAB, 5, [11]);
+      },
+    ],
+  ])(
+    "issued as %s, not as a candidate: rejected, zero requests",
+    async (_n, setUp) => {
+      const w = answerWorld({ state: STATE });
+      await setUp(w);
+      await expect(w.jobs.ficheLink(TAB, link())).rejects.toThrow();
+      expect(w.area.data.has("ficheLinks")).toBe(false);
+      expect(w.network()).toEqual([]);
+      expect(w.state()).toEqual(STATE);
+    },
+  );
 
   it("issued to another tab: rejected", async () => {
     const w = await chosenWorld();

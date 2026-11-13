@@ -19,15 +19,16 @@ import { type InfoTurn, turnLimiters } from "./fiche-info-turns";
 import { linkedProduct } from "./fiche-link-lookup";
 import { readFicheProduct } from "./fiche-product";
 import type { FicheRegistry } from "./fiche-registry";
+import type { FicheTitle } from "./fiche-registry-schema";
 import { searchFiche } from "./fiche-search";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { readNakaItem } from "./read-ports";
 
 export type FicheAsker = { registry: FicheRegistry; tabId: number };
 
-type Resolved = { info: FicheInfo; title?: number; issued: number[] };
+type Resolved = { info: FicheInfo; title?: FicheTitle; candidates: number[] };
 
-const NOT_FOUND: Resolved = { info: { state: "notfound" }, issued: [] };
+const NOT_FOUND: Resolved = { info: { state: "notfound" }, candidates: [] };
 
 async function naka(
   deps: JobDeps,
@@ -50,7 +51,8 @@ async function shown(
 ): Promise<Resolved> {
   const product = await readFicheProduct(deps, productId, type);
   if (product === undefined) return NOT_FOUND;
-  return { info: { state, product }, title: productId, issued: [] };
+  const title = { productId, type };
+  return { info: { state, product }, title, candidates: [] };
 }
 
 async function searched(deps: JobDeps, item: NakaItem): Promise<Resolved> {
@@ -62,8 +64,8 @@ async function searched(deps: JobDeps, item: NakaItem): Promise<Resolved> {
   }
   if (match.kind === "none") return NOT_FOUND;
   const candidates = toCandidates(found, match.ids);
-  const issued = candidates.map((candidate) => candidate.id);
-  return { info: { state: "choose", candidates }, issued };
+  const ids = candidates.map((candidate) => candidate.id);
+  return { info: { state: "choose", candidates }, candidates: ids };
 }
 
 async function resolved(
@@ -96,7 +98,8 @@ async function answered(
     return NOT_FOUND.info;
   } finally {
     if (turn.live()) {
-      await registry.open(tabId, msg.contentId, outcome.title, outcome.issued);
+      const { title, candidates } = outcome;
+      await registry.open(tabId, msg.contentId, title, candidates);
     }
   }
 }

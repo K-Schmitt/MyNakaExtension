@@ -1,5 +1,5 @@
-// « Relier » on the title page without a rating (fiche-link), for a product issued to the asking tab for
-// that content. A title the extension knows (unlinked on the Naka side, or with an open question) takes
+// « Relier » on the title page without a rating (fiche-link), for a candidate issued to the asking tab
+// for that content. A title the extension knows (unlinked on the Naka side, or with an open question) takes
 // the status page's link-title path: both sites read, then the mapping; any ending but `done` (refused,
 // mismatch, failed) rejects, so the tab shows its error line. Any other title gets a
 // display-only link (§7 choice 6), kept apart from the mapping and the sync, at most MAX_FICHE_LINKS of
@@ -53,7 +53,7 @@ export async function ficheLinkJob(
   asker: FicheAsker,
   msg: FicheLinkMessage,
 ): Promise<LinkAnswer> {
-  await assertIssued(asker, msg.contentId, msg.productId);
+  await assertIssued(asker, msg.contentId, msg.productId, "candidate");
   const { contentId: id, productId: otherId } = msg;
   if (knownTitle(await deps.store.loadState(), id)) {
     const ending = await linkTitleJob(deps, {

@@ -6,7 +6,13 @@ import { ScUnavailableError } from "../src/sc/sc-errors";
 import { createJobQueue } from "../src/sw/job-queue";
 import { createRouter } from "../src/sw/router";
 import { answerWorld, BOUND, NOW, type WorldOpts } from "./answer-world";
-import { linkedTo, OTHER_TAB, TAB } from "./fiche-fixtures";
+import {
+  filmTitle,
+  linkedTo,
+  OTHER_TAB,
+  seriesTitle,
+  TAB,
+} from "./fiche-fixtures";
 import { episodeCard, filmCard, target } from "./rating-fixtures";
 
 const rate = (over: Partial<FicheRateMessage> = {}): FicheRateMessage => ({
@@ -37,7 +43,7 @@ const markDones = (calls: string[]) =>
 describe("fiche-rate: a film", () => {
   it("linked: one rate, one finish (one slot), then removed from « Ma liste » in live mode", async () => {
     const w = filmWorld();
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
@@ -55,7 +61,7 @@ describe("fiche-rate: a film", () => {
 
   it("in simulation: the same rate and finish, and « Ma liste » neither read nor written", async () => {
     const w = filmWorld({ settings: SIMULATION });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toHaveLength(1);
@@ -65,7 +71,7 @@ describe("fiche-rate: a film", () => {
 
   it("not in « Ma liste »: rated, and no removal", async () => {
     const w = filmWorld({ playlist: () => [99] });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
   });
@@ -76,7 +82,7 @@ describe("fiche-rate: a film", () => {
         throw new Error("down");
       },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
       error: "unavailable",
@@ -87,7 +93,7 @@ describe("fiche-rate: a film", () => {
 
   it("unlinked: the mapping is written first, then the same path", async () => {
     const w = filmWorld({ state: emptyState() });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
@@ -100,7 +106,7 @@ describe("fiche-rate: a film", () => {
       state: emptyState(),
       settings: { ...LIVE, finishWindow: { from: NOW, count: 30 } },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       error: "finish-limit",
     });
@@ -117,7 +123,7 @@ describe("fiche-rate: a film", () => {
         ],
       },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().unlinked).toEqual([]);
@@ -137,7 +143,7 @@ describe("fiche-rate: a film", () => {
         ],
       },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().pending).toEqual([]);
@@ -155,7 +161,7 @@ describe("fiche-rate: a film", () => {
     async (_n, over) => {
       const state = { ...emptyState(), ...over };
       const w = filmWorld({ state });
-      await w.registry.open(TAB, 5, 2005, []);
+      await w.registry.open(TAB, 5, filmTitle(2005), []);
       await expect(w.jobs.ficheRate(TAB, rate())).rejects.toThrow();
       expect(w.network()).toEqual([]);
       expect(w.state()).toEqual(state);
@@ -171,7 +177,7 @@ describe("fiche-rate: a film", () => {
         },
       },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       error: "unavailable",
     });
@@ -181,7 +187,7 @@ describe("fiche-rate: a film", () => {
 
   it("linked to another product than the one issued: rejected, no request, nothing saved", async () => {
     const w = filmWorld({ state: linkedTo(2006) });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     await expect(w.jobs.ficheRate(TAB, rate())).rejects.toThrow();
     expect(w.network()).toEqual([]);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2006 }]);
@@ -192,7 +198,7 @@ describe("fiche-rate: a film", () => {
     w.area.data.set("ratings", [
       filmCard({ key: "movie:5", contentId: 5, targets: [target("film")] }),
     ]);
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     await expect(w.jobs.ficheRate(TAB, rate())).rejects.toThrow();
     expect(w.network()).toEqual([]);
   });
@@ -212,7 +218,7 @@ describe("fiche-rate: a series", () => {
   it("rated, its pair settled, every card of the content gets its série rated; no finish, no slot", async () => {
     const w = filmWorld({ state: linkedTo(13) });
     w.area.data.set("ratings", cards());
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
     expect(w.writes()).toEqual(["rate:13:8"]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
@@ -232,7 +238,7 @@ describe("fiche-rate: a series", () => {
     async (_n, over) => {
       const state = { ...emptyState(), ...over };
       const w = filmWorld({ state });
-      await w.registry.open(TAB, 5, 13, []);
+      await w.registry.open(TAB, 5, seriesTitle(13), []);
       await expect(w.jobs.ficheRate(TAB, seriesRate())).rejects.toThrow();
       expect(w.network()).toEqual([]);
       expect(w.state()).toEqual(state);
@@ -241,7 +247,7 @@ describe("fiche-rate: a series", () => {
 
   it("unlinked: linked first, then rated and settled", async () => {
     const w = filmWorld({ state: emptyState() });
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
@@ -249,7 +255,7 @@ describe("fiche-rate: a series", () => {
 
   it("the binding is checked before the write: another account, no rate, its error answered", async () => {
     const w = filmWorld({ state: linkedTo(13), username: "intruder" });
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({
       error: "other-account",
     });
@@ -307,7 +313,7 @@ function seriesWorld(state: SyncState, sc: WorldOpts["sc"] = {}) {
 describe("fiche-rate: a linked title's waiting finish", () => {
   it("a series whose open question holds an episode finish: rated, settled, then that episode finished once", async () => {
     const w = seriesWorld(question("tv:5:S1E2"));
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
     expect(rates(w.sk.calls)).toEqual(["rate:13:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
@@ -324,7 +330,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
 
   it("a series whose question holds no finish: rated and settled, no finish", async () => {
     const w = seriesWorld(question());
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
     expect(markDones(w.sk.calls)).toEqual([]);
     expect(w.settings().finishWindow).toBeUndefined();
@@ -336,7 +342,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
         throw new ScUnavailableError("x");
       },
     });
-    await w.registry.open(TAB, 5, 13, []);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({
       error: "unavailable",
     });
@@ -358,7 +364,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
         ],
       },
     });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
     expect(w.settings().finishWindow?.count).toBe(1);
@@ -369,7 +375,8 @@ describe("fiche-rate: an episode", () => {
   it("rated only; the card of that episode gets its épisode rated; no finish, no slot, no link", async () => {
     const w = filmWorld({ state: emptyState() });
     w.area.data.set("ratings", [episodeCard()]);
-    await w.registry.open(TAB, 5, 13, [11]);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
     expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
     expect(w.writes()).toEqual(["rate:11:8"]);
     expect(w.cards()[0]?.targets[0]).toEqual(target("épisode", 8, 11));
@@ -379,7 +386,8 @@ describe("fiche-rate: an episode", () => {
 
   it("no card: rated, no card made", async () => {
     const w = filmWorld();
-    await w.registry.open(TAB, 5, 13, [11]);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
     expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
     expect(w.writes()).toEqual(["rate:11:8"]);
     expect(w.cards()).toEqual([]);
@@ -392,11 +400,12 @@ describe("fiche-rate: only a product issued to that tab for that content", () =>
     [
       "issued to another tab",
       (w: ReturnType<typeof filmWorld>) =>
-        w.registry.open(OTHER_TAB, 5, 2005, []),
+        w.registry.open(OTHER_TAB, 5, filmTitle(2005), []),
     ],
     [
       "issued for another content",
-      (w: ReturnType<typeof filmWorld>) => w.registry.open(TAB, 6, 2005, []),
+      (w: ReturnType<typeof filmWorld>) =>
+        w.registry.open(TAB, 6, filmTitle(2005), []),
     ],
   ])("%s: rejected, zero SC and Naka requests", async (_n, setUp) => {
     const w = filmWorld();
@@ -411,11 +420,55 @@ describe("fiche-rate: only a product issued to that tab for that content", () =>
 
   it("an unreadable registry counts as not issued", async () => {
     const w = filmWorld();
-    w.registry.has = async () => {
+    w.registry.issuedAs = async () => {
       throw new Error("session down");
     };
     await expect(w.jobs.ficheRate(TAB, rate())).rejects.toThrow();
     expect(w.network()).toEqual([]);
+  });
+});
+
+describe("fiche-rate: only a product issued as what the target names", () => {
+  type SetUp = (w: ReturnType<typeof filmWorld>) => Promise<void>;
+  const titled =
+    (title: ReturnType<typeof filmTitle>): SetUp =>
+    (w) =>
+      w.registry.open(TAB, 5, title, []);
+  const offered =
+    (id: number): SetUp =>
+    (w) =>
+      w.registry.open(TAB, 5, undefined, [id]);
+  const episodeOf =
+    (series: number, id: number): SetUp =>
+    async (w) => {
+      await w.registry.open(TAB, 5, seriesTitle(series), []);
+      await w.registry.issue(TAB, 5, [id]);
+    };
+
+  it.each<[string, SetUp, FicheRateMessage]>([
+    ["a film target on a candidate", offered(2005), rate()],
+    ["a film target on a series' title", titled(seriesTitle(2005)), rate()],
+    ["a film target on an episode", episodeOf(13, 2005), rate()],
+    ["a série target on a film's title", titled(filmTitle(13)), seriesRate()],
+    ["a série target on a candidate", offered(13), seriesRate()],
+    ["a série target on an episode", episodeOf(12, 13), seriesRate()],
+    [
+      "an épisode target on the title's product",
+      episodeOf(11, 11),
+      episodeRate(),
+    ],
+    ["an épisode target on a candidate", offered(11), episodeRate()],
+    [
+      "an épisode target on a film's title",
+      titled(filmTitle(11)),
+      episodeRate(),
+    ],
+  ])("%s: refused, zero requests", async (_n, setUp, msg) => {
+    const w = filmWorld();
+    await setUp(w);
+    await expect(w.jobs.ficheRate(TAB, msg)).rejects.toThrow();
+    expect(w.network()).toEqual([]);
+    expect(w.state()).toEqual(linkedTo(2005));
   });
 });
 
@@ -430,7 +483,7 @@ describe("fiche-rate: the route", () => {
 
   it("a Naka tab's fiche-rate is queued and answered with the job's answer", async () => {
     const w = filmWorld({ settings: SIMULATION });
-    await w.registry.open(TAB, 5, 2005, []);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
     const router = createRouter({
       extensionId: "ext",
       queue: createJobQueue(),
