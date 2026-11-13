@@ -53,7 +53,8 @@ function arrowStep(key: string | undefined): number {
 }
 
 // The stars take the arrows: their default action would also scroll the scroller around them (the home
-// row's track, which then snaps to the next card).
+// row's track, which then snaps to the next card). A modified arrow (Alt+arrow is back/forward) is the
+// browser's.
 function onArrows(
   group: ElementLike,
   buttons: ElementLike[],
@@ -66,6 +67,7 @@ function onArrows(
     });
   });
   group.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const step = arrowStep(event.key);
     if (step === 0) return;
     event.preventDefault();

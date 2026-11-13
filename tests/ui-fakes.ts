@@ -38,6 +38,8 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
   }
 }
 
+type Modifiers = { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean };
+
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
   className = "";
@@ -85,11 +87,13 @@ export class FakeElement extends FakeNode implements ElementLike {
     type: string,
     isTrusted: unknown,
     key?: string,
+    modifiers: Modifiers = {},
   ): { stopped: boolean; prevented: boolean } {
     const seen = { stopped: false, prevented: false };
     const event = {
       isTrusted,
       key,
+      ...modifiers,
       stopPropagation: () => {
         seen.stopped = true;
       },
@@ -113,8 +117,8 @@ export class FakeElement extends FakeNode implements ElementLike {
   }
 
   /** A trusted keydown; true when a listener prevented its default action (a scroll, for an arrow). */
-  press(key: string): boolean {
-    return this.fire("keydown", true, key).prevented;
+  press(key: string, modifiers: Modifiers = {}): boolean {
+    return this.fire("keydown", true, key, modifiers).prevented;
   }
 
   click(isTrusted: boolean): void {

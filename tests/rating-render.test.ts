@@ -242,11 +242,24 @@ describe("the rating block", () => {
   });
 
   it("other keys keep their default: Tab leaves the stars, Enter clicks the focused one", () => {
-    const { block, star } = setup();
+    const { block, handlers, star } = setup();
     block.show(ratingView(episodeCard(), "saison", 8));
     const group = star(8).parent as FakeElement;
     expect(group.press("Tab")).toBe(false);
     expect(group.press("Enter")).toBe(false);
+    star(8).click(true);
+    expect(handlers.onChoose).toHaveBeenCalledWith(8);
+  });
+
+  it("a modified arrow key is left to the browser: no focus move, no preventDefault", () => {
+    const { block, star } = setup();
+    block.show(ratingView(episodeCard(), "saison", 8));
+    const group = star(8).parent as FakeElement;
+    expect(group.press("ArrowLeft", { altKey: true })).toBe(false);
+    expect(group.press("ArrowRight", { ctrlKey: true })).toBe(false);
+    expect(group.press("ArrowRight", { metaKey: true })).toBe(false);
+    expect(FakeElement.focused).toBeNull();
+    expect(star(8).attributes.tabindex).toBe("0");
   });
 
   it("arrow keys stop at both ends", () => {
