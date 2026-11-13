@@ -6,8 +6,9 @@
 // Read-only. The tab's issued products are reset at the start of every fiche-info (nothing of the earlier
 // page stays writable during the reads), then hold what the answer named; a failed read rejects (the tab
 // shows its error line) and leaves the tab with nothing issued. One fiche-info per tab is in flight: a
-// newer one of the same tab supersedes it, and it then takes no new site slot, answers notfound and
-// leaves the registry to the newer one.
+// newer one of the same tab supersedes it; its reads still waiting are then skipped when their slot
+// comes (the slot goes to the next waiter, fiche-info-turns), and it answers notfound and leaves the
+// registry to the newer one.
 
 import { nakaToTitled } from "../core/adapt-titles";
 import { toCandidates } from "../core/questions";
