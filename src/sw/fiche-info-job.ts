@@ -5,7 +5,9 @@
 // being saved (the list sync stays as it was), an ambiguous one offers its candidates, none is notfound.
 // Read-only. The tab's issued products are reset at the start of every fiche-info (nothing of the earlier
 // page stays writable during the reads), then hold what the answer named; a failed read rejects (the tab
-// shows its error line) and leaves the tab with nothing issued.
+// shows its error line) and leaves the tab with nothing issued. One fiche-info per tab is in flight: a
+// newer one of the same tab supersedes it, and it then takes no new site slot, answers notfound and
+// leaves the registry to the newer one.
 
 import { nakaToTitled } from "../core/adapt-titles";
 import { toCandidates } from "../core/questions";
@@ -13,6 +15,7 @@ import { type MediaType, matchTitle } from "../core/title-match";
 import type { FicheInfo } from "../ext/fiche-answers";
 import type { FicheInfoMessage } from "../ext/fiche-messages";
 import type { NakaItem } from "../naka/naka-client";
+import { type InfoTurn, turnLimiters } from "./fiche-info-turns";
 import { linkedProduct } from "./fiche-link-lookup";
 import { readFicheProduct } from "./fiche-product";
 import type { FicheRegistry } from "./fiche-registry";
@@ -75,17 +78,38 @@ async function resolved(
   return searched(deps, item);
 }
 
-export async function ficheInfoJob(
+// The registry is the newest turn's: a superseded one leaves it as the newer one set it.
+async function answered(
   deps: JobDeps,
   { registry, tabId }: FicheAsker,
   msg: FicheInfoMessage,
+  turn: InfoTurn,
 ): Promise<FicheInfo> {
   let outcome: Resolved = NOT_FOUND;
   await registry.open(tabId, msg.contentId, undefined, []);
   try {
-    outcome = await resolved(deps, msg);
-    return outcome.info;
+    const limiters = turnLimiters(deps.limiters, turn);
+    outcome = await resolved({ ...deps, limiters }, msg);
+    return turn.live() ? outcome.info : NOT_FOUND.info;
+  } catch (error) {
+    if (turn.live()) throw error;
+    return NOT_FOUND.info;
   } finally {
-    await registry.open(tabId, msg.contentId, outcome.title, outcome.issued);
+    if (turn.live()) {
+      await registry.open(tabId, msg.contentId, outcome.title, outcome.issued);
+    }
+  }
+}
+
+export async function ficheInfoJob(
+  deps: JobDeps,
+  asker: FicheAsker,
+  msg: FicheInfoMessage,
+  turn: InfoTurn,
+): Promise<FicheInfo> {
+  try {
+    return await answered(deps, asker, msg, turn);
+  } finally {
+    turn.end();
   }
 }

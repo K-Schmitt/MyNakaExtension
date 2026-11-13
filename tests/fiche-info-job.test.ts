@@ -8,6 +8,7 @@ import {
   mine,
   nakaSays,
   nakaSolaris,
+  OTHER_TAB,
   solaris,
   TAB,
 } from "./fiche-fixtures";
@@ -251,5 +252,78 @@ describe("fiche-info", () => {
     });
     await expect(w.jobs.ficheInfo(TAB, info())).rejects.toThrow();
     await expect(w.jobs.ficheMine(TAB, mine())).rejects.toThrow();
+  });
+});
+
+// Naka's reads of content 5 wait until released; content 6 (TMDB 9006) answers at once.
+function heldNaka() {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const naka = {
+    contentById: async (id: number) => {
+      if (id !== 5) return nakaSolaris({ contentId: id, tmdbId: 9000 + id });
+      await held;
+      return nakaSolaris();
+    },
+  };
+  return { naka, release: () => release() };
+}
+
+const searches = (calls: readonly string[]) =>
+  calls.filter((call) => call.startsWith("search:"));
+
+describe("one fiche-info in flight per tab", () => {
+  it("two overlapping from one tab: one SC search, the older answers notfound, the newer its match", async () => {
+    const h = heldNaka();
+    const w = world({ naka: h.naka, sc: two });
+    const older = w.jobs.ficheInfo(TAB, info());
+    const newer = w.jobs.ficheInfo(TAB, info());
+    h.release();
+    expect(await older).toEqual({ state: "notfound" });
+    expect(await newer).toMatchObject({
+      state: "matched",
+      product: { id: 11 },
+    });
+    expect(searches(w.sk.calls)).toEqual(["search:movie:Solaris"]);
+    expect(await w.registry.has(TAB, 5, 11)).toBe(true);
+  });
+
+  it("the newest wins: an older read that ends last writes nothing to the registry", async () => {
+    const h = heldNaka();
+    const w = world({ naka: h.naka });
+    w.area.data.set("ficheLinks", { "5": 2005, "6": 2006 });
+    const older = w.jobs.ficheInfo(TAB, info());
+    await vi.waitFor(() => expect(w.nk.calls).toEqual(["contentById:5"]));
+    const newer = w.jobs.ficheInfo(TAB, info({ contentId: 6, tmdbId: 9006 }));
+    expect(await newer).toMatchObject({ product: { id: 2006 } });
+    h.release();
+    expect(await older).toEqual({ state: "notfound" });
+    expect(w.sk.calls).toEqual(["productState:2006"]);
+    expect(await w.registry.titleOf(TAB, 6)).toBe(2006);
+    expect(await w.registry.titleOf(TAB, 5)).toBeUndefined();
+  });
+
+  it("another tab's fiche-info is unaffected", async () => {
+    const h = heldNaka();
+    const w = world({ naka: h.naka, sc: two });
+    const mine = w.jobs.ficheInfo(TAB, info());
+    const other = w.jobs.ficheInfo(OTHER_TAB, info());
+    h.release();
+    expect(await mine).toMatchObject({ state: "matched" });
+    expect(await other).toMatchObject({ state: "matched" });
+    expect(searches(w.sk.calls)).toHaveLength(2);
+    expect(await w.registry.has(TAB, 5, 11)).toBe(true);
+    expect(await w.registry.has(OTHER_TAB, 5, 11)).toBe(true);
+  });
+
+  it("a fiche-info after the tab's last one ended runs in full", async () => {
+    const w = world({ sc: two });
+    await w.jobs.ficheInfo(TAB, info());
+    expect(await w.jobs.ficheInfo(TAB, info())).toMatchObject({
+      state: "matched",
+    });
+    expect(searches(w.sk.calls)).toHaveLength(2);
   });
 });
