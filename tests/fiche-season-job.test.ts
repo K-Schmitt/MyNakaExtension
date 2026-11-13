@@ -58,7 +58,7 @@ describe("fiche-season", () => {
     await w.jobs.ficheSeason(TAB, season());
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 3101 })),
-    ).resolves.toEqual({ mine: null });
+    ).resolves.toEqual({ mine: null, average: null });
   });
 
   it("a choice issues no title: no season read", async () => {
@@ -155,7 +155,7 @@ describe("one fiche-season in flight per tab", () => {
     ).rejects.toThrow();
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 3131 })),
-    ).resolves.toEqual({ mine: null });
+    ).resolves.toEqual({ mine: null, average: null });
   });
 
   it("an older read that ends after the newer one issues nothing", async () => {

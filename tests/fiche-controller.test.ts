@@ -165,7 +165,7 @@ describe("the season it reads", () => {
     t.controller.path(SERIES_PATH);
     expect(t.last()?.season).toBeUndefined();
     expect(t.last()?.episodes.size).toBe(0);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 9 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 9, average: null });
     await settle();
     expect(t.last()?.episodes.size).toBe(0);
     expect(t.ofType("fiche-season")).toHaveLength(1);
@@ -293,7 +293,7 @@ describe("the season it reads", () => {
     await settle();
     t.ofType("fiche-season")[0]?.answer(seasonOf(1, 2));
     await settle();
-    t.ofType("fiche-mine")[0]?.answer({ mine: 5 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 5, average: null });
     await settle();
     expect(minedIds(t.calls)).toEqual([201]);
     expect(t.last()?.episodes.get(1)).toEqual({
@@ -310,7 +310,7 @@ describe("the owner's own episode ratings", () => {
     expect(mineIds(t)).toEqual([
       { type: "fiche-mine", contentId: 6, productId: 101 },
     ]);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 8 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 8, average: null });
     await settle();
     expect(t.last()?.episodes.get(1)?.mine).toBe(8);
     expect(minedIds(t.calls)).toEqual([101, 102]);
@@ -323,7 +323,7 @@ describe("the owner's own episode ratings", () => {
     t.ofType("fiche-season")[0]?.answer(seasonOf(1, 2, 3, 4));
     await settle();
     for (let i = 0; i < 4; i++) {
-      t.ofType("fiche-mine")[i]?.answer({ mine: null });
+      t.ofType("fiche-mine")[i]?.answer({ mine: null, average: null });
       await settle();
     }
     expect(minedIds(t.calls)).toEqual([103, 104, 101, 102]);
@@ -336,7 +336,7 @@ describe("the owner's own episode ratings", () => {
     t.ofType("fiche-season")[1]?.answer(seasonOf(1, 2));
     await settle();
     expect(t.ofType("fiche-mine")).toHaveLength(1);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 9 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 9, average: null });
     await settle();
     expect(t.last()?.season).toBe(2);
     expect(t.last()?.episodes.get(1)).toEqual({ productId: 101, average: 7 });
@@ -346,11 +346,81 @@ describe("the owner's own episode ratings", () => {
     );
   });
 
+  it("an episode the season page gave no average gets its badge from its own read", async () => {
+    const t = await series(1);
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-season")[0]?.answer({
+      episodes: [
+        { episode: 1, productId: 101, average: null },
+        { episode: 2, productId: 102, average: null },
+      ],
+    });
+    await settle();
+    t.ofType("fiche-mine")[0]?.answer({ mine: null, average: 7.8 });
+    await settle();
+    expect(t.last()?.episodes.get(1)).toEqual({
+      productId: 101,
+      average: 7.8,
+      mine: null,
+    });
+    expect(t.last()?.episodes.get(2)).toEqual({
+      productId: 102,
+      average: null,
+    });
+  });
+
+  it("the read's average wins over the season page's; a null read keeps the season page's", async () => {
+    const t = await seasonShown(1, 1, 2);
+    t.ofType("fiche-mine")[0]?.answer({ mine: 6, average: 8.2 });
+    await settle();
+    t.ofType("fiche-mine")[1]?.answer({ mine: null, average: null });
+    await settle();
+    expect(t.last()?.episodes.get(1)).toEqual({
+      productId: 101,
+      average: 8.2,
+      mine: 6,
+    });
+    expect(t.last()?.episodes.get(2)).toEqual({
+      productId: 102,
+      average: 7,
+      mine: null,
+    });
+  });
+
+  it("a late read after a season change stores neither rating nor average", async () => {
+    const t = await series(1);
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-season")[0]?.answer({
+      episodes: [{ episode: 1, productId: 101, average: null }],
+    });
+    await settle();
+    t.page.shown = 2;
+    t.controller.event(seasonEvent(2));
+    t.ofType("fiche-season")[1]?.answer({
+      episodes: [{ episode: 1, productId: 201, average: null }],
+    });
+    await settle();
+    t.ofType("fiche-mine")[0]?.answer({ mine: 9, average: 7.8 });
+    await settle();
+    expect(t.last()?.season).toBe(2);
+    expect(t.last()?.episodes.get(1)).toEqual({
+      productId: 201,
+      average: null,
+    });
+    t.page.shown = 1;
+    t.controller.path(SERIES_PATH);
+    expect(t.last()?.season).toBe(1);
+    expect(t.last()?.episodes.get(1)?.average).toBeNull();
+    expect(t.views.some((view) => view?.episodes.get(1)?.average === 7.8)).toBe(
+      false,
+    );
+  });
+
   it("cancels the reads when the page is left", async () => {
     const t = await seasonShown(1, 1, 2);
     t.controller.path("/");
     expect(t.last()).toBeUndefined();
-    t.ofType("fiche-mine")[0]?.answer({ mine: 9 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 9, average: null });
     await settle();
     expect(t.ofType("fiche-mine")).toHaveLength(1);
     expect(t.last()).toBeUndefined();
@@ -358,7 +428,7 @@ describe("the owner's own episode ratings", () => {
 
   it("keeps a read season for the visit: back on it, no new season read", async () => {
     const t = await seasonShown(1, 1);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 6 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 6, average: null });
     await settle();
     t.page.shown = 2;
     t.controller.event(seasonEvent(2));

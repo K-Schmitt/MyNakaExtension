@@ -1,5 +1,6 @@
-// The owner's own rating of one product of the title page (fiche-mine): only a product issued to the
-// asking tab for that content; any other is refused before any request. One read through the SC limiter.
+// The owner's own rating of one product of the title page (fiche-mine), with its public average (the
+// cookieless season page has none): only a product issued to the asking tab for that content; any other
+// is refused before any request. One read through the SC limiter.
 
 import type { MineAnswer } from "../ext/fiche-answers";
 import type { FicheMineMessage } from "../ext/fiche-messages";
@@ -24,5 +25,5 @@ export async function ficheMineJob(
   const state = await deps.limiters.sc.run(() =>
     deps.sc.productState(msg.productId),
   );
-  return { mine: state.rating };
+  return { mine: state.rating, average: state.average };
 }

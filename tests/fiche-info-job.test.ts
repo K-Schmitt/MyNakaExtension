@@ -193,7 +193,10 @@ describe("fiche-info", () => {
   it("issues the product to the asking tab: its own rating can then be read", async () => {
     const w = world({ state: linkedTo(2005) });
     await w.jobs.ficheInfo(TAB, info());
-    expect(await w.jobs.ficheMine(TAB, mine())).toEqual({ mine: 7 });
+    expect(await w.jobs.ficheMine(TAB, mine())).toEqual({
+      mine: 7,
+      average: 6.9,
+    });
   });
 
   it("issues the candidates of a choice", async () => {
@@ -201,7 +204,7 @@ describe("fiche-info", () => {
     await w.jobs.ficheInfo(TAB, info());
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 12 })),
-    ).resolves.toEqual({ mine: 7 });
+    ).resolves.toEqual({ mine: 7, average: 6.9 });
   });
 
   it("a new fiche-info resets the tab: the candidates of the earlier choice are no longer issued", async () => {
@@ -214,7 +217,7 @@ describe("fiche-info", () => {
     ).rejects.toThrow();
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 11 })),
-    ).resolves.toEqual({ mine: 7 });
+    ).resolves.toEqual({ mine: 7, average: 6.9 });
   });
 
   it("a new fiche-info forgets the tab's products before its Naka read", async () => {

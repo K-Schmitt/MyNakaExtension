@@ -225,7 +225,7 @@ function recordingJobs(over: Partial<Jobs> = {}) {
     },
     ficheMine: async (tabId, msg) => {
       calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
-      return { mine: 6 };
+      return { mine: 6, average: null };
     },
     ficheRate: async (tabId, msg) => {
       calls.push(`fiche-rate:${tabId}:${JSON.stringify(msg)}`);
@@ -2534,7 +2534,7 @@ describe("router: the title page messages", () => {
     expect(r.answers).toEqual([
       { state: "notfound" },
       { episodes: [] },
-      { mine: 6 },
+      { mine: 6, average: null },
     ]);
   });
 

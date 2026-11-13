@@ -183,8 +183,22 @@ describe("title page answers", () => {
       episodes: [{ episode: 1, productId: 4, average: 7, title: "Pilote" }],
     };
     expect(parseSeasonAnswer(titled)).toEqual(titled);
-    expect(parseMineAnswer({ mine: 6 })).toEqual({ mine: 6 });
-    expect(parseMineAnswer({ mine: null })).toEqual({ mine: null });
+    expect(parseMineAnswer({ mine: 6, average: 7.4 })).toEqual({
+      mine: 6,
+      average: 7.4,
+    });
+    expect(parseMineAnswer({ mine: null, average: null })).toEqual({
+      mine: null,
+      average: null,
+    });
+    expect(parseMineAnswer({ mine: null, average: 0 })).toEqual({
+      mine: null,
+      average: 0,
+    });
+    expect(parseMineAnswer({ mine: 1, average: 10 })).toEqual({
+      mine: 1,
+      average: 10,
+    });
     expect(parseRateAnswer({ ok: true })).toEqual({ ok: true });
     expect(parseRateAnswer({ error: "sc-session" })).toEqual({
       error: "sc-session",
@@ -217,9 +231,14 @@ describe("title page answers", () => {
       parseSeasonAnswer({
         episodes: [{ episode: 1, productId: 4, average: null, title: 4 }],
       }),
-    () => parseMineAnswer({ mine: 11 }),
+    () => parseMineAnswer({ mine: 11, average: null }),
     () => parseMineAnswer({}),
-    () => parseMineAnswer({ mine: 6, x: 1 }),
+    () => parseMineAnswer({ mine: 6 }),
+    () => parseMineAnswer({ mine: 6, average: null, x: 1 }),
+    () => parseMineAnswer({ mine: 6, average: 10.1 }),
+    () => parseMineAnswer({ mine: 6, average: -0.1 }),
+    () => parseMineAnswer({ mine: 6, average: "7" }),
+    () => parseMineAnswer({ mine: 6, average: Number.NaN }),
     () => parseRateAnswer({ ok: true, x: 1 }),
     () => parseRateAnswer({ error: "sc-session", x: 1 }),
     () => parseRateAnswer({ error: "nope" }),

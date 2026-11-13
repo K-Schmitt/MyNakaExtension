@@ -87,6 +87,17 @@ export function storeEpisodes(
   if (page.season === season) page.episodes = episodes;
 }
 
+/** A read average replaces the episode's; a null one keeps what the season page gave. */
+export function withAverage(
+  episodes: Episodes,
+  episode: number,
+  average: number | null,
+): Episodes {
+  const known = episodes.get(episode);
+  if (known === undefined || average === null) return episodes;
+  return new Map(episodes).set(episode, { ...known, average });
+}
+
 export function withMine(
   episodes: Episodes,
   episode: number,

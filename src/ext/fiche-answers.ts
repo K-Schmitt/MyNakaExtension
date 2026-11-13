@@ -40,7 +40,8 @@ export type SeasonEpisode = {
   title?: string;
 };
 export type SeasonAnswer = { episodes: SeasonEpisode[] };
-export type MineAnswer = { mine: number | null };
+/** The owner's rating of one product and its public average, read together (authenticated). */
+export type MineAnswer = { mine: number | null; average: number | null };
 export type OkAnswer = { ok: true };
 /** The rating did not go out. */
 export type NotSentAnswer = { error: JobError };
@@ -76,7 +77,7 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
   title: true,
 });
 const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
-const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true });
+const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true, average: true });
 const OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
 const NOT_SENT_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
 const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
@@ -159,7 +160,10 @@ export function parseSeasonAnswer(raw: unknown): SeasonAnswer {
 export function parseMineAnswer(raw: unknown): MineAnswer {
   const record = asRecord(raw, "answer");
   onlyKeys(record, MINE_KEYS, "answer");
-  return { mine: nullableRating(record.mine, "mine") };
+  return {
+    mine: nullableRating(record.mine, "mine"),
+    average: nullableAverage(record.average, "average"),
+  };
 }
 
 export function parseRateAnswer(raw: unknown): RateAnswer {
