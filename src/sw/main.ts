@@ -27,6 +27,10 @@ const router = createWorker({
     get: (key) => chrome.storage.local.get(key),
     set: (items) => chrome.storage.local.set(items),
   },
+  session: {
+    get: (key) => chrome.storage.session.get(key),
+    set: (items) => chrome.storage.session.set(items),
+  },
   tabs,
   fetch: workerFetch,
   timer,
@@ -37,6 +41,9 @@ const router = createWorker({
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) =>
   router.handle(msg, sender, sendResponse),
 );
+
+// A closed tab can write nothing more: the products issued to its title page are forgotten.
+chrome.tabs.onRemoved.addListener((tabId) => router.dropTab(tabId));
 
 function ignore(): void {}
 

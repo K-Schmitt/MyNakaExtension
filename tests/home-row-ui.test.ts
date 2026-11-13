@@ -41,6 +41,7 @@ function world() {
         timer: { set: () => 0, clear: () => {} },
       };
     },
+    reducedMotion: () => false,
     watchSize: (target, fn) => {
       const entry = { target, fn, stopped: false };
       watched.push(entry);

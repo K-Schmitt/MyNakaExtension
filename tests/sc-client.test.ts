@@ -1373,11 +1373,12 @@ describe("productState", () => {
         isWished,
         universe,
         rating: null,
+        average: null,
       });
     },
   );
 
-  it("returns only the flags, the universe and the owner's rating, whatever else the answer holds", async () => {
+  it("returns only the flags, the universe, the owner's rating and the average, whatever else the answer holds", async () => {
     const infos = userInfos(5, {
       ...PERSONAL,
       isDone: true,
@@ -1395,8 +1396,10 @@ describe("productState", () => {
       isWished: false,
       universe: 1,
       rating: 6,
+      average: null,
     });
     expect(Object.keys(state).sort()).toEqual([
+      "average",
       "isDone",
       "isWished",
       "rating",
@@ -1496,6 +1499,32 @@ describe("productState", () => {
       expect(state.rating).toBe(6);
     });
 
+    it("carries the public average next to the owner's own rating", async () => {
+      const state = await read({
+        rating: 6.9,
+        currentUserInfos: userInfos(5, { rating: 8 }),
+      });
+      expect(state).toMatchObject({ average: 6.9, rating: 8 });
+    });
+
+    it("gives a null average when the product has no rating", async () => {
+      const state = await read({ currentUserInfos: userInfos(5) });
+      expect(state.average).toBeNull();
+    });
+
+    it.each([
+      ["a string", "7"],
+      ["null", null],
+      ["a boolean", true],
+      ["NaN", Number.NaN],
+      ["Infinity", Number.POSITIVE_INFINITY],
+      ["above 10", 11],
+      ["below 0", -1],
+    ])("gives a null average for %s", async (_name, rating) => {
+      const state = await read({ rating, currentUserInfos: userInfos(5) });
+      expect(state.average).toBeNull();
+    });
+
     it("a null own rating stays null whatever the community average", async () => {
       const state = await read({
         rating: 8,
@@ -1524,6 +1553,7 @@ describe("productState", () => {
           isWished: true,
           universe: 1,
           rating: 6,
+          average: null,
         });
       },
     );
@@ -1992,6 +2022,7 @@ describe("productState: the label for the preview", () => {
         isWished: true,
         universe: 1,
         rating: null,
+        average: null,
       });
     }
   });
