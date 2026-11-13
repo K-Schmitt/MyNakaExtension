@@ -32,6 +32,8 @@ export type FicheView = {
   pending?: FichePending;
   /** The info's or the last write's ending; a season read has its own flag. */
   outcome?: FicheOutcome;
+  /** The shown season's episode that `pending` (a rating) or `outcome` is about, when one is. */
+  ratedEpisode?: number;
   /** The shown season's episodes could not be read. */
   seasonFailed?: true;
 };

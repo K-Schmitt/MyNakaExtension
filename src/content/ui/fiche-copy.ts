@@ -3,8 +3,9 @@
 
 import type { JobError } from "../../ext/job-error";
 import type { ProductLabel } from "../../sc/product-label";
+import type { FicheOutcome } from "../fiche-view";
 import { frenchAverage } from "./fiche-numbers";
-import { RATING_ERROR_LABELS } from "./rating-copy";
+import { errorLine, RATING_ERROR_LABELS } from "./rating-copy";
 
 const NB = "\u202F";
 
@@ -36,6 +37,18 @@ export function sentWithErrorLine(error: JobError): string {
 /** The name of an episode's stars: the SensCritique episode they rate. */
 export function episodeStarsName(title: string): string {
   return `Noter «${NB}${title}${NB}» sur SensCritique`;
+}
+
+/** The error line of a write's outcome; `failed` names what an unanswered or refused write was. */
+export function outcomeLine(outcome: FicheOutcome, failed: string): string {
+  switch (outcome.kind) {
+    case "failed":
+      return failed;
+    case "not-sent":
+      return errorLine(outcome.error);
+    case "sent-with-error":
+      return sentWithErrorLine(outcome.error);
+  }
 }
 
 export function seasonFailedLine(season: number): string {

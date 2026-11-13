@@ -7,6 +7,7 @@
 import type { FicheView } from "../fiche-view";
 import type { DocLike, ElementLike } from "./dom-like";
 import {
+  boxWriteOf,
   createDecor,
   drawDecor,
   type EpisodeDecor,
@@ -63,7 +64,7 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
     }
     const decor = known ?? createDecor(ports.doc);
     decors.set(box.key, decor);
-    drawDecor(ports.doc, decor, n, episode, handlers);
+    drawDecor(ports.doc, decor, n, episode, handlers, boxWriteOf(view, n));
     if (episode.average === null) decor.badge.host.remove();
     else box.placeBadge(decor.badge.host);
     box.placeStars(decor.stars.host);

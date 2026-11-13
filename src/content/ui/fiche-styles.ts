@@ -26,6 +26,7 @@ const BADGE_RULES = [
 
 const EPISODE_STARS_RULES = [
   `.mn-row--stars{margin-top:0;gap:${v("space-1")};}`,
+  `.mn-row--stars[aria-busy="true"]{opacity:.5;}`,
   `.mn-star{font-size:16px;min-width:0;padding:0 1px;}`,
 ];
 

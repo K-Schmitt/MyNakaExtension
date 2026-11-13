@@ -15,6 +15,7 @@ import type {
 } from "./fiche-view";
 
 export type Episodes = Map<number, FicheEpisode>;
+export type EpisodePlace = { season: number; episode: number };
 
 export type FichePage = {
   readonly title: TitlePath;
@@ -22,6 +23,8 @@ export type FichePage = {
   info?: FicheInfo;
   outcome?: FicheOutcome;
   pending?: FichePending;
+  /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */
+  ratedEpisode?: EpisodePlace;
   seriesRating?: number;
   /** The seasons the page's season events named. */
   readonly seen: SeenSeasons;
@@ -62,6 +65,10 @@ export function viewOf(page: FichePage): FicheView {
   if (page.outcome !== undefined) view.outcome = page.outcome;
   if (page.season !== undefined && page.failedSeason === page.season) {
     view.seasonFailed = true;
+  }
+  const rated = page.ratedEpisode;
+  if (rated !== undefined && rated.season === page.season) {
+    view.ratedEpisode = rated.episode;
   }
   return view;
 }

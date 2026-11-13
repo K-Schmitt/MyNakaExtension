@@ -9,7 +9,9 @@ import {
   frenchAverage,
   seasonNumber,
 } from "../src/content/ui/fiche-numbers";
+import { EPISODE_STARS_SHEET } from "../src/content/ui/fiche-styles";
 import { visibleFirstOrder } from "../src/content/ui/fiche-visible-order";
+import { errorLine, NOT_RATED_LINE } from "../src/content/ui/rating-copy";
 import {
   linked,
   SERIES_PATH,
@@ -23,6 +25,7 @@ import {
   fakeBox,
   fakeUi,
   hostsIn,
+  panelParts,
   shadowParts,
   starsOf,
   texts,
@@ -373,5 +376,90 @@ describe("the episode boxes", () => {
     expect(t.watching()).toBe(false);
     expect(hostsIn(box.thumb)).toEqual([]);
     expect(hostsIn(box.body)).toEqual([]);
+  });
+});
+
+describe("an episode rating on its box", () => {
+  const busyOf = (b: FakeBox) =>
+    shadowParts(starsHostOf(b)).filter(
+      (el) => el.attributes["aria-busy"] === "true",
+    );
+  const starOf = (b: FakeBox, value: number) =>
+    starsOf(shadowParts(starsHostOf(b)))[value - 1];
+  const linesOf = (b: FakeBox) =>
+    shadowParts(starsHostOf(b))
+      .filter((el) => el.className.includes("mn-error"))
+      .map((el) => el.textContent);
+  const twoBoxes = async () => {
+    const three = fakeBox("S1 E3");
+    const four = fakeBox("S1 E4");
+    const t = await seasonOne([three, four], episodes([3, 7.4], [4, 6.8]));
+    return { t, three, four };
+  };
+
+  it("dims the box's stars and marks them busy while it is sent; a second click sends nothing", async () => {
+    const { t, three, four } = await twoBoxes();
+    starOf(three, 6)?.click(true);
+    await settle();
+    expect(busyOf(three)).toHaveLength(1);
+    expect(busyOf(four)).toEqual([]);
+    expect(EPISODE_STARS_SHEET).toContain('[aria-busy="true"]{opacity:');
+    starOf(three, 8)?.click(true);
+    starOf(four, 8)?.click(true);
+    expect(t.ofType("fiche-rate")).toHaveLength(1);
+  });
+
+  it.each([
+    ["not sent", { error: "sc-session" }, errorLine("sc-session")],
+    ["no answer", undefined, NOT_RATED_LINE],
+  ])(
+    "%s: the panel's error line under that box's stars only",
+    async (_n, answer, line) => {
+      const { t, three, four } = await twoBoxes();
+      starOf(three, 6)?.click(true);
+      t.ofType("fiche-rate")[0]?.answer(answer);
+      await settle();
+      expect(linesOf(three)).toEqual([line]);
+      expect(linesOf(four)).toEqual([]);
+      expect(texts(panelParts(t.kept))).toContain(line);
+      expect(busyOf(three)).toEqual([]);
+      expect(checked(shadowParts(starsHostOf(three)))).toEqual([]);
+    },
+  );
+
+  it("the line goes with the next view without that outcome", async () => {
+    const { t, three, four } = await twoBoxes();
+    starOf(three, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({ error: "sc-session" });
+    await settle();
+    starOf(four, 5)?.click(true);
+    await settle();
+    expect(linesOf(three)).toEqual([]);
+    expect(busyOf(four)).toHaveLength(1);
+  });
+
+  it("sent: normal stars with the new rating", async () => {
+    const { t, three } = await twoBoxes();
+    starOf(three, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({ ok: true });
+    await settle();
+    expect(busyOf(three)).toEqual([]);
+    expect(linesOf(three)).toEqual([]);
+    expect(checked(shadowParts(starsHostOf(three)))).toEqual(["6 sur 10"]);
+  });
+
+  it("the box of the same episode in another season shows nothing of it", async () => {
+    const box = fakeBox("E3");
+    const t = await seasonOne([box]);
+    starOf(box, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({ error: "sc-session" });
+    await settle();
+    t.page.shown = 2;
+    t.controller.event(seasonEvent(2));
+    await settle();
+    t.ofType("fiche-season")[1]?.answer(episodes([3, 7.4]));
+    await settle();
+    expect(starsOf(shadowParts(starsHostOf(box)))).toHaveLength(10);
+    expect(linesOf(box)).toEqual([]);
   });
 });
