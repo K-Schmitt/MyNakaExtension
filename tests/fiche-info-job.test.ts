@@ -288,6 +288,7 @@ describe("one fiche-info in flight per tab", () => {
       product: { id: 11 },
     });
     expect(searches(w.sk.calls)).toEqual(["search:movie:Solaris"]);
+    expect(w.limited).toEqual(["limit:naka", "limit:sc", "limit:sc"]);
     expect(await w.registry.has(TAB, 5, 11)).toBe(true);
   });
 

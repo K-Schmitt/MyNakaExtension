@@ -1,14 +1,16 @@
 // Test-only fakes for the worker suites: SensCritique and Naka clients that log every call, a limiter that
 // logs every slot, and a store over an in-memory storage area (the REAL store and its validation).
-import type { RateLimiter } from "../src/core/rate-limiter";
+import { type RateLimiter, SkippedError } from "../src/core/rate-limiter";
 import { createStore, type StorageArea } from "../src/ext/store";
 import type { NakaClient, NakaItem } from "../src/naka/naka-client";
 import type { ScClient } from "../src/sc/sc-client";
 import type { ScWishItem } from "../src/sc/wishlist-page";
 
+/** Takes no time; a call its check skips is refused as the real limiter refuses it, and logs no slot. */
 export function countingLimiter(calls: string[], name: string): RateLimiter {
   return {
-    run: async (task) => {
+    run: async (task, options) => {
+      if (options?.skip?.() === true) throw new SkippedError();
       calls.push(`limit:${name}`);
       return task();
     },
