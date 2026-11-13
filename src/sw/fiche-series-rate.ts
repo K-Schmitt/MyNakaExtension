@@ -1,13 +1,16 @@
-// A series or an episode rated from its title page (Q10): no finish, no slot of the hour's budget. The
-// binding is checked before the one ProductRate (sendRating); a failure is answered with its code. Then
+// A series or an episode rated from its title page (Q10): no finish, no slot of the hour's budget. Both
+// first make the series' link (Q11, D6: an episode's star links its series like the panel's star): the
+// title's pair {content, series product} goes through linkForRating's checks in this same queued job (no
+// conflicting mapping, no settled pair holding either side), so a refusal writes nothing and sends nothing.
+// The binding is checked before the one ProductRate (sendRating); a failure is answered with its code. Then
 // the stored cards that name this very product are updated: a series' rating goes to the série target of
-// every card of the content, an episode's to the épisode target of that episode's card. A series' pair is
-// settled only after linkForRating's checks passed in this same queued job (no conflicting mapping, no
-// settled pair holding either side), so settlePair never makes a pair the sync would skip. A finish that
-// waited on the series' resolved question (an episode's) then runs, as after the status page's link,
-// whether the rating went out or not: the link is made either way.
+// every card of the content, an episode's to the épisode target of that episode's card. Only a series'
+// rating settles the pair, so settlePair never makes a pair the sync would skip. A finish that waited on
+// the series' resolved question (an episode's) then runs once, after the rating, as after the status
+// page's link, whether the rating went out or not: the link is made either way.
 
 import { contentKeyOf } from "../core/finish-event";
+import type { Pair } from "../core/list-diff";
 import {
   applyRating,
   type RatingCard,
@@ -61,21 +64,29 @@ async function sent(
   }
 }
 
-export async function rateSeries(
+async function afterLink(
+  deps: JobDeps,
+  pair: Pair,
+  rated: () => Promise<RateAnswer>,
+): Promise<RateAnswer> {
+  const waiting = await linkForRating(deps.store, pair);
+  const answer = await rated();
+  if (waiting !== undefined) await finishJob(deps, waiting);
+  return answer;
+}
+
+export function rateSeries(
   deps: JobDeps,
   msg: FicheRateMessage,
 ): Promise<RateAnswer> {
   const pair = { nakaId: msg.contentId, scId: msg.productId };
-  const waiting = await linkForRating(deps.store, pair);
-  const answer = await ratedSeries(deps, msg, pair);
-  if (waiting !== undefined) await finishJob(deps, waiting);
-  return answer;
+  return afterLink(deps, pair, () => ratedSeries(deps, msg, pair));
 }
 
 async function ratedSeries(
   deps: JobDeps,
   msg: FicheRateMessage,
-  pair: { nakaId: number; scId: number },
+  pair: Pair,
 ): Promise<RateAnswer> {
   const failed = await sent(deps, msg);
   if (failed !== undefined) return failed;
@@ -85,7 +96,17 @@ async function ratedSeries(
   return OK;
 }
 
-export async function rateEpisode(
+/** `seriesId`: the series' product issued to the tab as the title (fiche-issued's issuedSeries). */
+export function rateEpisode(
+  deps: JobDeps,
+  msg: FicheRateMessage,
+  seriesId: number,
+): Promise<RateAnswer> {
+  const pair = { nakaId: msg.contentId, scId: seriesId };
+  return afterLink(deps, pair, () => ratedEpisode(deps, msg));
+}
+
+async function ratedEpisode(
   deps: JobDeps,
   msg: FicheRateMessage,
 ): Promise<RateAnswer> {

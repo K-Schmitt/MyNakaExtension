@@ -4,6 +4,7 @@
 
 import type { FicheAsker } from "./fiche-info-job";
 import { NotIssuedError } from "./fiche-mine-job";
+import type { FicheTitle } from "./fiche-registry-schema";
 import type { FicheRole } from "./fiche-roles";
 
 async function issuedAs(
@@ -17,6 +18,27 @@ async function issuedAs(
   } catch {
     return false;
   }
+}
+
+async function titleOf(
+  { registry, tabId }: FicheAsker,
+  contentId: number,
+): Promise<FicheTitle | undefined> {
+  try {
+    return await registry.titleOf(tabId, contentId);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The series' product issued to the tab as that content's title, which an episode's star links (D6). */
+export async function issuedSeries(
+  asker: FicheAsker,
+  contentId: number,
+): Promise<number> {
+  const title = await titleOf(asker, contentId);
+  if (title?.type !== "serie") throw new NotIssuedError();
+  return title.productId;
 }
 
 export async function assertIssued(

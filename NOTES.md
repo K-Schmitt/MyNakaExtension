@@ -538,7 +538,9 @@ Q1–Q12 du propriétaire).
 - **Série** : confirmation « SensCritique va retirer la série de tes envies. », puis la note et la paire réglée,
   sans « vu » ni place du budget (Q10). Une fin d'épisode qui attendait la question de cette série est jouée après
   la note, comme « Relier » sur la page d'état.
-- **Épisode** : la note seule.
+- **Épisode** : la note seule, sans « vu » ni place du budget ; une série pas encore reliée l'est d'abord, comme
+  par l'étoile du panneau (D6, Q11 : mêmes refus, rien d'écrit), et la fin d'épisode qui attendait sa question est
+  jouée après la note.
 - **Titre non relié** : la note enregistre d'abord la liaison (Q11), sauf si le produit est déjà lié à un autre
   contenu ou tenu par une paire réglée : alors refus, rien d'écrit. Un titre « non relié » ou en question passe par
   le chemin de « Relier à la main ».
