@@ -36,6 +36,8 @@ export type SeasonEpisode = {
   episode: number;
   productId: number;
   average: number | null;
+  /** SensCritique's own title of the episode, when it has one: the stars' name. */
+  title?: string;
 };
 export type SeasonAnswer = { episodes: SeasonEpisode[] };
 export type MineAnswer = { mine: number | null };
@@ -71,6 +73,7 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
   episode: true,
   productId: true,
   average: true,
+  title: true,
 });
 const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
 const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true });
@@ -136,11 +139,14 @@ export function parseFicheInfo(raw: unknown): FicheInfo {
 function parseEpisode(raw: unknown, path: string): SeasonEpisode {
   const record = asRecord(raw, path);
   onlyKeys(record, EPISODE_KEYS, path);
-  return {
+  const episode: SeasonEpisode = {
     episode: asInt(record.episode, 1, `${path}.episode`),
     productId: asId(record.productId, `${path}.productId`),
     average: nullableAverage(record.average, `${path}.average`),
   };
+  const title = whenPresent(record.title, (v) => asText(v, `${path}.title`));
+  if (title !== undefined) episode.title = title;
+  return episode;
 }
 
 export function parseSeasonAnswer(raw: unknown): SeasonAnswer {

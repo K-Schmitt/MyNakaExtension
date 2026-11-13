@@ -173,6 +173,10 @@ describe("title page answers", () => {
   it("reads the season, mine, rate and link answers", () => {
     const season = { episodes: [{ episode: 1, productId: 4, average: null }] };
     expect(parseSeasonAnswer(season)).toEqual(season);
+    const titled = {
+      episodes: [{ episode: 1, productId: 4, average: 7, title: "Pilote" }],
+    };
+    expect(parseSeasonAnswer(titled)).toEqual(titled);
     expect(parseMineAnswer({ mine: 6 })).toEqual({ mine: 6 });
     expect(parseMineAnswer({ mine: null })).toEqual({ mine: null });
     expect(parseRateAnswer({ ok: true })).toEqual({ ok: true });
@@ -193,6 +197,20 @@ describe("title page answers", () => {
       }),
     () => parseSeasonAnswer({ episodes: [{ episode: 1, productId: 4 }] }),
     () => parseSeasonAnswer({ episodes: [], x: 1 }),
+    () =>
+      parseSeasonAnswer({
+        episodes: [{ episode: 1, productId: 4, average: null, title: "" }],
+      }),
+    () =>
+      parseSeasonAnswer({
+        episodes: [
+          { episode: 1, productId: 4, average: null, title: "x".repeat(201) },
+        ],
+      }),
+    () =>
+      parseSeasonAnswer({
+        episodes: [{ episode: 1, productId: 4, average: null, title: 4 }],
+      }),
     () => parseMineAnswer({ mine: 11 }),
     () => parseMineAnswer({}),
     () => parseMineAnswer({ mine: 6, x: 1 }),
