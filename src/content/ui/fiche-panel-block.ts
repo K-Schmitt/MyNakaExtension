@@ -19,15 +19,15 @@ import {
   MINE_LABEL,
   NO_AVERAGE_LINE,
   NOT_FOUND_LINE,
+  outcomeLine,
   PANEL_TITLE,
   SERIES_CONFIRM,
   seasonFailedLine,
-  sentWithErrorLine,
 } from "./fiche-copy";
 import { type FicheHandlers, ficheStars } from "./fiche-handlers";
 import { candidateLabel } from "./question-copy";
 import { candidateButton } from "./question-tile";
-import { errorLine, NOT_RATED_LINE, SENDING_LINE } from "./rating-copy";
+import { NOT_RATED_LINE, SENDING_LINE } from "./rating-copy";
 import {
   confirmRow,
   ERROR_CLASS,
@@ -56,12 +56,7 @@ function head(doc: Maker, product: FicheProduct | undefined): ElementLike {
 function outcomeLines(doc: Maker, view: FicheView, failed: string) {
   const { outcome } = view;
   if (outcome === undefined) return [];
-  if (outcome.kind === "failed") return [textLine(doc, failed, ERROR_CLASS)];
-  const line =
-    outcome.kind === "not-sent"
-      ? errorLine(outcome.error)
-      : sentWithErrorLine(outcome.error);
-  return [textLine(doc, line, ERROR_CLASS)];
+  return [textLine(doc, outcomeLine(outcome, failed), ERROR_CLASS)];
 }
 
 function seasonLines(doc: Maker, view: FicheView): ElementLike[] {

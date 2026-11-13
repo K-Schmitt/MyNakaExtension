@@ -80,7 +80,11 @@ export class FakeElement extends FakeNode implements ElementLike {
     this.parent?.drop(this);
   }
 
-  /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
+  /**
+   * Bubbles an event from here, through the shadow boundary; true when nothing stopped it. As in the DOM,
+   * the path is fixed before any listener runs: a listener that redraws (detaching this element) does not
+   * cut the event off from the ancestors it had.
+   */
   dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
     let stopped = false;
     const event = {
@@ -90,14 +94,21 @@ export class FakeElement extends FakeNode implements ElementLike {
         stopped = true;
       },
     } as EventLike;
-    let node: FakeNode | null = this;
-    while (node !== null && !stopped) {
-      if (node instanceof FakeElement) {
-        for (const listener of node.listeners[type] ?? []) listener(event);
-      }
-      node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
+    for (const element of this.eventPath()) {
+      if (stopped) break;
+      for (const listener of element.listeners[type] ?? []) listener(event);
     }
     return !stopped;
+  }
+
+  private eventPath(): FakeElement[] {
+    const path: FakeElement[] = [];
+    let node: FakeNode | null = this;
+    while (node !== null) {
+      if (node instanceof FakeElement) path.push(node);
+      node = node.parent ?? (node instanceof FakeShadow ? node.host : null);
+    }
+    return path;
   }
 
   press(key: string): void {

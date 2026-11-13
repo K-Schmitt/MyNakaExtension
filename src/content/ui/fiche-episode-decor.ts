@@ -1,17 +1,24 @@
 // The decoration of one episode box: an average badge for the thumb and ten stars for under the title,
-// named after the SensCritique episode when it has a title, each in its own closed host that keeps the page's input events (the box's `button.dcf-ep-hit` starts the
-// episode: a click meant for a star must never reach it). Drawn again only when what it shows changed.
+// named after the SensCritique episode when it has a title. While the box's rating is on its way its stars
+// are dimmed and busy; when it failed, the panel's error line sits under them until the next view without
+// that outcome. Each in its own closed host that keeps the page's input events (the box's
+// `button.dcf-ep-hit` starts the episode: a click meant for a star must never reach it). Drawn again only
+// when what it shows changed.
 
-import type { FicheEpisode } from "../fiche-view";
+import type { FicheEpisode, FicheView } from "../fiche-view";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
-import { episodeStarsName } from "./fiche-copy";
+import { episodeStarsName, outcomeLine } from "./fiche-copy";
 import { type FicheHandlers, ficheStars } from "./fiche-handlers";
 import { frenchAverage } from "./fiche-numbers";
 import { BADGE_SHEET, EPISODE_STARS_SHEET } from "./fiche-styles";
-import { textLine } from "./rating-render";
+import { NOT_RATED_LINE } from "./rating-copy";
+import { ERROR_CLASS, textLine } from "./rating-render";
 import { createClosedHost } from "./row-host";
 
 type Host = { host: ElementLike; root: ShadowRootLike };
+
+/** What a box shows of the rating sent from it. */
+export type BoxWrite = { busy: boolean; line?: string };
 
 export type EpisodeDecor = {
   badge: Host;
@@ -50,8 +57,34 @@ export function createDecor(doc: Pick<DocLike, "createElement">): EpisodeDecor {
   };
 }
 
-const keyOf = (n: number, { productId, average, mine, title }: FicheEpisode) =>
-  JSON.stringify([n, productId, average, mine, title]);
+export function boxWriteOf(view: FicheView, n: number): BoxWrite {
+  if (view.ratedEpisode !== n) return { busy: false };
+  if (view.pending === "rating") return { busy: true };
+  if (view.outcome === undefined) return { busy: false };
+  return { busy: false, line: outcomeLine(view.outcome, NOT_RATED_LINE) };
+}
+
+const keyOf = (
+  n: number,
+  { productId, average, mine, title }: FicheEpisode,
+  { busy, line }: BoxWrite,
+) => JSON.stringify([n, productId, average, mine, title, busy, line]);
+
+function starsOf(
+  doc: Pick<DocLike, "createElement">,
+  n: number,
+  episode: FicheEpisode,
+  handlers: FicheHandlers,
+  write: BoxWrite,
+): ElementLike[] {
+  const name =
+    episode.title === undefined ? undefined : episodeStarsName(episode.title);
+  const onChoose = (value: number) => handlers.rateEpisode(n, value);
+  const stars = ficheStars(doc, episode.mine, onChoose, name);
+  if (write.busy) stars.setAttribute("aria-busy", "true");
+  if (write.line === undefined) return [stars];
+  return [stars, textLine(doc, write.line, ERROR_CLASS)];
+}
 
 /** Draws the episode's values in the hosts, unless they already show them. */
 export function drawDecor(
@@ -60,8 +93,9 @@ export function drawDecor(
   n: number,
   episode: FicheEpisode,
   handlers: FicheHandlers,
+  write: BoxWrite,
 ): void {
-  const key = keyOf(n, episode);
+  const key = keyOf(n, episode, write);
   if (decor.drawn?.key === key && decor.drawn.handlers === handlers) return;
   decor.drawn = { key, handlers };
   decor.badge.root.replaceChildren(
@@ -69,15 +103,8 @@ export function drawDecor(
       ? []
       : [textLine(doc, frenchAverage(episode.average), BADGE_CLASS)]),
   );
-  const name =
-    episode.title === undefined ? undefined : episodeStarsName(episode.title);
   decor.stars.root.replaceChildren(
-    ficheStars(
-      doc,
-      episode.mine,
-      (value) => handlers.rateEpisode(n, value),
-      name,
-    ),
+    ...starsOf(doc, n, episode, handlers, write),
   );
 }
 

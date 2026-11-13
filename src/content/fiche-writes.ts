@@ -7,6 +7,7 @@ import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
 import { askInfo } from "./fiche-info-reader";
 import {
   contentOf,
+  type EpisodePlace,
   type FicheScope,
   storeEpisodes,
   withMine,
@@ -15,7 +16,6 @@ import { forgetSeasons } from "./fiche-season-reader";
 import type { FicheOutcome } from "./fiche-view";
 
 type Ending = { sent: boolean; outcome?: FicheOutcome };
-type RatePlace = { season: number; episode: number };
 
 // The worker's answer says whether the rating went out: `{ sent: true, error }` when a later step failed.
 function endingOf(answer: RateAnswer | undefined): Ending {
@@ -30,14 +30,17 @@ function endingOf(answer: RateAnswer | undefined): Ending {
   return { sent: false, outcome: { kind: "not-sent", error: answer.error } };
 }
 
+// An episode's rating names its place: its box shows the rating on its way, then its outcome.
 async function sendRate(
   scope: FicheScope,
   msg: FicheRateMessage,
   apply: (rating: number) => void,
+  place?: EpisodePlace,
 ): Promise<void> {
   const { page } = scope;
   page.pending = "rating";
   page.outcome = undefined;
+  page.ratedEpisode = place;
   scope.show();
   const ending = endingOf(await scope.ports.rate(msg));
   if (!scope.live()) return;
@@ -52,7 +55,7 @@ function rateMessage(
   target: FicheTarget,
   productId: number,
   rating: number,
-  place?: RatePlace,
+  place?: EpisodePlace,
 ): FicheRateMessage {
   return { type: "fiche-rate", contentId, target, productId, rating, ...place };
 }
@@ -112,10 +115,11 @@ export function rateEpisode(
   if (season === undefined || contentId === undefined) return;
   const place = { season, episode };
   const msg = rateMessage(contentId, "épisode", known.productId, rating, place);
-  void sendRate(scope, msg, (mine) => {
+  const apply = (mine: number) => {
     const episodes = page.read.get(season) ?? new Map();
     storeEpisodes(page, season, withMine(episodes, episode, mine));
-  });
+  };
+  void sendRate(scope, msg, apply, place);
 }
 
 function offered(scope: FicheScope, productId: number): boolean {
@@ -131,6 +135,7 @@ export async function link(scope: FicheScope, productId: number) {
   if (!offered(scope, productId)) return;
   page.pending = "link";
   page.outcome = undefined;
+  page.ratedEpisode = undefined;
   scope.show();
   const answer = await scope.ports.link({
     type: "fiche-link",
