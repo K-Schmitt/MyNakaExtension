@@ -1,10 +1,12 @@
-// The owner's own ratings of the shown season's episodes: one read at a time, the visible boxes first,
-// each episode tried once per opening. Opening another season, or leaving, stops them (`live`).
+// The owner's own ratings of the shown season's episodes, each with its average (the badge): one read at
+// a time, the visible boxes first, each episode tried once per opening. Opening another season, or
+// leaving, stops them (`live`).
 
 import {
   contentOf,
   type FicheScope,
   storeEpisodes,
+  withAverage,
   withMine,
 } from "./fiche-page";
 
@@ -55,6 +57,7 @@ async function readOne(
   if (episodes === undefined || episodes.get(episode)?.mine !== undefined) {
     return;
   }
-  storeEpisodes(page, season, withMine(episodes, episode, answer.mine));
+  const rated = withMine(episodes, episode, answer.mine);
+  storeEpisodes(page, season, withAverage(rated, episode, answer.average));
   scope.show();
 }

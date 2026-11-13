@@ -366,7 +366,7 @@ describe("the panel between two views", () => {
     });
     await settle();
     const before = starsOf(panelParts(t.kept))[4];
-    t.ofType("fiche-mine")[0]?.answer({ mine: 6 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 6, average: null });
     await settle();
     expect(t.last()?.episodes.get(1)?.mine).toBe(6);
     expect(starsOf(panelParts(t.kept))[4]).toBe(before);

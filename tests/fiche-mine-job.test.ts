@@ -19,14 +19,30 @@ const linkedWorld = () =>
   });
 
 describe("fiche-mine", () => {
-  it("an issued product: the owner's rating, one read through the SC limiter", async () => {
+  it("an issued product: the owner's rating and the average, one read through the SC limiter", async () => {
     const w = linkedWorld();
     await w.jobs.ficheInfo(TAB, info());
     w.sk.calls.length = 0;
     w.limited.length = 0;
-    expect(await w.jobs.ficheMine(TAB, mine())).toEqual({ mine: 8 });
+    expect(await w.jobs.ficheMine(TAB, mine())).toEqual({
+      mine: 8,
+      average: 7.1,
+    });
     expect(w.sk.calls).toEqual(["productState:2005"]);
     expect(w.limited).toEqual(["limit:sc"]);
+  });
+
+  it("a product with no average yet: a null average", async () => {
+    const w = answerWorld({
+      state: linkedTo(2005),
+      naka: nakaSays(),
+      product: () => ({ rating: null, average: null, label: { title: "S" } }),
+    });
+    await w.jobs.ficheInfo(TAB, info());
+    expect(await w.jobs.ficheMine(TAB, mine())).toEqual({
+      mine: null,
+      average: null,
+    });
   });
 
   it("a product never issued: rejected without a request", async () => {
@@ -56,7 +72,10 @@ describe("fiche-mine", () => {
     const w = linkedWorld();
     await w.jobs.ficheInfo(TAB, info());
     const restarted = createJobs(w.jobDeps, createFicheRegistry(w.session));
-    expect(await restarted.ficheMine(TAB, mine())).toEqual({ mine: 8 });
+    expect(await restarted.ficheMine(TAB, mine())).toEqual({
+      mine: 8,
+      average: 7.1,
+    });
   });
 
   it("a closed tab forgets its products", async () => {

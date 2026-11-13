@@ -332,7 +332,7 @@ describe("the episode boxes", () => {
     const box = fakeBox("E3");
     const t = await seasonOne([box]);
     expect(checked(shadowParts(starsHostOf(box)))).toEqual([]);
-    t.ofType("fiche-mine")[0]?.answer({ mine: 8 });
+    t.ofType("fiche-mine")[0]?.answer({ mine: 8, average: null });
     await settle();
     expect(checked(shadowParts(starsHostOf(box)))).toEqual(["8 sur 10"]);
     expect(hostsIn(box.body)).toHaveLength(1);

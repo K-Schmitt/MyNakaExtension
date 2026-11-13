@@ -524,8 +524,11 @@ Q1–Q12 du propriétaire).
   derniers événements et les renvoie quand l'onglet annonce sa visite, ce qui couvre F5 et le retour du lecteur.
 - **Le worker ne croit pas la page** : il relit lui-même l'item Naka (`contentId` → `tmdbId` et type doivent égaler
   l'adresse de l'onglet), puis cherche sur SC avec les titres de Naka. Le bloc affiche le titre SC qui sera noté.
-- La moyenne d'un épisode vient de la page de saison SC, lue **sans cookies**. Tes notes d'épisodes sont lues une
-  par une, les épisodes visibles d'abord, au rythme du limiteur SC (1 requête toutes les 2 s).
+- La page de saison SC, lue **sans cookies**, ne donne que la liste des épisodes et leurs ids : sa moyenne vaut
+  `null` partout (sonde du 2026-11-13). La moyenne d'un épisode arrive avec ta note, par la lecture authentifiée
+  de cet épisode (`productState`, E1) : une par une, les épisodes visibles d'abord, au rythme du limiteur SC
+  (1 requête toutes les 2 s). Une moyenne lue gagne sur celle de la page de saison ; une lecture sans moyenne
+  garde celle-ci.
 
 **Ce qui peut s'écrire**
 - **Rien sans clic de confiance** sur un bouton de l'extension (`isTrusted`).

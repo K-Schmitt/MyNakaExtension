@@ -44,11 +44,14 @@ describe("createFicheWorkerPort", () => {
       episodes,
     });
     const mine = { type: "fiche-mine", contentId: 5, productId: 3 } as const;
-    expect(await createFicheWorkerPort(ok({ mine: 8 })).mine(mine)).toEqual({
+    expect(
+      await createFicheWorkerPort(ok({ mine: 8, average: 7.1 })).mine(mine),
+    ).toEqual({
       mine: 8,
+      average: 7.1,
     });
     expect(
-      await createFicheWorkerPort(ok({ mine: 11 })).mine(mine),
+      await createFicheWorkerPort(ok({ mine: 11, average: null })).mine(mine),
     ).toBeUndefined();
     const rate = {
       type: "fiche-rate",
