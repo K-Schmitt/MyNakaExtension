@@ -3,6 +3,7 @@ import { MAX_CANDIDATES } from "../src/core/questions";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import { answerWorld, type WorldOpts } from "./answer-world";
 import {
+  filmTitle,
   info,
   linkedTo,
   mine,
@@ -301,7 +302,7 @@ describe("one fiche-info in flight per tab", () => {
     h.release();
     expect(await older).toEqual({ state: "notfound" });
     expect(w.sk.calls).toEqual(["productState:2006"]);
-    expect(await w.registry.titleOf(TAB, 6)).toBe(2006);
+    expect(await w.registry.titleOf(TAB, 6)).toEqual(filmTitle(2006));
     expect(await w.registry.titleOf(TAB, 5)).toBeUndefined();
   });
 

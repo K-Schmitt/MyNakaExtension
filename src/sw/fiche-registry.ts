@@ -1,15 +1,21 @@
 // The SensCritique products the worker gave each Naka tab for the title page it shows. It is the gate of
 // the title page's writes: a write names a product only this registry can vouch for, issued to that tab
-// for that content by one of the worker's own answers. One title page per tab: `open` (a fiche-info
-// answer) resets the tab, `issue` (a season answer) adds to its current page only. At most MAX_FICHE_TABS
-// tabs (the least recently opened or issued goes first) and MAX_FICHE_PRODUCTS products per tab besides
-// its title (the oldest goes first).
+// for that content by one of the worker's own answers, as what the write names (fiche-roles). One title
+// page per tab: `open` (a fiche-info answer: the title, or the candidates of a choice) resets the tab,
+// `issue` (a season answer: its episodes) adds to its current page only. At most MAX_FICHE_TABS tabs (the
+// least recently opened or issued goes first) and MAX_FICHE_PRODUCTS candidates, and as many episodes,
+// per tab (the oldest goes first).
 // It lives in chrome.storage.session under one key: memory only, it survives the MV3 worker's restarts,
 // and content scripts cannot read it. Every operation runs after the previous one (one read, one write),
 // so that two answers issued at once both stay.
 
 import type { StorageArea } from "../ext/store";
-import { type FichePage, parseFichePages } from "./fiche-registry-schema";
+import {
+  type FichePage,
+  type FicheTitle,
+  parseFichePages,
+} from "./fiche-registry-schema";
+import { type FicheRole, isIssued, standsFor } from "./fiche-roles";
 
 export const FICHE_REGISTRY_KEY = "ficheRegistry";
 export const MAX_FICHE_TABS = 50;
@@ -20,18 +26,26 @@ export type FicheRegistry = {
   open(
     tabId: number,
     contentId: number,
-    title: number | undefined,
-    productIds: readonly number[],
+    title: FicheTitle | undefined,
+    candidates: readonly number[],
   ): Promise<void>;
-  /** Adds to the tab's page for that content; nothing when the tab shows another content. */
+  /** Adds episodes to the tab's page for that content; nothing when the tab shows another content. */
   issue(
     tabId: number,
     contentId: number,
-    productIds: readonly number[],
+    episodes: readonly number[],
   ): Promise<void>;
   /** The title's product issued to that tab for that content, if any. */
-  titleOf(tabId: number, contentId: number): Promise<number | undefined>;
+  titleOf(tabId: number, contentId: number): Promise<FicheTitle | undefined>;
+  /** Issued to that tab for that content, whatever it stands for (a read). */
   has(tabId: number, contentId: number, productId: number): Promise<boolean>;
+  /** Issued to that tab for that content as `role` (a write). */
+  issuedAs(
+    tabId: number,
+    contentId: number,
+    productId: number,
+    role: FicheRole,
+  ): Promise<boolean>;
   drop(tabId: number): Promise<void>;
 };
 
@@ -59,13 +73,14 @@ function pageOf(
 function opened(
   tabId: number,
   contentId: number,
-  title: number | undefined,
-  productIds: readonly number[],
+  title: FicheTitle | undefined,
+  candidates: readonly number[],
 ): FichePage {
   const page: FichePage = {
     tabId,
     contentId,
-    products: lastProducts(productIds),
+    candidates: lastProducts(candidates),
+    episodes: [],
   };
   if (title !== undefined) page.title = title;
   return page;
@@ -87,26 +102,30 @@ export function createFicheRegistry(area: StorageArea): FicheRegistry {
     area.set({ [FICHE_REGISTRY_KEY]: pages });
 
   return {
-    open: (tabId, contentId, title, productIds) =>
+    open: (tabId, contentId, title, candidates) =>
       serial(async () => {
-        const page = opened(tabId, contentId, title, productIds);
+        const page = opened(tabId, contentId, title, candidates);
         await save(placed(await load(), page));
       }),
-    issue: (tabId, contentId, productIds) =>
+    issue: (tabId, contentId, episodes) =>
       serial(async () => {
         const pages = await load();
         const page = pageOf(pages, tabId, contentId);
         if (page === undefined) return;
-        const products = lastProducts([...page.products, ...productIds]);
-        await save(placed(pages, { ...page, products }));
+        const all = lastProducts([...page.episodes, ...episodes]);
+        await save(placed(pages, { ...page, episodes: all }));
       }),
     titleOf: (tabId, contentId) =>
       serial(async () => pageOf(await load(), tabId, contentId)?.title),
     has: (tabId, contentId, productId) =>
       serial(async () => {
         const page = pageOf(await load(), tabId, contentId);
-        if (page === undefined) return false;
-        return page.title === productId || page.products.includes(productId);
+        return page !== undefined && isIssued(page, productId);
+      }),
+    issuedAs: (tabId, contentId, productId, role) =>
+      serial(async () => {
+        const page = pageOf(await load(), tabId, contentId);
+        return page !== undefined && standsFor(page, productId, role);
       }),
     drop: (tabId) =>
       serial(async () => {

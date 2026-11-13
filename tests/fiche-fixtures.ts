@@ -8,6 +8,7 @@ import type {
 } from "../src/ext/fiche-messages";
 import type { NakaItem } from "../src/naka/naka-client";
 import type { ScWishItem } from "../src/sc/wishlist-page";
+import type { FicheTitle } from "../src/sw/fiche-registry-schema";
 
 export const TAB = 7;
 export const OTHER_TAB = 8;
@@ -61,6 +62,16 @@ export const solaris = (productId: number, year: number): ScWishItem => ({
   url: `/film/solaris/${productId}`,
   universe: 1,
   year,
+});
+
+/** The title's product as the registry keeps it: a film's or a series'. */
+export const filmTitle = (productId: number): FicheTitle => ({
+  productId,
+  type: "film",
+});
+export const seriesTitle = (productId: number): FicheTitle => ({
+  productId,
+  type: "serie",
 });
 
 export const linkedTo = (scId: number): SyncState => ({

@@ -70,6 +70,19 @@ describe("fiche-season", () => {
     expect(w.sk.calls).toEqual(["search:movie:Solaris"]);
   });
 
+  it("a film's title page: no episodes, no season read", async () => {
+    const w = answerWorld({
+      state: linkedTo(2005),
+      naka: nakaSays(),
+      product: () => ({ label: { title: "Solaris" } }),
+      sc: { seasonInfo: async () => ({ seasonProductId: 1, episodes: [] }) },
+    });
+    await w.jobs.ficheInfo(TAB, info());
+    expect(await w.registry.titleOf(TAB, 5)).toMatchObject({ productId: 2005 });
+    expect(await w.jobs.ficheSeason(TAB, season())).toEqual({ episodes: [] });
+    expect(w.sk.calls).toEqual(["productState:2005"]);
+  });
+
   it("another content of the same tab gets no episodes", async () => {
     const w = seriesWorld([episode(1)]);
     await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
