@@ -41,6 +41,10 @@ describe("thumbUrl", () => {
     ).toBe(`${TMDB}/w92/a.jpg`);
   });
 
+  it("has no thumbnail for a backdrop alone", () => {
+    expect(thumbUrl({ backdropPath: "/b.jpg" })).toBeUndefined();
+  });
+
   it("falls back to the picture", () => {
     expect(thumbUrl({ picture: "https://media.example.org/p.jpg" })).toBe(
       "https://media.example.org/p.jpg",

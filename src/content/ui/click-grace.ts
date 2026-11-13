@@ -1,6 +1,6 @@
 // The click grace both sessions share. A click that lands within GRACE_MS of a block's buttons appearing
 // under the cursor is taken for one meant for the page: ignored. `shownAt` is when the buttons were last
-// drawn; a new draw (an unlock, a move of the panel, a changed view) starts the grace again.
+// drawn; a new draw (an unlock, a move of the row, a changed view) starts the grace again.
 
 export const GRACE_MS = 400;
 

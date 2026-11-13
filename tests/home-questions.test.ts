@@ -357,7 +357,7 @@ describe("Ruling 27: an entry that redraws gives every other entry a fresh grace
   it("a rating entry locking: a click on its neighbour at 100 ms sends nothing, 400 ms after is taken", async () => {
     const w = await arrived([A, B], questionsOf());
     await w.ready();
-    w.handlersOf("movie:2").onChoose(7); // locks: the entry shrinks, the panel shifts
+    w.handlersOf("movie:2").onChoose(7); // locks: the entry shrinks, the row shifts
     await flush();
     await w.clock.advance(100);
     w.handlersOf("movie:1").onChoose(7);

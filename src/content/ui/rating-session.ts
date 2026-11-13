@@ -188,7 +188,7 @@ export function createRatingSession(
     closeShown(): void {
       if (current !== undefined) close(current);
     },
-    /** The panel moved under the cursor: the grace counts again from now. */
+    /** The row moved under the cursor: the grace counts again from now. */
     regrace(): void {
       if (current !== undefined) startGrace(current, ports.now);
     },

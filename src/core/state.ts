@@ -21,7 +21,7 @@ export type PendingItem =
       kind: "removal";
       removeFrom: Side;
       pair: Pair;
-      /** Dismissed from the home panel. */
+      /** Dismissed from the home row. */
       asked: boolean;
       title?: string;
       image?: TitleImage;
@@ -31,7 +31,7 @@ export type PendingItem =
       side: Side;
       id: number;
       candidateIds: number[];
-      /** Dismissed from the home panel (design §7). */
+      /** Dismissed from the home row (design §7). */
       asked?: true;
       /** The asked title, on its own side. */
       title?: string;

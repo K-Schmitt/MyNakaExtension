@@ -11,6 +11,7 @@ const CODES: JobError[] = [
   "finish-limit",
   "naka-list-empty",
   "naka-tab-changed",
+  "naka-content-unknown",
 ];
 
 describe("JobRejected", () => {
@@ -36,6 +37,12 @@ describe("JobRejected", () => {
   it("says a Naka tab that changed page in fixed words", () => {
     expect(new JobRejected("naka-tab-changed").message).toBe(
       "Naka tab changed page",
+    );
+  });
+
+  it("says a content Naka does not know in fixed words", () => {
+    expect(new JobRejected("naka-content-unknown").message).toBe(
+      "content unknown to Naka",
     );
   });
 
