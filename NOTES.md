@@ -511,6 +511,57 @@ catalogue entre la fin et la relance). Décision du propriétaire (D1, option b,
   tout appel réseau pour qu'un arrêt ne perde pas le compte.
 - Les données ne vont que vers l'avant : une version plus ancienne lit ce code comme un état illisible.
 
+## 2026-11-13 — Étape 7 : note SensCritique sur la fiche Naka
+
+La fiche d'un titre Naka (`/content/{movie|tv}/{tmdbId}`) montre un bloc SensCritique sous l'encadré d'infos : la
+moyenne SC et « Ta note » sur 10 étoiles. Pour une série, chaque case d'épisode porte une pastille avec la moyenne de
+l'épisode et ses propres étoiles. Spec : `docs/superpowers/specs/2026-11-11-7-fiche-sc-rating-design.md` (décisions
+Q1–Q12 du propriétaire).
+
+**D'où viennent les données**
+- La page de Naka charge elle-même `by-tmdb` et ses saisons. Le relais de la page lit une **copie** de ces réponses
+  ok, sans jamais lire un en-tête, et n'en transmet que des ids, des titres et le nombre de saisons. Il garde les
+  derniers événements et les renvoie quand l'onglet annonce sa visite, ce qui couvre F5 et le retour du lecteur.
+- **Le worker ne croit pas la page** : il relit lui-même l'item Naka (`contentId` → `tmdbId` et type doivent égaler
+  l'adresse de l'onglet), puis cherche sur SC avec les titres de Naka. Le bloc affiche le titre SC qui sera noté.
+- La moyenne d'un épisode vient de la page de saison SC, lue **sans cookies**. Tes notes d'épisodes sont lues une
+  par une, les épisodes visibles d'abord, au rythme du limiteur SC (1 requête toutes les 2 s).
+
+**Ce qui peut s'écrire**
+- **Rien sans clic de confiance** sur un bouton de l'extension (`isTrusted`).
+- **Seulement un produit proposé à cet onglet pour cette fiche** : le registre des produits proposés vit dans
+  `chrome.storage.session`, survit à l'arrêt du worker, et est illisible par les scripts de contenu. Chaque nouvelle
+  fiche le remet à zéro. Une écriture vérifie aussi le rôle du produit : film ou série = le titre ; épisode = un
+  épisode proposé ; liaison = un candidat proposé.
+- **Film** : même chemin que la note à la pause (vu daté du jour, retiré des envies, une place du budget), puis
+  retiré de Ma liste Naka en mode réel seulement (Q9, Q12).
+- **Série** : confirmation « SensCritique va retirer la série de tes envies. », puis la note et la paire réglée,
+  sans « vu » ni place du budget (Q10). Une fin d'épisode qui attendait la question de cette série est jouée après
+  la note, comme « Relier » sur la page d'état.
+- **Épisode** : la note seule.
+- **Titre non relié** : la note enregistre d'abord la liaison (Q11), sauf si le produit est déjà lié à un autre
+  contenu ou tenu par une paire réglée : alors refus, rien d'écrit. Un titre « non relié » ou en question passe par
+  le chemin de « Relier à la main ».
+- **« Relier » sans noter** : une liaison d'affichage seulement (`ficheLinks`, 500 au plus), vidée par
+  « Réinitialiser ».
+
+**Limites connues**
+- Le tmdbId suivi vient de l'adresse, qu'une page peut changer (pushState) ; l'item Naka doit concorder, et le bloc
+  montre le titre SC noté. Les étoiles d'épisode montrent le titre SC de l'épisode dans leur nom accessible.
+- Une page hostile peut inonder l'onglet de faux événements : une seule lecture de fiche et une seule lecture de
+  saison à la fois par onglet, saisons bornées, aucune écriture possible.
+- Une case dont le code ne porte pas « S<n> » n'est pas protégée contre une grille pas encore redessinée après un
+  changement de saison.
+- Sans encadré d'infos (`div.dca-panel`), le bloc ne s'affiche pas (pas d'emplacement de repli).
+- Pas de recherche manuelle quand SC ne trouve rien ; pas de nouvel essai après « SensCritique n’a pas pu être lu ».
+- Une note envoyée dont l'enregistrement local échoue ensuite s'affiche « pas partie ».
+- Les liaisons d'affichage ne se défont pas une par une ; au-delà de 500, c'est le plus petit identifiant qui part.
+- Le worker se réveille à chaque fermeture d'onglet du navigateur (une lecture de session).
+- Les lignes d'erreur reprises mêlent « vous » et apostrophes droites (dette au backlog).
+- À vérifier à la recette avec les sondes du propriétaire : l'empilement des cases de Naka (nos étoiles au-dessus du
+  bouton de l'épisode), le format des codes d'épisode, le texte du menu des saisons, l'encadré d'infos d'un film,
+  la note d'épisode sur la page de saison SC sans connexion.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
