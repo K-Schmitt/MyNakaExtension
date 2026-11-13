@@ -52,6 +52,12 @@ describe("creditsRequest", () => {
     ["an episode 1.5", "GET", `${SEGMENTS}?type=tv&season=1&episode=1.5`],
     ["a repeated episode", "GET", `${EPISODE_URL}&episode=18`],
     ["a repeated type", "GET", `${FILM_URL}&type=tv`],
+    ["a url that does not parse", "GET", "http://[::1"],
+    [
+      "a season past the safe integers",
+      "GET",
+      `${SEGMENTS}?type=tv&season=9007199254740993&episode=1`,
+    ],
   ])("%s is no credits request", (_name, method, url) => {
     expect(creditsRequest(method, url)).toBeUndefined();
   });
