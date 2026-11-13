@@ -2,7 +2,7 @@
 // the asking tab for that content (none yet, or a film's: no episodes, no request). One public season page
 // read through the SC limiter; each episode product is issued to the tab, at most MAX_SEASON_EPISODES,
 // each with its SensCritique title when it has one (at most MAX_TEXT characters). One fiche-season per tab
-// is in flight: a newer one of the same tab supersedes it (fiche-info-turns); its read still waiting is
+// is in flight: a newer one of the same tab supersedes it (fiche-tab-turns); its read still waiting is
 // then skipped when its slot comes, and it answers no episodes and issues nothing.
 
 import type { SeasonAnswer, SeasonEpisode } from "../ext/fiche-answers";
@@ -10,7 +10,7 @@ import type { FicheSeasonMessage } from "../ext/fiche-messages";
 import { MAX_TEXT } from "../ext/fiche-page-events";
 import type { ScEpisode } from "../sc/season-episodes";
 import type { FicheAsker } from "./fiche-info-job";
-import { type InfoTurn, turnLimiters } from "./fiche-info-turns";
+import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import type { JobDeps } from "./job-deps";
 
 export const MAX_SEASON_EPISODES = 500;
@@ -30,7 +30,7 @@ async function readEpisodes(
   deps: JobDeps,
   productId: number,
   msg: FicheSeasonMessage,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): Promise<ScEpisode[] | undefined> {
   const { sc } = turnLimiters(deps.limiters, turn);
   try {
@@ -46,7 +46,7 @@ async function answered(
   deps: JobDeps,
   asker: FicheAsker,
   msg: FicheSeasonMessage,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): Promise<SeasonAnswer> {
   const title = await asker.registry.titleOf(asker.tabId, msg.contentId);
   if (title?.type !== "serie") return { episodes: [] };
@@ -62,7 +62,7 @@ export async function ficheSeasonJob(
   deps: JobDeps,
   asker: FicheAsker,
   msg: FicheSeasonMessage,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): Promise<SeasonAnswer> {
   try {
     return await answered(deps, asker, msg, turn);

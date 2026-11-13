@@ -8,16 +8,17 @@
 import type { RunOptions } from "../core/rate-limiter";
 import type { SiteLimiters } from "./read-ports";
 
-export type InfoTurn = {
-  /** Still the tab's newest fiche-info. */
+export type TabTurn = {
+  /** Still the tab's newest read of this kind. */
   live(): boolean;
-  /** The fiche-info ended: the tab holds no turn, unless a newer one started. */
+  /** The read ended: the tab holds no turn of this kind, unless a newer one started. */
   end(): void;
 };
 
-export type InfoTurns = { start(tabId: number): InfoTurn };
+/** The turns of one kind of read (one instance for fiche-info, one for fiche-season). */
+export type TabTurns = { start(tabId: number): TabTurn };
 
-export function createInfoTurns(): InfoTurns {
+export function createTabTurns(): TabTurns {
   const current = new Map<number, object>();
   return {
     start(tabId) {
@@ -37,7 +38,7 @@ export function createInfoTurns(): InfoTurns {
 /** The site limiters for one turn: once a newer turn started, a read waiting for its slot is skipped. */
 export function turnLimiters(
   limiters: SiteLimiters,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): SiteLimiters {
   const guarded = (limiter: SiteLimiters["naka"]): SiteLimiters["naka"] => ({
     run: (task, options?: RunOptions) =>
