@@ -5,6 +5,8 @@
 import type { ToWorker } from "../ext/messages";
 import { createNakaClient } from "../naka/naka-client";
 import type { Fetch } from "../sc/sc-client";
+import { createFicheController } from "./fiche-controller";
+import { createFicheWorkerPort } from "./fiche-worker-port";
 import { readAccount } from "./naka-bridge";
 import { startNakaTab } from "./naka-tab";
 import { createTabListener } from "./naka-tab-listener";
@@ -13,6 +15,9 @@ import { listenToPauses } from "./pause-events";
 import { createTitleLookup } from "./title-lookup";
 import { wireBlocks } from "./ui/blocks-wiring";
 import { createEndUi } from "./ui/end-ui";
+import { gridPorts } from "./ui/fiche-grid-dom";
+import { fichePagePorts } from "./ui/fiche-page-ports";
+import { createFicheUi } from "./ui/fiche-ui";
 import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { createWorkerPort } from "./ui/worker-port";
@@ -41,17 +46,26 @@ chrome.runtime.onMessage.addListener(
   createTabListener(chrome.runtime.id, client, () => readAccount(localStorage)),
 );
 
+const pageTimer = {
+  set: (fn: () => void, ms: number) => setTimeout(fn, ms),
+  clear: (handle: unknown) =>
+    clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+
 const blocks = wireBlocks({
   port: createWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
-  timer: {
-    set: (fn: () => void, ms: number) => setTimeout(fn, ms),
-    clear: (handle: unknown) =>
-      clearTimeout(handle as ReturnType<typeof setTimeout>),
-  },
+  timer: pageTimer,
   playerUi: createEndUi(document),
   homeUi: createHomeRowUi(homeRowPorts(document)),
   now: () => Date.now(),
   titleOf: createTitleLookup((contentId) => client.contentById(contentId)),
+});
+
+const ficheUi = createFicheUi(fichePagePorts(document, pageTimer));
+const fiche = createFicheController({
+  ...createFicheWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
+  ...gridPorts(document, () => window.innerHeight),
+  render: (view) => ficheUi.render(view, fiche),
 });
 
 listenToPauses(document, {
@@ -74,6 +88,5 @@ startNakaTab({
   urlChanged: blocks.urlChanged,
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
-  // The title page controller and its blocks are wired with their UI (plan 7, task 9).
-  fiche: { path: ignore, event: ignore },
+  fiche,
 });
