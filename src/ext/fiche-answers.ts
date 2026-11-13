@@ -25,7 +25,7 @@ export type FicheProduct = {
   average: number | null;
   mine: number | null;
   /** SensCritique's own title and year of the product: the block shows what a star will rate. */
-  label?: ProductLabel;
+  label: ProductLabel;
 };
 export type FicheInfo = {
   state: "linked" | "matched" | "choose" | "notfound";
@@ -39,14 +39,13 @@ export type SeasonEpisode = {
 };
 export type SeasonAnswer = { episodes: SeasonEpisode[] };
 export type MineAnswer = { mine: number | null };
-/**
- * `{ error }`: the rating did not go out. `{ sent: true, error }`: it went out and a later step failed
- * (a film's removal from « Ma liste »).
- */
-export type RateAnswer =
-  | { ok: true }
-  | { error: JobError }
-  | { sent: true; error: JobError };
+export type OkAnswer = { ok: true };
+/** The rating did not go out. */
+export type NotSentAnswer = { error: JobError };
+/** The rating went out and a later step failed (a film's removal from « Ma liste »). */
+export type SentWithErrorAnswer = { sent: true; error: JobError };
+export type RateAnswer = OkAnswer | NotSentAnswer | SentWithErrorAnswer;
+export type LinkAnswer = OkAnswer;
 
 const MAX_AVERAGE = 10;
 const MAX_EPISODES = 500;
@@ -72,6 +71,14 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
   episode: true,
   productId: true,
   average: true,
+});
+const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
+const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true });
+const OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
+const NOT_SENT_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
+const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
+  sent: true,
+  error: true,
 });
 
 function asAverage(raw: unknown, path: string): number {
@@ -105,14 +112,12 @@ function parseLabel(raw: unknown): ProductLabel {
 function parseProduct(raw: unknown): FicheProduct {
   const record = asRecord(raw, "product");
   onlyKeys(record, PRODUCT_KEYS, "product");
-  const product: FicheProduct = {
+  return {
     id: asId(record.id, "product.id"),
     average: nullableAverage(record.average, "product.average"),
     mine: nullableRating(record.mine, "product.mine"),
+    label: parseLabel(record.label),
   };
-  const label = whenPresent(record.label, parseLabel);
-  if (label !== undefined) product.label = label;
-  return product;
 }
 
 export function parseFicheInfo(raw: unknown): FicheInfo {
@@ -140,34 +145,34 @@ function parseEpisode(raw: unknown, path: string): SeasonEpisode {
 
 export function parseSeasonAnswer(raw: unknown): SeasonAnswer {
   const record = asRecord(raw, "answer");
-  onlyKeys(record, ["episodes"], "answer");
+  onlyKeys(record, SEASON_KEYS, "answer");
   const episodes = asList(record.episodes, "episodes", parseEpisode);
   return episodes.length > MAX_EPISODES ? fail("episodes") : { episodes };
 }
 
 export function parseMineAnswer(raw: unknown): MineAnswer {
   const record = asRecord(raw, "answer");
-  onlyKeys(record, ["mine"], "answer");
+  onlyKeys(record, MINE_KEYS, "answer");
   return { mine: nullableRating(record.mine, "mine") };
 }
 
 export function parseRateAnswer(raw: unknown): RateAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
-    onlyKeys(record, ["ok"], "answer");
+    onlyKeys(record, OK_KEYS, "answer");
     return { ok: true };
   }
   const error = asOneOf(record.error, ERROR_CODES, "error");
   if (record.sent === undefined) {
-    onlyKeys(record, ["error"], "answer");
+    onlyKeys(record, NOT_SENT_KEYS, "answer");
     return { error };
   }
-  onlyKeys(record, ["sent", "error"], "answer");
+  onlyKeys(record, SENT_WITH_ERROR_KEYS, "answer");
   return record.sent === true ? { sent: true, error } : fail("sent");
 }
 
-export function parseLinkAnswer(raw: unknown): { ok: true } {
+export function parseLinkAnswer(raw: unknown): LinkAnswer {
   const record = asRecord(raw, "answer");
-  onlyKeys(record, ["ok"], "answer");
+  onlyKeys(record, OK_KEYS, "answer");
   return record.ok === true ? { ok: true } : fail("ok");
 }

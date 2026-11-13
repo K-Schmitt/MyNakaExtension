@@ -7,6 +7,7 @@
 
 import { openAmbiguity } from "../core/questions";
 import type { SyncState } from "../core/state";
+import type { LinkAnswer } from "../ext/fiche-answers";
 import { type FicheLinks, MAX_FICHE_LINKS } from "../ext/fiche-links-schema";
 import type { FicheLinkMessage } from "../ext/fiche-messages";
 import type { Store } from "../ext/store";
@@ -15,8 +16,6 @@ import { assertIssued } from "./fiche-issued";
 import { LinkRefusedError } from "./fiche-link-pair";
 import type { JobDeps } from "./job-deps";
 import { linkTitleJob } from "./link-job";
-
-export type LinkAnswer = { ok: true };
 
 function knownTitle(state: SyncState, contentId: number): boolean {
   const unlinked = state.unlinked.some(

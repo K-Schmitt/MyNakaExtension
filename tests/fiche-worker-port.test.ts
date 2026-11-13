@@ -14,7 +14,7 @@ describe("createFicheWorkerPort", () => {
   it("sends fiche-info as given and returns the checked info", async () => {
     const answer = {
       state: "linked",
-      product: { id: 9, average: 6.9, mine: null },
+      product: { id: 9, average: 6.9, mine: null, label: { title: "Dark" } },
     };
     const send = ok(answer);
     expect(await createFicheWorkerPort(send).info(INFO)).toEqual(answer);

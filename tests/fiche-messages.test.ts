@@ -99,7 +99,7 @@ describe("title page answers", () => {
   it("reads a FicheInfo", () => {
     const info = {
       state: "linked",
-      product: { id: 3, average: 7.4, mine: null },
+      product: { id: 3, average: 7.4, mine: null, label: { title: "Dark" } },
     };
     expect(parseFicheInfo(info)).toEqual(info);
     const labelled = {
@@ -131,6 +131,7 @@ describe("title page answers", () => {
     { state: "linked", product: { id: 1, average: 11, mine: null } },
     { state: "linked", product: { id: 1, average: null, mine: 0 } },
     { state: "linked", product: { id: 1, average: null } },
+    { state: "linked", product: { id: 1, average: null, mine: null } },
     {
       state: "linked",
       product: { id: 1, average: null, mine: null, label: { title: "" } },
@@ -194,6 +195,9 @@ describe("title page answers", () => {
     () => parseSeasonAnswer({ episodes: [], x: 1 }),
     () => parseMineAnswer({ mine: 11 }),
     () => parseMineAnswer({}),
+    () => parseMineAnswer({ mine: 6, x: 1 }),
+    () => parseRateAnswer({ ok: true, x: 1 }),
+    () => parseRateAnswer({ error: "sc-session", x: 1 }),
     () => parseRateAnswer({ error: "nope" }),
     () => parseRateAnswer({ ok: true, error: "sc-session" }),
     () => parseRateAnswer({ ok: false }),
@@ -202,6 +206,7 @@ describe("title page answers", () => {
     () => parseRateAnswer({ sent: true, error: "nope" }),
     () => parseRateAnswer({ sent: true, error: "sc-session", ok: true }),
     () => parseLinkAnswer({ ok: false }),
+    () => parseLinkAnswer({ ok: true, x: 1 }),
   ])("rejects a bad answer %#", (parse) => {
     expect(parse).toThrow();
   });
