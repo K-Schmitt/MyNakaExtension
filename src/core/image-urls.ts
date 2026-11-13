@@ -36,6 +36,13 @@ export function wideUrl(image?: TitleImage): string | undefined {
   return image?.picture;
 }
 
+/** The rating tile's fill, a vertical frame: the poster first, then the backdrop, then the picture. */
+export function posterUrl(image?: TitleImage): string | undefined {
+  if (image?.posterPath) return `${TMDB_BASE}/w500${image.posterPath}`;
+  if (image?.backdropPath) return `${TMDB_BASE}/w780${image.backdropPath}`;
+  return image?.picture;
+}
+
 export function isShownImageUrl(
   url: string,
   hosts: readonly string[] = SC_IMAGE_HOSTS,
