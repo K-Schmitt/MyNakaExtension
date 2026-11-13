@@ -1,6 +1,8 @@
 // The page events of a Naka title page: the content the page loaded (`fiche`) and the season it opens
 // (`season`). The page is untrusted: ids are positive safe integers, texts are capped, and any other key
-// refuses the event. The channel is the caller's, to avoid an import cycle with messages.ts.
+// refuses the event. A bad title, original title or year costs only that field: the worker reads them
+// from Naka's own item, never from the event. The channel is the caller's, to avoid an import cycle with
+// messages.ts.
 
 import {
   asId,
@@ -19,7 +21,7 @@ export type FicheEvent<C extends string> = {
   contentId: number;
   tmdbId: number;
   mediaType: "movie" | "tv";
-  title: string;
+  title?: string;
   originalTitle?: string;
   year?: number;
   /** Naka's season count of a series (absent for a film): an unreadable one is left out, not refused. */
@@ -69,6 +71,20 @@ export function asYear(raw: unknown): number {
   return year <= MAX_YEAR ? year : fail("year");
 }
 
+// A field the event can do without: absent or unreadable, it is left out.
+function leftOutWhenBad<T>(
+  raw: unknown,
+  parse: (value: unknown) => T,
+): T | undefined {
+  try {
+    return whenPresent(raw, parse);
+  } catch {
+    return undefined;
+  }
+}
+
+const asTitleField = (path: string) => (raw: unknown) => asText(raw, path);
+
 function seasonCountOf(raw: unknown): number | undefined {
   if (typeof raw !== "number" || !Number.isInteger(raw)) return undefined;
   return raw >= 1 && raw <= MAX_SEASON_COUNT ? raw : undefined;
@@ -85,14 +101,16 @@ export function ficheEvent<C extends string>(
     contentId: asId(record.contentId, "contentId"),
     tmdbId: asId(record.tmdbId, "tmdbId"),
     mediaType: asOneOf(record.mediaType, MEDIA_TYPES, "mediaType"),
-    title: asText(record.title, "title"),
   };
-  const originalTitle = whenPresent(record.originalTitle, (v) =>
-    asText(v, "originalTitle"),
+  const title = leftOutWhenBad(record.title, asTitleField("title"));
+  const originalTitle = leftOutWhenBad(
+    record.originalTitle,
+    asTitleField("originalTitle"),
   );
-  const year = whenPresent(record.year, asYear);
-  if (originalTitle !== undefined) event.originalTitle = originalTitle;
+  const year = leftOutWhenBad(record.year, asYear);
   const numberOfSeasons = seasonCountOf(record.numberOfSeasons);
+  if (title !== undefined) event.title = title;
+  if (originalTitle !== undefined) event.originalTitle = originalTitle;
   if (year !== undefined) event.year = year;
   if (numberOfSeasons !== undefined) event.numberOfSeasons = numberOfSeasons;
   return event;

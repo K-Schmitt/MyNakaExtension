@@ -89,8 +89,17 @@ describe("ficheEvent", () => {
   });
 
   it.each([
-    ["a title of 201 characters", { ...PROBE, title: "x".repeat(201) }],
-    ["no title", { ...PROBE, title: undefined }],
+    ["a title of 201 characters", { title: "x".repeat(201) }],
+    ["no title", { title: undefined }],
+    ["a number original title", { originalTitle: 7 }],
+  ])("keeps the event without %s", (_name, over) => {
+    const event = ficheEvent({ ...PROBE, ...over });
+    expect(event?.kind).toBe("fiche");
+    expect(event).not.toHaveProperty(Object.keys(over)[0] ?? "");
+    expect(event).toHaveProperty("contentId", 21391);
+  });
+
+  it.each([
     ["no id", { ...PROBE, id: undefined }],
     ["a string tmdbId", { ...PROBE, tmdbId: "1434" }],
     ["an unknown media type", { ...PROBE, mediaType: "anime" }],

@@ -94,6 +94,15 @@ describe("the title page it follows", () => {
     expect(t.calls).toEqual([]);
   });
 
+  it("asks the info of a fiche event whose title was unreadable, without a title", () => {
+    const t = film();
+    const { title: _t, ...untitled } = ficheEvent();
+    t.controller.event(untitled);
+    expect(t.ofType("fiche-info").map((call) => call.msg)).toEqual([
+      { type: "fiche-info", contentId: 5, tmdbId: 9005, mediaType: "movie" },
+    ]);
+  });
+
   it("asks the info once per page, whatever the page fetches again", () => {
     const t = film();
     t.controller.event(ficheEvent());
@@ -130,9 +139,16 @@ describe("the season it reads", () => {
   });
 
   it("ignores a season event of another content", async () => {
-    const t = await series(1);
+    const t = await series("no dropdown", { numberOfSeasons: 1 });
     t.controller.event(seasonEvent(1, 99));
     expect(t.ofType("fiche-season")).toEqual([]);
+  });
+
+  it("reads the season the dropdown names though the page fetched it before the tab listened", async () => {
+    const t = await series(3);
+    expect(t.ofType("fiche-season").map((call) => call.msg)).toEqual([
+      { type: "fiche-season", contentId: 6, season: 3 },
+    ]);
   });
 
   it("reads a season seen before the info once the info is answered", async () => {
@@ -439,6 +455,29 @@ describe("a link chosen among the candidates", () => {
   });
 });
 
+describe("the events sent before the tab listened", () => {
+  it("asks the page's relay for them once per new title page address", () => {
+    const t = fakePorts();
+    const controller = createFicheController(t.ports);
+    controller.path("/");
+    controller.path(SERIES_PATH);
+    controller.path(SERIES_PATH);
+    controller.path(FILM_PATH);
+    controller.path("/player");
+    controller.path(SERIES_PATH);
+    expect(t.announced).toEqual([SERIES_PATH, FILM_PATH, SERIES_PATH]);
+  });
+
+  it("asks for none off a title page", () => {
+    const t = fakePorts();
+    const controller = createFicheController(t.ports);
+    for (const path of ["/", "/player", "/content/tv/0", "/content/tv/1/x"]) {
+      controller.path(path);
+    }
+    expect(t.announced).toEqual([]);
+  });
+});
+
 describe("the events sent as the page opens", () => {
   it("follows a fiche event sent right after the address changed", () => {
     const t = fakePorts();
@@ -461,6 +500,12 @@ describe("a series page with no season dropdown", () => {
     expect(seasonsAsked(t)).toEqual([
       { type: "fiche-season", contentId: 6, season: 1 },
     ]);
+  });
+
+  it("opens none before the page fetched the lone season", async () => {
+    const t = await series("no dropdown", ONE);
+    t.controller.path(SERIES_PATH);
+    expect(seasonsAsked(t)).toEqual([]);
   });
 
   it("opens none when Naka gives no season count", async () => {

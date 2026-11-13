@@ -86,8 +86,8 @@ describe("by-tmdb, wrapped", () => {
   it.each([
     ["a non-JSON body", json("<html>oops</html>")],
     [
-      "a title of 201 characters",
-      json(JSON.stringify({ ...PROBE, title: "x".repeat(201) })),
+      "an unreadable content id",
+      json(JSON.stringify({ ...PROBE, id: "21391" })),
     ],
     ["a refused request (404)", json(PROBE_TEXT, 404)],
     ["a server error (500)", json(PROBE_TEXT, 500)],
