@@ -71,4 +71,22 @@ describe("createFicheWorkerPort", () => {
       await createFicheWorkerPort(ok(undefined)).link(link),
     ).toBeUndefined();
   });
+
+  it("sends fiche-rate as given and passes a rating sent before an error through", async () => {
+    const rate = {
+      type: "fiche-rate",
+      contentId: 5,
+      target: "épisode",
+      productId: 3,
+      rating: 7,
+      season: 1,
+      episode: 2,
+    } as const;
+    const send = ok({ sent: true, error: "unavailable" });
+    expect(await createFicheWorkerPort(send).rate(rate)).toEqual({
+      sent: true,
+      error: "unavailable",
+    });
+    expect(send).toHaveBeenCalledWith(rate);
+  });
 });
