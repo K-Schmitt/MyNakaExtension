@@ -438,6 +438,23 @@ describe("the end block actions", () => {
     expect(w.last().view.notice).toBe(SENDING_LINE);
   });
 
+  it("a label switch from the view before the click changes nothing while the rating is sent", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(toSaison({ pending: ["saison"] })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    await w.ready();
+    w.last().handlers.onOther("épisode");
+    await w.ready(); // Ruling F1
+    const before = w.last().handlers;
+    before.onChoose(8);
+    await flush();
+    const drawn = w.shown.length;
+    before.onOther("saison");
+    expect(w.shown).toHaveLength(drawn);
+    expect(w.last().view.choices).toEqual([]);
+  });
+
   it("a manual choice of a label that is not pending offers Fermer only", async () => {
     const w = world();
     w.script(EP_IDS, answer(toSaison({ pending: ["saison"] })));
