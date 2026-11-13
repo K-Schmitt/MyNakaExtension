@@ -5,7 +5,7 @@ import {
   type RateLimiter,
   SkippedError,
 } from "../src/core/rate-limiter";
-import { createInfoTurns, turnLimiters } from "../src/sw/fiche-info-turns";
+import { createTabTurns, turnLimiters } from "../src/sw/fiche-tab-turns";
 
 // The worker's limiters: one slot per 2 s for each site, on a fake clock.
 function siteLimiters() {
@@ -30,7 +30,7 @@ const startedAt = (limiter: RateLimiter, clock: { time: number }) =>
 describe("the site limiters of a turn, over the real limiter", () => {
   it("a superseded turn's read takes no slot: the next live read starts with no 2 s gap", async () => {
     const { clock, limiters } = siteLimiters();
-    const turns = createInfoTurns();
+    const turns = createTabTurns();
     const older = turnLimiters(limiters, turns.start(7));
     expect(await startedAt(older.sc, clock)).toBe(0);
     const dead = older.sc.run(async () => "ran");
@@ -44,7 +44,7 @@ describe("the site limiters of a turn, over the real limiter", () => {
 
   it("a live turn's reads take one slot each, as any caller's", async () => {
     const { clock, limiters } = siteLimiters();
-    const live = turnLimiters(limiters, createInfoTurns().start(7));
+    const live = turnLimiters(limiters, createTabTurns().start(7));
     const starts = [
       await startedAt(live.naka, clock),
       await startedAt(limiters.naka, clock),
@@ -55,15 +55,15 @@ describe("the site limiters of a turn, over the real limiter", () => {
 
   it("a read's own check still holds on a live turn", async () => {
     const { limiters } = siteLimiters();
-    const live = turnLimiters(limiters, createInfoTurns().start(7));
+    const live = turnLimiters(limiters, createTabTurns().start(7));
     const skipped = live.sc.run(async () => 1, { skip: () => true });
     await expect(skipped).rejects.toBeInstanceOf(SkippedError);
   });
 });
 
-describe("the fiche-info turns of the tabs", () => {
+describe("the turns of the tabs, for one kind of read", () => {
   it("a new turn of a tab ends the older one's", () => {
-    const turns = createInfoTurns();
+    const turns = createTabTurns();
     const older = turns.start(7);
     expect(older.live()).toBe(true);
     const newer = turns.start(7);
@@ -72,7 +72,7 @@ describe("the fiche-info turns of the tabs", () => {
   });
 
   it("an older turn that ends leaves the newer live", () => {
-    const turns = createInfoTurns();
+    const turns = createTabTurns();
     const older = turns.start(7);
     const newer = turns.start(7);
     older.end();
@@ -80,7 +80,7 @@ describe("the fiche-info turns of the tabs", () => {
   });
 
   it("an ended turn is no longer live, and the tab's next turn is", () => {
-    const turns = createInfoTurns();
+    const turns = createTabTurns();
     const first = turns.start(7);
     first.end();
     expect(first.live()).toBe(false);
@@ -88,7 +88,7 @@ describe("the fiche-info turns of the tabs", () => {
   });
 
   it("the turns of two tabs are apart", () => {
-    const turns = createInfoTurns();
+    const turns = createTabTurns();
     const mine = turns.start(7);
     const other = turns.start(8);
     expect(mine.live()).toBe(true);

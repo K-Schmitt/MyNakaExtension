@@ -41,12 +41,12 @@ import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { cancelRetryJob } from "./cancel-retry-job";
 import { ficheInfoJob } from "./fiche-info-job";
-import { createInfoTurns } from "./fiche-info-turns";
 import { ficheLinkJob } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
 import { ficheSeasonJob } from "./fiche-season-job";
+import { createTabTurns } from "./fiche-tab-turns";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -157,8 +157,8 @@ export function createJobs(
   registry: FicheRegistry = createFicheRegistry(memorySession()),
 ): Jobs {
   const asker = (tabId: number) => ({ registry, tabId });
-  const infoTurns = createInfoTurns();
-  const seasonTurns = createInfoTurns();
+  const infoTurns = createTabTurns();
+  const seasonTurns = createTabTurns();
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>

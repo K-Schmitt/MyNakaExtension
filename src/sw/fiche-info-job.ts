@@ -7,7 +7,7 @@
 // page stays writable during the reads), then hold what the answer named; a failed read rejects (the tab
 // shows its error line) and leaves the tab with nothing issued. One fiche-info per tab is in flight: a
 // newer one of the same tab supersedes it; its reads still waiting are then skipped when their slot
-// comes (the slot goes to the next waiter, fiche-info-turns), and it answers notfound and leaves the
+// comes (the slot goes to the next waiter, fiche-tab-turns), and it answers notfound and leaves the
 // registry to the newer one.
 
 import { nakaToTitled } from "../core/adapt-titles";
@@ -16,12 +16,12 @@ import { type MediaType, matchTitle } from "../core/title-match";
 import type { FicheInfo } from "../ext/fiche-answers";
 import type { FicheInfoMessage } from "../ext/fiche-messages";
 import type { NakaItem } from "../naka/naka-client";
-import { type InfoTurn, turnLimiters } from "./fiche-info-turns";
 import { linkedProduct } from "./fiche-link-lookup";
 import { readFicheProduct } from "./fiche-product";
 import type { FicheRegistry } from "./fiche-registry";
 import type { FicheTitle } from "./fiche-registry-schema";
 import { searchFiche } from "./fiche-search";
+import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { readNakaItem } from "./read-ports";
 
@@ -86,7 +86,7 @@ async function answered(
   deps: JobDeps,
   { registry, tabId }: FicheAsker,
   msg: FicheInfoMessage,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): Promise<FicheInfo> {
   let outcome: Resolved = NOT_FOUND;
   await registry.open(tabId, msg.contentId, undefined, []);
@@ -109,7 +109,7 @@ export async function ficheInfoJob(
   deps: JobDeps,
   asker: FicheAsker,
   msg: FicheInfoMessage,
-  turn: InfoTurn,
+  turn: TabTurn,
 ): Promise<FicheInfo> {
   try {
     return await answered(deps, asker, msg, turn);
