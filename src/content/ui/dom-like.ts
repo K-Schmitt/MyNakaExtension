@@ -45,6 +45,6 @@ export type TrackLike = {
   scrollLeft: number;
   readonly clientWidth: number;
   readonly scrollWidth: number;
-  scrollBy(o: { left: number; behavior: "smooth" }): void;
+  scrollBy(o: { left: number; behavior: "smooth" | "auto" }): void;
   addEventListener(type: "scroll" | "pointerenter", fn: () => void): void;
 };

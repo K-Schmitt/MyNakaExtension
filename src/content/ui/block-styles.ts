@@ -28,7 +28,11 @@ export const BLOCK_RULES: string[] = [
   `.mn-btn--primary{background:${v("color-accent")};color:${v("color-on-accent")};border-color:${v("color-accent")};font-weight:600;}`,
   `.mn-btn--primary:hover{background:${v("color-accent-hover")};}`,
   `.mn-btn--ghost{background:transparent;color:${v("color-accent-text")};border-color:transparent;}`,
-  `@media (prefers-reduced-motion: reduce){.mn-btn{transition:none;}}`,
 ];
 
-export const BLOCK_SHEET: string = themeCss(":host") + BLOCK_RULES.join("");
+/** Last in every sheet: a media query adds no weight, so it must follow the rules it overrides. */
+export const REDUCED_MOTION_RULE =
+  "@media (prefers-reduced-motion: reduce){.mn-btn,.mn-arrow{transition:none;}}";
+
+export const BLOCK_SHEET: string =
+  themeCss(":host") + BLOCK_RULES.join("") + REDUCED_MOTION_RULE;

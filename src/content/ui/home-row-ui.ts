@@ -17,6 +17,8 @@ export type HomeRowPorts = {
   /** The keeper's ports over the page's list, for the host just made. */
   keeper(host: ElementLike): KeeperPorts;
   watchSize: SizeWatch;
+  /** Whether the system asks for reduced motion, now. */
+  reducedMotion(): boolean;
 };
 
 function createRow(ports: HomeRowPorts) {
@@ -32,7 +34,10 @@ export function createHomeRowUi(ports: HomeRowPorts): {
   return {
     show(view, handlers) {
       row ??= createRow(ports);
-      renderRow(ports.doc, row.root, view, handlers, ports.watchSize);
+      renderRow(ports.doc, row.root, view, handlers, {
+        watchSize: ports.watchSize,
+        reducedMotion: ports.reducedMotion,
+      });
       row.keeper.start();
     },
     hide() {
