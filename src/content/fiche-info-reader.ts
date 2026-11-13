@@ -18,7 +18,7 @@ export function onFiche(scope: FicheScope, event: FicheEventOf): void {
     contentId: event.contentId,
     tmdbId,
     mediaType,
-    title: event.title,
+    ...(event.title === undefined ? {} : { title: event.title }),
     ...(event.originalTitle === undefined
       ? {}
       : { originalTitle: event.originalTitle }),

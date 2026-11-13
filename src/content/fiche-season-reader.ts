@@ -1,5 +1,5 @@
-// The season the page shows: read once the title has its product, among the seasons the page fetched
-// (it prefetches others) the one its dropdown names. Its averages show at once; then the owner's own
+// The season the page shows: read once the title has its product, the one its dropdown names (with no
+// dropdown, the lone season the page fetched). Its averages show at once; then the owner's own
 // ratings, one read at a time, visible boxes first. Opening another season, or leaving, stops the reads.
 
 import type { SeasonAnswer } from "../ext/fiche-answers";
@@ -35,9 +35,10 @@ function seasonToOpen(scope: FicheScope): number | undefined {
   const contentId = contentOf(page);
   if (page.title.mediaType !== "tv" || contentId === undefined) return;
   if (page.info?.product === undefined) return;
+  // The worker reads a season from the content and its number alone: the dropdown's season opens even
+  // when the page fetched it before the tab listened.
   const shown = ports.shownSeason() ?? onlySeason(scope, contentId);
-  if (shown === undefined || shown === page.season) return;
-  return seasonsOf(page.seen, contentId).includes(shown) ? shown : undefined;
+  return shown === page.season ? undefined : shown;
 }
 
 /** A new season event of this content for the shown season whose read failed asks it once more. */

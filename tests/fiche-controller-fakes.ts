@@ -57,6 +57,7 @@ export const seasonOf = (...numbers: number[]) => ({
 export function fakePorts() {
   const calls: Call[] = [];
   const views: (FicheView | undefined)[] = [];
+  const announced: string[] = [];
   const page = {
     shown: undefined as number | undefined,
     visible: [] as number[],
@@ -81,11 +82,14 @@ export function fakePorts() {
     render: (view) => {
       views.push(view);
     },
+    announceVisit: (path) => {
+      announced.push(path);
+    },
   };
   const ofType = (type: FicheMessage["type"]) =>
     calls.filter((call) => call.msg.type === type);
   const last = () => views[views.length - 1];
-  return { ports, calls, views, page, ofType, last };
+  return { ports, calls, views, page, ofType, last, announced };
 }
 
 /** Lets every resolved answer reach the controller. */

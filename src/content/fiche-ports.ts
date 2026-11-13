@@ -1,5 +1,6 @@
 // What the title page controller needs from the tab: the worker's five fiche answers (already checked,
-// undefined when lost or refused), two readings of the page and the drawing of its view.
+// undefined when lost or refused), three readings of the page, the drawing of its view and the
+// announcement of a visit to the page's relay.
 
 import type {
   FicheInfo,
@@ -31,6 +32,8 @@ export type FichePorts = {
   visibleFirst(numbers: readonly number[]): number[];
   /** The view of the title page, or undefined off a title page. */
   render(view: FicheView | undefined): void;
+  /** Asks the page's MAIN relay to post again the events it kept for this title page path. */
+  announceVisit(path: string): void;
 };
 
 export type TitlePageEvent = Extract<PageEvent, { kind: "fiche" | "season" }>;

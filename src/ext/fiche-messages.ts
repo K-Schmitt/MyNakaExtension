@@ -23,7 +23,8 @@ export type FicheMessage =
       /** From the tab's address (/content/{movie|tv}/{tmdbId}): the worker checks it against Naka's item. */
       tmdbId: number;
       mediaType: "movie" | "tv";
-      title: string;
+      /** The page's words, unread by the worker: absent when the page's was unreadable. */
+      title?: string;
       originalTitle?: string;
       year?: number;
     }
@@ -117,12 +118,13 @@ function parseInfo(record: Record<string, unknown>): FicheInfoMessage {
     contentId: asId(record.contentId, "contentId"),
     tmdbId: asId(record.tmdbId, "tmdbId"),
     mediaType: asOneOf(record.mediaType, MEDIA_TYPES, "mediaType"),
-    title: asText(record.title, "title"),
   };
+  const title = whenPresent(record.title, (v) => asText(v, "title"));
   const originalTitle = whenPresent(record.originalTitle, (v) =>
     asText(v, "originalTitle"),
   );
   const year = whenPresent(record.year, asYear);
+  if (title !== undefined) message.title = title;
   if (originalTitle !== undefined) message.originalTitle = originalTitle;
   if (year !== undefined) message.year = year;
   return message;

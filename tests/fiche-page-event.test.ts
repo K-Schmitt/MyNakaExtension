@@ -10,6 +10,7 @@ const fiche = {
   mediaType: "tv",
   title: "Les Griffin",
 };
+const full = { ...fiche, originalTitle: "Family Guy", year: 1999 };
 const season = { channel: CH, kind: "season", contentId: 12, season: 3 };
 
 describe("fiche page event", () => {
@@ -44,18 +45,26 @@ describe("fiche page event", () => {
     }
   });
 
+  // The worker reads the titles and the year from Naka's own item: a bad one costs only that field.
+  it.each([
+    ["no title", "title", undefined],
+    ["an empty title", "title", ""],
+    ["a title of 201 characters", "title", "x".repeat(201)],
+    ["a number title", "title", 42],
+    ["an empty original title", "originalTitle", ""],
+    ["an original title of 201", "originalTitle", "x".repeat(201)],
+    ["a number original title", "originalTitle", 7],
+    ["a year 1799", "year", 1799],
+    ["a year 2101", "year", 2101],
+    ["a fractional year", "year", 1999.5],
+    ["a string year", "year", "1999"],
+  ])("keeps the event without %s", (_name, field, value) => {
+    const { [field as keyof typeof full]: _dropped, ...rest } = full;
+    expect(parsePageEvent({ ...full, [field]: value })).toEqual(rest);
+  });
+
   it.each([
     ["an extra key", { ...fiche, token: "t" }],
-    ["no title", { ...fiche, title: undefined }],
-    ["an empty title", { ...fiche, title: "" }],
-    ["a title of 201 characters", { ...fiche, title: "x".repeat(201) }],
-    ["a number title", { ...fiche, title: 42 }],
-    ["an empty original title", { ...fiche, originalTitle: "" }],
-    ["an original title of 201", { ...fiche, originalTitle: "x".repeat(201) }],
-    ["a year 1799", { ...fiche, year: 1799 }],
-    ["a year 2101", { ...fiche, year: 2101 }],
-    ["a fractional year", { ...fiche, year: 1999.5 }],
-    ["a string year", { ...fiche, year: "1999" }],
     ["an unknown media type", { ...fiche, mediaType: "anime" }],
     ["a zero contentId", { ...fiche, contentId: 0 }],
     ["a fractional tmdbId", { ...fiche, tmdbId: 1.5 }],

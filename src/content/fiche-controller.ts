@@ -60,8 +60,11 @@ export function createFicheController(ports: FichePorts): FicheController {
     reads.cancel();
     const title = parseTitlePath(pathname);
     current = title === undefined ? undefined : visit(title);
-    if (current !== undefined) current.show();
-    else if (left !== undefined) ports.render(undefined);
+    if (current !== undefined) {
+      current.show();
+      // The page may have fetched this title before the tab listened: its relay posts it again.
+      ports.announceVisit(pathname);
+    } else if (left !== undefined) ports.render(undefined);
   }
 
   const on = (act: (scope: FicheScope) => void) => () => {

@@ -51,6 +51,11 @@ describe("title page messages", () => {
     });
   });
 
+  it("parses an info without a title (the page's was unreadable; the worker reads Naka's)", () => {
+    const { title: _t, ...untitled } = INFO;
+    expect(parseToWorker(untitled)).toEqual(untitled);
+  });
+
   it.each([
     ["rating 0", { ...FILM, rating: 0 }],
     ["rating 11", { ...FILM, rating: 11 }],

@@ -2,6 +2,7 @@
 // blocks and their rules are wired in ui/blocks-wiring). The page's token is read here, inside the client's
 // token function, and goes only into the client's requests to the Naka API.
 
+import { visitMessage } from "../ext/fiche-visit";
 import type { ToWorker } from "../ext/messages";
 import { createNakaClient } from "../naka/naka-client";
 import type { Fetch } from "../sc/sc-client";
@@ -23,6 +24,8 @@ import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
+
+const NAKA_ORIGIN = "https://naka.cx";
 
 function ignore(): void {}
 
@@ -68,6 +71,7 @@ const fiche = createFicheController({
   ...gridPorts(document, () => window.innerHeight),
   // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
+  announceVisit: (path) => window.postMessage(visitMessage(path), NAKA_ORIGIN),
 });
 
 listenToPauses(document, {
