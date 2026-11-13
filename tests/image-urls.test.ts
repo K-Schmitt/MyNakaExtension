@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isShownImageUrl,
+  posterUrl,
   scPictureOf,
   thumbUrl,
   wideUrl,
@@ -77,6 +78,34 @@ describe("wideUrl", () => {
   it("is undefined without an image", () => {
     expect(wideUrl(undefined)).toBeUndefined();
     expect(wideUrl({})).toBeUndefined();
+  });
+});
+
+describe("posterUrl", () => {
+  it("prefers the poster at w500", () => {
+    expect(posterUrl({ posterPath: "/a.jpg", backdropPath: "/b.jpg" })).toBe(
+      `${TMDB}/w500/a.jpg`,
+    );
+  });
+
+  it("then the backdrop at w780", () => {
+    expect(
+      posterUrl({
+        backdropPath: "/b.jpg",
+        picture: "https://media.example.org/p.jpg",
+      }),
+    ).toBe(`${TMDB}/w780/b.jpg`);
+  });
+
+  it("then the picture", () => {
+    expect(posterUrl({ picture: "https://media.example.org/p.jpg" })).toBe(
+      "https://media.example.org/p.jpg",
+    );
+  });
+
+  it("is undefined without an image", () => {
+    expect(posterUrl(undefined)).toBeUndefined();
+    expect(posterUrl({})).toBeUndefined();
   });
 });
 

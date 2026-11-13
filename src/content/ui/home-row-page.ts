@@ -11,6 +11,8 @@ const pageTimer = {
     clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
 // The track is a `div` the real document made: a real element, which a ResizeObserver can watch.
 const watchSize: SizeWatch = (track, onResize) => {
   const observer = new ResizeObserver(() => onResize());
@@ -27,5 +29,7 @@ export function homeRowPorts(doc: Document): HomeRowPorts {
         performance.now(),
       ),
     watchSize,
+    reducedMotion: () =>
+      doc.defaultView?.matchMedia(REDUCED_MOTION).matches ?? false,
   };
 }

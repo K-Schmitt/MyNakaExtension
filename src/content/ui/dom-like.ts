@@ -4,7 +4,11 @@
 export type ClickEvent = { isTrusted: boolean };
 export type EventLike = ClickEvent & {
   key?: string;
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
   stopPropagation(): void;
+  preventDefault(): void;
 };
 
 export interface NodeLike {
@@ -41,6 +45,6 @@ export type TrackLike = {
   scrollLeft: number;
   readonly clientWidth: number;
   readonly scrollWidth: number;
-  scrollBy(o: { left: number; behavior: "smooth" }): void;
+  scrollBy(o: { left: number; behavior: "smooth" | "auto" }): void;
   addEventListener(type: "scroll" | "pointerenter", fn: () => void): void;
 };

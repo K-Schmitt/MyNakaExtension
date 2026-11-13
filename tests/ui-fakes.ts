@@ -38,6 +38,8 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
   }
 }
 
+type Modifiers = { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean };
+
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
   className = "";
@@ -81,24 +83,33 @@ export class FakeElement extends FakeNode implements ElementLike {
   }
 
   /**
-   * Bubbles an event from here, through the shadow boundary; true when nothing stopped it. As in the DOM,
-   * the path is fixed before any listener runs: a listener that redraws (detaching this element) does not
-   * cut the event off from the ancestors it had.
+   * Bubbles an event from here, through the shadow boundary; whether a listener stopped it or prevented its
+   * default. As in the DOM, the path is fixed before any listener runs: a listener that redraws (detaching
+   * this element) does not cut the event off from the ancestors it had.
    */
-  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
-    let stopped = false;
+  private fire(
+    type: string,
+    isTrusted: unknown,
+    key?: string,
+    modifiers: Modifiers = {},
+  ): { stopped: boolean; prevented: boolean } {
+    const seen = { stopped: false, prevented: false };
     const event = {
       isTrusted,
       key,
+      ...modifiers,
       stopPropagation: () => {
-        stopped = true;
+        seen.stopped = true;
+      },
+      preventDefault: () => {
+        seen.prevented = true;
       },
     } as EventLike;
     for (const element of this.eventPath()) {
-      if (stopped) break;
+      if (seen.stopped) break;
       for (const listener of element.listeners[type] ?? []) listener(event);
     }
-    return !stopped;
+    return seen;
   }
 
   private eventPath(): FakeElement[] {
@@ -111,8 +122,14 @@ export class FakeElement extends FakeNode implements ElementLike {
     return path;
   }
 
-  press(key: string): void {
-    this.dispatch("keydown", true, key);
+  /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
+  dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
+    return !this.fire(type, isTrusted, key).stopped;
+  }
+
+  /** A trusted keydown; true when a listener prevented its default action (a scroll, for an arrow). */
+  press(key: string, modifiers: Modifiers = {}): boolean {
+    return this.fire("keydown", true, key, modifiers).prevented;
   }
 
   click(isTrusted: boolean): void {

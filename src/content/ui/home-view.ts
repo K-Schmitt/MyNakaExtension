@@ -2,7 +2,7 @@
 // rating view that offers its choices and « Ignorer » only, then the open questions, in the worker's
 // order. Pure: cards and question views in, views out.
 
-import { wideUrl } from "../../core/image-urls";
+import { posterUrl } from "../../core/image-urls";
 import type { QuestionKey } from "../../core/questions";
 import type { RatingCard } from "../../core/rating-cards";
 import type { QuestionView } from "./question-view";
@@ -39,7 +39,8 @@ const newestFirst = (a: HomeEntry, b: HomeEntry): number =>
 function shownEntry(entry: HomeEntry): HomeView["entries"] {
   const view = viewOfEntry(entry);
   if (view === undefined) return [];
-  const image = wideUrl(entry.card.image);
+  // The rating tile is filled by its image, a vertical frame: the poster, not the wide backdrop.
+  const image = posterUrl(entry.card.image);
   return [
     { key: entry.card.key, view, ...(image === undefined ? {} : { image }) },
   ];

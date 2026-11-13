@@ -50,8 +50,13 @@ describe("question offers with images", () => {
   });
   it("rejects an image of the wrong shape", () => {
     expect(() =>
-      parseQuestionOffer({ ...REMOVAL, image: { posterPath: "x" } }, "o"),
+      parseQuestionOffer({ ...REMOVAL, image: { posterPath: 3 } }, "o"),
     ).toThrow();
+  });
+  it("drops an image whose TMDB path the rule does not accept", () => {
+    expect(
+      parseQuestionOffer({ ...REMOVAL, image: { posterPath: "x" } }, "o"),
+    ).toEqual(REMOVAL);
   });
 });
 

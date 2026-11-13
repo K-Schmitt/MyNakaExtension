@@ -3,7 +3,7 @@
 // as a tile. Texts go through textContent; every button acts on a trusted click only (the tiles' own
 // buttons).
 
-import { carryScroll, type SizeWatch, wireArrows } from "./carousel";
+import { type ArrowPorts, carryScroll, wireArrows } from "./carousel";
 import type { ElementLike, ShadowRootLike, TrackLike } from "./dom-like";
 import type { HomeHandlers } from "./home-block";
 import { NEXT_LABEL, PREV_LABEL, ROW_SUBTITLE, ROW_TITLE } from "./home-copy";
@@ -92,13 +92,13 @@ const shownTracks = new WeakMap<
   { track: TrackLike; unwatch: () => void }
 >();
 
-/** Replaces whatever the root holds with the row; `watchSize` re-measures the arrows on a resize. */
+/** Replaces whatever the root holds with the row; `arrows` re-measures them on a resize and sets their motion. */
 export function renderRow(
   doc: Maker,
   root: ShadowRootLike,
   view: HomeView,
   handlers: HomeHandlers,
-  watchSize?: SizeWatch,
+  arrows?: ArrowPorts,
 ): void {
   const prev = arrow(doc, PREV_GLYPH, PREV_LABEL);
   const next = arrow(doc, NEXT_GLYPH, NEXT_LABEL);
@@ -109,6 +109,6 @@ export function renderRow(
   const left = shown?.track.scrollLeft;
   root.replaceChildren(header(doc, [prev, next]), cards);
   carryScroll(left, asTrack(cards));
-  const unwatch = wireArrows(asTrack(cards), prev, next, watchSize);
+  const unwatch = wireArrows(asTrack(cards), prev, next, arrows);
   shownTracks.set(root, { track: asTrack(cards), unwatch });
 }
