@@ -654,11 +654,33 @@ describe("parseState images", () => {
         removeFrom: "sc",
         pair: p(3, 30),
         asked: false,
-        image: { posterPath: "nope" },
+        image: { picture: "http://x/p.jpg" },
       },
     ];
     expect(rejection(JSON.parse(JSON.stringify(state)))).toBeInstanceOf(
       StoredStateError,
     );
+  });
+
+  it("reads a removal and a candidate whose stored path the rule no longer accepts, without the image", () => {
+    const removal = {
+      kind: "removal" as const,
+      removeFrom: "sc" as const,
+      pair: p(3, 30),
+      asked: false,
+    };
+    const ambiguity = {
+      kind: "ambiguity" as const,
+      side: "naka" as const,
+      id: 9,
+      candidateIds: [90],
+      candidates: [candidate],
+    };
+    const expected = valid();
+    expected.pending = [removal, ambiguity];
+    const stored = JSON.parse(JSON.stringify(expected));
+    stored.pending[0].image = { posterPath: "nope" };
+    stored.pending[1].candidates[0].image = { backdropPath: "/b.gif" };
+    expect(parseState(stored)).toEqual(expected);
   });
 });
