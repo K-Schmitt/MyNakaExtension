@@ -7,6 +7,7 @@ import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
 import type {
   FicheInfo,
+  LinkAnswer,
   MineAnswer,
   RateAnswer,
   SeasonAnswer,
@@ -41,7 +42,7 @@ import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { cancelRetryJob } from "./cancel-retry-job";
 import { ficheInfoJob } from "./fiche-info-job";
 import { createInfoTurns } from "./fiche-info-turns";
-import { ficheLinkJob, type LinkAnswer } from "./fiche-link-job";
+import { ficheLinkJob } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";

@@ -89,7 +89,12 @@ describe("the title page panel", () => {
   it("says when SensCritique has no average", async () => {
     const t = await film({
       state: "matched",
-      product: { id: 55, average: null, mine: null },
+      product: {
+        id: 55,
+        average: null,
+        mine: null,
+        label: { title: "Solaris" },
+      },
     });
     expect(texts(t.parts())).toContain("Pas encore de moyenne");
     expect(checked(t.parts())).toEqual([]);

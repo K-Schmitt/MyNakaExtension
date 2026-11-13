@@ -99,9 +99,7 @@ function productParts(
 ): ElementLike[] {
   return [
     ...(product.average === null ? [textLine(doc, NO_AVERAGE_LINE)] : []),
-    ...(product.label === undefined
-      ? []
-      : [textLine(doc, labelLine(product.label))]),
+    textLine(doc, labelLine(product.label)),
     textLine(doc, MINE_LABEL, MINE_CLASS),
     ...rating(doc, view, product, handlers),
     ...outcomeLines(doc, view, NOT_RATED_LINE),
