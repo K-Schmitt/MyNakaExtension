@@ -3,7 +3,7 @@
 // tiles 200×280 (the owner found 300×420 a third too big), 12 px apart like its `pl-3`, a 20:9 picture, 13px text, two-line titles, 24×36 choice posters.
 
 import { themeCss } from "../../ui/theme-tokens";
-import { BLOCK_RULES } from "./block-styles";
+import { BLOCK_RULES, REDUCED_MOTION_RULE } from "./block-styles";
 
 const v = (name: string): string => `var(--mn-${name})`;
 
@@ -58,6 +58,7 @@ const ROW_RULES = [
   ...TRACK_RULES,
   ...TILE_RULES,
   ...CHOICE_RULES,
+  REDUCED_MOTION_RULE,
 ].join("");
 
 export const ROW_SHEET: string = themeCss(":host") + ROW_RULES;

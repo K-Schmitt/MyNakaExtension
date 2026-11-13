@@ -38,6 +38,7 @@ describe("arrowState", () => {
 class FakeTrack implements TrackLike {
   scrollLeft = 0;
   steps: number[] = [];
+  behaviors: ScrollBehavior[] = [];
   private listeners: Record<string, (() => void)[]> = {};
 
   constructor(
@@ -45,8 +46,9 @@ class FakeTrack implements TrackLike {
     public scrollWidth: number,
   ) {}
 
-  scrollBy(o: { left: number; behavior: "smooth" }): void {
+  scrollBy(o: { left: number; behavior: "smooth" | "auto" }): void {
     this.steps.push(o.left);
+    this.behaviors.push(o.behavior);
   }
 
   addEventListener(type: "scroll" | "pointerenter", fn: () => void): void {
@@ -93,6 +95,24 @@ describe("wireArrows", () => {
     expect(track.steps).toEqual([300, -300]);
   });
 
+  it("scrolls smoothly when the system does not ask for reduced motion", () => {
+    const { track, next } = wired(300, 900);
+    next.click(true);
+    expect(track.behaviors).toEqual(["smooth"]);
+  });
+
+  it("jumps (behavior auto) when the system asks for reduced motion, read at each click", () => {
+    const track = new FakeTrack(300, 900);
+    const prev = new FakeElement("button");
+    const next = new FakeElement("button");
+    let reduced = true;
+    wireArrows(track, prev, next, { reducedMotion: () => reduced });
+    next.click(true);
+    reduced = false;
+    next.click(true);
+    expect(track.behaviors).toEqual(["auto", "smooth"]);
+  });
+
   it("a forged click steps nothing", () => {
     const { track, next } = wired(300, 900);
     next.click(false);
@@ -123,9 +143,11 @@ describe("wireArrows", () => {
     const prev = new FakeElement("button");
     const next = new FakeElement("button");
     const watched: { target: TrackLike; fn: () => void }[] = [];
-    wireArrows(track, prev, next, (target, fn) => {
-      watched.push({ target, fn });
-      return () => {};
+    wireArrows(track, prev, next, {
+      watchSize: (target, fn) => {
+        watched.push({ target, fn });
+        return () => {};
+      },
     });
     expect(next.attributes.hidden).toBe("");
     expect(watched.map((w) => w.target)).toEqual([track]);

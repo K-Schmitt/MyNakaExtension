@@ -23,10 +23,32 @@ describe("parseTitleImage", () => {
     expect(parseTitleImage(image, "x")).toEqual(image);
   });
 
+  // The entry rule may tighten after a path was stored: a stored path it no longer accepts drops, never
+  // the record that holds it.
   it.each([
     { posterPath: "a.jpg" },
     { posterPath: "/../a.jpg" },
     { backdropPath: "/a.jpg?x=1" },
+    { posterPath: "/a.gif", backdropPath: "/b.svg" },
+  ])("drops %j, a TMDB path the rule no longer accepts", (raw) => {
+    expect(parseTitleImage(raw, "x")).toBeUndefined();
+  });
+
+  it("keeps the fields that still pass beside a dropped path", () => {
+    const raw = {
+      posterPath: "/a.gif",
+      backdropPath: "/b.jpg",
+      picture: "https://any.example/p.jpg",
+    };
+    expect(parseTitleImage(raw, "x")).toEqual({
+      backdropPath: "/b.jpg",
+      picture: "https://any.example/p.jpg",
+    });
+  });
+
+  it.each([
+    { posterPath: 3 },
+    { backdropPath: null },
     { picture: "http://x/p.jpg" },
     { picture: "javascript:alert(1)" },
     { picture: 3 },

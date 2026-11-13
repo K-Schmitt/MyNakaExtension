@@ -37,6 +37,11 @@ describe("parseRatings", () => {
   it("rejects an image of the wrong shape", () => {
     bad({ ...filmCard(), image: { picture: "http://x/p.jpg" } });
   });
+  it("reads a card whose stored path the rule no longer accepts, without its image", () => {
+    const card = filmCard();
+    const stored = { ...card, image: { posterPath: "/a.gif" } };
+    expect(parseRatings([stored])).toEqual([card]);
+  });
   it("rejects a non-list", () => {
     expect(() => parseRatings(null)).toThrow(StoredStateError);
     expect(() => parseRatings({})).toThrow(StoredStateError);

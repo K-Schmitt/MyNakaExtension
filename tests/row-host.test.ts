@@ -31,6 +31,11 @@ describe("createRowHost", () => {
     }
   });
 
+  it("draws the native controls dark, as the player overlay does: the reset would make them light", () => {
+    const { host } = createRowHost(new FakeDoc(), "");
+    expect(host.style.cssText).toContain("color-scheme: dark !important");
+  });
+
   it("keeps the page's input events out, but lets wheel through so the page and the track scroll", () => {
     const { host } = createRowHost(new FakeDoc(), "");
     const el = host as FakeElement;
