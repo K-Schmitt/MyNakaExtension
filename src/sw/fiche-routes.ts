@@ -1,9 +1,9 @@
 // The title page family of the router. Every fiche message names the tab that sent it (a Naka tab with
 // no tab id is ignored): the worker answers and later writes per tab. The three reads are answered
-// outside the queue (answerRead: a rejection is answered undefined); a tab's newer fiche-info supersedes
-// its older one, which answers notfound (fiche-info-turns). The two writes, fiche-rate and
-// fiche-link, run on the worker's one queue (`run`) and are answered when their job ends: the job's answer,
-// or undefined when it rejected (a product not issued, the store down).
+// outside the queue (answerRead: a rejection is answered undefined); a tab's newer fiche-info or
+// fiche-season supersedes its older one, which answers notfound or no episodes (fiche-info-turns). The
+// two writes, fiche-rate and fiche-link, run on the worker's one queue (`run`) and are answered when their
+// job ends: the job's answer, or undefined when it rejected (a product not issued, the store down).
 
 import type { FicheMessage } from "../ext/fiche-messages";
 import { answerRead, type Respond } from "./answer-read";
