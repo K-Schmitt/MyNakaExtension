@@ -11,15 +11,16 @@ export type FicheHandlers = Pick<
 
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-/** Ten stars, the owner's rating marked once known. */
+/** Ten stars, the owner's rating marked once known; `name` names them (« Note » without). */
 export function ficheStars(
   doc: Pick<DocLike, "createElement">,
   mine: number | null | undefined,
   onChoose: (value: number) => void,
+  name?: string,
 ): ElementLike {
   const stars: Star[] = VALUES.map((value) => ({
     value,
     marked: value === mine,
   }));
-  return starRater(doc, stars, onChoose);
+  return starRater(doc, stars, onChoose, name);
 }

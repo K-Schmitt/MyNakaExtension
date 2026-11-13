@@ -33,6 +33,11 @@ export function sentWithErrorLine(error: JobError): string {
   return `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
+/** The name of an episode's stars: the SensCritique episode they rate. */
+export function episodeStarsName(title: string): string {
+  return `Noter «${NB}${title}${NB}» sur SensCritique`;
+}
+
 export function seasonFailedLine(season: number): string {
   return `Les notes de la saison ${season} n’ont pas pu être lues.`;
 }

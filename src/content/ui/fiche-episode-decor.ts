@@ -1,9 +1,10 @@
 // The decoration of one episode box: an average badge for the thumb and ten stars for under the title,
-// each in its own closed host that keeps the page's input events (the box's `button.dcf-ep-hit` starts the
+// named after the SensCritique episode when it has a title, each in its own closed host that keeps the page's input events (the box's `button.dcf-ep-hit` starts the
 // episode: a click meant for a star must never reach it). Drawn again only when what it shows changed.
 
 import type { FicheEpisode } from "../fiche-view";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
+import { episodeStarsName } from "./fiche-copy";
 import { type FicheHandlers, ficheStars } from "./fiche-handlers";
 import { frenchAverage } from "./fiche-numbers";
 import { BADGE_SHEET, EPISODE_STARS_SHEET } from "./fiche-styles";
@@ -49,8 +50,8 @@ export function createDecor(doc: Pick<DocLike, "createElement">): EpisodeDecor {
   };
 }
 
-const keyOf = (n: number, { productId, average, mine }: FicheEpisode) =>
-  `${n}|${productId}|${average}|${mine}`;
+const keyOf = (n: number, { productId, average, mine, title }: FicheEpisode) =>
+  JSON.stringify([n, productId, average, mine, title]);
 
 /** Draws the episode's values in the hosts, unless they already show them. */
 export function drawDecor(
@@ -68,8 +69,15 @@ export function drawDecor(
       ? []
       : [textLine(doc, frenchAverage(episode.average), BADGE_CLASS)]),
   );
+  const name =
+    episode.title === undefined ? undefined : episodeStarsName(episode.title);
   decor.stars.root.replaceChildren(
-    ficheStars(doc, episode.mine, (value) => handlers.rateEpisode(n, value)),
+    ficheStars(
+      doc,
+      episode.mine,
+      (value) => handlers.rateEpisode(n, value),
+      name,
+    ),
   );
 }
 

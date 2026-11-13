@@ -49,8 +49,11 @@ async function seasonOne(boxes: FakeBox[], answer = episodes([3, 7.4])) {
   return t;
 }
 
+const NB = "\u202F";
 const badgeOf = (b: FakeBox) => hostsIn(b.thumb)[0];
 const starsHostOf = (b: FakeBox) => hostsIn(b.body)[0];
+const groupOf = (b: FakeBox) =>
+  shadowParts(starsHostOf(b)).find((el) => el.attributes.role === "radiogroup");
 
 describe("the episode number of a box", () => {
   it("reads the number that ends span.dcf-ep-code", () => {
@@ -195,6 +198,42 @@ describe("the episode boxes", () => {
     expect(badgeOf(box)?.shadowInit).toEqual([{ mode: "closed" }]);
     expect(starsOf(shadowParts(starsHostOf(box)))).toHaveLength(10);
     expect(starsHostOf(box)?.shadowInit).toEqual([{ mode: "closed" }]);
+  });
+
+  it("names the stars after the SensCritique episode they rate", async () => {
+    const box = fakeBox("S1 E3");
+    const answer = {
+      episodes: [{ episode: 3, productId: 103, average: 7.4, title: "Pilote" }],
+    };
+    await seasonOne([box], answer);
+    const group = groupOf(box);
+    const name = `Noter «${NB}Pilote${NB}» sur SensCritique`;
+    expect(group?.attributes["aria-label"]).toBe(name);
+    expect(group?.attributes.title).toBe(name);
+  });
+
+  it("names an untitled episode's stars as before", async () => {
+    const box = fakeBox("S1 E3");
+    await seasonOne([box]);
+    const group = groupOf(box);
+    expect(group?.attributes["aria-label"]).toBe("Note");
+    expect(group?.attributes.title).toBeUndefined();
+  });
+
+  it("names the stars again when the episode's title changes", async () => {
+    const box = fakeBox("E3");
+    const titled = (title: string) => ({
+      episodes: [{ episode: 3, productId: 103, average: 7.4, title }],
+    });
+    const t = await seasonOne([box], titled("Pilote"));
+    t.page.shown = 2;
+    t.controller.event(seasonEvent(2));
+    await settle();
+    t.ofType("fiche-season")[1]?.answer(titled("Retour"));
+    await settle();
+    expect(groupOf(box)?.attributes.title).toBe(
+      `Noter «${NB}Retour${NB}» sur SensCritique`,
+    );
   });
 
   it("keeps a star's click from the box (and its hit button) and sends the episode's rating", async () => {

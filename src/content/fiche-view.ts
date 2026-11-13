@@ -7,6 +7,8 @@ import type { JobError } from "../ext/job-error";
 export type FicheEpisode = {
   productId: number;
   average: number | null;
+  /** SensCritique's title of the episode, when it has one. */
+  title?: string;
   /** Absent until read; null when the owner has not rated it. */
   mine?: number | null;
 };

@@ -42,8 +42,8 @@ describe("fiche-season", () => {
     const answer = await w.jobs.ficheSeason(TAB, season());
     expect(answer).toEqual({
       episodes: [
-        { episode: 1, productId: 3101, average: 7.4 },
-        { episode: 2, productId: 3102, average: null },
+        { episode: 1, productId: 3101, average: 7.4, title: "Épisode 1" },
+        { episode: 2, productId: 3102, average: null, title: "Épisode 2" },
       ],
     });
     expect(w.sk.calls).toEqual(["productState:3000", "seasonInfo:3000:2"]);
@@ -88,6 +88,16 @@ describe("fiche-season", () => {
     await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
     const answer = await w.jobs.ficheSeason(TAB, season({ contentId: 6 }));
     expect(answer).toEqual({ episodes: [] });
+  });
+
+  it("carries each episode's SensCritique title, capped at 200 characters, none when SC has none", async () => {
+    const long = { ...episode(1), title: "x".repeat(300) };
+    const untitled = { ...episode(2), title: "" };
+    const w = seriesWorld([long, untitled]);
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    const [first, second] = (await w.jobs.ficheSeason(TAB, season())).episodes;
+    expect(first?.title).toBe("x".repeat(200));
+    expect(second).toEqual({ episode: 2, productId: 3102, average: 7.4 });
   });
 
   it("at most 500 episodes", async () => {

@@ -78,10 +78,7 @@ function openSeason(scope: FicheScope, season: number): void {
 
 function episodesOf(answer: SeasonAnswer): Episodes {
   return new Map(
-    answer.episodes.map(({ episode, productId, average }) => [
-      episode,
-      { productId, average },
-    ]),
+    answer.episodes.map(({ episode, ...values }) => [episode, values]),
   );
 }
 
