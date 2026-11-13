@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
 import { answerWorld } from "./answer-world";
@@ -7,6 +7,7 @@ import {
   linkedTo,
   mine,
   nakaSays,
+  OTHER_TAB,
   season,
   solaris,
   TAB,
@@ -106,5 +107,92 @@ describe("fiche-season", () => {
     await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
     const answer = await w.jobs.ficheSeason(TAB, season());
     expect(answer.episodes).toHaveLength(500);
+  });
+});
+
+// Season s, episode n is SensCritique product 3100 + 10 s + n; season 1's read waits until released.
+function heldSeasons() {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let hold = false;
+  const seasonInfo = async (_id: number, s: number) => {
+    if (hold && s === 1) await held;
+    const episodes = [1, 2].map((n) => ({ ...episode(n), season: s }));
+    return {
+      episodes: episodes.map((found) => ({
+        ...found,
+        productId: 3100 + 10 * s + found.episode,
+      })),
+    };
+  };
+  const world = answerWorld({
+    state: linkedTo(3000),
+    naka: nakaSays({ mediaType: "tv" }),
+    product: () => ({ universe: UNIVERSE.serie, label: { title: "Dark" } }),
+    sc: { seasonInfo },
+  });
+  return { w: world, hold: () => (hold = true), release: () => release() };
+}
+
+const seasonReads = (calls: readonly string[]) =>
+  calls.filter((call) => call.startsWith("seasonInfo:"));
+const ids = (answer: { episodes: { productId: number }[] }) =>
+  answer.episodes.map((found) => found.productId);
+
+describe("one fiche-season in flight per tab", () => {
+  it("two overlapping from one tab: one SC request, the older answers no episodes, the newest wins", async () => {
+    const { w } = heldSeasons();
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    const older = w.jobs.ficheSeason(TAB, season({ season: 1 }));
+    const newer = w.jobs.ficheSeason(TAB, season({ season: 3 }));
+    expect(await older).toEqual({ episodes: [] });
+    expect(ids(await newer)).toEqual([3131, 3132]);
+    expect(seasonReads(w.sk.calls)).toEqual(["seasonInfo:3000:3"]);
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3111 })),
+    ).rejects.toThrow();
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3131 })),
+    ).resolves.toEqual({ mine: null });
+  });
+
+  it("an older read that ends after the newer one issues nothing", async () => {
+    const h = heldSeasons();
+    await h.w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    h.hold();
+    const older = h.w.jobs.ficheSeason(TAB, season({ season: 1 }));
+    await vi.waitFor(() =>
+      expect(seasonReads(h.w.sk.calls)).toEqual(["seasonInfo:3000:1"]),
+    );
+    expect(ids(await h.w.jobs.ficheSeason(TAB, season({ season: 3 })))).toEqual(
+      [3131, 3132],
+    );
+    h.release();
+    expect(await older).toEqual({ episodes: [] });
+    await expect(
+      h.w.jobs.ficheMine(TAB, mine({ productId: 3111 })),
+    ).rejects.toThrow();
+  });
+
+  it("another tab's season is unaffected", async () => {
+    const { w } = heldSeasons();
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    await w.jobs.ficheInfo(OTHER_TAB, info({ mediaType: "tv" }));
+    const mineRead = w.jobs.ficheSeason(TAB, season({ season: 1 }));
+    const other = w.jobs.ficheSeason(OTHER_TAB, season({ season: 3 }));
+    expect(ids(await mineRead)).toEqual([3111, 3112]);
+    expect(ids(await other)).toEqual([3131, 3132]);
+  });
+
+  it("a season after the tab's last one ended runs in full", async () => {
+    const { w } = heldSeasons();
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    await w.jobs.ficheSeason(TAB, season({ season: 1 }));
+    expect(ids(await w.jobs.ficheSeason(TAB, season({ season: 3 })))).toEqual([
+      3131, 3132,
+    ]);
+    expect(seasonReads(w.sk.calls)).toHaveLength(2);
   });
 });

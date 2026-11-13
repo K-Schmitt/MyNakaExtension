@@ -2538,6 +2538,14 @@ describe("router: the title page messages", () => {
     ]);
   });
 
+  it("a fiche-season above season 100 is refused: no job, no answer", async () => {
+    const r = router();
+    expect(r.send({ ...FICHE_SEASON, season: 101 }, FICHE_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
   it("a fiche read that rejects is answered undefined at once", async () => {
     const r = router({
       ficheMine: async () => {

@@ -158,6 +158,7 @@ export function createJobs(
 ): Jobs {
   const asker = (tabId: number) => ({ registry, tabId });
   const infoTurns = createInfoTurns();
+  const seasonTurns = createInfoTurns();
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
@@ -211,7 +212,8 @@ export function createJobs(
     pageLists: (answering) => answerPageLists(deps.store, answering),
     ficheInfo: (tabId, msg) =>
       ficheInfoJob(deps, asker(tabId), msg, infoTurns.start(tabId)),
-    ficheSeason: (tabId, msg) => ficheSeasonJob(deps, asker(tabId), msg),
+    ficheSeason: (tabId, msg) =>
+      ficheSeasonJob(deps, asker(tabId), msg, seasonTurns.start(tabId)),
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
     ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
     ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),

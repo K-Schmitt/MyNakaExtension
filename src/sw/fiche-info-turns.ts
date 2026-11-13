@@ -1,8 +1,9 @@
-// One fiche-info in flight per tab (a page alternating pushState and forged fiche events would otherwise
-// queue endless Naka and SensCritique reads on the shared limiters): a tab's new fiche-info starts a new
-// turn, which ends the older one's. A read of a turn no longer live when its slot comes is skipped by the
-// site's limiter (SkippedError): it takes no slot, and the next waiter goes on at once. Only the tabs with
-// a fiche-info in flight are held.
+// One fiche-info and one fiche-season in flight per tab, each kind with its own turns (a page alternating
+// pushState and forged fiche events, or rewriting its season dropdown, would otherwise queue endless Naka
+// and SensCritique reads on the shared limiters): a tab's new read starts a new turn, which ends the older
+// one's. A read of a turn no longer live when its slot comes is skipped by the site's limiter
+// (SkippedError): it takes no slot, and the next waiter goes on at once. Only the tabs with a read in
+// flight are held.
 
 import type { RunOptions } from "../core/rate-limiter";
 import type { SiteLimiters } from "./read-ports";

@@ -2,7 +2,7 @@
 // are positive safe integers, texts are capped, a rating is 1 to 10, and any other key refuses the message.
 // The worker still writes only a product it issued to this tab (fiche-registry), after a trusted click.
 
-import { asText, asYear } from "./fiche-page-events";
+import { asText, asYear, MAX_SEASON_COUNT } from "./fiche-page-events";
 import {
   asId,
   asOneOf,
@@ -162,6 +162,12 @@ function parseProduct(
   };
 }
 
+// A season a title can have, 1 to MAX_SEASON_COUNT: each season is one SensCritique read.
+function asSeason(raw: unknown): number {
+  const season = asId(raw, "season");
+  return season <= MAX_SEASON_COUNT ? season : fail("season");
+}
+
 export function parseFicheMessage(
   type: FicheType,
   record: Record<string, unknown>,
@@ -174,7 +180,7 @@ export function parseFicheMessage(
       return {
         type,
         contentId: asId(record.contentId, "contentId"),
-        season: asId(record.season, "season"),
+        season: asSeason(record.season),
       };
     case "fiche-rate":
       return parseRate(record);

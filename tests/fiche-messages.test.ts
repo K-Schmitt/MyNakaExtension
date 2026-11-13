@@ -79,8 +79,14 @@ describe("title page messages", () => {
     ["a TMDB id of 0", { ...INFO, tmdbId: 0 }],
     ["a text TMDB id", { ...INFO, tmdbId: "1434" }],
     ["season 0", { ...SEASON, season: 0 }],
+    ["season 101", { ...SEASON, season: 101 }],
   ])("rejects %s", (_name, msg) => {
     expect(parseToWorker(msg)).toBeUndefined();
+  });
+
+  it("reads season 100, the most seasons a title can have", () => {
+    const last = { ...SEASON, season: 100 };
+    expect(parseToWorker(last)).toEqual(last);
   });
 
   it("refuses a status-page sender, allows the Naka tab, for each type", () => {
