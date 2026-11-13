@@ -88,6 +88,17 @@ describe("reset", () => {
     expect(w.settings().lastAnswer?.seq).toBe(8);
   });
 
+  it("erases the title page links, readable or not, without loading them", async () => {
+    const w = answerWorld({ settings: FULL });
+    w.area.data.set("ficheLinks", { "5": 1005 });
+    await w.jobs.reset();
+    expect(w.area.data.get("ficheLinks")).toEqual({});
+    expect(w.area.ops).not.toContain("get:ficheLinks");
+    w.area.data.set("ficheLinks", "x");
+    await w.jobs.reset();
+    expect(w.area.data.get("ficheLinks")).toEqual({});
+  });
+
   it("writes the default settings in simulation when the settings are unreadable", async () => {
     const w = answerWorld({ settings: FULL });
     w.area.data.set("settings", { mode: "nonsense" });

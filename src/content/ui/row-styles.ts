@@ -40,7 +40,7 @@ const TILE_RULES = [
   `.mn-btn--small{font:${v("text-small")} ${v("font")};padding:2px 8px;}`,
 ];
 
-const CHOICE_RULES = [
+export const CHOICE_RULES = [
   `.mn-choices{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:${v("space-1")};margin-top:${v("space-2")};overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}`,
   `.mn-choice{display:flex;align-items:center;gap:${v("space-2")};width:100%;flex:0 0 auto;padding:${v("space-1")};text-align:left;}`,
   `.mn-choice-label{min-width:0;overflow-wrap:anywhere;}`,

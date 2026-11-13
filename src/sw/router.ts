@@ -20,6 +20,7 @@ import type { RatingCardMessage } from "../ext/rating-messages";
 import { createActivity, overlapping } from "./activity";
 import { answerRead, type Respond } from "./answer-read";
 import { createDebounce } from "./debounce";
+import { routeFiche } from "./fiche-routes";
 import { createFinishQueue } from "./finish-queue";
 import { createForgetQueue } from "./forget-queue";
 import type { JobQueue } from "./job-queue";
@@ -37,6 +38,8 @@ export type { Respond };
 export type Router = {
   /** true when `respond` will be called later (Chrome keeps the channel open). */
   handle(raw: unknown, sender: Sender, respond: Respond): boolean;
+  /** A closed tab: what the worker issued to it for its title page is forgotten. */
+  dropTab(tabId: number): void;
 };
 
 export type RouterDeps = {
@@ -135,6 +138,7 @@ export function createRouter(deps: RouterDeps): Router {
     msg: ToWorker,
     respond: Respond,
     role: SenderRole,
+    tabId: number | undefined,
   ): boolean {
     switch (msg.type) {
       case "naka-ready":
@@ -218,6 +222,12 @@ export function createRouter(deps: RouterDeps): Router {
       case "link-title":
       case "requeue-question":
         return questions.route(msg, respond);
+      case "fiche-info":
+      case "fiche-season":
+      case "fiche-mine":
+      case "fiche-rate":
+      case "fiche-link":
+        return routeFiche((job) => queue.run(job), jobs, msg, tabId, respond);
     }
   }
 
@@ -227,7 +237,11 @@ export function createRouter(deps: RouterDeps): Router {
       if (msg === undefined) return false;
       const role = isTrustedSender(sender, deps.extensionId);
       if (role === undefined || !allowedFor(role, msg)) return false;
-      return dispatch(msg, respond, role);
+      return dispatch(msg, respond, role, sender.tab?.id);
+    },
+    dropTab(tabId) {
+      // A session area that cannot be written leaves the entry until it is replaced: no error of the worker.
+      jobs.dropFicheTab(tabId).catch(ignore);
     },
   };
 }

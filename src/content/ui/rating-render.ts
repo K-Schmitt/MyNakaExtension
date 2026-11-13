@@ -82,7 +82,10 @@ export function ratingLines(doc: Maker, view: RatingView): ElementLike[] {
   ];
 }
 
-export function confirmRow(doc: Maker, handlers: RatingHandlers): ElementLike {
+export function confirmRow(
+  doc: Maker,
+  handlers: Pick<RatingHandlers, "onConfirm">,
+): ElementLike {
   return row(doc, [
     button(doc, SEND_LABEL, PRIMARY_CLASS, () => handlers.onConfirm(true)),
     button(doc, CANCEL_LABEL, BUTTON_CLASS, () => handlers.onConfirm(false)),

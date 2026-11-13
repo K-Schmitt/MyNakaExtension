@@ -8,6 +8,7 @@ import { createStore } from "../ext/store";
 import { createScClient, type Fetch } from "../sc/sc-client";
 import { createSessionReader } from "../sc/sc-session";
 import { readScUsername } from "./binding";
+import { createFicheRegistry } from "./fiche-registry";
 import { createJobQueue } from "./job-queue";
 import { createJobs } from "./jobs";
 import { localDate } from "./local-date";
@@ -22,6 +23,8 @@ const SEARCH_WINDOW_MS = 2000;
 export type WorkerEnv = {
   extensionId: string;
   storage: StorageArea;
+  /** chrome.storage.session: the products issued to the title pages, kept across worker restarts. */
+  session: StorageArea;
   tabs: TabsPort;
   fetch: Fetch;
   timer: Timer;
@@ -35,16 +38,20 @@ export function createWorker(env: WorkerEnv): Router {
   const clock = { now: env.now, sleep: env.sleep };
   const limiter = () =>
     createRateLimiter(clock, SEARCHES_PER_WINDOW, SEARCH_WINDOW_MS);
-  const jobs = createJobs({
-    store: createStore(env.storage),
-    tabs: env.tabs,
-    sc: createScClient(scDeps),
-    scUsername: () => readScUsername(scDeps),
-    limiters: { naka: limiter(), sc: limiter() },
-    now: env.now,
-    today: () => localDate(new Date(env.now())),
-    timer: env.timer,
-  });
+  const registry = createFicheRegistry(env.session);
+  const jobs = createJobs(
+    {
+      store: createStore(env.storage),
+      tabs: env.tabs,
+      sc: createScClient(scDeps),
+      scUsername: () => readScUsername(scDeps),
+      limiters: { naka: limiter(), sc: limiter() },
+      now: env.now,
+      today: () => localDate(new Date(env.now())),
+      timer: env.timer,
+    },
+    registry,
+  );
   return createRouter({
     extensionId: env.extensionId,
     queue: createJobQueue(),

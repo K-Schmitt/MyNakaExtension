@@ -75,17 +75,19 @@ function onArrows(
   });
 }
 
-/** The group of stars plus the value line, wrapped in one row. */
+/** The group of stars plus the value line, wrapped in one row; `name` names the group (« Note » without). */
 export function starRater(
   doc: Maker,
   stars: Star[],
   onChoose: (value: number) => void,
+  name?: string,
 ): ElementLike {
   const start = shownIndex(stars);
   const group = doc.createElement("div");
   group.className = "mn-stars";
   group.setAttribute("role", "radiogroup");
-  group.setAttribute("aria-label", "Note");
+  group.setAttribute("aria-label", name ?? "Note");
+  if (name !== undefined) group.setAttribute("title", name);
   const buttons = stars.map((s, i) =>
     starButton(doc, s, i === start, onChoose),
   );
