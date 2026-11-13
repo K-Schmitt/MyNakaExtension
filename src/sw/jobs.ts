@@ -40,6 +40,7 @@ import type { Store } from "../ext/store";
 import { answerQuestionJob, hideQuestionJob } from "./answer-jobs";
 import { cancelRetryJob } from "./cancel-retry-job";
 import { ficheInfoJob } from "./fiche-info-job";
+import { createInfoTurns } from "./fiche-info-turns";
 import { ficheLinkJob, type LinkAnswer } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
@@ -155,6 +156,7 @@ export function createJobs(
   registry: FicheRegistry = createFicheRegistry(memorySession()),
 ): Jobs {
   const asker = (tabId: number) => ({ registry, tabId });
+  const infoTurns = createInfoTurns();
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
@@ -206,7 +208,8 @@ export function createJobs(
     removalOffer: (contentId, answering) =>
       answerRemovalOffer(deps.store, contentId, answering),
     pageLists: (answering) => answerPageLists(deps.store, answering),
-    ficheInfo: (tabId, msg) => ficheInfoJob(deps, asker(tabId), msg),
+    ficheInfo: (tabId, msg) =>
+      ficheInfoJob(deps, asker(tabId), msg, infoTurns.start(tabId)),
     ficheSeason: (tabId, msg) => ficheSeasonJob(deps, asker(tabId), msg),
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
     ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
