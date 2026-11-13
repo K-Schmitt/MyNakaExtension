@@ -215,6 +215,29 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`search:${JSON.stringify(msg)}`);
       return { candidates: [] };
     },
+    ficheInfo: async (tabId, msg) => {
+      calls.push(`fiche-info:${tabId}:${JSON.stringify(msg)}`);
+      return { state: "notfound" };
+    },
+    ficheSeason: async (tabId, msg) => {
+      calls.push(`fiche-season:${tabId}:${JSON.stringify(msg)}`);
+      return { episodes: [] };
+    },
+    ficheMine: async (tabId, msg) => {
+      calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
+      return { mine: 6, average: null };
+    },
+    ficheRate: async (tabId, msg) => {
+      calls.push(`fiche-rate:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true };
+    },
+    ficheLink: async (tabId, msg) => {
+      calls.push(`fiche-link:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true };
+    },
+    dropFicheTab: async (tabId) => {
+      calls.push(`drop-fiche-tab:${tabId}`);
+    },
     ...over,
   };
   return { jobs, calls, snapshot };
@@ -236,7 +259,8 @@ function router(over: Partial<Jobs> = {}) {
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, (answer) => answers.push(answer));
-  return { ...recorded, ...clock, answers, send, time };
+  const dropTab = (tabId: number) => r.dropTab(tabId);
+  return { ...recorded, ...clock, answers, send, dropTab, time };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -1806,6 +1830,7 @@ function worker(loggedIn = true, start = "2026-11-04T12:00:00Z") {
   const answers: unknown[] = [];
   const r = createWorker({
     extensionId: EXT,
+    session: memoryArea(),
     storage,
     tabs,
     fetch: sc.fetch,
@@ -1854,6 +1879,7 @@ describe("worker end to end: a SensCritique request that never answers", () => {
       const answers: unknown[] = [];
       const r = createWorker({
         extensionId: EXT,
+        session: memoryArea(),
         storage,
         tabs: tabRunning(client, () => "77").tabs,
         fetch: hanging,
@@ -1943,6 +1969,7 @@ function stallingWorker(stuck: string, hangs: (answered: Call[]) => boolean) {
   const clock: Clock = { time: Date.parse("2026-11-04T12:00:00Z") };
   const r = createWorker({
     extensionId: EXT,
+    session: memoryArea(),
     storage,
     tabs: tabRunning(client, () => "77").tabs,
     fetch,
@@ -2232,6 +2259,7 @@ describe("worker end to end: searches read no session", () => {
     });
     const r = createWorker({
       extensionId: EXT,
+      session: memoryArea(),
       storage: memoryArea(),
       tabs: tabRunning(client, () => "77").tabs,
       fetch: sc.fetch,
@@ -2477,5 +2505,138 @@ describe("router: the manual link family (B6)", () => {
     await settle();
     expect(r.calls).toEqual([]);
     expect(r.answers).toEqual([]);
+  });
+});
+
+describe("router: the title page messages", () => {
+  const FICHE_TAB = { ...NAKA_TAB, tab: { id: 42, url: PLAYER } };
+  const FICHE_INFO = {
+    type: "fiche-info",
+    contentId: 5,
+    tmdbId: 9005,
+    mediaType: "movie",
+    title: "Solaris",
+  };
+  const FICHE_SEASON = { type: "fiche-season", contentId: 5, season: 2 };
+  const FICHE_MINE = { type: "fiche-mine", contentId: 5, productId: 2005 };
+
+  it("fiche-info, fiche-season and fiche-mine are answered outside the queue, for the sending tab", async () => {
+    const r = router();
+    expect(r.send(FICHE_INFO, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_SEASON, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_MINE, FICHE_TAB)).toBe(true);
+    await settle();
+    expect(r.calls).toEqual([
+      `fiche-info:42:${JSON.stringify(FICHE_INFO)}`,
+      `fiche-season:42:${JSON.stringify(FICHE_SEASON)}`,
+      `fiche-mine:42:${JSON.stringify(FICHE_MINE)}`,
+    ]);
+    expect(r.answers).toEqual([
+      { state: "notfound" },
+      { episodes: [] },
+      { mine: 6, average: null },
+    ]);
+  });
+
+  it("a fiche-season above season 100 is refused: no job, no answer", async () => {
+    const r = router();
+    expect(r.send({ ...FICHE_SEASON, season: 101 }, FICHE_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("a fiche read that rejects is answered undefined at once", async () => {
+    const r = router({
+      ficheMine: async () => {
+        throw new Error("not issued");
+      },
+    });
+    expect(r.send(FICHE_MINE, FICHE_TAB)).toBe(true);
+    await settle();
+    expect(r.answers).toEqual([undefined]);
+  });
+
+  it("a Naka sender with no tab id is ignored", async () => {
+    const r = router();
+    expect(r.send(FICHE_INFO, NAKA_TAB)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+    expect(r.answers).toEqual([]);
+  });
+
+  it("the fiche reads from the status page are ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    expect(r.send(FICHE_INFO, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+  });
+
+  const FICHE_RATE = {
+    type: "fiche-rate",
+    contentId: 5,
+    target: "film",
+    productId: 2005,
+    rating: 7,
+  };
+  const FICHE_LINK = { type: "fiche-link", contentId: 5, productId: 2005 };
+
+  it("fiche-rate and fiche-link run for the sending tab and are answered with their job's answer", async () => {
+    const r = router({
+      ficheRate: async () => ({ error: "finish-limit" }),
+    });
+    expect(r.send(FICHE_RATE, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_LINK, FICHE_TAB)).toBe(true);
+    await settle();
+    expect(r.calls).toEqual([`fiche-link:42:${JSON.stringify(FICHE_LINK)}`]);
+    expect(r.answers).toEqual([{ error: "finish-limit" }, { ok: true }]);
+  });
+
+  it("the fiche writes wait on the one queue: they start after the job before them ends", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    r.send(FICHE_RATE, FICHE_TAB);
+    r.send(FICHE_LINK, FICHE_TAB);
+    await settle();
+    expect(r.answers).toEqual([]);
+    expect(r.calls).toEqual([]);
+    release();
+    await settle();
+    expect(r.calls).toEqual([
+      `fiche-rate:42:${JSON.stringify(FICHE_RATE)}`,
+      `fiche-link:42:${JSON.stringify(FICHE_LINK)}`,
+    ]);
+    expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+  });
+
+  it("a fiche write that rejects is answered undefined", async () => {
+    const r = router({
+      ficheLink: async () => {
+        throw new Error("not issued");
+      },
+    });
+    r.send(FICHE_LINK, FICHE_TAB);
+    await settle();
+    expect(r.answers).toEqual([undefined]);
+  });
+
+  it("the fiche writes from the status page are ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    expect(r.send(FICHE_RATE, page)).toBe(false);
+    expect(r.send(FICHE_LINK, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+  });
+
+  it("a removed tab drops its issued products", () => {
+    const r = router();
+    r.dropTab(42);
+    expect(r.calls).toEqual(["drop-fiche-tab:42"]);
   });
 });

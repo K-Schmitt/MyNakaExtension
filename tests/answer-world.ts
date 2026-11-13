@@ -6,10 +6,17 @@ import { emptyState, type SyncState } from "../src/core/state";
 import { parseSettings, type Settings } from "../src/ext/settings";
 import type { NakaClient, NakaItem } from "../src/naka/naka-client";
 import type { ProductState, ScClient } from "../src/sc/sc-client";
+import { createFicheRegistry } from "../src/sw/fiche-registry";
 import { createJobs, type JobDeps } from "../src/sw/jobs";
 import type { TabsPort } from "../src/sw/naka-proxy";
 import { type Traffic, tabRunning } from "./naka-bridge-fakes";
-import { countingLimiter, fakeNaka, fakeSc, memoryStore } from "./sw-fakes";
+import {
+  countingLimiter,
+  fakeNaka,
+  fakeSc,
+  memoryArea,
+  memoryStore,
+} from "./sw-fakes";
 
 export const NOW = Date.parse("2026-11-05T12:00:00Z");
 export const BOUND = { scUsername: "owner", nakaAccount: "77" };
@@ -54,6 +61,7 @@ export function answerWorld(o: WorldOpts = {}) {
       isWished: true,
       universe: 1,
       rating: null,
+      average: null,
       ...o.product?.(id),
     }),
     ...o.sc,
@@ -78,9 +86,14 @@ export function answerWorld(o: WorldOpts = {}) {
     today: () => "2026-11-05",
     timer: { set: () => 0, clear: () => undefined },
   };
-  const jobs = createJobs(jobDeps);
+  // chrome.storage.session: the registry of the title page products.
+  const session = memoryArea();
+  const registry = createFicheRegistry(session);
+  const jobs = createJobs(jobDeps, registry);
   return {
     jobs,
+    session,
+    registry,
     jobDeps,
     area,
     nk,

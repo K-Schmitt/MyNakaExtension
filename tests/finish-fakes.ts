@@ -40,6 +40,7 @@ export const ep = (
   season,
   episode,
   title: `Épisode ${episode}`,
+  average: null,
 });
 
 export type Season = { seasonProductId?: number; episodes: ScEpisode[] };
@@ -158,6 +159,7 @@ export function world(o: Opts = {}) {
         isDone,
         isWished,
         rating: rating ?? null,
+        average: null,
         universe: universeOf(id),
       };
     },

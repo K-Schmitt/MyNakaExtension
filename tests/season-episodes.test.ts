@@ -16,12 +16,18 @@ function pageWith(state: unknown, scriptAttrs = ""): string {
   return `<html><script id="__NEXT_DATA__" type="application/json"${scriptAttrs}>${JSON.stringify(data)}</script></html>`;
 }
 
-function product(id: number, url: string, title?: string): object {
+function product(
+  id: number,
+  url: string,
+  title?: string,
+  rating?: unknown,
+): object {
   return {
     __typename: "Product",
     id,
     url,
     ...(title === undefined ? {} : { title }),
+    ...(rating === undefined ? {} : { rating }),
   };
 }
 
@@ -51,6 +57,7 @@ describe("parseSeasonEpisodes on the real fixture", () => {
       season: 1,
       episode: 2,
       title: "Hébergement",
+      average: null,
     });
   });
 
@@ -435,7 +442,7 @@ describe("parseSeasonEpisodes rules", () => {
       "Product:2": product(2, `${BASE}/S2/E1`),
     });
     expect(parseSeasonEpisodes(html, SERIES, 2)).toEqual([
-      { productId: 2, season: 2, episode: 1, title: "" },
+      { productId: 2, season: 2, episode: 1, title: "", average: null },
     ]);
   });
 
@@ -447,8 +454,8 @@ describe("parseSeasonEpisodes rules", () => {
 
 describe("findEpisode", () => {
   const list = [
-    { productId: 1, season: 1, episode: 1, title: "" },
-    { productId: 2, season: 2, episode: 1, title: "" },
+    { productId: 1, season: 1, episode: 1, title: "", average: null },
+    { productId: 2, season: 2, episode: 1, title: "", average: null },
   ];
 
   it("matches on both season and episode", () => {
@@ -532,4 +539,30 @@ describe("locating the __NEXT_DATA__ tag", () => {
     expect(parseSeasonEpisodes(html, SERIES, 1)).toEqual([]);
     expect(performance.now() - started).toBeLessThan(200);
   });
+});
+
+describe("the average of each episode", () => {
+  const seasonUrl = `${BASE}/S1`;
+  const pageOf = (rating?: unknown): string =>
+    pageWith({
+      "Product:1": seasonEntry(1, seasonUrl, [2]),
+      "Product:2": product(2, `${seasonUrl}/E1`, "Un", rating),
+    });
+
+  it("reads each episode product's rating", () => {
+    expect(parseSeasonEpisodes(pageOf(7.4), SERIES, 1)[0]?.average).toBe(7.4);
+  });
+
+  it("is null when the rating is missing", () => {
+    expect(parseSeasonEpisodes(pageOf(), SERIES, 1)[0]?.average).toBeNull();
+  });
+
+  it.each([["7"], [null], [Number.POSITIVE_INFINITY], [11], [-1]])(
+    "is null for the rating %s",
+    (rating) => {
+      expect(
+        parseSeasonEpisodes(pageOf(rating), SERIES, 1)[0]?.average,
+      ).toBeNull();
+    },
+  );
 });

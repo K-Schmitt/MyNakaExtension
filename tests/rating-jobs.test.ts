@@ -101,6 +101,7 @@ function world(o: Opts = {}) {
       isWished: false,
       universe: id >= 5000 ? 32 : id === 1007 ? 4 : 1,
       rating: o.rated?.[id] ?? null,
+      average: null,
     }),
     seasonInfo: async (id, season) => ({
       seasonProductId: 4000 + id,
@@ -109,6 +110,7 @@ function world(o: Opts = {}) {
         season,
         episode: i + 1,
         title: `Episode ${i + 1}`,
+        average: null,
       })),
     }),
     ...o.sc,
@@ -290,7 +292,13 @@ describe("the finish creates the rating card", () => {
   const failing = (...ids: number[]) => ({
     productState: async (id: number) => {
       if (ids.includes(id)) throw new ScUnavailableError("boom");
-      return { isDone: false, isWished: false, universe: 32, rating: null };
+      return {
+        isDone: false,
+        isWished: false,
+        universe: 32,
+        rating: null,
+        average: null,
+      };
     },
   });
 
@@ -573,7 +581,13 @@ describe("rate", () => {
       sc: {
         productState: async (id) => {
           if (id === 5007) throw new ScUnavailableError("boom");
-          return { isDone: false, isWished: false, universe: 32, rating: null };
+          return {
+            isDone: false,
+            isWished: false,
+            universe: 32,
+            rating: null,
+            average: null,
+          };
         },
       },
     });
@@ -921,6 +935,7 @@ describe("rate a handled title that has no card (Ruling L2)", () => {
             isWished: false,
             universe: 1,
             rating: null,
+            average: null,
           }),
         },
       },

@@ -147,6 +147,7 @@ describe("retryNextJob", () => {
             season,
             episode: e,
             title: `Episode ${e}`,
+            average: null,
           })),
         }),
       },
