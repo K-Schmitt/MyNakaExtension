@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TitlePageEvent } from "../src/content/fiche-ports";
 import { startNakaTab, type TabEnv } from "../src/content/naka-tab";
 import { createTabListener } from "../src/content/naka-tab-listener";
 import { readVideo } from "../src/content/video-sample";
@@ -127,6 +128,9 @@ function tab(start = PLAYER(3)) {
   const urls: (ContentIds | undefined)[] = [];
   const paths: string[] = [];
   const removals: number[] = [];
+  const fichePaths: string[] = [];
+  const ficheEvents: TitlePageEvent[] = [];
+  const ficheLog: string[] = [];
   const timers: { ms: number; fn: () => void }[] = [];
   const pageListeners: ((ev: {
     source: unknown;
@@ -164,6 +168,16 @@ function tab(start = PLAYER(3)) {
     removed: (contentId) => {
       removals.push(contentId);
     },
+    fiche: {
+      path: (pathname) => {
+        fichePaths.push(pathname);
+        ficheLog.push(`path ${pathname}`);
+      },
+      event: (event) => {
+        ficheEvents.push(event);
+        ficheLog.push(`event ${event.kind}`);
+      },
+    },
   };
   startNakaTab(env);
   const tick = (ms: number) => {
@@ -176,7 +190,20 @@ function tab(start = PLAYER(3)) {
   ) => {
     for (const fn of pageListeners) fn({ source, origin, data });
   };
-  return { sent, ended, urls, paths, removals, timers, page, tick, post };
+  return {
+    sent,
+    ended,
+    urls,
+    paths,
+    removals,
+    fichePaths,
+    ficheEvents,
+    ficheLog,
+    timers,
+    page,
+    tick,
+    post,
+  };
 }
 
 describe("the Naka tab URL changes", () => {
@@ -494,5 +521,52 @@ describe("the Naka tab at the credits", () => {
     expect(t.sent.slice(1)).toEqual([
       { type: "finished", source: "threshold", progress: 0.9, contentId: 3 },
     ]);
+  });
+});
+
+describe("the title page events", () => {
+  const fiche = {
+    channel: PAGE_CHANNEL,
+    kind: "fiche",
+    contentId: 6,
+    tmdbId: 9006,
+    mediaType: "tv",
+    title: "Dark",
+  };
+
+  it("hands the pathname to the fiche controller at every poll", () => {
+    const t = tab("https://naka.cx/content/tv/9006");
+    t.tick(1000);
+    t.tick(1000);
+    expect(t.fichePaths).toEqual(["/content/tv/9006", "/content/tv/9006"]);
+  });
+
+  it("hands the fiche and season events to the controller, and sends nothing", () => {
+    const t = tab("https://naka.cx/content/tv/9006");
+    t.post(fiche);
+    t.post({ channel: PAGE_CHANNEL, kind: "season", contentId: 6, season: 2 });
+    expect(t.ficheEvents).toEqual([
+      fiche,
+      { channel: PAGE_CHANNEL, kind: "season", contentId: 6, season: 2 },
+    ]);
+    expect(t.sent).toEqual([{ type: "naka-ready" }]);
+  });
+
+  it("hands the address before an event posted before the next poll", () => {
+    const t = tab(PLAYER(3));
+    t.tick(1000);
+    t.page.href = "https://naka.cx/content/tv/9006";
+    t.post(fiche);
+    expect(t.ficheLog).toEqual([
+      "path /player",
+      "path /content/tv/9006",
+      "event fiche",
+    ]);
+  });
+
+  it("hands over no fiche event from another window", () => {
+    const t = tab("https://naka.cx/content/tv/9006");
+    t.post(fiche, { name: "a frame" });
+    expect(t.ficheEvents).toEqual([]);
   });
 });

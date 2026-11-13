@@ -1,13 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { visitMessage } from "../src/ext/fiche-visit";
 
 // The MAIN-world entry against a fake page: what it wraps, where it posts, and what it never reads.
 const calls: unknown[][] = [];
 const posts: unknown[][] = [];
 const storageReads: string[] = [];
 
+const listeners: ((ev: unknown) => void)[] = [];
+const CONTENT = {
+  id: 21391,
+  tmdbId: 1434,
+  mediaType: "tv",
+  title: "Les Griffin",
+};
+
 const pageFetch = async (...args: unknown[]) => {
   calls.push(args);
-  return { ok: true, status: 200 } as Response;
+  const json = async () => CONTENT;
+  return { ok: true, status: 200, clone: () => ({ json }) } as Response;
 };
 
 const page = {
@@ -15,6 +25,13 @@ const page = {
   postMessage: (...args: unknown[]) => {
     posts.push(args);
   },
+  addEventListener: (type: string, fn: (ev: unknown) => void) => {
+    if (type === "message") listeners.push(fn);
+  },
+};
+const announce = (path: string, over: object = {}) => {
+  const ev = { source: page, origin: "https://naka.cx", ...over };
+  for (const fn of listeners) fn({ ...ev, data: visitMessage(path) });
 };
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -59,6 +76,40 @@ describe("MAIN-world entry", () => {
     await page.fetch("api/v1/playlist", { method: "POST" });
     where.href = "https://naka.cx/player?id=3&type=movie";
     await settle();
+    expect(posts.slice(before)).toEqual([]);
+  });
+
+  it("posts again the title page events the tab missed when it announces that title's visit", async () => {
+    await page.fetch("https://naka.cx/api/v1/browse/by-tmdb/tv/1434");
+    await page.fetch("https://naka.cx/api/v1/browse/21391/season/2");
+    await settle();
+    const before = posts.length;
+    announce("/content/tv/1434");
+    expect(posts.slice(before)).toEqual([
+      [
+        {
+          channel: "mynaka/1",
+          kind: "fiche",
+          contentId: 21391,
+          tmdbId: 1434,
+          mediaType: "tv",
+          title: "Les Griffin",
+        },
+        "https://naka.cx",
+      ],
+      [
+        { channel: "mynaka/1", kind: "season", contentId: 21391, season: 2 },
+        "https://naka.cx",
+      ],
+    ]);
+  });
+
+  it("posts nothing for another title, another window or another origin", () => {
+    const before = posts.length;
+    announce("/content/tv/1435");
+    announce("/content/movie/1434");
+    announce("/content/tv/1434", { source: {} });
+    announce("/content/tv/1434", { origin: "https://evil.example" });
     expect(posts.slice(before)).toEqual([]);
   });
 

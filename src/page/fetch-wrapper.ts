@@ -3,8 +3,10 @@
 // touched. On the side it resolves the URL against the page, classifies the request, and posts the event
 // only once the response is ok, so a refused "vu" never counts. It reads the method and a string body,
 // never a header (the page's Authorization header holds the Naka token) and never a Request's body.
-// One response body is read, for one path only (GET /api/v1/skip-segments, where the credits start): a
-// CLONE of the ok response, as JSON, never the page's own response and never a header of either.
+// Response bodies are read for two paths only (GET /api/v1/skip-segments, where the credits start, and
+// GET /api/v1/browse/by-tmdb/{movie|tv}/{n}, the title page's content): a CLONE of the ok response, as
+// JSON, never the page's own response and never a header of either. The season a title page opens is
+// read from the url of its request alone.
 // Any error of its own is swallowed: the page's fetch goes on as if nothing watched it.
 //
 // Two differences the page could notice, both accepted (M10): observing the outcome of a classified
@@ -12,12 +14,9 @@
 // that request; and the wrapper's name, length and toString differ from the native fetch.
 
 import type { PageEvent } from "../ext/messages";
-import {
-  type CreditsQuery,
-  creditsEvent,
-  creditsRequest,
-} from "./credits-observer";
+import { creditsEvent, creditsRequest } from "./credits-observer";
 import { classifyRequest } from "./fetch-observer";
+import { ficheEvent, ficheRequest, seasonRequest } from "./fiche-observer";
 
 type Post = (event: PageEvent) => void;
 
@@ -40,34 +39,54 @@ function methodOf(input: unknown, init: unknown): string {
   return typeof method === "string" ? method : "GET";
 }
 
+type ReadBody = (json: unknown) => PageEvent | undefined;
 type Watched =
   | { kind: "request"; event: PageEvent }
-  | { kind: "credits"; query: CreditsQuery };
+  | { kind: "body"; read: ReadBody };
+
+// A request whose answer body is read: the credits start, or the title page's content.
+function bodyReader(method: string, url: string): ReadBody | undefined {
+  const query = creditsRequest(method, url);
+  if (query !== undefined) return (json) => creditsEvent(query, json);
+  return ficheRequest(method, url) ? ficheEvent : undefined;
+}
+
+// A request whose event is known from the request alone: a list change, a « vu », a season opened.
+function requestEvent(
+  method: string,
+  url: string,
+  init: unknown,
+): PageEvent | undefined {
+  return (
+    classifyRequest(method, url, asRecord(init)?.body) ??
+    seasonRequest(method, url)
+  );
+}
 
 function classify(args: unknown[], base: () => string): Watched | undefined {
   const [input, init] = args;
   const url = new URL(urlOf(input), base()).href;
   const method = methodOf(input, init);
-  const event = classifyRequest(method, url, asRecord(init)?.body);
+  const event = requestEvent(method, url, init);
   if (event !== undefined) return { kind: "request", event };
-  const query = creditsRequest(method, url);
-  return query === undefined ? undefined : { kind: "credits", query };
+  const read = bodyReader(method, url);
+  return read === undefined ? undefined : { kind: "body", read };
 }
 
 // The clone is taken in the first handler of the page's promise, before the page can read its own body.
-async function readCredits(
+async function readBody(
   answer: Response,
-  query: CreditsQuery,
+  read: ReadBody,
   post: Post,
 ): Promise<void> {
-  const event = creditsEvent(query, await answer.clone().json());
+  const event = read(await answer.clone().json());
   if (event !== undefined) post(event);
 }
 
 function onAnswer(answer: Response, watched: Watched, post: Post): unknown {
   if (!answer.ok) return undefined;
   if (watched.kind === "request") return post(watched.event);
-  return readCredits(answer, watched.query, post);
+  return readBody(answer, watched.read, post);
 }
 
 function observe(
