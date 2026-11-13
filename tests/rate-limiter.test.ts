@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type Clock, createRateLimiter } from "../src/core/rate-limiter";
+import {
+  type Clock,
+  createRateLimiter,
+  SkippedError,
+} from "../src/core/rate-limiter";
 
 type FakeClock = Clock & { time: number; sleeps: number[] };
 
@@ -175,6 +179,86 @@ describe("createRateLimiter scheduling", () => {
     await first;
     await second;
     expect(secondStarted).toBe(true);
+  });
+});
+
+describe("createRateLimiter skip", () => {
+  it("a call skipped once its slot is free rejects with SkippedError and never calls its task", async () => {
+    const limiter = createRateLimiter(fakeClock(), 1, 2000);
+    let called = false;
+    const skipped = limiter.run(
+      async () => {
+        called = true;
+      },
+      { skip: () => true },
+    );
+    await expect(skipped).rejects.toBeInstanceOf(SkippedError);
+    expect(called).toBe(false);
+  });
+
+  it("a skipped call takes no slot: the next call starts at once, the one after a window later", async () => {
+    const clock = fakeClock(0);
+    const limiter = createRateLimiter(clock, 1, 2000);
+    const starts: number[] = [];
+    const started = async () => {
+      starts.push(clock.now());
+    };
+    await limiter.run(started);
+    const skipped = limiter.run(started, { skip: () => true });
+    const next = limiter.run(started);
+    const after = limiter.run(started);
+    await expect(skipped).rejects.toBeInstanceOf(SkippedError);
+    await next;
+    await after;
+    expect(starts).toEqual([0, 2000, 4000]);
+    expect(clock.sleeps).toEqual([2000, 2000]);
+  });
+
+  it("the check runs after the wait: a call that dies while waiting gives up its slot", async () => {
+    let dead = false;
+    let time = 0;
+    const clock: Clock = {
+      now: () => time,
+      sleep: async (ms) => {
+        time += ms;
+        dead = true;
+      },
+    };
+    const limiter = createRateLimiter(clock, 1, 2000);
+    await limiter.run(async () => 1);
+    const checked = limiter.run(async () => "ran", { skip: () => dead });
+    await expect(checked).rejects.toBeInstanceOf(SkippedError);
+    const starts: number[] = [];
+    await limiter.run(async () => starts.push(time));
+    expect(starts).toEqual([2000]);
+  });
+
+  it("a call whose check says go takes its slot as a call with no check does", async () => {
+    const clock = fakeClock(0);
+    const limiter = createRateLimiter(clock, 1, 2000);
+    const starts: number[] = [];
+    const started = async () => {
+      starts.push(clock.now());
+    };
+    await limiter.run(started, { skip: () => false });
+    await limiter.run(started);
+    await limiter.run(started, { skip: () => false });
+    expect(starts).toEqual([0, 2000, 4000]);
+  });
+
+  it("a check that throws rejects the call with its error and takes no slot", async () => {
+    const clock = fakeClock(0);
+    const limiter = createRateLimiter(clock, 1, 2000);
+    const boom = new Error("check");
+    const failing = limiter.run(async () => 1, {
+      skip: () => {
+        throw boom;
+      },
+    });
+    await expect(failing).rejects.toBe(boom);
+    const starts: number[] = [];
+    await limiter.run(async () => starts.push(clock.now()));
+    expect(starts).toEqual([0]);
   });
 });
 

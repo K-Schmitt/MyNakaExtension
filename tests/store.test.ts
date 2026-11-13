@@ -180,3 +180,30 @@ describe("ratings store", () => {
     expect(await store.loadRatings()).toEqual(cards);
   });
 });
+
+describe("fiche links store", () => {
+  it("loads no links when the key is absent", async () => {
+    expect(await createStore(fakeArea().area).loadFicheLinks()).toEqual({});
+  });
+
+  it("round-trips links under the key ficheLinks", async () => {
+    const { area, data } = fakeArea();
+    const store = createStore(area);
+    await store.saveFicheLinks({ "7": 99 });
+    expect(data.get("ficheLinks")).toEqual({ "7": 99 });
+    expect(await store.loadFicheLinks()).toEqual({ "7": 99 });
+  });
+
+  it("rejects a stored value that does not parse", async () => {
+    const store = createStore(fakeArea({ ficheLinks: { x: 1 } }).area);
+    await expect(store.loadFicheLinks()).rejects.toThrow(StoredStateError);
+  });
+
+  it("keeps the links apart from state", async () => {
+    const { area } = fakeArea();
+    const store = createStore(area);
+    await store.saveState(sample());
+    await store.saveFicheLinks({ "7": 99 });
+    expect(await store.loadState()).toEqual(sample());
+  });
+});
