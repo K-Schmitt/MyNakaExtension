@@ -46,11 +46,20 @@ function setup(lists: unknown = LISTS) {
   const searches: Deferred[] = [];
   const holds: Deferred[] = [];
   const t = fakeTimer();
-  const world = { lists, holdActions: false, rejectActions: false };
+  const world = {
+    lists,
+    holdActions: false,
+    rejectActions: false,
+    rejectLists: false,
+  };
   const controller = createListsController({
     send: (message) => {
       sent.push(message);
-      if (message.type === "page-lists") return Promise.resolve(world.lists);
+      if (message.type === "page-lists") {
+        return world.rejectLists
+          ? Promise.reject(new Error("closed"))
+          : Promise.resolve(world.lists);
+      }
       if (message.type === "search-titles") {
         return new Promise((resolve, reject) =>
           searches.push({ resolve, reject }),
@@ -115,6 +124,13 @@ describe("loading", () => {
     t.world.lists = undefined;
     await t.controller.load();
     expect(t.last().questions).toEqual([]);
+  });
+
+  it("a page-lists send that rejects shows no rows, never a throw", async () => {
+    const t = setup();
+    t.world.rejectLists = true;
+    await t.controller.load();
+    expect(t.last()).toEqual({ questions: [], unlinked: [], note: "" });
   });
 });
 

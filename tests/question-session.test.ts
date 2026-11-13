@@ -326,6 +326,19 @@ describe("the question session actions", () => {
     expect(t.closed).toEqual([]);
     expect(t.top().view.error).toBe(UNREACHABLE_LINE);
   });
+
+  it("shows the unreachable line when the dismissal rejects, and unlocks", async () => {
+    const t = setup();
+    vi.mocked(t.ports.dismiss as () => Promise<boolean>).mockRejectedValue(
+      new Error("gone"),
+    );
+    await t.clock.advance(GRACE_MS);
+    t.top().h.onAction("ecarter");
+    await flush();
+    expect(t.closed).toEqual([]);
+    expect(t.top().view.error).toBe(UNREACHABLE_LINE);
+    expect(t.top().view.sending).toBeUndefined();
+  });
 });
 
 describe("the question session retry and absentIsDone", () => {

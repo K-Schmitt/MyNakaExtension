@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { attachSheet, defaultSheetMaker } from "../src/content/ui/sheet";
 import { FakeDoc, type FakeElement, FakeNode, FakeShadow } from "./ui-fakes";
 
@@ -85,7 +85,37 @@ describe("attachSheet, fallback path", () => {
 });
 
 describe("defaultSheetMaker", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns undefined where CSSStyleSheet is absent", () => {
+    expect(defaultSheetMaker(CSS)).toBeUndefined();
+  });
+
+  it("returns a constructed sheet holding the css", () => {
+    const fed: string[] = [];
+    vi.stubGlobal(
+      "CSSStyleSheet",
+      class {
+        replaceSync(css: string): void {
+          fed.push(css);
+        }
+      },
+    );
+    expect(defaultSheetMaker(CSS)).toBeDefined();
+    expect(fed).toEqual([CSS]);
+  });
+
+  it("returns undefined when the sheet refuses the css, never a throw", () => {
+    vi.stubGlobal(
+      "CSSStyleSheet",
+      class {
+        replaceSync(): void {
+          throw new Error("refused");
+        }
+      },
+    );
     expect(defaultSheetMaker(CSS)).toBeUndefined();
   });
 });

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createPauseBlock } from "../src/content/ui/pause-block";
+import {
+  createPauseBlock,
+  DOUBLE_PAUSE_MS,
+} from "../src/content/ui/pause-block";
 import { SENDING_LINE as QUESTION_SENDING_LINE } from "../src/content/ui/question-copy";
 import {
   errorLine,
@@ -156,6 +159,17 @@ describe("the pause block thresholds", () => {
     w.block.paused({ currentTime: 10, duration: Number.NaN }, EP_IDS);
     w.block.paused({ currentTime: 10, duration: 0 }, EP_IDS);
     await flush();
+    expect(w.shown).toEqual([]);
+  });
+
+  it("shows nothing for a position that is not a number, nor for a zero duration, and asks nothing", async () => {
+    const w = world();
+    w.script(EP_IDS, asked(episodeCard()));
+    w.block.paused({ currentTime: Number.NaN, duration: DURATION }, EP_IDS);
+    await w.clock.advance(DOUBLE_PAUSE_MS);
+    w.block.paused({ currentTime: 0, duration: 0 }, EP_IDS);
+    await flush();
+    expect(w.calls).toEqual([]);
     expect(w.shown).toEqual([]);
   });
 
