@@ -77,6 +77,12 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     openQuestions: async () => ({ questions: [] }),
     removalOffer: async () => ({ offer: null }),
     pageLists: async () => ({ questions: [], unlinked: [] }),
+    ficheInfo: async () => ({ state: "notfound" }),
+    ficheSeason: async () => ({ episodes: [] }),
+    ficheMine: async () => ({ mine: null, average: null }),
+    ficheRate: async () => ({ ok: true }),
+    ficheLink: async () => ({ ok: true }),
+    dropFicheTab: async () => undefined,
     ...over,
   };
 }

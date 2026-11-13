@@ -1,5 +1,6 @@
 import type { RatingCard } from "../core/rating-cards";
 import { emptyState, type SyncState } from "../core/state";
+import { type FicheLinks, parseFicheLinks } from "./fiche-links-schema";
 import { parseRatings } from "./rating-schema";
 import { parseSettings, type Settings } from "./settings";
 import { parseState } from "./state-schema";
@@ -16,11 +17,14 @@ export type Store = {
   saveSettings(s: Settings): Promise<void>;
   loadRatings(): Promise<RatingCard[]>;
   saveRatings(cards: RatingCard[]): Promise<void>;
+  loadFicheLinks(): Promise<FicheLinks>;
+  saveFicheLinks(links: FicheLinks): Promise<void>;
 };
 
 const RATINGS_KEY = "ratings";
 const STATE_KEY = "state";
 const SETTINGS_KEY = "settings";
+const FICHE_LINKS_KEY = "ficheLinks";
 
 // Only an absent key means a first install; a stored value that does not parse rejects.
 async function read(area: StorageArea, key: string): Promise<unknown> {
@@ -48,6 +52,12 @@ export function createStore(area: StorageArea): Store {
     },
     async saveRatings(cards) {
       await area.set({ [RATINGS_KEY]: cards });
+    },
+    async loadFicheLinks() {
+      return parseFicheLinks(await read(area, FICHE_LINKS_KEY));
+    },
+    async saveFicheLinks(links) {
+      await area.set({ [FICHE_LINKS_KEY]: links });
     },
   };
 }

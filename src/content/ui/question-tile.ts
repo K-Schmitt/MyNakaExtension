@@ -25,10 +25,11 @@ const isCandidate = ({ choice }: Choice): boolean =>
   choice.kind === "candidate";
 const isRemoval = (view: QuestionView): boolean => view.kind === "removal";
 
-function candidateButton(
+/** A candidate as a button: its small poster and its label; a trusted click chooses it. */
+export function candidateButton(
   doc: Maker,
   { choice, label, image }: Choice,
-  handlers: QuestionHandlers,
+  handlers: Pick<QuestionHandlers, "onChoose">,
 ): ElementLike {
   const el = doc.createElement("button");
   el.className = CANDIDATE_CLASS;

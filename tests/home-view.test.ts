@@ -41,6 +41,13 @@ describe("homeView", () => {
     expect(homeView([{ card: old }]).entries[0]).not.toHaveProperty("image");
   });
 
+  it("fills the tile with the poster, not the backdrop, when Naka gives both", () => {
+    const image = { posterPath: "/a.jpg", backdropPath: "/b.jpg" };
+    const card = filmCard({ ...old, image });
+    const [entry] = homeView([{ card }]).entries;
+    expect(entry?.image).toBe("https://image.tmdb.org/t/p/w500/a.jpg");
+  });
+
   it("has no heading and no fold", () => {
     const view = homeView([{ card: old }]);
     expect(view).not.toHaveProperty("heading");

@@ -174,6 +174,7 @@ async function simulate(seed: number): Promise<string[]> {
         isWished: lists.sc.has(id),
         universe: universeOf(id),
         rating: null,
+        average: null,
       };
     },
     unwish: async (id) => {
@@ -196,6 +197,7 @@ async function simulate(seed: number): Promise<string[]> {
         season,
         episode: i + 1,
         title: `Episode ${i + 1}`,
+        average: null,
       })),
     }),
     today: () => "2026-11-03",

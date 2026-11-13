@@ -86,6 +86,11 @@ describe("BLOCK_SHEET", () => {
 
   it("removes the transitions for reduced motion", () => {
     expect(BLOCK_SHEET).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(
+      BLOCK_SHEET.endsWith(
+        "@media (prefers-reduced-motion: reduce){.mn-btn,.mn-arrow{transition:none;}}",
+      ),
+    ).toBe(true);
     expect(BLOCK_SHEET).toMatch(
       /prefers-reduced-motion: reduce\)\{[^}]*transition:none/,
     );

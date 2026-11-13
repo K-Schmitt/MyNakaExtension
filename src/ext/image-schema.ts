@@ -1,6 +1,8 @@
 // The image of a stored or answered record. Shape only: a TMDB path or an https URL. The host allowlist
 // applies when an image enters from a site and when it is drawn, never here, so a later change of the
-// list cannot make stored state unreadable.
+// list cannot make stored state unreadable. The TMDB path rule is the entry's, and it may tighten after a
+// path was stored: a path it no longer accepts drops, with the image when nothing else is left, never
+// the record that holds it.
 
 import { type TitleImage, tmdbPathOf } from "../core/title-image";
 import {
@@ -18,8 +20,9 @@ const IMAGE_KEYS = valuesOf<keyof TitleImage>({
   picture: true,
 });
 
-function asTmdbPath(raw: unknown, path: string): string {
-  return tmdbPathOf(asString(raw, path)) ?? fail(path);
+/** The path when the entry rule still accepts it, else undefined; a non-string is the wrong shape. */
+function keptTmdbPath(raw: unknown, path: string): string | undefined {
+  return tmdbPathOf(asString(raw, path));
 }
 
 function asHttpsUrl(raw: unknown, path: string): string {
@@ -31,19 +34,24 @@ function asHttpsUrl(raw: unknown, path: string): string {
   }
 }
 
-export function parseTitleImage(raw: unknown, path: string): TitleImage {
+/** The image, or undefined when every path it held was dropped; an image with no field is the wrong shape. */
+export function parseTitleImage(
+  raw: unknown,
+  path: string,
+): TitleImage | undefined {
   const record = asRecord(raw, path);
   onlyKeys(record, IMAGE_KEYS, path);
+  if (Object.keys(record).length === 0) return fail(path);
   const posterPath = whenPresent(record.posterPath, (v) =>
-    asTmdbPath(v, `${path}.posterPath`),
+    keptTmdbPath(v, `${path}.posterPath`),
   );
   const backdropPath = whenPresent(record.backdropPath, (v) =>
-    asTmdbPath(v, `${path}.backdropPath`),
+    keptTmdbPath(v, `${path}.backdropPath`),
   );
   const picture = whenPresent(record.picture, (v) =>
     asHttpsUrl(v, `${path}.picture`),
   );
-  if (!posterPath && !backdropPath && !picture) return fail(path);
+  if (!posterPath && !backdropPath && !picture) return undefined;
   return {
     ...(posterPath && { posterPath }),
     ...(backdropPath && { backdropPath }),
@@ -51,7 +59,7 @@ export function parseTitleImage(raw: unknown, path: string): TitleImage {
   };
 }
 
-/** `{ image }` when the record holds one, else `{}`. */
+/** `{ image }` when the record holds one that still reads, else `{}`. */
 export function optionalImage(
   record: Record<string, unknown>,
   path: string,
