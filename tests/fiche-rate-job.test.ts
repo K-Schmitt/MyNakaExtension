@@ -349,6 +349,30 @@ describe("fiche-rate: a linked title's waiting finish", () => {
     expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
   });
 
+  it("an episode of a series whose question holds an episode finish: linked, the episode rated, then that finish once", async () => {
+    const w = seriesWorld(question("tv:5:S1E2"));
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [1301]);
+    const msg = rate({
+      target: "épisode",
+      productId: 1301,
+      season: 1,
+      episode: 1,
+    });
+    expect(await w.jobs.ficheRate(TAB, msg)).toEqual({ ok: true });
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
+    expect(rates(w.sk.calls)).toEqual(["rate:1301:8"]);
+    expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
+    expect(w.sk.calls.indexOf("rate:1301:8")).toBeLessThan(
+      w.sk.calls.indexOf("markDone:1302:2026-11-05"),
+    );
+    expect(w.state().pending).toEqual([]);
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "tv:5:S1E2",
+      outcome: "done",
+    });
+  });
+
   it("a film whose question holds its own finish: exactly one finish", async () => {
     const w = filmWorld({
       state: {
@@ -372,20 +396,64 @@ describe("fiche-rate: a linked title's waiting finish", () => {
 });
 
 describe("fiche-rate: an episode", () => {
-  it("rated only; the card of that episode gets its épisode rated; no finish, no slot, no link", async () => {
-    const w = filmWorld({ state: emptyState() });
+  it("of a linked series: rated only, its card's épisode rated; no finish, no slot, no link", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
     w.area.data.set("ratings", [episodeCard()]);
     await w.registry.open(TAB, 5, seriesTitle(13), []);
     await w.registry.issue(TAB, 5, [11]);
     expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
     expect(w.writes()).toEqual(["rate:11:8"]);
     expect(w.cards()[0]?.targets[0]).toEqual(target("épisode", 8, 11));
-    expect(w.state()).toEqual(emptyState());
+    expect(w.stateSaves()).toBe(0);
+    expect(w.state()).toEqual(linkedTo(13));
     expect(w.settings().finishWindow).toBeUndefined();
   });
 
+  it("of an unlinked series: the series' mapping written first, then the episode rated; no settled pair", async () => {
+    let atRate: SyncState | undefined;
+    const w = filmWorld({
+      state: emptyState(),
+      sc: {
+        rate: async () => {
+          atRate = structuredClone(w.state());
+        },
+      },
+    });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
+    expect(atRate?.mapping).toEqual([{ nakaId: 5, scId: 13 }]);
+    expect(w.writes()).toEqual(["rate:11:8"]);
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
+    expect(w.state().settled).toEqual([]);
+    expect(w.settings().finishWindow).toBeUndefined();
+  });
+
+  it.each([
+    ["the content mapped to another product", linkedTo(14)],
+    [
+      "the series mapped to another content",
+      { ...emptyState(), mapping: [{ nakaId: 9, scId: 13 }] },
+    ],
+    [
+      "the series held by a settled pair",
+      { ...emptyState(), settled: [{ nakaId: 9, scId: 13 }] },
+    ],
+    [
+      "the content held by a settled pair",
+      { ...emptyState(), settled: [{ nakaId: 5, scId: 14 }] },
+    ],
+  ])("%s: refused, zero requests, nothing saved", async (_n, state) => {
+    const w = filmWorld({ state });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    await expect(w.jobs.ficheRate(TAB, episodeRate())).rejects.toThrow();
+    expect(w.network()).toEqual([]);
+    expect(w.state()).toEqual(state);
+  });
+
   it("no card: rated, no card made", async () => {
-    const w = filmWorld();
+    const w = filmWorld({ state: linkedTo(13) });
     await w.registry.open(TAB, 5, seriesTitle(13), []);
     await w.registry.issue(TAB, 5, [11]);
     expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
@@ -461,6 +529,22 @@ describe("fiche-rate: only a product issued as what the target names", () => {
     [
       "an épisode target on a film's title",
       titled(filmTitle(11)),
+      episodeRate(),
+    ],
+    [
+      "an épisode target issued under a film's title",
+      async (w) => {
+        await w.registry.open(TAB, 5, filmTitle(2005), []);
+        await w.registry.issue(TAB, 5, [11]);
+      },
+      episodeRate(),
+    ],
+    [
+      "an épisode target issued under no title",
+      async (w) => {
+        await offered(2005)(w);
+        await w.registry.issue(TAB, 5, [11]);
+      },
       episodeRate(),
     ],
   ])("%s: refused, zero requests", async (_n, setUp, msg) => {
