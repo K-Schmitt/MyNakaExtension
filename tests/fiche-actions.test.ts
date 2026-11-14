@@ -469,7 +469,7 @@ describe("every step 7 rare state, in the actions host", () => {
     t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnectez-vous sur Naka.`,
+      `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnecte-toi sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
   });
@@ -480,13 +480,13 @@ describe("every step 7 rare state, in the actions host", () => {
     t.ofType("fiche-rate")[0]?.answer({ error: "finish-limit" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: trop de fins de visionnage en une heure, réessayez plus tard.`,
+      `La note n’est pas partie${NB}: trop de fins de visionnage en une heure, réessaie plus tard.`,
     );
     t.controller.rateTitle(4);
     t.ofType("fiche-rate")[1]?.answer(undefined);
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`,
+      `La note n’est pas partie${NB}: ce titre n’a pas pu être noté.`,
     );
   });
 
@@ -507,7 +507,7 @@ describe("every step 7 rare state, in the actions host", () => {
     const line = `La note n\u2019est pas partie, mais SensCritique a d\u00e9j\u00e0 marqu\u00e9 le titre vu${NB}: \u00ab${NB}Annuler${NB}\u00bb le remet comme avant.`;
     expect(texts(t.parts())).toContain(line);
     expect(texts(t.parts())).not.toContain(
-      `La note n'est pas partie${NB}: le site ne répond pas, réessayez plus tard.`,
+      `La note n’est pas partie${NB}: le site ne répond pas, réessaie plus tard.`,
     );
     expect(checked(t.parts())).toEqual(["7 sur 10"]);
     buttonNamed(actionParts(t), "Annuler")?.click(true);

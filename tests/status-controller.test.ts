@@ -129,7 +129,7 @@ describe("load", () => {
     await t.controller.load();
     expect(t.shown.at(-1)).toEqual({
       kind: "no-engine",
-      message: "Le moteur ne répond pas, rouvrez cette page",
+      message: "Le moteur ne répond pas, rouvre cette page",
     });
     expect(t.busy).toEqual([true, false]);
   });
@@ -186,7 +186,7 @@ describe("toggleMode", () => {
     await t.controller.load();
     await t.controller.toggleMode();
     expect(t.confirms).toHaveLength(1);
-    expect(t.confirms[0]).toContain("reprendra les 2 titres de l'aperçu");
+    expect(t.confirms[0]).toContain("reprendra les 2 titres de l’aperçu");
     expect(t.sent.slice(1)).toEqual([
       { type: "set-mode", mode: "live" },
       { type: "status" },
@@ -454,7 +454,7 @@ describe("saveSettings", () => {
   );
 
   describe("while the worker still holds the change", () => {
-    const WAITING = "Réglages en attente d'enregistrement";
+    const WAITING = "Réglages en attente d’enregistrement";
     const SAVED_TEXT = "Réglages enregistrés";
     const OLD_RUNNING = {
       ...SETTINGS,
@@ -539,9 +539,9 @@ describe("saveSettings", () => {
 
 const cps = (text: string) => [...text].map((c) => c.codePointAt(0));
 const FORGET_TEXT =
-  "Oublier les comptes liés efface seulement le lien enregistré entre votre compte SensCritique et votre compte Naka. Aucun jeton n'est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?";
+  "Oublier les comptes liés efface seulement le lien enregistré entre ton compte SensCritique et ton compte Naka. Aucun jeton n’est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?";
 const RESET_TEXT =
-  "Réinitialiser efface l'état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu'ajouter, sans la mémoire des retraits\u202F: un titre retiré d'un côté et encore présent de l'autre y reviendrait. Vérifiez l'aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?";
+  "Réinitialiser efface l’état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu’ajouter, sans la mémoire des retraits\u202F: un titre retiré d’un côté et encore présent de l’autre y reviendrait. Vérifie l’aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?";
 
 describe("the local actions", () => {
   it.each([
