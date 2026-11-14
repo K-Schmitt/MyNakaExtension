@@ -5,7 +5,8 @@
 // The record also keeps the extension's own state of the title (ruling R8), read in the same job before
 // any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
 // clears the record the same way. A film the worker's client took out of « Ma liste » while the tab could
-// not read the button is noted as listed (ruling R10), so « Annuler » adds it back.
+// not read the button is noted as listed (ruling R10), so « Annuler » adds it back. A rating refused before
+// any SensCritique write (its `{ error }` answer) puts the record it replaced back.
 
 import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";
@@ -71,28 +72,62 @@ function recordOf(
   };
 }
 
-/** Stores the record of this rating, or clears any when a state was not read. */
+/** Stores the record of this rating, or clears any when a state was not read; the record stored, if any. */
 async function keepUndo(
   deps: JobDeps,
   msg: FicheRateMessage,
   role: UndoRole,
   before: ProductState | undefined,
-): Promise<void> {
+): Promise<FicheUndo | undefined> {
   const title = { role, contentId: msg.contentId, productId: msg.productId };
   const local = before && (await readLocal(deps, title));
-  const record = before && local && recordOf(deps, msg, role, before, local);
+  const record =
+    before && local ? recordOf(deps, msg, role, before, local) : undefined;
   await deps.store.saveFicheUndo(record ?? null);
+  return record;
 }
+
+/** The record stored now: null when there is none, undefined when the store could not give it. */
+async function storedRecord(
+  deps: JobDeps,
+): Promise<FicheUndo | null | undefined> {
+  try {
+    return await deps.store.loadFicheUndo();
+  } catch {
+    return undefined;
+  }
+}
+
+/** What a film's or a series' rating found before its write: the product's state, the record kept, the one it replaced. */
+export type KeptBefore = {
+  state: ProductState | undefined;
+  record: FicheUndo | undefined;
+  replaced: FicheUndo | null | undefined;
+};
 
 /** Reads and keeps the before-state of a film's or a series' rating; handed back for the answer's panel. */
 export async function recordBefore(
   deps: JobDeps,
   msg: FicheRateMessage,
   role: UndoRole,
-): Promise<ProductState | undefined> {
-  const before = await readBefore(deps, msg.productId);
-  await keepUndo(deps, msg, role, before);
-  return before;
+): Promise<KeptBefore> {
+  const replaced = await storedRecord(deps);
+  const state = await readBefore(deps, msg.productId);
+  const record = await keepUndo(deps, msg, role, state);
+  return { state, record, replaced };
+}
+
+/** The rating did not go out: the record it replaced is stored again, so the earlier « Annuler » still holds. */
+export async function putBackReplaced(
+  deps: JobDeps,
+  { replaced }: KeptBefore,
+): Promise<void> {
+  if (replaced === undefined) return;
+  try {
+    await deps.store.saveFicheUndo(replaced);
+  } catch {
+    // The rating's error is answered either way; « Annuler » then answers « expired ».
+  }
 }
 
 /** The film was listed: kept only on a record that still names this content and this product (R10). */
