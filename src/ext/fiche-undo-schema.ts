@@ -40,7 +40,7 @@ function asRating(raw: unknown, path: string): number | null {
   return rating > MAX_RATING ? fail(path) : rating;
 }
 
-function asDateDone(raw: unknown, path: string): string | null {
+export function asDateDone(raw: unknown, path: string): string | null {
   if (raw === null) return null;
   const date = asString(raw, path);
   return DATE_DONE.test(date) ? date : fail(path);

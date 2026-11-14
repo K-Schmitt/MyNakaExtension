@@ -17,8 +17,11 @@ import type {
   FicheLinkMessage,
   FicheMineMessage,
   FicheRateMessage,
+  FicheRemoveMessage,
   FicheSeasonMessage,
+  FicheUndoMessage,
 } from "../ext/fiche-messages";
+import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import type {
   CancelRetryMessage,
   ForgetHandledMessage,
@@ -45,8 +48,10 @@ import { ficheLinkJob } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
+import { ficheRemoveJob } from "./fiche-remove-job";
 import { ficheSeasonJob } from "./fiche-season-job";
 import { createTabTurns } from "./fiche-tab-turns";
+import { ficheUndoJob } from "./fiche-undo-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -134,6 +139,9 @@ export type Jobs = {
   /** The title page's writes, queued: they reject, with no request, for a product not issued to that tab. */
   ficheRate(tabId: number, msg: FicheRateMessage): Promise<RateAnswer>;
   ficheLink(tabId: number, msg: FicheLinkMessage): Promise<LinkAnswer>;
+  /** « Annuler » and « Retirer la note »: they reject, with no request, for a title not issued to that tab. */
+  ficheUndo(tabId: number, msg: FicheUndoMessage): Promise<UndoAnswer>;
+  ficheRemove(tabId: number, msg: FicheRemoveMessage): Promise<RemoveAnswer>;
   /** A closed tab: the products issued to it are forgotten. */
   dropFicheTab(tabId: number): Promise<void>;
 };
@@ -217,6 +225,8 @@ export function createJobs(
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
     ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
     ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),
+    ficheUndo: (tabId, msg) => ficheUndoJob(deps, asker(tabId), msg),
+    ficheRemove: (tabId, msg) => ficheRemoveJob(deps, asker(tabId), msg),
     dropFicheTab: (tabId) => registry.drop(tabId),
   };
 }

@@ -20,6 +20,8 @@ const INFO = {
 const SEASON = { type: "fiche-season", contentId: 5, season: 2 };
 const MINE = { type: "fiche-mine", contentId: 5, productId: 77 };
 const LINK = { type: "fiche-link", contentId: 5, productId: 77 };
+const UNDO = { type: "fiche-undo", contentId: 5, productId: 77 };
+const REMOVE = { type: "fiche-remove", contentId: 5, productId: 77 };
 const FILM = {
   type: "fiche-rate",
   contentId: 5,
@@ -38,6 +40,10 @@ const VALID = [
   EPISODE,
   { ...FILM, inMaListe: true },
   { ...FILM, inMaListe: false },
+  UNDO,
+  { ...UNDO, listByTab: true },
+  { ...UNDO, listByTab: false },
+  REMOVE,
 ];
 
 describe("title page messages", () => {
@@ -78,6 +84,11 @@ describe("title page messages", () => {
     ["an extra key on rate", { ...FILM, tmdbId: 1 }],
     ["an extra key on mine", { ...MINE, x: 1 }],
     ["an extra key on link", { ...LINK, x: 1 }],
+    ["an extra key on undo", { ...UNDO, x: 1 }],
+    ["an undo without a product", { ...UNDO, productId: undefined }],
+    ["listByTab as text", { ...UNDO, listByTab: "true" }],
+    ["listByTab on a removal", { ...REMOVE, listByTab: true }],
+    ["a removal with a zero content id", { ...REMOVE, contentId: 0 }],
     ["an extra key on season", { ...SEASON, x: 1 }],
     ["a 201 character title", { ...INFO, title: "x".repeat(201) }],
     ["a bad media type", { ...INFO, mediaType: "film" }],
