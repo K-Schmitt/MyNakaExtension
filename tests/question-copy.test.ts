@@ -53,11 +53,11 @@ describe("the question copy", () => {
       `«${NB}Dune${NB}» a quitté Ma liste Naka.`,
     );
     expect(removalQuestion("sc")).toBe(
-      `Retirer aussi de vos envies SensCritique${NB}?`,
+      `Retirer aussi de tes envies SensCritique${NB}?`,
     );
-    expect(removeLabel("sc")).toBe("Retirer aussi de vos envies SensCritique");
+    expect(removeLabel("sc")).toBe("Retirer aussi de tes envies SensCritique");
     expect(removalHeading("naka", "Dune")).toBe(
-      `«${NB}Dune${NB}» a quitté vos envies SensCritique.`,
+      `«${NB}Dune${NB}» a quitté tes envies SensCritique.`,
     );
     expect(removalQuestion("naka")).toBe(
       `Retirer aussi de Ma liste Naka${NB}?`,
@@ -75,22 +75,22 @@ describe("the question copy", () => {
     });
     expect(SENDING_LINE).toBe("Envoi de la réponse\u2026");
     expect(points(SENDING_LINE).at(-1)).toBe("2026");
-    expect(MOOT_LINE).toBe(`Rien à retirer${NB}: ce titre n'y est déjà plus.`);
+    expect(MOOT_LINE).toBe(`Rien à retirer${NB}: ce titre n’y est déjà plus.`);
     expect(REFUSED_LINE).toBe(
-      `La réponse n'a pas été prise en compte${NB}: la question a changé.`,
+      `La réponse n’a pas été prise en compte${NB}: la question a changé.`,
     );
     expect(MISMATCH_LINE).toBe(
-      `Ce titre n'est pas du même type${NB}: un film ne se relie qu'à un film, une série qu'à une série.`,
+      `Ce titre n’est pas du même type${NB}: un film ne se relie qu’à un film, une série qu’à une série.`,
     );
     expect(UNREACHABLE_LINE).toBe(
-      `La réponse n'est pas partie${NB}: l'extension ne répond pas.`,
+      `La réponse n’est pas partie${NB}: l’extension ne répond pas.`,
     );
     expect(UNKNOWN_TITLE).toBe("(titre inconnu)");
   });
 
   it("gives the reason of a failed answer from the rating labels", () => {
     expect(notSentLine("sc-session")).toBe(
-      `La réponse n'est pas partie${NB}: ${RATING_ERROR_LABELS["sc-session"]}.`,
+      `La réponse n’est pas partie${NB}: ${RATING_ERROR_LABELS["sc-session"]}.`,
     );
     expect(notSentLine("naka-list-empty")).toContain(
       RATING_ERROR_LABELS["naka-list-empty"],
