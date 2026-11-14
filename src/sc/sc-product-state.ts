@@ -6,7 +6,7 @@
 // an undo restores: the date seen (kept to put « vu » back as it was), whether the owner reviewed or recommended the
 // title (an undo never drops those) and the product's page; the user id, the season count (Naka's is the one used, Ruling 11) and everything else in the answer
 // are dropped here. The product-level `rating` is the public average, read leniently by average-rating.ts (null when unreadable, it never fails the answer). An answer that
-// does not describe the requested product, whose flags are not booleans, whose universe is not a safe
+// does not describe the requested product, whose isDone or isWished is not a boolean, whose universe is not a safe
 // integer or whose rating is neither null nor an integer 1 to 10 (the key must be present) fails closed
 // with one fixed message (never a piece of the answer).
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
@@ -85,6 +85,12 @@ function dateDoneOf(infos: Record<string, unknown>): string | null {
   return typeof dateDone === "string" && isIsoDate(dateDone) ? dateDone : null;
 }
 
+/** A critique or recommendation flag: only `false` says there is none; anything else counts as one, so
+ * nothing that could drop it is offered (fails closed, owner decision D13). */
+function protectedFlagOf(flag: unknown): boolean {
+  return flag !== false;
+}
+
 export function readProductState(
   envelope: Envelope,
   productId: number,
@@ -103,8 +109,8 @@ export function readProductState(
     rating: ratingOf(infos),
     average: readAverage(product),
     dateDone: dateDoneOf(infos),
-    isReviewed: infos.isReviewed === true,
-    isRecommended: infos.isRecommended === true,
+    isReviewed: protectedFlagOf(infos.isReviewed),
+    isRecommended: protectedFlagOf(infos.isRecommended),
     url: productUrlOf(product.url),
     ...(label === undefined ? {} : { label }),
   };
