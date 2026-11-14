@@ -2,12 +2,14 @@
 // rating changed, or takes the rating off. The tab sends either for the shown product, never while another
 // write is on its way (its `pending` turns a double click into one message), and gives the film back to
 // Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste). The answer's line stays
-// shown; the info is then asked again, since these answers carry no panel flags (ruling R11).
+// shown; the info is then asked again, since these answers carry no panel flags (ruling R11), and with it
+// the shown season.
 
 import type { FicheUndoMessage } from "../ext/fiche-messages";
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
 import { contentOf, type FicheScope } from "./fiche-page";
+import { considerSeason, forgetSeasons } from "./fiche-season-reader";
 import type { FicheOutcome, UndoAction } from "./fiche-view";
 
 type TitleIds = { contentId: number; productId: number };
@@ -44,20 +46,17 @@ function begin(scope: FicheScope, action: UndoAction): void {
   scope.show();
 }
 
-/** Fails closed: without fresh flags, neither « Annuler » nor « Retirer la note » stays offered. */
-function dropWriteFlags(scope: FicheScope): void {
-  const { info } = scope.page;
-  if (info?.product === undefined) return;
-  const product = { ...info.product, canUndo: false, canRemove: false };
-  scope.page.info = { ...info, product };
-}
-
+// Every fiche-info resets what the worker issued to the tab: the seasons are read again, as after a link.
+// A lost read leaves no product of the old page on screen (its stars would be refused): the read failure
+// shows, with « Réessayer », in place of the answer's line.
 async function refreshInfo(scope: FicheScope): Promise<void> {
   const msg = scope.page.infoMessage;
   const info = msg === undefined ? undefined : await scope.ports.info(msg);
   if (!scope.live()) return;
-  if (info === undefined) dropWriteFlags(scope);
-  else scope.page.info = info;
+  forgetSeasons(scope);
+  scope.page.info = info;
+  if (info === undefined) scope.page.outcome = { kind: "failed" };
+  considerSeason(scope);
 }
 
 // The line shows at once; the write stays pending until the fresh flags are in, so no stale « Annuler »
