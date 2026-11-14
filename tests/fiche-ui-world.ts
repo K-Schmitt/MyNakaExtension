@@ -115,14 +115,17 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     hidden: false,
     hiddenRows: new Set<unknown>(),
     rows: [] as FakeElement[],
+    /** The slot each watched row was drawn in, in the same order as `rows`. */
+    slots: [] as object[],
   };
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: idleTimer,
     boxes: () => boxes.map((b) => b.port),
-    seen: (row) => {
+    seen: (row, slot) => {
       stars.rows.push(row as FakeElement);
+      stars.slots.push(slot);
       return () => !stars.hidden && !stars.hiddenRows.has(row);
     },
     watch: (fn) => {
