@@ -77,6 +77,9 @@ export function sentWithErrorLine(error: JobError): string {
   return `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
+/** A film's rating that did not go out after its explicit finish wrote (D9, ruling R2). */
+export const FINISH_WROTE_LINE = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}${UNDO_LABEL}${NB}» le remet comme avant.`;
+
 /** The name of a group of stars: the SensCritique title or episode they rate. */
 export function episodeStarsName(title: string): string {
   return `Noter «${NB}${title}${NB}» sur SensCritique`;
@@ -91,6 +94,8 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
       return errorLine(outcome.error);
     case "sent-with-error":
       return sentWithErrorLine(outcome.error);
+    case "finish-wrote":
+      return FINISH_WROTE_LINE;
     case "undo-failed":
       return UNDO_FAILED_LINES[outcome.action];
     case "undo-refused":

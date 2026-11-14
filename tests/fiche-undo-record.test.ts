@@ -473,8 +473,16 @@ describe("D9: the earlier record comes back only when nothing was written", () =
     // Act
     const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
 
-    // Assert: the finish wrote, the rating did not go out, this film's record stays.
-    expect(answer).toEqual({ error: "unavailable" });
+    // Assert: the finish wrote, the rating did not go out, this film's record stays and the panel offers it.
+    expect(answer).toEqual({
+      error: "unavailable",
+      panel: {
+        canUndo: true,
+        undoLeftMs: UNDO_WINDOW_MS,
+        canRemove: false,
+        protected: false,
+      },
+    });
     expect(w.writes()).toEqual([
       "unwish:2005",
       "markDone:2005:2026-11-05",
@@ -506,6 +514,7 @@ describe("D9: the earlier record comes back only when nothing was written", () =
     expect(now).toMatchObject({ isDone: false, isWished: true });
     expect(w.state().handled).toEqual([]);
     expect(w.state().settled).toEqual([]);
+    expect(w.cards()).toEqual([]);
   });
 
   it("a film already seen whose finish wrote only its sync state, then its ProductRate threw: this film's record kept", async () => {
@@ -518,7 +527,10 @@ describe("D9: the earlier record comes back only when nothing was written", () =
     const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
 
     // Assert
-    expect(answer).toEqual({ error: "unavailable" });
+    expect(answer).toMatchObject({
+      error: "unavailable",
+      panel: { canUndo: true },
+    });
     expect(w.writes()).toEqual(["rate:2005:8"]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(stored(w)).toEqual(filmRecord());
@@ -568,7 +580,7 @@ describe("D9: the earlier record comes back only when nothing was written", () =
 
     const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
 
-    expect(answer).toMatchObject({ error: expect.any(String) });
+    expect(answer).toEqual({ error: "unavailable" });
     expect(w.writes()).toEqual([]);
     expect(w.state().settled).toEqual([]);
     expect(stored(w)).toEqual(otherTitle());

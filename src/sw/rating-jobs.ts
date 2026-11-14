@@ -117,6 +117,8 @@ async function rated(
   }
 }
 
+// A ProductRate that throws counts as not sent: SensCritique answered no rating, and the card keeps the
+// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique (D9).
 export async function rateJob(
   deps: JobDeps,
   msg: RateMessage,
