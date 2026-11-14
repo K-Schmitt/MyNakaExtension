@@ -4,6 +4,8 @@
 // changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is
 // on screen (fiche-ma-liste).
 // A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer la note », the link).
+// A film's rating that did not go out after its explicit finish wrote brings them too (D9, ruling R2): the
+// flags apply, the stars keep the owner's rating, and its own line says « Annuler » puts the title back.
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
@@ -21,7 +23,7 @@ import { forgetSeasons } from "./fiche-season-reader";
 import { watchUndoExpiry } from "./fiche-undo-expiry";
 import type { FicheOutcome } from "./fiche-view";
 
-type Ending = { sent: boolean; outcome?: FicheOutcome };
+type Ending = { sent: boolean; outcome?: FicheOutcome; flagged?: boolean };
 
 // The worker's answer says whether the rating went out: `{ sent: true, error }` when a later step failed.
 function endingOf(answer: RateAnswer | undefined): Ending {
@@ -33,6 +35,9 @@ function endingOf(answer: RateAnswer | undefined): Ending {
       outcome: { kind: "sent-with-error", error: answer.error },
     };
   }
+  if (answer.panel !== undefined) {
+    return { sent: false, outcome: { kind: "finish-wrote" }, flagged: true };
+  }
   return { sent: false, outcome: { kind: "not-sent", error: answer.error } };
 }
 
@@ -40,7 +45,8 @@ function endingOf(answer: RateAnswer | undefined): Ending {
 async function sendRate(
   scope: FicheScope,
   msg: FicheRateMessage,
-  apply: (rating: number, answer: RateAnswer | undefined) => void,
+  /** `rating` undefined: the rating did not go out, only the answer's flags apply. */
+  apply: (rating: number | undefined, answer: RateAnswer | undefined) => void,
   place?: EpisodePlace,
 ): Promise<RateAnswer | undefined> {
   const { page } = scope;
@@ -54,6 +60,7 @@ async function sendRate(
   page.pending = undefined;
   page.outcome = ending.outcome;
   if (ending.sent) apply(msg.rating, answer);
+  else if (ending.flagged === true) apply(undefined, answer);
   scope.show();
   return answer;
 }
@@ -82,7 +89,8 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
   const answer = await sendRate(scope, msg, (mine, sent) => {
     if (page.info?.product?.id !== product.id) return;
     const flags = sent !== undefined && "panel" in sent ? sent.panel : {};
-    page.info = { ...page.info, product: { ...product, mine, ...flags } };
+    const rated = { ...product, mine: mine ?? product.mine, ...flags };
+    page.info = { ...page.info, product: rated };
     watchUndoExpiry(scope);
   });
   if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
@@ -130,7 +138,8 @@ export function rateEpisode(
   if (season === undefined || contentId === undefined) return;
   const place = { season, episode };
   const msg = rateMessage(contentId, "épisode", known.productId, rating, place);
-  const apply = (mine: number) => {
+  const apply = (mine: number | undefined) => {
+    if (mine === undefined) return;
     const episodes = page.read.get(season) ?? new Map();
     storeEpisodes(page, season, withMine(episodes, episode, mine));
   };

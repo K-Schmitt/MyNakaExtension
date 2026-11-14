@@ -408,6 +408,14 @@ describe("the panel's flags in the answers", () => {
     expect(parseRateAnswer(sent)).toEqual(sent);
   });
 
+  it("reads the flags on a rating that did not go out after its finish wrote (D9, R2)", () => {
+    const wrote = { error: "unavailable", panel };
+    expect(parseRateAnswer(wrote)).toEqual(wrote);
+    expect(parseRateAnswer({ error: "unavailable" })).toEqual({
+      error: "unavailable",
+    });
+  });
+
   it("reads « Ma liste » left to the tab on a rating that went out", () => {
     const tab = { ok: true, maListe: "tab", panel };
     expect(parseRateAnswer(tab)).toEqual(tab);
@@ -429,7 +437,10 @@ describe("the panel's flags in the answers", () => {
   });
 
   it.each([
-    ["on a rating that did not go out", { error: "sc-session", panel }],
+    [
+      "on a rating that did not go out, incomplete",
+      { error: "sc-session", panel: { canUndo: true } },
+    ],
     ["without the undo flag", { ok: true, panel: { canRemove: true } }],
     ["without the removal flag", { ok: true, panel: { canUndo: true } }],
     [

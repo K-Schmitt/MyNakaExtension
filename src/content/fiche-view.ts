@@ -20,6 +20,8 @@ export type FicheOutcome =
   | { kind: "failed" }
   /** The rating did not reach SensCritique (the budget, a session…). */
   | { kind: "not-sent"; error: JobError }
+  /** The rating did not go out, but its explicit finish marked the title seen: « Annuler » is offered (D9, R2). */
+  | { kind: "finish-wrote" }
   /** The rating reached SensCritique; what came after it (the Ma liste removal) failed. */
   | { kind: "sent-with-error"; error: JobError }
   /** « Annuler » or « Retirer la note » got no answer, or the worker could not run it. */

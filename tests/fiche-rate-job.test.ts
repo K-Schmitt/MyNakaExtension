@@ -191,8 +191,10 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
+    // No card: the finish wrote first, so the answer offers « Annuler » (D9, R2).
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       error: "unavailable",
+      panel: expect.objectContaining({ canUndo: true }),
     });
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
     expect(w.cards()[0]?.failed).toMatchObject({ error: "unavailable" });

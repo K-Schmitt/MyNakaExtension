@@ -490,6 +490,32 @@ describe("every step 7 rare state, in the actions host", () => {
     );
   });
 
+  it("a rating not sent after its finish wrote: its line, « Annuler » at once, the stars as they were (D9, R2)", async () => {
+    const t = await film();
+    star(t.parts(), 9)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      error: "unavailable",
+      panel: {
+        canUndo: true,
+        undoLeftMs: 600_000,
+        canRemove: true,
+        protected: false,
+        url: URL,
+      },
+    });
+    await settle();
+    const line = `La note n\u2019est pas partie, mais SensCritique a d\u00e9j\u00e0 marqu\u00e9 le titre vu${NB}: \u00ab${NB}Annuler${NB}\u00bb le remet comme avant.`;
+    expect(texts(t.parts())).toContain(line);
+    expect(texts(t.parts())).not.toContain(
+      `La note n'est pas partie${NB}: le site ne répond pas, réessayez plus tard.`,
+    );
+    expect(checked(t.parts())).toEqual(["7 sur 10"]);
+    buttonNamed(actionParts(t), "Annuler")?.click(true);
+    expect(t.ofType("fiche-undo").map((c) => c.msg)).toEqual([
+      { type: "fiche-undo", contentId: 5, productId: 55 },
+    ]);
+  });
+
   it("shows a line for the shown season whose read failed", async () => {
     const t = fakeUi(SERIES_PATH);
     t.page.shown = 2;

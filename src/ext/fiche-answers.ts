@@ -65,11 +65,16 @@ type Paneled = { panel?: PanelFlags };
 /** A film's live rating with Naka's button on screen: the tab clicks « Ma liste » itself, the client did not. */
 type ListedByTab = { maListe?: "tab" };
 export type RateOkAnswer = OkAnswer & Paneled & ListedByTab;
-/** The rating did not go out. */
+/** The write did not go out. */
 export type NotSentAnswer = { error: JobError };
+/**
+ * The rating did not go out. With a panel only when a film's explicit finish wrote before it (D9, ruling R2):
+ * the title is « vu » on SensCritique and its « Annuler » is live.
+ */
+export type RateNotSentAnswer = NotSentAnswer & Paneled;
 /** The rating went out and a later step failed (a film's removal from « Ma liste »). */
 export type SentWithErrorAnswer = { sent: true; error: JobError } & Paneled;
-export type RateAnswer = RateOkAnswer | NotSentAnswer | SentWithErrorAnswer;
+export type RateAnswer = RateOkAnswer | RateNotSentAnswer | SentWithErrorAnswer;
 export type LinkAnswer = OkAnswer;
 /** « Chercher »'s results, at most MAX_SEARCH_RESULTS, each issued to the tab as a candidate. */
 export type FicheSearchAnswer = { candidates: QuestionCandidate[] };
@@ -124,7 +129,10 @@ const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({
   maListe: true,
 });
 const BY_TAB = valuesOf<NonNullable<ListedByTab["maListe"]>>({ tab: true });
-const NOT_SENT_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
+const NOT_SENT_KEYS = valuesOf<keyof RateNotSentAnswer>({
+  error: true,
+  panel: true,
+});
 const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
   sent: true,
   error: true,
@@ -265,7 +273,7 @@ export function parseRateAnswer(raw: unknown): RateAnswer {
   const error = asOneOf(record.error, ERROR_CODES, "error");
   if (record.sent === undefined) {
     onlyKeys(record, NOT_SENT_KEYS, "answer");
-    return { error };
+    return withPanel({ error }, record.panel);
   }
   onlyKeys(record, SENT_WITH_ERROR_KEYS, "answer");
   if (record.sent !== true) return fail("sent");
