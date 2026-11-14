@@ -634,11 +634,14 @@ et D6 réglées, le champ de recherche durci, D7 laissée en attente.
 - Quand la fin a écrit mais que l’état d’avant n’a pas pu être lu (pas d’enregistrement), la ligne simple « La note
   n’est pas partie » s’affiche et le passage à « vu » sur SC n’est pas dit.
 - D7 (décision D11 du propriétaire, revue du 2026-11-14) : un clic sur une étoile de la fiche (encadré et épisodes) ne
-  compte que si IntersectionObserver v2 a dit en dernier sa ligne visible. Il voit l’opacité, un filtre, une mise à
-  l’échelle ou une rotation d’un ancêtre, et un calque opaque ; il ne voit ni une translation 2D ni un calque
-  transparent. Sans réponse encore, ou sans v2, le clic compte : un vrai clic n’est jamais perdu faute de signal. La
-  sonde du propriétaire sur Naka : aucun ancêtre gênant, seule la case d’épisode survolée monte de 3 px par translation,
-  que v2 laisse passer.
+  compte que si IntersectionObserver v2 dit le groupe d’étoiles visible sans interruption depuis 300 ms (choix du
+  propriétaire : v2 ne répond qu’au plus toutes les 100 ms, et une étoile montrée un instant entre deux moments
+  cachés ne doit pas compter). Il voit l’opacité, un filtre, une mise à l’échelle ou une rotation d’un ancêtre, et un
+  élément opaque posé dessus ; il ne voit ni une translation 2D ni un calque à opacité 0 (un calque d’opacité 1 au
+  fond transparent n’a pas été testé). Sans réponse encore, ou sans v2, le clic compte : un vrai clic n’est jamais
+  perdu faute de signal. Coût : un clic dans les 300 ms où les étoiles apparaissent est ignoré sans rien dire. Une
+  ligne retirée puis remise (changement de saison) reste observée et reprend son état. La sonde du propriétaire sur
+  Naka : aucun ancêtre gênant, seule la case d’épisode survolée monte de 3 px par translation, que v2 laisse passer.
 - Après une annulation, une lecture perdue de la fiche affiche « SensCritique n’a pas pu être lu », « Réessayer » et
   la ligne de l’annulation, qui reste.
 - À vérifier à la recette dans Brave : le rendu réel des lignes avec le CSS de Naka ; l’effet d’un clic
