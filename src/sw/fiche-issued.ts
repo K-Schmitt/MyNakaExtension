@@ -1,7 +1,8 @@
 // The gate of every title page write: the product must be one the worker issued to the asking tab for
-// that content, as what the write names (fiche-roles). A registry that cannot be read counts as not
-// issued. Throws before any request.
+// that content, as what the write names (fiche-roles); « Annuler » and « Retirer la note » name the title,
+// a film's or a series'. A registry that cannot be read counts as not issued. Throws before any request.
 
+import type { UndoRole } from "../core/fiche-undo";
 import type { FicheAsker } from "./fiche-info-job";
 import { NotIssuedError } from "./fiche-mine-job";
 import type { FicheTitle } from "./fiche-registry-schema";
@@ -50,4 +51,15 @@ export async function assertIssued(
   if (!(await issuedAs(asker, contentId, productId, role))) {
     throw new NotIssuedError();
   }
+}
+
+/** The role the product was issued under as that content's title (a film's or a series'), else throws. */
+export async function issuedTitle(
+  asker: FicheAsker,
+  contentId: number,
+  productId: number,
+): Promise<UndoRole> {
+  if (await issuedAs(asker, contentId, productId, "film")) return "film";
+  if (await issuedAs(asker, contentId, productId, "série")) return "série";
+  throw new NotIssuedError();
 }

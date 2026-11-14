@@ -519,6 +519,10 @@ function scReads(
         universe: universeOf(id),
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       };
     },
     seasonInfo: async (series, season) => {
@@ -577,6 +581,9 @@ export function scFor(w: World, gen: number): ScClient {
       flaky(w, `markDone ${id}`);
       w.done.add(id);
       if (isFilmProduct(id) && !w.guarded.has(id)) guard(w, id, "its markDone");
+    },
+    markDoneWithoutDate: async (id) => {
+      violation(w, `markDoneWithoutDate ${id}`);
     },
     unmarkDone: async (id) => {
       violation(w, `unmarkDone ${id}`);
@@ -769,9 +776,11 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     ficheInfo: (tabId, msg) => jobs.ficheInfo(tabId, msg),
     ficheSeason: (tabId, msg) => jobs.ficheSeason(tabId, msg),
     ficheMine: (tabId, msg) => jobs.ficheMine(tabId, msg),
+    ficheSearch: (tabId, msg) => jobs.ficheSearch(tabId, msg),
     ficheRate: (tabId, msg) => jobs.ficheRate(tabId, msg),
     ficheLink: (tabId, msg) => jobs.ficheLink(tabId, msg),
-    dropFicheTab: (tabId) => jobs.dropFicheTab(tabId),
+    ficheUndo: (tabId, msg) => jobs.ficheUndo(tabId, msg),
+    ficheRemove: (tabId, msg) => jobs.ficheRemove(tabId, msg),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)

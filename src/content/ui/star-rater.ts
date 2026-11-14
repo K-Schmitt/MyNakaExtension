@@ -75,12 +75,50 @@ function onArrows(
   });
 }
 
-/** The group of stars plus the value line, wrapped in one row; `name` names the group (« Note » without). */
+const LIT_CLASS = "mn-star--lit";
+
+// The preview is a class on the stars 1..k and an attribute on the group; no layout is read, nothing is sent.
+function showPreview(group: ElementLike, buttons: ElementLike[], k: number) {
+  buttons.forEach((b, i) => {
+    b.className = i < k ? `mn-star ${LIT_CLASS}` : "mn-star";
+  });
+  group.setAttribute("data-previewing", "");
+}
+
+function clearPreview(group: ElementLike, buttons: ElementLike[]): void {
+  for (const b of buttons) b.className = "mn-star";
+  group.removeAttribute("data-previewing");
+}
+
+// A touch has no hover: its first tap rates. Moving the focus between stars blurs one and focuses the next
+// at once, so the preview goes on; the group's `pointerleave` or a blur out of it returns to the rating.
+function onPreview(group: ElementLike, buttons: ElementLike[]): void {
+  buttons.forEach((b, i) => {
+    b.addEventListener("pointerenter", (event) => {
+      if (event.pointerType === "touch") return;
+      showPreview(group, buttons, i + 1);
+    });
+    b.addEventListener("focus", () => showPreview(group, buttons, i + 1));
+    b.addEventListener("blur", () => clearPreview(group, buttons));
+  });
+  group.addEventListener("pointerleave", () => clearPreview(group, buttons));
+}
+
+export type StarOptions = {
+  /** Names the group (« Note » without). */
+  name?: string;
+  /** The hover preview. */
+  preview?: true;
+  /** Watches the group of stars; a click chooses only while the answer says it counts (D7). */
+  watch?: (group: ElementLike) => () => boolean;
+};
+
+/** The group of stars plus the value line, wrapped in one row. */
 export function starRater(
   doc: Maker,
   stars: Star[],
   onChoose: (value: number) => void,
-  name?: string,
+  { name, preview, watch }: StarOptions = {},
 ): ElementLike {
   const start = shownIndex(stars);
   const group = doc.createElement("div");
@@ -88,11 +126,14 @@ export function starRater(
   group.setAttribute("role", "radiogroup");
   group.setAttribute("aria-label", name ?? "Note");
   if (name !== undefined) group.setAttribute("title", name);
-  const buttons = stars.map((s, i) =>
-    starButton(doc, s, i === start, onChoose),
-  );
+  const counts = watch?.(group);
+  const choose = (value: number) => {
+    if (counts === undefined || counts()) onChoose(value);
+  };
+  const buttons = stars.map((s, i) => starButton(doc, s, i === start, choose));
   for (const b of buttons) group.appendChild(b);
   onArrows(group, buttons, start);
+  if (preview) onPreview(group, buttons);
   const marked = stars[start]?.marked ? stars[start] : undefined;
   const value = doc.createElement("span");
   value.className = "mn-stars-value";

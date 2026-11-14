@@ -17,6 +17,7 @@ import type { FicheInfo } from "../ext/fiche-answers";
 import type { FicheInfoMessage } from "../ext/fiche-messages";
 import type { NakaItem } from "../naka/naka-client";
 import { linkedProduct } from "./fiche-link-lookup";
+import type { TitleIds } from "./fiche-panel-flags";
 import { readFicheProduct } from "./fiche-product";
 import type { FicheRegistry } from "./fiche-registry";
 import type { FicheTitle } from "./fiche-registry-schema";
@@ -47,12 +48,12 @@ async function naka(
 async function shown(
   deps: JobDeps,
   state: "linked" | "matched",
-  productId: number,
+  ids: TitleIds,
   type: MediaType,
 ): Promise<Resolved> {
-  const product = await readFicheProduct(deps, productId, type);
+  const product = await readFicheProduct(deps, ids, type);
   if (product === undefined) return NOT_FOUND;
-  const title = { productId, type };
+  const title = { productId: ids.productId, type };
   return { info: { state, product }, title, candidates: [] };
 }
 
@@ -61,7 +62,8 @@ async function searched(deps: JobDeps, item: NakaItem): Promise<Resolved> {
   const found = await searchFiche(deps, item);
   const match = matchTitle(titled, found);
   if (match.kind === "match") {
-    return shown(deps, "matched", match.id, titled.type);
+    const ids = { contentId: item.contentId, productId: match.id };
+    return shown(deps, "matched", ids, titled.type);
   }
   if (match.kind === "none") return NOT_FOUND;
   const candidates = toCandidates(found, match.ids);
@@ -77,8 +79,9 @@ async function resolved(
   if (item === undefined) return NOT_FOUND;
   const type = nakaToTitled(item).type;
   const linked = await linkedProduct(deps.store, msg.contentId);
-  if (linked !== undefined) return shown(deps, "linked", linked, type);
-  return searched(deps, item);
+  if (linked === undefined) return searched(deps, item);
+  const ids = { contentId: msg.contentId, productId: linked };
+  return shown(deps, "linked", ids, type);
 }
 
 // The registry is the newest turn's: a superseded one leaves it as the newer one set it.

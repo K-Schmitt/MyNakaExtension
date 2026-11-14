@@ -4,10 +4,7 @@ import {
   REDUCED_MOTION_RULE,
 } from "../src/content/ui/block-styles";
 import { createEndUi } from "../src/content/ui/end-ui";
-import {
-  EPISODE_STARS_SHEET,
-  PANEL_SHEET,
-} from "../src/content/ui/fiche-styles";
+import { ACTIONS_SHEET } from "../src/content/ui/fiche-styles";
 import { ratingView } from "../src/content/ui/rating-view";
 import { themeCss } from "../src/ui/theme-tokens";
 import { filmCard } from "./rating-fixtures";
@@ -103,11 +100,9 @@ describe("BLOCK_SHEET", () => {
     );
   });
 
-  it("the title page sheets that carry the buttons end with the reduced motion rule too", () => {
-    for (const sheet of [PANEL_SHEET, EPISODE_STARS_SHEET]) {
-      expect(sheet).toContain(".mn-btn{");
-      expect(sheet.endsWith(REDUCED_MOTION_RULE)).toBe(true);
-    }
+  it("the title page's actions sheet, which carries the buttons, ends with the reduced motion rule too", () => {
+    expect(ACTIONS_SHEET).toContain(".mn-btn{");
+    expect(ACTIONS_SHEET.endsWith(REDUCED_MOTION_RULE)).toBe(true);
   });
 });
 

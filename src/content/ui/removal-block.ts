@@ -1,4 +1,4 @@
-// The block right after a removal from « Ma liste » on Naka: « Retirer aussi de vos envies SensCritique ? ».
+// The block right after a removal from « Ma liste » on Naka: « Retirer aussi de tes envies SensCritique ? ».
 // The page reports an id (the MAIN world saw `DELETE /playlist/<id>`); a page script can forge that id, so
 // the id alone shows nothing: the worker's `removal-offer` must return an offer (a mapped pair both lists
 // held at the last run), and the removal itself needs a trusted click on the block, which the worker then

@@ -58,7 +58,7 @@ describe("toHandledView", () => {
   });
 
   it("the waiting and cancel copy is exact", () => {
-    expect(HANDLED_COPY.waiting).toBe("en attente d'un onglet Naka");
+    expect(HANDLED_COPY.waiting).toBe("en attente d’un onglet Naka");
     expect(HANDLED_COPY.cancel).toBe("Annuler");
   });
 

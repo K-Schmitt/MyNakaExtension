@@ -42,8 +42,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) =>
   router.handle(msg, sender, sendResponse),
 );
 
-// A closed tab can write nothing more: the products issued to its title page are forgotten.
-chrome.tabs.onRemoved.addListener((tabId) => router.dropTab(tabId));
+// No listener on closed tabs: it would wake the worker at every tab close. The registry of issued products
+// is bounded (MAX_FICHE_TABS) and reset by each fiche-info, so a closed tab's entry is replaced in time.
 
 function ignore(): void {}
 

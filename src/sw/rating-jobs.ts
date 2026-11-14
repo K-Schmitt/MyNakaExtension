@@ -2,8 +2,9 @@
 // from a message. The card is the one the finish made, the one the explicit finish of the pause case makes
 // here, or, for a title already handled, the one rebuilt read-only (handled-card.ts). A film or an épisode
 // only: a saison or a série is never rated without its card. The binding is checked before the write, as
-// the finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended:
-// undefined once the rating went out, else the error (the card's failure, or why no card could be made).
+// the finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended: no
+// error once the rating went out, else the error (the card's failure, or why no card could be made), and
+// whether the card step wrote before it (D9: the explicit finish's SensCritique writes or its sync state).
 
 import { cardlessLabel } from "../core/cardless-label";
 import { contentKeyOf } from "../core/finish-event";
@@ -26,11 +27,16 @@ import { finishJob } from "./finish-job";
 import { handledCard } from "./handled-card";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
+import { watchWrites } from "./write-watch";
 
 type Found = { cards: RatingCard[]; target: CardTarget };
+/** Whether the card step wrote anything before the ProductRate (watchWrites). */
+type Wrote = { wroteBefore: boolean };
 /** The card's target, or why there is none (a label never rated without its card has no error). */
-type Lookup = { found?: Found; error?: JobError };
+type Lookup = Wrote & { found?: Found; error?: JobError };
 type Rated = { cards: RatingCard[]; error?: JobError };
+/** How a rating ended: no error once it went out. */
+export type RateEnd = Wrote & { error?: JobError };
 
 function foundIn(
   cards: RatingCard[],
@@ -45,7 +51,7 @@ function foundIn(
 // the same job as any finish: its pre-check, its budget, its binding. A title already handled (finished
 // under Plan 3, or before its card existed) has a free finish that makes no card: its card is built
 // read-only instead (Ruling L2), with no write and no finish record. The finish's error, if any.
-async function makeCard(
+async function cardStep(
   deps: JobDeps,
   msg: RateMessage,
   cards: RatingCard[],
@@ -59,17 +65,29 @@ async function makeCard(
   return finishJob(deps, explicitFinish(msg));
 }
 
+async function makeCard(
+  deps: JobDeps,
+  msg: RateMessage,
+  cards: RatingCard[],
+): Promise<RateEnd> {
+  const watched = watchWrites(deps);
+  const error = await cardStep(watched.deps, msg, cards);
+  return { error, wroteBefore: watched.wrote() };
+}
+
 // The card's target, or why none. A finish that ended with no card and no error (Naka does not know
 // the content) is `unavailable`.
 async function targetFor(deps: JobDeps, msg: RateMessage): Promise<Lookup> {
   const key = contentKeyOf(msg);
   const cards = await deps.store.loadRatings();
   const known = foundIn(cards, key, msg.label);
-  if (known !== undefined) return { found: known };
-  if (cardlessLabel(msg) !== msg.label) return {};
-  const error = await makeCard(deps, msg, cards);
+  if (known !== undefined) return { found: known, wroteBefore: false };
+  if (cardlessLabel(msg) !== msg.label) return { wroteBefore: false };
+  const { error, wroteBefore } = await makeCard(deps, msg, cards);
   const found = foundIn(await deps.store.loadRatings(), key, msg.label);
-  return found === undefined ? { error: error ?? "unavailable" } : { found };
+  if (found === undefined)
+    return { error: error ?? "unavailable", wroteBefore };
+  return { found, wroteBefore };
 }
 
 /** The binding checked, then the one ProductRate. */
@@ -99,15 +117,18 @@ async function rated(
   }
 }
 
+// A ProductRate that throws counts as not sent: SensCritique answered no rating, and the card keeps the
+// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique (D9).
 export async function rateJob(
   deps: JobDeps,
   msg: RateMessage,
-): Promise<JobError | undefined> {
-  const { found, error } = await targetFor(deps, msg);
-  if (found === undefined) return error ?? "unavailable";
+): Promise<RateEnd> {
+  const { found, error, wroteBefore } = await targetFor(deps, msg);
+  if (found === undefined)
+    return { error: error ?? "unavailable", wroteBefore };
   const result = await rated(deps, found, msg);
   await deps.store.saveRatings(result.cards);
-  return result.error;
+  return { error: result.error, wroteBefore };
 }
 
 export async function dismissJob(
