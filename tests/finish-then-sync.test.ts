@@ -121,6 +121,10 @@ function world(o: Opts) {
       universe: universeOf(id),
       rating: null,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     }),
     unwish: async (id) => {
       w.writes.push(`unwish:${id}`);

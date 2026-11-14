@@ -121,6 +121,10 @@ describe("fiche-link: the link-title path answers from its ending", () => {
       universe: 4,
       rating: null,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     });
     await expect(w.jobs.ficheLink(TAB, link())).rejects.toThrow();
     expect(w.state()).toEqual(unlinked);

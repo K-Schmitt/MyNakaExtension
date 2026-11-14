@@ -4,9 +4,12 @@
 export type ClickEvent = { isTrusted: boolean };
 export type EventLike = ClickEvent & {
   key?: string;
+  pointerType?: string;
   altKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
+  /** A key pressed while an input method composes a character. */
+  isComposing?: boolean;
   stopPropagation(): void;
   preventDefault(): void;
 };
@@ -30,6 +33,8 @@ export interface ElementLike extends NodeLike {
 
 export interface ShadowRootLike extends NodeLike {
   adoptedStyleSheets?: unknown[];
+  /** The element of this tree that has the focus, if any. */
+  readonly activeElement?: unknown;
   replaceChildren(...nodes: NodeLike[]): void;
 }
 

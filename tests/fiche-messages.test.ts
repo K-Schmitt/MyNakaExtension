@@ -4,6 +4,7 @@ import {
   parseLinkAnswer,
   parseMineAnswer,
   parseRateAnswer,
+  parseSearchAnswer,
   parseSeasonAnswer,
 } from "../src/ext/fiche-answers";
 import { allowedFor, parseToWorker } from "../src/ext/messages";
@@ -20,6 +21,9 @@ const INFO = {
 const SEASON = { type: "fiche-season", contentId: 5, season: 2 };
 const MINE = { type: "fiche-mine", contentId: 5, productId: 77 };
 const LINK = { type: "fiche-link", contentId: 5, productId: 77 };
+const UNDO = { type: "fiche-undo", contentId: 5, productId: 77 };
+const REMOVE = { type: "fiche-remove", contentId: 5, productId: 77 };
+const SEARCH = { type: "fiche-search", contentId: 5, query: "Solaris" };
 const FILM = {
   type: "fiche-rate",
   contentId: 5,
@@ -36,6 +40,17 @@ const VALID = [
   FILM,
   { ...FILM, target: "série" },
   EPISODE,
+  { ...FILM, inMaListe: true },
+  { ...FILM, inMaListe: false },
+  { ...FILM, inMaListe: true, listByTab: true },
+  { ...FILM, listByTab: false },
+  UNDO,
+  { ...UNDO, listByTab: true },
+  { ...UNDO, listByTab: false },
+  REMOVE,
+  SEARCH,
+  { ...SEARCH, query: "x".repeat(100) },
+  { ...SEARCH, query: "Solaris \u{1F3AC}" },
 ];
 
 describe("title page messages", () => {
@@ -68,10 +83,22 @@ describe("title page messages", () => {
     ["épisode without episode", { ...EPISODE, episode: undefined }],
     ["épisode without season", { ...EPISODE, season: undefined }],
     ["film with a season", { ...FILM, season: 1 }],
+    ["« Ma liste » as text", { ...FILM, inMaListe: "true" }],
+    ["« Ma liste » as a number", { ...FILM, inMaListe: 1 }],
+    ["« Ma liste » on a series", { ...FILM, target: "série", inMaListe: true }],
+    ["« Ma liste » on an episode", { ...EPISODE, inMaListe: false }],
+    ["a rating's listByTab as text", { ...FILM, listByTab: "true" }],
+    ["listByTab on a series", { ...FILM, target: "série", listByTab: true }],
+    ["listByTab on an episode", { ...EPISODE, listByTab: true }],
     ["an extra key on info", { ...INFO, token: "t" }],
     ["an extra key on rate", { ...FILM, tmdbId: 1 }],
     ["an extra key on mine", { ...MINE, x: 1 }],
     ["an extra key on link", { ...LINK, x: 1 }],
+    ["an extra key on undo", { ...UNDO, x: 1 }],
+    ["an undo without a product", { ...UNDO, productId: undefined }],
+    ["listByTab as text", { ...UNDO, listByTab: "true" }],
+    ["listByTab on a removal", { ...REMOVE, listByTab: true }],
+    ["a removal with a zero content id", { ...REMOVE, contentId: 0 }],
     ["an extra key on season", { ...SEASON, x: 1 }],
     ["a 201 character title", { ...INFO, title: "x".repeat(201) }],
     ["a bad media type", { ...INFO, mediaType: "film" }],
@@ -80,8 +107,28 @@ describe("title page messages", () => {
     ["a text TMDB id", { ...INFO, tmdbId: "1434" }],
     ["season 0", { ...SEASON, season: 0 }],
     ["season 101", { ...SEASON, season: 101 }],
+    ["an empty query", { ...SEARCH, query: "" }],
+    ["a query of spaces only", { ...SEARCH, query: "   " }],
+    ["a 101 character query", { ...SEARCH, query: "x".repeat(101) }],
+    ["a query as a number", { ...SEARCH, query: 7 }],
+    ["a query with a lone surrogate", { ...SEARCH, query: "Sol\uD800aris" }],
+    [
+      "a query ending in a lone surrogate",
+      { ...SEARCH, query: "Solaris\uD83C" },
+    ],
+    ["a search without a query", { ...SEARCH, query: undefined }],
+    ["a search without a content", { ...SEARCH, contentId: undefined }],
+    ["an extra key on search", { ...SEARCH, universe: "movie" }],
   ])("rejects %s", (_name, msg) => {
     expect(parseToWorker(msg)).toBeUndefined();
+  });
+
+  it("trims the query: 100 characters between spaces is read, trimmed", () => {
+    const padded = { ...SEARCH, query: `  ${"x".repeat(100)}\n` };
+    expect(parseToWorker(padded)).toEqual({
+      ...SEARCH,
+      query: "x".repeat(100),
+    });
   });
 
   it("reads season 100, the most seasons a title can have", () => {
@@ -99,13 +146,22 @@ describe("title page messages", () => {
   });
 });
 
+const SC_URL = "https://www.senscritique.com/film/solaris/2005";
+const FLAGS = { canUndo: false, canRemove: false, protected: false };
+
 describe("title page answers", () => {
   const cand = { id: 9, title: "A", type: "serie" };
 
   it("reads a FicheInfo", () => {
     const info = {
       state: "linked",
-      product: { id: 3, average: 7.4, mine: null, label: { title: "Dark" } },
+      product: {
+        id: 3,
+        average: 7.4,
+        mine: null,
+        label: { title: "Dark" },
+        ...FLAGS,
+      },
     };
     expect(parseFicheInfo(info)).toEqual(info);
     const labelled = {
@@ -115,6 +171,10 @@ describe("title page answers", () => {
         average: null,
         mine: 8,
         label: { title: "Solaris", year: 1972 },
+        canUndo: true,
+        canRemove: true,
+        protected: false,
+        url: SC_URL,
       },
     };
     expect(parseFicheInfo(labelled)).toEqual(labelled);
@@ -210,6 +270,22 @@ describe("title page answers", () => {
     expect(parseLinkAnswer({ ok: true })).toEqual({ ok: true });
   });
 
+  it("reads a search answer: its candidates, or none", () => {
+    const found = { candidates: [cand, { ...cand, id: 10, year: 2002 }] };
+    expect(parseSearchAnswer(found)).toEqual(found);
+    expect(parseSearchAnswer({ candidates: [] })).toEqual({ candidates: [] });
+  });
+
+  it.each([
+    ["no candidates", {}],
+    ["an extra key", { candidates: [], state: "choose" }],
+    ["a bad candidate", { candidates: [{ ...cand, x: 1 }] }],
+    ["11 candidates", { candidates: Array.from({ length: 11 }, () => cand) }],
+    ["not a record", null],
+  ])("rejects a search answer with %s", (_name, raw) => {
+    expect(() => parseSearchAnswer(raw)).toThrow();
+  });
+
   it.each([
     () =>
       parseSeasonAnswer({
@@ -252,5 +328,138 @@ describe("title page answers", () => {
     () => parseLinkAnswer({ ok: true, x: 1 }),
   ])("rejects a bad answer %#", (parse) => {
     expect(parse).toThrow();
+  });
+});
+
+describe("the panel's flags in the answers", () => {
+  const product = (over: Record<string, unknown> = {}) => ({
+    state: "linked",
+    product: {
+      id: 3,
+      average: null,
+      mine: 8,
+      label: { title: "Solaris" },
+      ...FLAGS,
+      ...over,
+    },
+  });
+  const panel = {
+    canUndo: true,
+    canRemove: false,
+    protected: true,
+    url: SC_URL,
+  };
+
+  it.each([
+    ["a film page", SC_URL],
+    ["a season page", "https://www.senscritique.com/serie/dark/13/S2"],
+  ])("reads the product's flags with %s", (_n, url) => {
+    const raw = product({ canUndo: true, canRemove: true, url });
+    expect(parseFicheInfo(raw)).toEqual(raw);
+  });
+
+  it.each([
+    ["no undo flag", { canUndo: undefined }],
+    ["no removal flag", { canRemove: undefined }],
+    ["a text undo flag", { canUndo: "true" }],
+    ["a numeric removal flag", { canRemove: 1 }],
+    ["no protected flag", { protected: undefined }],
+    ["a text protected flag", { protected: "false" }],
+    ["a page of another site", { url: "https://x.com/film/a/1" }],
+    ["a protocol-relative page", { url: "//www.senscritique.com/film/a/1" }],
+    ["a script page", { url: "javascript:alert(1)" }],
+    ["a page with ..", { url: "https://www.senscritique.com/film/../1" }],
+    ["a relative page", { url: "/film/solaris/2005" }],
+    ["an empty page", { url: "" }],
+    [
+      "a page over 300 characters",
+      { url: `https://www.senscritique.com/film/${"a".repeat(270)}/1` },
+    ],
+    ["a numeric page", { url: 5 }],
+  ])("rejects a product with %s", (_n, over) => {
+    expect(() => parseFicheInfo(product(over))).toThrow();
+  });
+
+  it.each([
+    ["one millisecond", 1],
+    ["the whole window", 600_000],
+  ])("reads how long « Annuler » stays offered: %s", (_n, left) => {
+    const raw = product({ canUndo: true, undoLeftMs: left });
+    expect(parseFicheInfo(raw)).toEqual(raw);
+    const ok = { ok: true, panel: { ...panel, undoLeftMs: left } };
+    expect(parseRateAnswer(ok)).toEqual(ok);
+  });
+
+  it.each([
+    ["no time left", { canUndo: true, undoLeftMs: 0 }],
+    ["more than the window", { canUndo: true, undoLeftMs: 600_001 }],
+    ["a fraction of a millisecond", { canUndo: true, undoLeftMs: 1.5 }],
+    ["a text time", { canUndo: true, undoLeftMs: "5" }],
+    ["a time without « Annuler »", { canUndo: false, undoLeftMs: 5000 }],
+  ])("rejects a product with %s", (_n, over) => {
+    expect(() => parseFicheInfo(product(over))).toThrow();
+    const raw = { ok: true, panel: { ...panel, ...over } };
+    expect(() => parseRateAnswer(raw)).toThrow();
+  });
+
+  it("reads the flags on a rating that went out, with and without a page", () => {
+    const ok = { ok: true, panel };
+    expect(parseRateAnswer(ok)).toEqual(ok);
+    const bare = {
+      ok: true,
+      panel: { canUndo: false, canRemove: false, protected: false },
+    };
+    expect(parseRateAnswer(bare)).toEqual(bare);
+    const sent = { sent: true, error: "naka-session", panel };
+    expect(parseRateAnswer(sent)).toEqual(sent);
+  });
+
+  it("reads the flags on a rating that did not go out after its finish wrote (D9, R2)", () => {
+    const wrote = { error: "unavailable", panel };
+    expect(parseRateAnswer(wrote)).toEqual(wrote);
+    expect(parseRateAnswer({ error: "unavailable" })).toEqual({
+      error: "unavailable",
+    });
+  });
+
+  it("reads « Ma liste » left to the tab on a rating that went out", () => {
+    const tab = { ok: true, maListe: "tab", panel };
+    expect(parseRateAnswer(tab)).toEqual(tab);
+  });
+
+  it.each([
+    ["by the client", { ok: true, maListe: "client" }],
+    ["by nobody", { ok: true, maListe: "none" }],
+    [
+      "on a rating sent with an error",
+      { sent: true, error: "sc-session", maListe: "tab" },
+    ],
+    [
+      "on a rating that did not go out",
+      { error: "sc-session", maListe: "tab" },
+    ],
+  ])("rejects « Ma liste » %s", (_n, raw) => {
+    expect(() => parseRateAnswer(raw)).toThrow();
+  });
+
+  it.each([
+    [
+      "on a rating that did not go out, incomplete",
+      { error: "sc-session", panel: { canUndo: true } },
+    ],
+    ["without the undo flag", { ok: true, panel: { canRemove: true } }],
+    ["without the removal flag", { ok: true, panel: { canUndo: true } }],
+    [
+      "without the protected flag",
+      { ok: true, panel: { canUndo: true, canRemove: true } },
+    ],
+    ["with an extra key", { ok: true, panel: { ...panel, x: 1 } }],
+    [
+      "with a foreign page",
+      { ok: true, panel: { ...panel, url: "https://x.com/a/b/1" } },
+    ],
+    ["not a record", { ok: true, panel: true }],
+  ])("rejects a panel %s", (_n, raw) => {
+    expect(() => parseRateAnswer(raw)).toThrow();
   });
 });

@@ -4,6 +4,8 @@ import * as ficheCopy from "../src/content/ui/fiche-copy";
 import * as homeCopy from "../src/content/ui/home-copy";
 import * as questionCopy from "../src/content/ui/question-copy";
 import * as ratingCopy from "../src/content/ui/rating-copy";
+import type { RunStep } from "../src/ext/fiche-undo-answers";
+import { valuesOf } from "../src/ext/field-checks";
 import type { JobError } from "../src/ext/job-error";
 import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { HANDLED_COPY } from "../src/status/handled-view";
@@ -110,6 +112,17 @@ const QUESTION_CALLS: CopyCalls<typeof questionCopy> = {
   notSentLine: () => CODES.map(questionCopy.notSentLine),
 };
 
+/** Every step an undo can stop at (a new kind fails the compile). */
+const RUN_STEPS = valuesOf<RunStep["kind"]>({
+  rate: true,
+  undone: true,
+  markDone: true,
+  markDoneWithoutDate: true,
+  wish: true,
+  maListe: true,
+  localRestore: true,
+});
+
 const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
   averageLine: () => [ficheCopy.averageLine(7.4)],
   labelLine: () => [
@@ -124,8 +137,21 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
       ficheCopy.outcomeLine({ kind: "not-sent", error }, ""),
       ficheCopy.outcomeLine({ kind: "sent-with-error", error }, ""),
     ]),
+    ficheCopy.outcomeLine({ kind: "finish-wrote" }, ""),
+    ficheCopy.outcomeLine({ kind: "finish-wrote-expired" }, ""),
+    ...(["undo", "remove"] as const).map((action) =>
+      ficheCopy.outcomeLine({ kind: "undo-failed", action }, ""),
+    ),
+    ...(["protected", "expired", "unrated"] as const).map((reason) =>
+      ficheCopy.outcomeLine({ kind: "undo-refused", reason }, ""),
+    ),
+    ...RUN_STEPS.map((failed) =>
+      ficheCopy.outcomeLine({ kind: "undo-partial", failed }, ""),
+    ),
   ],
   seasonFailedLine: () => [ficheCopy.seasonFailedLine(2)],
+  partialUndoLine: () => RUN_STEPS.map(ficheCopy.partialUndoLine),
+  nothingFoundLine: () => [ficheCopy.nothingFoundLine("Dune")],
 };
 
 const LISTS_CALLS: CopyCalls<typeof listsCopy> = {

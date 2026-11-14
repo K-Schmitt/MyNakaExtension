@@ -43,7 +43,15 @@ export const minedIds = (calls: readonly Call[]) =>
 
 export const linked = (id: number, mine: number | null = null): FicheInfo => ({
   state: "linked",
-  product: { id, average: 6.9, mine, label: { title: "Solaris" } },
+  product: {
+    id,
+    average: 6.9,
+    mine,
+    label: { title: "Solaris" },
+    canUndo: false,
+    canRemove: false,
+    protected: false,
+  },
 });
 
 export const seasonOf = (...numbers: number[]) => ({
@@ -62,7 +70,13 @@ export function fakePorts() {
     shown: undefined as number | undefined,
     visible: [] as number[],
     grid: true,
+    /** Naka's « Ma liste » button: undefined off screen, else whether it is `.is-active`. */
+    maListe: undefined as boolean | undefined,
+    /** The programmatic clicks on it; each one flips it, as Naka's handler does. */
+    clicks: 0,
   };
+  /** The page timer's timers; `fire` runs one even once cleared, as a late call would. */
+  const timers: { ms: number; cleared: boolean; fire(): void }[] = [];
   const ask = (msg: FicheMessage) =>
     new Promise<never>((resolve) => {
       calls.push({ msg, answer: resolve as (value: unknown) => void });
@@ -73,23 +87,42 @@ export function fakePorts() {
     mine: ask,
     rate: ask,
     link: ask,
+    undo: ask,
+    remove: ask,
+    search: ask,
     shownSeason: () => page.shown,
     hasEpisodeGrid: () => page.grid,
     visibleFirst: (numbers) => [
       ...numbers.filter((n) => page.visible.includes(n)),
       ...numbers.filter((n) => !page.visible.includes(n)),
     ],
+    maListe: () => page.maListe,
+    clickMaListe: () => {
+      if (page.maListe === undefined) return;
+      page.clicks += 1;
+      page.maListe = !page.maListe;
+    },
     render: (view) => {
       views.push(view);
     },
     announceVisit: (path) => {
       announced.push(path);
     },
+    timer: {
+      set: (fn, ms) => {
+        const timer = { ms, cleared: false, fire: fn };
+        timers.push(timer);
+        return timer;
+      },
+      clear: (handle) => {
+        (handle as { cleared: boolean }).cleared = true;
+      },
+    },
   };
   const ofType = (type: FicheMessage["type"]) =>
     calls.filter((call) => call.msg.type === type);
   const last = () => views[views.length - 1];
-  return { ports, calls, views, page, ofType, last, announced };
+  return { ports, calls, views, page, ofType, last, announced, timers };
 }
 
 /** Lets every resolved answer reach the controller. */
