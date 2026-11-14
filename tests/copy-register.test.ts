@@ -5,7 +5,7 @@ import * as homeCopy from "../src/content/ui/home-copy";
 import * as questionCopy from "../src/content/ui/question-copy";
 import * as ratingCopy from "../src/content/ui/rating-copy";
 import type { JobError } from "../src/ext/job-error";
-import type { RunRecord } from "../src/ext/settings";
+import type { FinishRecord, RunRecord } from "../src/ext/settings";
 import { HANDLED_COPY } from "../src/status/handled-view";
 import * as jobErrorLabels from "../src/status/job-error-labels";
 import * as listsCopy from "../src/status/lists-copy";
@@ -54,6 +54,7 @@ type CopyCalls<M> = {
     : never]: () => readonly string[];
 };
 
+const NB = " ";
 const CODES = Object.keys(jobErrorLabels.JOB_ERROR_LABELS) as JobError[];
 const REASONS: UnlinkedOffer["reason"][] = [
   "no-match",
@@ -153,14 +154,28 @@ const REPORT = {
   pendingRemovals: 0,
   unresolved: 0,
 };
-const failedRun = (error: JobError): RunRecord => ({
+const run = (extra: Partial<RunRecord>): RunRecord => ({
   at: AT,
   trigger: "button",
   mode: "live",
-  outcome: "failed",
+  outcome: "ok",
   report: REPORT,
-  error,
+  ...extra,
 });
+const finish = (extra: Partial<FinishRecord>): FinishRecord => ({
+  at: AT,
+  key: "movie:1",
+  outcome: "done",
+  ...extra,
+});
+const TRIGGERS: RunRecord["trigger"][] = ["naka-ready", "playlist", "button"];
+const OUTCOMES: FinishRecord["outcome"][] = [
+  "ignored",
+  "needs-choice",
+  "not-found",
+  "done",
+  "failed",
+];
 const SNAPSHOTS: unknown[] = [
   undefined,
   { mode: "simulation", pendingRatings: 0 },
@@ -168,14 +183,49 @@ const SNAPSHOTS: unknown[] = [
   ...CODES.map((error) => ({ error })),
   ...CODES.map((error) => ({
     mode: "live",
-    lastRun: failedRun(error),
-    lastFinish: { at: AT, key: "movie:1", outcome: "failed", error },
+    lastRun: run({ outcome: "failed", error }),
+    lastFinish: finish({ outcome: "failed", error }),
+  })),
+  // The owner's lines, the activity lines, the preview and the next pass.
+  {
+    mode: "simulation",
+    binding: { scUsername: "owner", nakaAccount: "77" },
+    counts: { pendingRemovals: 1, openQuestions: 2, unlinked: 3 },
+    running: { kind: "sync", since: AT },
+    pendingMode: "live",
+    lastRun: run({
+      mode: "simulation",
+      trigger: "naka-ready",
+      preview: [
+        { side: "sc", title: "Alien", year: 1979, type: "film" },
+        { side: "naka", title: "" },
+      ],
+      next: [{ side: "naka", title: "Dune", year: 2021, type: "serie" }],
+    }),
+    lastFinish: finish({ key: "tv:21391:S1E3", title: "Un Job Mortel" }),
+  },
+  {
+    mode: "live",
+    counts: { pendingRemovals: 0, openQuestions: 0, unlinked: 0 },
+    running: { kind: "finish", since: AT },
+    pendingMode: "simulation",
+  },
+  ...TRIGGERS.map((trigger) => ({ mode: "live", lastRun: run({ trigger }) })),
+  ...OUTCOMES.map((outcome) => ({
+    mode: "live",
+    lastFinish: finish({ outcome, title: "Alien" }),
   })),
 ];
 
 function viewTexts(view: StatusView): string[] {
   if (view.kind !== "ready") return [view.message];
-  return [view.headline, view.switchLabel ?? "", ...view.lines];
+  return [
+    view.headline,
+    view.switchLabel ?? "",
+    ...view.lines,
+    ...view.preview,
+    ...view.next,
+  ];
 }
 
 function statusPageTexts(): string[] {
@@ -186,7 +236,10 @@ function statusPageTexts(): string[] {
     ...tableStrings([ACTION_COPY, CONFIRM_TEXT, SETTINGS_COPY]),
     ...tableStrings([WAITING_LABELS, HANDLED_COPY]),
     HANDLED_COPY.heading(3),
-    ...html.replace(/<[^>]*>/g, "\n").split("\n"),
+    ...html
+      .replace(/<[^>]*>/g, "\n")
+      .split("\n")
+      .map((text) => text.trim()),
   ];
 }
 
@@ -233,6 +286,42 @@ describe("the register guard (control)", () => {
 });
 
 describe("every shown sentence speaks in « tu » with ’", () => {
+  it("walks every source: one text only that source gives, each", () => {
+    const all = allShownTexts();
+    const anchors = [
+      ratingCopy.OTHER_LABELS.épisode,
+      questionCopy.MISMATCH_LINE,
+      homeCopy.ROW_TITLE,
+      ficheCopy.MINE_LABEL,
+      listsCopy.LISTS_COPY.hidden,
+      statusModeCopy.MODE_LABELS.live,
+      jobErrorLabels.JOB_ERROR_LABELS["other-account"],
+      CONFIRM_TEXT.reset,
+      SETTINGS_COPY.pauseFromError,
+      WAITING_LABELS.pendingRemovals,
+      HANDLED_COPY.waiting,
+      "Seuil pour les films",
+      "Rien en attente",
+      `Ma liste Naka${NB}: (titre inconnu)`,
+      `Ma liste Naka${NB}: Dune (2021, série)`,
+    ];
+    for (const anchor of anchors) expect(all).toContain(anchor);
+    const lines = all.join("\n");
+    for (const part of [
+      "Synchronisation en cours depuis",
+      "Fin de visionnage en cours de traitement",
+      "Changement de mode en attente",
+      "owner sur SensCritique",
+      "ouverture de Naka",
+      "changement de la liste",
+      "introuvable",
+      "choix à faire",
+      "ignorée",
+    ]) {
+      expect(lines).toContain(part);
+    }
+  });
+
   it("in every copy table, copy function and status page line", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
