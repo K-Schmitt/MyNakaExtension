@@ -30,37 +30,36 @@ export function seriesHeading(title: string): string {
 }
 
 export function currentLine(rating: number): string {
-  return `Votre note actuelle${NB}: ${rating}`;
+  return `Ta note actuelle${NB}: ${rating}`;
 }
 
 export function seasonStartLine(rating: number): string {
-  return `Moyenne de vos épisodes${NB}: ${rating}`;
+  return `Moyenne de tes épisodes${NB}: ${rating}`;
 }
 
 export function seriesStartLine(rating: number): string {
-  return `Moyenne de vos saisons${NB}: ${rating}`;
+  return `Moyenne de tes saisons${NB}: ${rating}`;
 }
 
-export const SERIES_WARNING = `Noter la série la retire de vos envies SensCritique, et elle n'est pas finie sur Naka. Envoyer quand même${NB}?`;
+export const SERIES_WARNING = `Noter la série la retire de tes envies SensCritique, et elle n’est pas finie sur Naka. Envoyer quand même${NB}?`;
 
 // Why a rating did not go, as the block words it (the status page has its own table).
 export const RATING_ERROR_LABELS: Record<JobError, string> = {
-  "no-naka-tab": "ouvrez ou rechargez un onglet Naka",
-  "sc-session": "reconnectez-vous sur SensCritique",
-  "naka-session": "reconnectez-vous sur Naka",
+  "no-naka-tab": "ouvre ou recharge un onglet Naka",
+  "sc-session": "reconnecte-toi sur SensCritique",
+  "naka-session": "reconnecte-toi sur Naka",
   "other-account": "un autre compte est connecté que celui enregistré",
-  "stored-state": "l'état enregistré est illisible",
-  unavailable: "le site ne répond pas, réessayez plus tard",
-  "finish-limit":
-    "trop de fins de visionnage en une heure, réessayez plus tard",
-  "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
-  "naka-tab-changed": "l'onglet Naka a changé de page, réessayez",
+  "stored-state": "l’état enregistré est illisible",
+  unavailable: "le site ne répond pas, réessaie plus tard",
+  "finish-limit": "trop de fins de visionnage en une heure, réessaie plus tard",
+  "naka-list-empty": "Ma liste Naka a été lue vide, rien n’a été retiré",
+  "naka-tab-changed": "l’onglet Naka a changé de page, réessaie",
   "naka-content-unknown":
     "ce contenu est inconnu de Naka ou d\u2019un autre type",
 };
 
 export function errorLine(error: JobError): string {
-  return `La note n'est pas partie${NB}: ${RATING_ERROR_LABELS[error]}.`;
+  return `La note n’est pas partie${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
 export const SENDING_LINE = "Envoi de la note\u2026";
@@ -68,11 +67,11 @@ export const SENDING_LINE = "Envoi de la note\u2026";
 // The wait after « Ignorer »: nothing is being rated.
 export const WAIT_LINE = "Un instant\u2026";
 
-export const UNREACHABLE_LINE = `La note n'est pas partie${NB}: l'extension ne répond pas.`;
+export const UNREACHABLE_LINE = `La note n’est pas partie${NB}: l’extension ne répond pas.`;
 
-export const NEEDS_CHOICE_LINE = `La note n'est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`;
+export const NEEDS_CHOICE_LINE = `La note n’est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`;
 
-export const NOT_RATED_LINE = `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`;
+export const NOT_RATED_LINE = `La note n’est pas partie${NB}: ce titre n’a pas pu être noté.`;
 
 /** A rate on a title with no card ran without making one: the title's last finish says why. */
 export function notSentLine(last: LastFinish | undefined): string {
@@ -98,7 +97,7 @@ export const CANCEL_LABEL = "Annuler";
 // The manual choice: rate another target of the same card.
 export const OTHER_LABELS: Record<RatingLabel, string> = {
   film: "Noter le film",
-  épisode: "Noter l'épisode",
+  épisode: "Noter l’épisode",
   saison: "Noter la saison",
   série: "Noter la série",
 };

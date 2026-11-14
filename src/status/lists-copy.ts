@@ -11,7 +11,7 @@ const NB = "\u202F";
 export const LISTS_COPY = {
   legacy: "Question enregistrée par une version précédente, sans ses titres.",
   requeue: "Reposer la question",
-  hidden: "Écartée de l'accueil",
+  hidden: "Écartée de l’accueil",
   search: "Chercher",
   submit: "Rechercher",
   field: "Titre à chercher",
@@ -24,7 +24,7 @@ export const LISTS_COPY = {
 const REASON_LINES: Record<UnlinkedOffer["reason"], string> = {
   "no-match": "Aucun titre correspondant trouvé",
   "not-in-catalogue": "Titre illisible sur le site",
-  "none-chosen": "Aucun des titres proposés n'a été retenu",
+  "none-chosen": "Aucun des titres proposés n’a été retenu",
 };
 
 export const reasonLine = (reason: UnlinkedOffer["reason"]): string =>
@@ -32,7 +32,7 @@ export const reasonLine = (reason: UnlinkedOffer["reason"]): string =>
 
 /** The list the title is in: its side. */
 export function unlinkedHeading(side: Side, title: string): string {
-  const list = side === "naka" ? "Ma liste Naka" : "vos envies SensCritique";
+  const list = side === "naka" ? "Ma liste Naka" : "tes envies SensCritique";
   return `${title} — dans ${list}`;
 }
 

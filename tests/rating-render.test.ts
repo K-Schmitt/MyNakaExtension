@@ -113,10 +113,10 @@ describe("the rating block", () => {
       ),
     );
     const texts = descendants(root).map((el) => el.textContent ?? "");
-    expect(texts.some((t) => t.includes("n'est pas finie sur Naka"))).toBe(
+    expect(texts.some((t) => t.includes("n’est pas finie sur Naka"))).toBe(
       true,
     );
-    expect(texts.some((t) => t.startsWith("La note n'est pas partie"))).toBe(
+    expect(texts.some((t) => t.startsWith("La note n’est pas partie"))).toBe(
       true,
     );
   });
@@ -361,8 +361,7 @@ describe("the hover preview of the stars", () => {
       doc,
       stars,
       choose,
-      undefined,
-      preview,
+      preview === undefined ? {} : { preview },
     ) as FakeElement;
     const group = wrap.children[0] as FakeElement;
     const buttons = group.children as FakeElement[];

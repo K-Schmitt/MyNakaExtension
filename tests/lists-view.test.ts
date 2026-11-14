@@ -59,11 +59,11 @@ describe("the question rows", () => {
 
   it("a hidden removal says so and keeps both answer buttons", () => {
     const r = row(view().questions, REMOVAL.key);
-    expect(r.lines).toContain("Écartée de l'accueil");
-    expect(r.question).toBe(`Retirer aussi de vos envies SensCritique${NB}?`);
+    expect(r.lines).toContain("Écartée de l’accueil");
+    expect(r.question).toBe(`Retirer aussi de tes envies SensCritique${NB}?`);
     expect(r.buttons).toEqual([
       {
-        label: "Retirer aussi de vos envies SensCritique",
+        label: "Retirer aussi de tes envies SensCritique",
         action: {
           kind: "answer-removal",
           removeFrom: "sc",
@@ -109,8 +109,8 @@ describe("the unlinked rows", () => {
 
   it("an sc entry with no title reads « (titre inconnu) »", () => {
     const sc = row(view().unlinked, UNLINKED_SC.key);
-    expect(sc.heading).toBe("(titre inconnu) — dans vos envies SensCritique");
-    expect(sc.lines).toEqual(["Aucun des titres proposés n'a été retenu"]);
+    expect(sc.heading).toBe("(titre inconnu) — dans tes envies SensCritique");
+    expect(sc.lines).toEqual(["Aucun des titres proposés n’a été retenu"]);
   });
 
   it("each reason has its line", () => {
@@ -174,7 +174,7 @@ describe("the search of an unlinked row", () => {
   it("words an error with the lowercase label after the colon", () => {
     const found = searchOf(open({ kind: "error", error: "sc-session" }));
     expect(found?.message).toBe(
-      `Recherche impossible${NB}: reconnectez-vous sur SensCritique.`,
+      `Recherche impossible${NB}: reconnecte-toi sur SensCritique.`,
     );
   });
 
@@ -225,7 +225,7 @@ describe("a row being answered", () => {
       LEGACY.key,
     );
     expect(r.lines).toEqual([
-      `La réponse n'est pas partie${NB}: l'extension ne répond pas.`,
+      `La réponse n’est pas partie${NB}: l’extension ne répond pas.`,
     ]);
     expect(labels(r)).toEqual(["Reposer la question"]);
   });
@@ -240,22 +240,22 @@ describe("the last answer", () => {
   it("failed, refused and mismatch show their line on the row of the target", () => {
     const failed = view(EMPTY_STATE, last("failed", { error: "unavailable" }));
     expect(row(failed.questions, AMBIGUITY.key).lines).toEqual([
-      `La réponse n'est pas partie${NB}: le site ne répond pas, réessayez plus tard.`,
+      `La réponse n’est pas partie${NB}: le site ne répond pas, réessaie plus tard.`,
     ]);
     const refused = view(EMPTY_STATE, last("refused"));
     expect(row(refused.questions, AMBIGUITY.key).lines).toEqual([
-      `La réponse n'a pas été prise en compte${NB}: la question a changé.`,
+      `La réponse n’a pas été prise en compte${NB}: la question a changé.`,
     ]);
     const mismatch = view(EMPTY_STATE, last("mismatch", {}, UNLINKED_NAKA.key));
     expect(row(mismatch.unlinked, UNLINKED_NAKA.key).lines).toEqual([
       "Aucun titre correspondant trouvé",
-      `Ce titre n'est pas du même type${NB}: un film ne se relie qu'à un film, une série qu'à une série.`,
+      `Ce titre n’est pas du même type${NB}: un film ne se relie qu’à un film, une série qu’à une série.`,
     ]);
   });
 
   it("another row's target shows nothing here", () => {
     const rows = view(EMPTY_STATE, last("refused")).questions;
-    expect(row(rows, REMOVAL.key).lines).toEqual(["Écartée de l'accueil"]);
+    expect(row(rows, REMOVAL.key).lines).toEqual(["Écartée de l’accueil"]);
   });
 
   it("done shows no line", () => {
@@ -266,7 +266,7 @@ describe("the last answer", () => {
   it("moot goes to the page note, only when it is news", () => {
     const answer = last("moot", {}, REMOVAL.key);
     expect(view({ ...EMPTY_STATE, seenSeq: 3 }, answer).note).toBe(
-      `Rien à retirer${NB}: ce titre n'y est déjà plus.`,
+      `Rien à retirer${NB}: ce titre n’y est déjà plus.`,
     );
     expect(view({ ...EMPTY_STATE, seenSeq: 4 }, answer).note).toBe("");
     expect(view(EMPTY_STATE, answer).note).toBe("");
@@ -277,6 +277,6 @@ describe("the last answer", () => {
       { ...EMPTY_STATE, seenSeq: 0 },
       last("moot", {}, REMOVAL.key),
     ).questions;
-    expect(row(rows, REMOVAL.key).lines).toEqual(["Écartée de l'accueil"]);
+    expect(row(rows, REMOVAL.key).lines).toEqual(["Écartée de l’accueil"]);
   });
 });

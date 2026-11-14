@@ -40,7 +40,7 @@ const because = (error: JobError | undefined): string =>
   error === undefined ? "" : `\u202F: ${JOB_ERROR_LABELS[error]}`;
 
 export function snapshotErrorLine(error: JobError): string {
-  return `Lecture de l'état impossible${because(error)}`;
+  return `Lecture de l’état impossible${because(error)}`;
 }
 
 export function runLine(run: RunRecord, format: StatusFormat): string {

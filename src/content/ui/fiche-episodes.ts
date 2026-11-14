@@ -15,6 +15,7 @@ import {
 } from "./fiche-episode-decor";
 import type { FicheHandlers } from "./fiche-handlers";
 import { codeSeason, episodeNumber } from "./fiche-numbers";
+import type { SeenWatch } from "./star-visibility";
 
 export type EpisodeBox = {
   /** The box element: its decoration is kept per box. */
@@ -29,6 +30,7 @@ export type EpisodeBox = {
 
 export type FicheEpisodesPorts = {
   doc: Pick<DocLike, "createElement">;
+  seen: SeenWatch;
   boxes(): EpisodeBox[];
   watch(onChange: () => void): () => void;
 };
@@ -64,7 +66,7 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
     }
     const decor = known ?? createDecor(ports.doc);
     decors.set(box.key, decor);
-    drawDecor(ports.doc, decor, n, episode, handlers, boxWriteOf(view, n));
+    drawDecor(ports, decor, n, episode, handlers, boxWriteOf(view, n));
     if (episode.average === null) decor.badge.host.remove();
     else box.placeBadge(decor.badge.host);
     box.placeStars(decor.stars.host);
