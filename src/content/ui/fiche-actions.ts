@@ -1,7 +1,8 @@
 // The actions under Naka's info panel (spec §2): a closed host right after `div.dca-panel`, kept there by the
 // row keeper whenever Naka redraws the aside. It holds the product's actions (fiche-product-actions:
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
-// product, every rare state of step 7 (fiche-rare-states). Built again only when what it shows changed.
+// product, every rare state of step 7 (fiche-rare-states) with step 8b's search field and « Réessayer ».
+// Built again only when what it shows changed. The search field's keys and input stay in the host.
 
 import type { FicheView } from "../fiche-view";
 import type { DocLike, ElementLike } from "./dom-like";
@@ -10,6 +11,7 @@ import { actionsPorts, type PanelPlace } from "./fiche-panel-dom";
 import { productActions } from "./fiche-product-actions";
 import { rareParts, seasonLines } from "./fiche-rare-states";
 import { ACTIONS_SHEET } from "./fiche-styles";
+import { FIELD_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import type { Maker } from "./rating-render";
 import { createClosedHost } from "./row-host";
 import { createRowKeeper } from "./row-keeper";
@@ -56,6 +58,7 @@ function createHost(ports: FicheActionsPorts) {
     HOST_DECLARATIONS,
     ACTIONS_SHEET,
   );
+  stopAtHost(host, FIELD_STOPPED_EVENTS);
   return { root, keeper: createRowKeeper(actionsPorts(ports, host)) };
 }
 

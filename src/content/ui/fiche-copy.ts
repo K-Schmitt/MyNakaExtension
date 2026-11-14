@@ -18,6 +18,10 @@ export const NOT_FOUND_LINE = "Pas trouvé sur SensCritique";
 export const LINK_HEADING = "Relier à SensCritique";
 export const LINKING_LINE = "Liaison en cours\u2026";
 export const LINK_FAILED_LINE = "La liaison n’a pas abouti.";
+export const RETRY_LABEL = "Réessayer";
+export const SEARCH_LABEL = "Chercher";
+export const SEARCH_PLACEHOLDER = "Titre sur SensCritique";
+export const SEARCHING_LINE = "Recherche en cours\u2026";
 /** A row's value when SensCritique gives none (no average, nothing read yet). */
 export const NO_VALUE = "—";
 export const SERIES_CONFIRM = "SensCritique va retirer la série de tes envies.";
@@ -94,6 +98,11 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
     case "undo-partial":
       return partialUndoLine(outcome.failed);
   }
+}
+
+/** A search that came back empty, with the owner's words. */
+export function nothingFoundLine(query: string): string {
+  return `Rien trouvé pour «${NB}${query}${NB}»`;
 }
 
 export function seasonFailedLine(season: number): string {

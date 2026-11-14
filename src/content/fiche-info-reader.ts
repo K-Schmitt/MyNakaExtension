@@ -1,5 +1,6 @@
 // The title's SensCritique info: asked once per visit from the page's `fiche` event of the title the tab's
-// address names (its own tmdbId, never the event's), and again after a link. Its product opens the seasons.
+// address names (its own tmdbId, never the event's), again after a link, and on « Réessayer » once a read
+// failed (spec 8b §2). Its product opens the seasons.
 
 import type { FicheScope } from "./fiche-page";
 import type { TitlePageEvent } from "./fiche-ports";
@@ -42,4 +43,13 @@ export async function askInfo(scope: FicheScope): Promise<void> {
   else page.info = answer;
   scope.show();
   considerSeason(scope);
+}
+
+/** « Réessayer »: the visit's fiche-info once more, only after its last read failed (never while one is on its way). */
+export function retryInfo(scope: FicheScope): void {
+  const { page } = scope;
+  if (page.info !== undefined || page.outcome?.kind !== "failed") return;
+  page.outcome = undefined;
+  scope.show();
+  void askInfo(scope);
 }

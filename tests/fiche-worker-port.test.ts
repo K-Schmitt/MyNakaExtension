@@ -118,4 +118,21 @@ describe("createFicheWorkerPort", () => {
       await createFicheWorkerPort(ok({ ok: true, maListe: "x" })).undo(undo),
     ).toBeUndefined();
   });
+
+  it("sends fiche-search as given and returns the checked results", async () => {
+    const search = {
+      type: "fiche-search",
+      contentId: 5,
+      query: "Dark",
+    } as const;
+    const candidates = [{ id: 4, title: "Dark", year: 2017, type: "serie" }];
+    const send = ok({ candidates });
+    expect(await createFicheWorkerPort(send).search(search)).toEqual({
+      candidates,
+    });
+    expect(send).toHaveBeenCalledWith(search);
+    expect(
+      await createFicheWorkerPort(ok({ candidates: "x" })).search(search),
+    ).toBeUndefined();
+  });
 });

@@ -1,6 +1,7 @@
 // What the title page controller shows: the title's SensCritique info, the shown season's episodes with
 // their averages (and the owner's own rating once read), the write on its way and how the last one ended.
 
+import type { QuestionCandidate } from "../core/state";
 import type { FicheInfo } from "../ext/fiche-answers";
 import type { RunStep } from "../ext/fiche-undo-answers";
 import type { JobError } from "../ext/job-error";
@@ -31,6 +32,12 @@ export type FicheOutcome =
 /** The panel's two writes that take a rating back: « Annuler » and « Retirer la note ». */
 export type UndoAction = "undo" | "remove";
 
+/** « Chercher » (spec 8b §2): the searched words, then what came back; `failed` when no answer did. */
+export type FicheSearch =
+  | { query: string; state: "searching" }
+  | { query: string; state: "done"; candidates: QuestionCandidate[] }
+  | { query: string; state: "failed" };
+
 export type FichePending = "rating" | "confirm-series" | "link" | UndoAction;
 
 export type FicheView = {
@@ -46,4 +53,8 @@ export type FicheView = {
   ratedEpisode?: number;
   /** The shown season's episodes could not be read. */
   seasonFailed?: true;
+  /** The last search of the visit, while SensCritique found nothing. */
+  search?: FicheSearch;
+  /** The words the search field starts with: the last searched ones, else Naka's title. */
+  fieldText?: string;
 };

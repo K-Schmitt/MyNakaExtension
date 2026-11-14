@@ -3,11 +3,12 @@
 // shown season's episodes, reads the owner's episode ratings one at a time, and sends the owner's writes.
 // A new address ends the visit: its reads stop and its late answers change nothing.
 
-import { onFiche } from "./fiche-info-reader";
+import { onFiche, retryInfo } from "./fiche-info-reader";
 import { type FicheScope, newPage, viewOf } from "./fiche-page";
 import { parseTitlePath, type TitlePath } from "./fiche-path";
 import type { FicheInput, FichePorts, TitlePageEvent } from "./fiche-ports";
 import { createReadQueue, type ReadQueue } from "./fiche-read-queue";
+import { searchTitle } from "./fiche-search";
 import { considerSeason, noteSeason, retrySeason } from "./fiche-season-reader";
 import { removeTitle, undoTitle } from "./fiche-undo-writes";
 import {
@@ -28,6 +29,10 @@ export type FicheController = FicheInput & {
   undo(): void;
   /** « Retirer la note »: takes the title's rating, its seen mark and date off SensCritique. */
   remove(): void;
+  /** « Chercher »: these words (trimmed) searched on SensCritique, while it found nothing. */
+  search(words: string): void;
+  /** « Réessayer »: the title's info read again after a failed read. */
+  retry(): void;
 };
 
 function onSeason(
@@ -94,5 +99,7 @@ export function createFicheController(ports: FichePorts): FicheController {
     link: (productId) => on((scope) => void link(scope, productId))(),
     undo: on((scope) => void undoTitle(scope)),
     remove: on((scope) => void removeTitle(scope)),
+    search: (words) => on((scope) => void searchTitle(scope, words))(),
+    retry: on(retryInfo),
   };
 }

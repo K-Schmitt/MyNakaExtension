@@ -345,12 +345,16 @@ describe("every step 7 rare state, in the actions host", () => {
     const host = t.kept.actions() as FakeElement;
     expect(texts(deepParts(host.shadow))).toEqual([
       "SensCritique n’a pas pu être lu.",
+      "Réessayer",
     ]);
   });
 
   it("says a title is not on SensCritique", async () => {
     const t = await film({ state: "notfound" });
-    expect(texts(actionParts(t))).toEqual(["Pas trouvé sur SensCritique"]);
+    expect(texts(actionParts(t))).toEqual([
+      "Pas trouvé sur SensCritique",
+      "Chercher",
+    ]);
   });
 
   it("offers the candidates with their posters; a trusted choice sends fiche-link, then shows the rows", async () => {
@@ -512,6 +516,8 @@ describe("the actions between two views", () => {
     link: noop,
     undo: noop,
     remove: noop,
+    search: noop,
+    retry: noop,
   };
   const filmView = (mine: number | null, episodes = 0): FicheView => ({
     mediaType: "movie",

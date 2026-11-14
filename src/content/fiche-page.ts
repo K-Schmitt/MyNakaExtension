@@ -11,6 +11,7 @@ import type {
   FicheEpisode,
   FicheOutcome,
   FichePending,
+  FicheSearch,
   FicheView,
 } from "./fiche-view";
 
@@ -40,6 +41,7 @@ export type FichePage = {
   episodes: Episodes;
   /** The seasons read during the visit. */
   readonly read: Map<number, Episodes>;
+  search?: FicheSearch;
 };
 
 export type FicheScope = {
@@ -66,11 +68,18 @@ export function viewOf(page: FichePage): FicheView {
   if (page.season !== undefined && page.failedSeason === page.season) {
     view.seasonFailed = true;
   }
+  if (page.search !== undefined) view.search = page.search;
+  const fieldText = page.search?.query ?? nakaTitle(page.infoMessage);
+  if (fieldText !== undefined) view.fieldText = fieldText;
   const rated = page.ratedEpisode;
   if (rated !== undefined && rated.season === page.season) {
     view.ratedEpisode = rated.episode;
   }
   return view;
+}
+
+function nakaTitle(msg: FicheInfoMessage | undefined): string | undefined {
+  return msg?.title ?? msg?.originalTitle;
 }
 
 export function contentOf(page: FichePage): number | undefined {
