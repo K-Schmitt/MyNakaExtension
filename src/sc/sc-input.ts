@@ -1,7 +1,7 @@
 // Runtime guards on what the caller hands to the client, run before any session read and any request.
 // The types are not enough at runtime: a bad id ends up in a request body, a bad date in a mutation.
 
-import { isIsoDate } from "../ext/field-checks";
+import { isIsoDate } from "../core/iso-date";
 
 export function checkProductId(value: number): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
