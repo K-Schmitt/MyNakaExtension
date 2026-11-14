@@ -15,6 +15,7 @@ import {
   SEARCHING_LINE,
 } from "./fiche-copy";
 import type { FicheHandlers } from "./fiche-handlers";
+import type { FieldLike, FieldSlot } from "./field-focus";
 import {
   BUTTON_CLASS,
   button,
@@ -25,11 +26,17 @@ import {
 } from "./rating-render";
 import { onTrustedEnter } from "./trusted";
 
-type FieldLike = ElementLike & { value: string };
-
 const FORM_CLASS = "mn-row mn-search";
 const FIELD_CLASS = "mn-field";
 
+// Naka's title may be longer than a query: clipped, never between the two halves of a surrogate pair.
+function prefill(text: string): string {
+  const clipped = text.slice(0, MAX_SEARCH_QUERY);
+  const last = clipped.charCodeAt(clipped.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? clipped.slice(0, -1) : clipped;
+}
+
+// Read-only while a search is on its way: words typed then would be replaced by the searched ones.
 function searchField(doc: Maker, view: FicheView): FieldLike {
   const field = doc.createElement("input") as FieldLike;
   field.className = FIELD_CLASS;
@@ -39,7 +46,8 @@ function searchField(doc: Maker, view: FicheView): FieldLike {
   field.setAttribute("maxlength", String(MAX_SEARCH_QUERY));
   field.setAttribute("autocomplete", "off");
   field.setAttribute("enterkeyhint", "search");
-  field.value = view.fieldText ?? "";
+  field.value = prefill(view.fieldText ?? "");
+  if (view.search?.state === "searching") field.setAttribute("readonly", "");
   return field;
 }
 
@@ -52,8 +60,10 @@ function searchForm(
   doc: Maker,
   view: FicheView,
   handlers: Pick<FicheHandlers, "search">,
+  slot: FieldSlot,
 ): ElementLike {
   const field = searchField(doc, view);
+  slot.field = field;
   const search = () => handlers.search(field.value);
   onTrustedEnter(field, search);
   const go = button(doc, SEARCH_LABEL, BUTTON_CLASS, search);
@@ -88,9 +98,10 @@ export function searchParts(
   doc: Maker,
   view: FicheView,
   handlers: Pick<FicheHandlers, "search" | "link">,
+  slot: FieldSlot,
 ): ElementLike[] {
   return [
-    searchForm(doc, view, handlers),
+    searchForm(doc, view, handlers, slot),
     ...searchEnding(doc, view, handlers),
   ];
 }

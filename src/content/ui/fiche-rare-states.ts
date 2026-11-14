@@ -21,6 +21,7 @@ import {
 } from "./fiche-copy";
 import type { FicheHandlers } from "./fiche-handlers";
 import { searchParts } from "./fiche-search-parts";
+import type { FieldSlot } from "./field-focus";
 import {
   BUTTON_CLASS,
   button,
@@ -95,24 +96,29 @@ function notFoundParts(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
+  slot: FieldSlot,
 ): ElementLike[] {
   return [
     textLine(doc, NOT_FOUND_LINE),
-    ...searchParts(doc, view, handlers),
+    ...searchParts(doc, view, handlers, slot),
     ...outcomeLines(doc, view, LINK_FAILED_LINE),
   ];
 }
 
-/** What shows while the title has no product to rate: loading, its failure, the candidates, « Pas trouvé ». */
+/**
+ * What shows while the title has no product to rate: loading, its failure, the candidates, « Pas trouvé ».
+ * The search field it makes, if any, goes into `slot`.
+ */
 export function rareParts(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
+  slot: FieldSlot,
 ): ElementLike[] {
   const { info } = view;
   if (info === undefined) return infoParts(doc, view, handlers);
   if (info.state === "choose") {
     return linkParts(doc, view, info.candidates ?? [], handlers);
   }
-  return notFoundParts(doc, view, handlers);
+  return notFoundParts(doc, view, handlers, slot);
 }

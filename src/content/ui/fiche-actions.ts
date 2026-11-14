@@ -2,15 +2,17 @@
 // row keeper whenever Naka redraws the aside. It holds the product's actions (fiche-product-actions:
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
 // product, every rare state of step 7 (fiche-rare-states) with step 8b's search field and « Réessayer ».
-// Built again only when what it shows changed. The search field's keys and input stay in the host.
+// Built again only when what it shows changed; a search field that had the focus gets it back
+// (field-focus). The search field's keys and input stay in the host.
 
 import type { FicheView } from "../fiche-view";
-import type { DocLike, ElementLike } from "./dom-like";
+import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
 import type { FicheHandlers } from "./fiche-handlers";
 import { actionsPorts, type PanelPlace } from "./fiche-panel-dom";
 import { productActions } from "./fiche-product-actions";
 import { rareParts, seasonLines } from "./fiche-rare-states";
 import { ACTIONS_SHEET } from "./fiche-styles";
+import { type FieldSlot, focusAtEnd, hasFocus } from "./field-focus";
 import { FIELD_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import type { Maker } from "./rating-render";
 import { createClosedHost } from "./row-host";
@@ -27,11 +29,12 @@ function buildActions(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
+  slot: FieldSlot,
 ): ElementLike[] {
   const product = view.info?.product;
   const parts = [
     ...(product === undefined
-      ? rareParts(doc, view, handlers)
+      ? rareParts(doc, view, handlers, slot)
       : productActions(doc, view, product, handlers)),
     ...seasonLines(doc, view),
   ];
@@ -51,6 +54,20 @@ export function actionsInputs(view: FicheView): string {
   return JSON.stringify(shown);
 }
 
+type Drawn = { inputs: string; handlers: FicheHandlers; slot: FieldSlot };
+
+function draw(
+  doc: Maker,
+  root: ShadowRootLike,
+  view: FicheView,
+  handlers: FicheHandlers,
+  inputs: string,
+): Drawn {
+  const slot: FieldSlot = {};
+  root.replaceChildren(...buildActions(doc, view, handlers, slot));
+  return { inputs, handlers, slot };
+}
+
 function createHost(ports: FicheActionsPorts) {
   const { host, root } = createClosedHost(
     ports.doc,
@@ -67,16 +84,17 @@ export function createFicheActions(ports: FicheActionsPorts): {
   hide(): void;
 } {
   let made: ReturnType<typeof createHost> | undefined;
-  let drawn: { inputs: string; handlers: FicheHandlers } | undefined;
+  let drawn: Drawn | undefined;
   return {
     show(view, handlers) {
       made ??= createHost(ports);
       const inputs = actionsInputs(view);
-      if (drawn?.inputs !== inputs || drawn.handlers !== handlers) {
-        drawn = { inputs, handlers };
-        made.root.replaceChildren(...buildActions(ports.doc, view, handlers));
-      }
+      const redraw = drawn?.inputs !== inputs || drawn.handlers !== handlers;
+      const refocus = redraw && hasFocus(made.root, drawn?.slot.field);
+      if (redraw) drawn = draw(ports.doc, made.root, view, handlers, inputs);
       made.keeper.start();
+      const field = drawn?.slot.field;
+      if (refocus && field !== undefined) focusAtEnd(field);
     },
     hide() {
       drawn = undefined;

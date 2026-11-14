@@ -33,6 +33,8 @@ export interface ElementLike extends NodeLike {
 
 export interface ShadowRootLike extends NodeLike {
   adoptedStyleSheets?: unknown[];
+  /** The element of this tree that has the focus, if any. */
+  readonly activeElement?: unknown;
   replaceChildren(...nodes: NodeLike[]): void;
 }
 
