@@ -28,6 +28,7 @@ export const SERIES_CONFIRM = "SensCritique va retirer la série de tes envies."
 export const SC_LINK_LABEL = "Voir sur SensCritique";
 export const UNDO_LABEL = "Annuler";
 export const REMOVE_LABEL = "Retirer la note";
+export const MA_LISTE_MISSED_LINE = "Ma liste Naka n’a pas été mise à jour.";
 export const PROTECTED_LINE = `Une critique ou une recommandation y est liée${NB}: retire la note sur SensCritique.`;
 export const UNDOING_LINE = "Annulation en cours\u2026";
 export const REMOVING_LINE = "Retrait de la note\u2026";

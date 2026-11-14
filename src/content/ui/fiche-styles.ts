@@ -3,7 +3,7 @@
 // panel's « Ta note » row uses them too).
 
 import { themeCss } from "../../ui/theme-tokens";
-import { BLOCK_RULES } from "./block-styles";
+import { BLOCK_RULES, REDUCED_MOTION_RULE } from "./block-styles";
 import { CHOICE_RULES } from "./row-styles";
 
 const v = (name: string): string => `var(--mn-${name})`;
@@ -33,9 +33,11 @@ const EPISODE_STARS_RULES = [
   `.mn-stars[data-previewing] .mn-star.mn-star--lit{color:${v("color-star-filled")};}`,
 ];
 
+// Its buttons (« Annuler », « Chercher », the candidates) have transitions: the reduced motion rule goes last.
 export const ACTIONS_SHEET: string =
   themeCss(":host") +
-  [...BLOCK_RULES, ...CHOICE_RULES, ...ACTIONS_RULES].join("");
+  [...BLOCK_RULES, ...CHOICE_RULES, ...ACTIONS_RULES].join("") +
+  REDUCED_MOTION_RULE;
 
 export const BADGE_SHEET: string = themeCss(":host") + BADGE_RULES.join("");
 
