@@ -519,6 +519,10 @@ function scReads(
         universe: universeOf(id),
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       };
     },
     seasonInfo: async (series, season) => {
@@ -577,6 +581,9 @@ export function scFor(w: World, gen: number): ScClient {
       flaky(w, `markDone ${id}`);
       w.done.add(id);
       if (isFilmProduct(id) && !w.guarded.has(id)) guard(w, id, "its markDone");
+    },
+    markDoneWithoutDate: async (id) => {
+      violation(w, `markDoneWithoutDate ${id}`);
     },
     unmarkDone: async (id) => {
       violation(w, `unmarkDone ${id}`);

@@ -50,6 +50,7 @@ export function fakeSc(over: Partial<ScClient> = {}) {
     wish: async () => undefined,
     unwish: async () => undefined,
     markDone: async () => undefined,
+    markDoneWithoutDate: async () => undefined,
     unmarkDone: async () => undefined,
     rate: async () => undefined,
     productState: async () => ({
@@ -58,6 +59,10 @@ export function fakeSc(over: Partial<ScClient> = {}) {
       universe: 1,
       rating: null,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     }),
     readWishlist: async () => [],
     search: async () => [],
@@ -76,6 +81,10 @@ export function fakeSc(over: Partial<ScClient> = {}) {
     markDone: (id, date) => {
       calls.push(`markDone:${id}:${date}`);
       return base.markDone(id, date);
+    },
+    markDoneWithoutDate: (id) => {
+      calls.push(`markDoneWithoutDate:${id}`);
+      return base.markDoneWithoutDate(id);
     },
     unmarkDone: (id) => {
       calls.push(`unmarkDone:${id}`);
