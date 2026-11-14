@@ -49,15 +49,15 @@ function begin(scope: FicheScope, action: UndoAction): void {
 
 // Every fiche-info resets what the worker issued to the tab: the seasons are read again, as after a link.
 // A lost read leaves no product of the old page on screen (its stars would be refused): the read failure
-// shows, with « Réessayer », in place of the answer's line.
+// shows, with « Réessayer », and the answer's line stays next to it (spec §4).
 async function refreshInfo(scope: FicheScope): Promise<void> {
   const msg = scope.page.infoMessage;
   const info = msg === undefined ? undefined : await scope.ports.info(msg);
   if (!scope.live()) return;
   forgetSeasons(scope);
   scope.page.info = info;
+  if (info === undefined) scope.page.infoFailed = true;
   watchUndoExpiry(scope);
-  if (info === undefined) scope.page.outcome = { kind: "failed" };
   considerSeason(scope);
 }
 

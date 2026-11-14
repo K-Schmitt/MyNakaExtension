@@ -22,6 +22,8 @@ export type FichePage = {
   readonly title: TitlePath;
   infoMessage?: FicheInfoMessage;
   info?: FicheInfo;
+  /** The last read of the info was lost: its line and « Réessayer », whatever the last write's outcome. */
+  infoFailed?: true;
   outcome?: FicheOutcome;
   pending?: FichePending;
   /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */
@@ -64,6 +66,7 @@ export function viewOf(page: FichePage): FicheView {
     episodes: new Map(page.episodes),
   };
   if (page.info !== undefined) view.info = page.info;
+  if (page.infoFailed === true) view.infoFailed = true;
   if (page.season !== undefined) view.season = page.season;
   if (page.pending !== undefined) view.pending = page.pending;
   if (page.outcome !== undefined) view.outcome = page.outcome;

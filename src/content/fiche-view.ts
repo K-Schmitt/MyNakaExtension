@@ -44,10 +44,12 @@ export type FicheView = {
   mediaType: "movie" | "tv";
   /** Absent while the worker has not answered. */
   info?: FicheInfo;
+  /** The info's last read was lost: « SensCritique n’a pas pu être lu » and « Réessayer ». */
+  infoFailed?: true;
   season?: number;
   episodes: Map<number, FicheEpisode>;
   pending?: FichePending;
-  /** The info's or the last write's ending; a season read has its own flag. */
+  /** The last write's ending; the info's read and a season's read have their own flags. */
   outcome?: FicheOutcome;
   /** The shown season's episode that `pending` (a rating) or `outcome` is about, when one is. */
   ratedEpisode?: number;
