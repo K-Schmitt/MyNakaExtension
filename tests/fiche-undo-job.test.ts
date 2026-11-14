@@ -512,6 +512,95 @@ describe("fiche-undo: « Ma liste »", () => {
   });
 });
 
+describe("fiche-undo: « Ma liste » when the button was not on screen at the rating (R10)", () => {
+  /** « Ma liste » as the client changes it: the film listed, then removed by the rating. */
+  function listedWorld(sc: Sc, o: WorldOpts = {}) {
+    let list = [5];
+    const w = world(sc, {
+      playlist: () => list,
+      naka: {
+        removeFromPlaylist: async (id) => {
+          list = list.filter((listed) => listed !== id);
+        },
+        addToPlaylist: async (id) => {
+          list = [...list, id];
+        },
+      },
+      ...o,
+    });
+    return { w, list: () => list };
+  }
+  const inMaListe = (w: World) =>
+    (stored(w) as FicheUndo | null)?.before.inMaListe;
+
+  it("removed by the client: the record says it was listed, and the undo adds it back", async () => {
+    // Arrange
+    const sc: Sc = { now: { isWished: true } };
+    const { w, list } = listedWorld(sc);
+    const mark = await rated(w, sc, RATED_SEEN, rate());
+    expect(list()).toEqual([]);
+
+    // Act
+    const answer = await w.jobs.ficheUndo(TAB, undo());
+
+    // Assert
+    expect(answer).toEqual({ ok: true, maListe: "client" });
+    expect(w.nk.calls.slice(mark.nk)).toContain("addToPlaylist:5");
+    expect(list()).toEqual([5]);
+  });
+
+  it("removed by the client: the stored record holds inMaListe true", async () => {
+    const sc: Sc = { now: { isWished: true } };
+    const { w } = listedWorld(sc);
+    await rated(w, sc, RATED_SEEN, rate());
+    expect(inMaListe(w)).toBe(true);
+  });
+
+  it("absent from « Ma liste »: inMaListe stays null, and the undo adds nothing", async () => {
+    const sc: Sc = { now: { isWished: true } };
+    const w = world(sc, { playlist: () => [99] });
+    const mark = await rated(w, sc, RATED_SEEN, rate());
+    expect(inMaListe(w)).toBeNull();
+    expect(await w.jobs.ficheUndo(TAB, undo())).toEqual({
+      ok: true,
+      maListe: "none",
+    });
+    expect(w.nk.calls.slice(mark.nk)).not.toContain("addToPlaylist:5");
+  });
+
+  it("in simulation: no removal, inMaListe stays null", async () => {
+    const sc: Sc = { now: { isWished: true } };
+    const { w, list } = listedWorld(sc, { settings: SIMULATION });
+    await rated(w, sc, RATED_SEEN, rate());
+    expect(list()).toEqual([5]);
+    expect(inMaListe(w)).toBeNull();
+  });
+
+  it("the tab's own reading is kept: inMaListe false stays false", async () => {
+    const sc: Sc = { now: { isWished: true } };
+    const { w } = listedWorld(sc);
+    await rated(w, sc, RATED_SEEN, rate({ inMaListe: false }));
+    expect(inMaListe(w)).toBe(false);
+  });
+
+  it("no record kept (the state read failed): none is written by the removal", async () => {
+    const sc: Sc = { now: { isWished: true } };
+    let reads = 0;
+    const { w, list } = listedWorld(sc, {
+      sc: {
+        productState: async () => {
+          reads += 1;
+          if (reads === 1) throw new Error("down");
+          return { ...BLANK, ...sc.now };
+        },
+      },
+    });
+    await rated(w, sc, RATED_SEEN, rate());
+    expect(list()).toEqual([]);
+    expect(stored(w)).toBeNull();
+  });
+});
+
 describe("fiche-undo: refused before any request", () => {
   const record: FicheUndo = {
     contentId: 5,

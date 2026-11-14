@@ -196,6 +196,16 @@ describe("an undo and Naka's « Ma liste » button", () => {
 });
 
 describe("a « tab » answer the tab did not ask for", () => {
+  it("a film rated without the button, the button shown before a « tab » answer: no click", async () => {
+    const t = await filmWith(undefined);
+    t.controller.rateTitle(8);
+    expect(rateMsgs(t)[0]).not.toHaveProperty("listByTab");
+    t.page.maListe = true;
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.page.clicks).toBe(0);
+  });
+
   it("an undo sent without listByTab gets no click on « tab »", async () => {
     const t = await filmWith(undefined);
     t.controller.undo();
