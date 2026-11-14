@@ -74,6 +74,8 @@ export function fakePorts() {
     maListe: undefined as boolean | undefined,
     /** The programmatic clicks on it; each one flips it, as Naka's handler does. */
     clicks: 0,
+    /** The tab's address now, which the controller learns only at its next poll (`path`). */
+    path: FILM_PATH,
   };
   /** The page timer's timers; `fire` runs one even once cleared, as a late call would. */
   const timers: { ms: number; cleared: boolean; fire(): void }[] = [];
@@ -102,6 +104,7 @@ export function fakePorts() {
       page.clicks += 1;
       page.maListe = !page.maListe;
     },
+    pathname: () => page.path,
     render: (view) => {
       views.push(view);
     },

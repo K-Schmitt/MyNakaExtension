@@ -116,6 +116,16 @@ describe("a film rating and Naka's « Ma liste » button", () => {
     expect(t.page.clicks).toBe(0);
   });
 
+  it("the address moved before the tab polled it: no click on the next title's button", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    t.page.path = "/content/movie/9999";
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.page.clicks).toBe(0);
+    expect(t.page.maListe).toBe(true);
+  });
+
   it("a series rating: no « Ma liste » field and no click", async () => {
     const t = fakePorts();
     t.page.maListe = true;
@@ -185,6 +195,16 @@ describe("an undo and Naka's « Ma liste » button", () => {
   ])("an undo answered %s: no click", async (_n, answer) => {
     const t = await filmUndone(false, answer);
     expect(t.page.clicks).toBe(0);
+  });
+
+  it("the address moved before the tab polled it: no click on the next title's button", async () => {
+    const t = await filmWith(false);
+    t.controller.undo();
+    t.page.path = "/content/movie/9999";
+    t.ofType("fiche-undo")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.page.clicks).toBe(0);
+    expect(t.page.maListe).toBe(false);
   });
 
   it("sends nothing while a rating is on its way", async () => {

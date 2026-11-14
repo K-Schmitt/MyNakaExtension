@@ -2,13 +2,15 @@
 // worker so (`listByTab`), and once the worker answers `maListe: "tab"` the tab clicks it itself; Naka's page
 // then sends its own request and its class follows. One click at most per answer, the button read again
 // right before it, and only when the tab itself sent `listByTab`: a button already in the wanted state, gone
-// from the screen, or a visit that is over gets none, so no click ever calls another. In simulation the
+// from the screen, or a visit that is over (or whose address already names another page) gets none, so no
+// click ever calls another. In simulation the
 // worker never answers "tab": no click.
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import type { UndoAnswer } from "../ext/fiche-undo-answers";
 import type { FicheScope } from "./fiche-page";
+import { parseTitlePath } from "./fiche-path";
 
 type RateListFields = Pick<FicheRateMessage, "inMaListe" | "listByTab">;
 
@@ -36,9 +38,17 @@ export function givenBackByTab(answer: UndoAnswer | undefined): boolean {
   return answer.partial.done.some((step) => step.kind === "maListe");
 }
 
+// The address is polled once a second: right after Naka moved to another title, the visit is still live
+// while the page already shows the next title's button.
+function stillOnTitle(scope: FicheScope): boolean {
+  const shown = parseTitlePath(scope.ports.pathname());
+  const { title } = scope.page;
+  return shown?.tmdbId === title.tmdbId && shown.mediaType === title.mediaType;
+}
+
 /** One click when the visit goes on and the button is on screen but not `wanted` (true: in the list). */
 export function setMaListe(scope: FicheScope, wanted: boolean): void {
-  if (!scope.live()) return;
+  if (!scope.live() || !stillOnTitle(scope)) return;
   const now = scope.ports.maListe();
   if (now !== undefined && now !== wanted) scope.ports.clickMaListe();
 }
