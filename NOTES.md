@@ -641,6 +641,18 @@ et D6 réglées, le champ de recherche durci, D7 laissée en attente.
 - À vérifier à la recette dans Brave : le rendu réel des lignes avec le CSS de Naka ; l’effet d’un clic
   programmatique sur le bouton Ma liste ; les raccourcis clavier du lecteur pendant la frappe dans le champ.
 
+### Audit de l’étape 8, décisions du propriétaire (revue du 2026-11-14)
+
+- D13 : `isReviewed` et `isRecommended` ne valent « aucune » que pour `false` ; absents, `null` ou d’un autre type,
+  ils comptent comme une critique ou une recommandation (échec fermé). Rejeté : l’ancien « faux quand absent », qui
+  aurait fait tomber la protection sans bruit si SC changeait son API. Coût connu : si SC répondait un jour `null`
+  pour un titre sans critique, chaque titre noté serait protégé (ni « Retirer la note » ni « Annuler » destructif), et
+  la ligne protégée l’affirmerait sans le savoir.
+- D14 : quand l’onglet devait cliquer « Ma liste » et que le bouton a quitté l’écran avant la réponse, la fiche
+  affiche « Ma liste Naka n’a pas été mise à jour. » jusqu’à l’écriture suivante. Rejeté : un appel de secours par le
+  worker (double écriture possible si le clic de la page part quand même). Limite : une visite déjà finie, ou une
+  lecture de la fiche perdue après « Annuler », n’affiche rien.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
