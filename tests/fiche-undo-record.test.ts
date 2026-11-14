@@ -177,6 +177,48 @@ describe("fiche-rate keeps what a film rating changes", () => {
     });
   });
 
+  it("a failed local read: still rated, no record kept, no undo offered", async () => {
+    // Arrange: the store fails once, on the local read right after the before-state.
+    let failNext = false;
+    let reads = 0;
+    const w: World = world({
+      sc: {
+        productState: async () => {
+          reads += 1;
+          if (reads === 1) failNext = true;
+          return { ...UNSEEN, ...SEEN };
+        },
+      },
+    });
+    const { store } = w.jobDeps;
+    const loadRatings = store.loadRatings.bind(store);
+    store.loadRatings = async () => {
+      if (!failNext) return loadRatings();
+      failNext = false;
+      throw new Error("storage");
+    };
+    w.area.data.set("ficheUndo", filmRecord({ at: NOW - 1000 }));
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert
+    expect(w.sk.calls.filter((c) => c.startsWith("rate:"))).toEqual([
+      "rate:2005:8",
+    ]);
+    expect(stored(w)).toBeNull();
+    expect(answer).toEqual({
+      ok: true,
+      panel: {
+        canUndo: false,
+        canRemove: true,
+        protected: false,
+        url: FILM_URL,
+      },
+    });
+  });
+
   it("a list removal that fails after the rating: answered as sent, with the panel", async () => {
     const w = world({
       playlist: () => {

@@ -102,7 +102,10 @@ async function ratedSeries(
   await deps.store.saveState(settlePair(await deps.store.loadState(), pair));
   const ofContent = (card: RatingCard) => card.contentId === msg.contentId;
   await rateCards(deps, ofContent, "série", msg);
-  return { ok: true, panel: afterRating(kept.state, msg.rating) };
+  return {
+    ok: true,
+    panel: afterRating(kept.state, msg.rating, kept.record !== undefined),
+  };
 }
 
 /** `seriesId`: the series' product issued to the tab as the title (fiche-issued's issuedSeries). */
