@@ -18,7 +18,7 @@ export type HandledView =
 
 export const HANDLED_COPY = {
   forget: "Oublier",
-  waiting: "en attente d'un onglet Naka",
+  waiting: "en attente d’un onglet Naka",
   cancel: "Annuler",
   heading: (count: number): string => `Titres traités (${count})`,
 };

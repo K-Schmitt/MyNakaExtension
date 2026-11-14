@@ -3,9 +3,12 @@
 // The worker still writes only a product it issued to this tab (fiche-registry), after a trusted click.
 
 import { asText, asYear, MAX_SEASON_COUNT } from "./fiche-page-events";
+import { parseRemove, parseUndo } from "./fiche-undo-messages";
 import {
+  asBoolean,
   asId,
   asOneOf,
+  asString,
   fail,
   onlyKeys,
   valuesOf,
@@ -38,8 +41,22 @@ export type FicheMessage =
       rating: number;
       season?: number;
       episode?: number;
+      /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
+      inMaListe?: boolean;
+      /** A film's only: the button is on screen, so the tab clicks it itself (`maListe: "tab"`). */
+      listByTab?: boolean;
     }
-  | { type: "fiche-link"; contentId: number; productId: number };
+  | { type: "fiche-link"; contentId: number; productId: number }
+  | {
+      type: "fiche-undo";
+      contentId: number;
+      productId: number;
+      /** Naka's « Ma liste » button is on screen: the tab clicks it itself (`maListe: "tab"`). */
+      listByTab?: boolean;
+    }
+  | { type: "fiche-remove"; contentId: number; productId: number }
+  /** « Chercher » on the title page: the owner's own words, trimmed, a search query (isSearchQuery). */
+  | { type: "fiche-search"; contentId: number; query: string };
 
 export type FicheType = FicheMessage["type"];
 export type FicheInfoMessage = Extract<FicheMessage, { type: "fiche-info" }>;
@@ -50,6 +67,23 @@ export type FicheSeasonMessage = Extract<
 export type FicheMineMessage = Extract<FicheMessage, { type: "fiche-mine" }>;
 export type FicheRateMessage = Extract<FicheMessage, { type: "fiche-rate" }>;
 export type FicheLinkMessage = Extract<FicheMessage, { type: "fiche-link" }>;
+export type FicheUndoMessage = Extract<FicheMessage, { type: "fiche-undo" }>;
+export type FicheRemoveMessage = Extract<
+  FicheMessage,
+  { type: "fiche-remove" }
+>;
+export type FicheSearchMessage = Extract<
+  FicheMessage,
+  { type: "fiche-search" }
+>;
+
+export const MAX_SEARCH_QUERY = 100;
+
+/** A trimmed query either side sends or reads: 1 to MAX_SEARCH_QUERY characters, with no lone surrogate. */
+export function isSearchQuery(query: string): boolean {
+  const sized = query.length >= 1 && query.length <= MAX_SEARCH_QUERY;
+  return sized && query.isWellFormed();
+}
 
 /** Spread into the worker's type list (messages.ts). */
 export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
@@ -58,6 +92,9 @@ export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
   "fiche-mine": true,
   "fiche-rate": true,
   "fiche-link": true,
+  "fiche-undo": true,
+  "fiche-remove": true,
+  "fiche-search": true,
 };
 const FICHE_TYPES = valuesOf<FicheType>(FICHE_TYPE_FLAGS);
 
@@ -67,6 +104,9 @@ export const FICHE_SENDERS: Record<FicheType, readonly SenderRole[]> = {
   "fiche-mine": ["naka-tab"],
   "fiche-rate": ["naka-tab"],
   "fiche-link": ["naka-tab"],
+  "fiche-undo": ["naka-tab"],
+  "fiche-remove": ["naka-tab"],
+  "fiche-search": ["naka-tab"],
 };
 
 const TARGETS = valuesOf<FicheTarget>({
@@ -105,7 +145,17 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   rating: true,
   season: true,
   episode: true,
+  inMaListe: true,
+  listByTab: true,
 });
+const SEARCH_KEYS = valuesOf<keyof FicheSearchMessage>({
+  type: true,
+  contentId: true,
+  query: true,
+});
+/** The rating's fields of Naka's « Ma liste » button: a film's only. */
+type FilmOnlyKey = Extract<keyof FicheRateMessage, "inMaListe" | "listByTab">;
+const FILM_ONLY = valuesOf<FilmOnlyKey>({ inMaListe: true, listByTab: true });
 
 export function isFicheType(type: string): type is FicheType {
   return FICHE_TYPES.some((known) => known === type);
@@ -130,6 +180,21 @@ function parseInfo(record: Record<string, unknown>): FicheInfoMessage {
   return message;
 }
 
+// « Ma liste » is a film's: present on another target, a field of it refuses the message.
+function withMaListe(
+  message: FicheRateMessage,
+  record: Record<string, unknown>,
+): FicheRateMessage {
+  let read = message;
+  for (const key of FILM_ONLY) {
+    const raw = record[key];
+    if (raw === undefined) continue;
+    if (message.target !== "film") return fail(key);
+    read = { ...read, [key]: asBoolean(raw, key) };
+  }
+  return read;
+}
+
 function parseRate(record: Record<string, unknown>): FicheRateMessage {
   onlyKeys(record, RATE_KEYS, "message");
   const target = asOneOf(record.target, TARGETS, "target");
@@ -142,12 +207,17 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
   };
   const place = target === "épisode";
   const hasPlace = record.season !== undefined || record.episode !== undefined;
-  if (!place) return hasPlace ? fail("season") : base;
-  return {
-    ...base,
-    season: asId(record.season, "season"),
-    episode: asId(record.episode, "episode"),
-  };
+  if (!place) {
+    return hasPlace ? fail("season") : withMaListe(base, record);
+  }
+  return withMaListe(
+    {
+      ...base,
+      season: asId(record.season, "season"),
+      episode: asId(record.episode, "episode"),
+    },
+    record,
+  );
 }
 
 function parseProduct(
@@ -168,6 +238,21 @@ function asSeason(raw: unknown): number {
   return season <= MAX_SEASON_COUNT ? season : fail("season");
 }
 
+// The query trimmed, then a search query (isSearchQuery): a broken one costs no SensCritique slot.
+function asQuery(raw: unknown): string {
+  const query = asString(raw, "query").trim();
+  return isSearchQuery(query) ? query : fail("query");
+}
+
+function parseSearch(record: Record<string, unknown>): FicheSearchMessage {
+  onlyKeys(record, SEARCH_KEYS, "message");
+  return {
+    type: "fiche-search",
+    contentId: asId(record.contentId, "contentId"),
+    query: asQuery(record.query),
+  };
+}
+
 export function parseFicheMessage(
   type: FicheType,
   record: Record<string, unknown>,
@@ -184,6 +269,12 @@ export function parseFicheMessage(
       };
     case "fiche-rate":
       return parseRate(record);
+    case "fiche-undo":
+      return parseUndo(record);
+    case "fiche-remove":
+      return parseRemove(record);
+    case "fiche-search":
+      return parseSearch(record);
     default:
       return parseProduct(type, record);
   }

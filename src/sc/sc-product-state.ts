@@ -2,8 +2,9 @@
 //
 // Only the two flags, the product's universe (public, non-personal: film, series, episode…), the
 // owner's own rating (currentUserInfos.rating, to be shown back to the owner), the product's public average and, now, the product's
-// public title and year (the label, read leniently by product-label.ts, for the preview) leave this module; the date
-// seen, the user id, the season count (Naka's is the one used, Ruling 11) and everything else in the answer
+// public title and year (the label, read leniently by product-label.ts, for the preview) leave this module, with what
+// an undo restores: the date seen (kept to put « vu » back as it was), whether the owner reviewed or recommended the
+// title (an undo never drops those) and the product's page; the user id, the season count (Naka's is the one used, Ruling 11) and everything else in the answer
 // are dropped here. The product-level `rating` is the public average, read leniently by average-rating.ts (null when unreadable, it never fails the answer). An answer that
 // does not describe the requested product, whose flags are not booleans, whose universe is not a safe
 // integer or whose rating is neither null nor an integer 1 to 10 (the key must be present) fails closed
@@ -11,8 +12,10 @@
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
 // recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
+import { isIsoDate } from "../core/iso-date";
 import { readAverage } from "./average-rating";
 import { type ProductLabel, readProductLabel } from "./product-label";
+import { productUrlOf } from "./product-url";
 import { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
 import { type Envelope, isRecord } from "./sc-transport";
 
@@ -25,6 +28,12 @@ export type ProductState = {
   average: number | null;
   /** The product's public title and year, for the preview only; absent when the answer does not give them. */
   label?: ProductLabel;
+  /** The date seen, YYYY-MM-DD only; null for any other value or shape. */
+  dateDone: string | null;
+  isReviewed: boolean;
+  isRecommended: boolean;
+  /** The product's page on SensCritique, absolute; undefined unless the path has the known shape (product-url). */
+  url: string | undefined;
 };
 
 const UNEXPECTED =
@@ -71,6 +80,11 @@ function ratingOf(infos: Record<string, unknown>): number | null {
   return rating;
 }
 
+function dateDoneOf(infos: Record<string, unknown>): string | null {
+  const { dateDone } = infos;
+  return typeof dateDone === "string" && isIsoDate(dateDone) ? dateDone : null;
+}
+
 export function readProductState(
   envelope: Envelope,
   productId: number,
@@ -88,6 +102,10 @@ export function readProductState(
     universe: universeOf(product),
     rating: ratingOf(infos),
     average: readAverage(product),
+    dateDone: dateDoneOf(infos),
+    isReviewed: infos.isReviewed === true,
+    isRecommended: infos.isRecommended === true,
+    url: productUrlOf(product.url),
     ...(label === undefined ? {} : { label }),
   };
 }

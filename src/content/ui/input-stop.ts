@@ -43,6 +43,15 @@ export const ROW_STOPPED_EVENTS: readonly string[] = STOPPED_EVENTS.filter(
   (type) => type !== "wheel",
 );
 
+/** A text field's own events, kept from the page too: its typing must not reach Naka's shortcuts. */
+export const FIELD_STOPPED_EVENTS = valuesOf<
+  "keypress" | "beforeinput" | "input"
+>({
+  keypress: true,
+  beforeinput: true,
+  input: true,
+});
+
 export function stopAtHost(host: ElementLike, types: readonly string[]): void {
   for (const type of types) {
     host.addEventListener(type, (event) => event.stopPropagation());

@@ -26,11 +26,50 @@ export class FakeNode implements NodeLike {
     this.children = this.children.filter((c) => c !== child);
     child.parent = null;
   }
+
+  /** Puts `child` right after `ref`, one of this node's children; moves it like appendChild. */
+  insertAfter(child: FakeNode, ref: FakeNode): void {
+    child.parent?.drop(child);
+    child.parent = this;
+    this.children.splice(this.children.indexOf(ref) + 1, 0, child);
+  }
+
+  get parentElement(): FakeElement | null {
+    return this.parent instanceof FakeElement ? this.parent : null;
+  }
+
+  get nextElementSibling(): FakeElement | null {
+    const siblings = this.parent?.children ?? [];
+    const after = siblings.slice(siblings.indexOf(this) + 1);
+    return (
+      after.find((s): s is FakeElement => s instanceof FakeElement) ?? null
+    );
+  }
+
+  after(...nodes: NodeLike[]): void {
+    let at: FakeNode = this;
+    for (const node of nodes) {
+      this.parent?.insertAfter(node as FakeNode, at);
+      at = node as FakeNode;
+    }
+  }
+
+  append(...nodes: NodeLike[]): void {
+    for (const node of nodes) this.appendChild(node);
+  }
 }
 
 export class FakeShadow extends FakeNode implements ShadowRootLike {
   host: FakeElement | null = null;
   adoptedStyleSheets?: unknown[];
+
+  /** As in the DOM: the focused element, while it is in this tree (a removed one lost the focus). */
+  get activeElement(): FakeElement | null {
+    const { focused } = FakeElement;
+    return focused !== null && descendants(this).includes(focused)
+      ? focused
+      : null;
+  }
 
   replaceChildren(...nodes: NodeLike[]): void {
     for (const child of [...this.children]) this.drop(child);
@@ -38,7 +77,12 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
   }
 }
 
-type Modifiers = { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean };
+type Modifiers = {
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  pointerType?: string;
+};
 
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
@@ -50,6 +94,8 @@ export class FakeElement extends FakeNode implements ElementLike {
   shadow = new FakeShadow();
   focusCount = 0;
   static focused: FakeElement | null = null;
+  /** A text field's caret, as setSelectionRange last put it. */
+  selection?: [number, number];
 
   constructor(readonly tag: string) {
     super();
@@ -80,6 +126,10 @@ export class FakeElement extends FakeNode implements ElementLike {
 
   remove(): void {
     this.parent?.drop(this);
+  }
+
+  setSelectionRange(start: number, end: number): void {
+    this.selection = [start, end];
   }
 
   /**
@@ -125,6 +175,11 @@ export class FakeElement extends FakeNode implements ElementLike {
   /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
   dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
     return !this.fire(type, isTrusted, key).stopped;
+  }
+
+  /** A pointer event of the given kind (« mouse », « touch »). */
+  pointer(type: string, pointerType: string): void {
+    this.fire(type, true, undefined, { pointerType });
   }
 
   /** A trusted keydown; true when a listener prevented its default action (a scroll, for an arrow). */

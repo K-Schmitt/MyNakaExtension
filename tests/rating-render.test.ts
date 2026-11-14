@@ -13,6 +13,7 @@ import {
   textLine,
 } from "../src/content/ui/rating-render";
 import { type RatingView, ratingView } from "../src/content/ui/rating-view";
+import { starRater } from "../src/content/ui/star-rater";
 import { episodeCard } from "./rating-fixtures";
 import { descendants, FakeDoc, FakeElement, FakeShadow } from "./ui-fakes";
 
@@ -112,10 +113,10 @@ describe("the rating block", () => {
       ),
     );
     const texts = descendants(root).map((el) => el.textContent ?? "");
-    expect(texts.some((t) => t.includes("n'est pas finie sur Naka"))).toBe(
+    expect(texts.some((t) => t.includes("n’est pas finie sur Naka"))).toBe(
       true,
     );
-    expect(texts.some((t) => t.startsWith("La note n'est pas partie"))).toBe(
+    expect(texts.some((t) => t.startsWith("La note n’est pas partie"))).toBe(
       true,
     );
   });
@@ -347,5 +348,65 @@ describe("the block's classes", () => {
       descendants(root).find((el) => el.textContent === text)?.className;
     expect(classOf("boom")).toBe("mn-line mn-error");
     expect(classOf("careful")).toBe("mn-line mn-warning");
+  });
+});
+
+describe("the hover preview of the stars", () => {
+  const VALUES = Array.from({ length: 10 }, (_, i) => i + 1);
+  function previewed(preview: true | undefined) {
+    const doc = new FakeDoc();
+    const choose = vi.fn();
+    const stars = VALUES.map((value) => ({ value, marked: value === 4 }));
+    const wrap = starRater(
+      doc,
+      stars,
+      choose,
+      preview === undefined ? {} : { preview },
+    ) as FakeElement;
+    const group = wrap.children[0] as FakeElement;
+    const buttons = group.children as FakeElement[];
+    const lit = () =>
+      buttons.flatMap((b, i) => (b.className.includes("lit") ? [i + 1] : []));
+    return { choose, group, buttons, lit };
+  }
+
+  it("lights 1 to 7 on entering star 7, and leaving returns to the rating of 4", () => {
+    const { group, buttons, lit, choose } = previewed(true);
+    buttons[6]?.pointer("pointerenter", "mouse");
+    expect(lit()).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(group.attributes["data-previewing"]).toBe("");
+    group.pointer("pointerleave", "mouse");
+    expect(lit()).toEqual([]);
+    expect(group.attributes["data-previewing"]).toBeUndefined();
+    expect(buttons[3]?.attributes["aria-checked"]).toBe("true");
+    expect(choose).not.toHaveBeenCalled();
+  });
+
+  it("lights 1 to 3 on the focus of star 3, keeps previewing from star to star, and a blur out ends it", () => {
+    const { buttons, lit, choose } = previewed(true);
+    buttons[2]?.dispatch("focus");
+    expect(lit()).toEqual([1, 2, 3]);
+    buttons[2]?.dispatch("blur");
+    buttons[3]?.dispatch("focus");
+    expect(lit()).toEqual([1, 2, 3, 4]);
+    buttons[3]?.dispatch("blur");
+    expect(lit()).toEqual([]);
+    expect(choose).not.toHaveBeenCalled();
+  });
+
+  it("a touch does not preview: the first tap rates", () => {
+    const { buttons, lit, choose } = previewed(true);
+    buttons[6]?.pointer("pointerenter", "touch");
+    expect(lit()).toEqual([]);
+    buttons[6]?.click(true);
+    expect(choose).toHaveBeenCalledWith(7);
+  });
+
+  it("without the option nothing changes on enter or focus", () => {
+    const { group, buttons, lit } = previewed(undefined);
+    buttons[6]?.pointer("pointerenter", "mouse");
+    buttons[2]?.dispatch("focus");
+    expect(lit()).toEqual([]);
+    expect(group.attributes["data-previewing"]).toBeUndefined();
   });
 });

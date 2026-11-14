@@ -1,24 +1,36 @@
-// The panel keeper's ports over the title page: the anchor is Naka's info panel (`div.dca-panel` in
-// `aside.dcf-aside`), and the host's place is right after it. The row keeper's rule serves as is, the
-// info panel standing for its anchor row: right after it is "keep", anywhere else moves it there. Without
-// the info panel, nothing is placed. Moving the host where it already is does nothing, so the keeper
-// cannot loop on its own insertion.
+// The keepers' ports over Naka's info panel (`div.dca-panel` in `aside.dcf-aside`): our two rows stay its
+// last children, in order, and the actions host stays right after it. The row keeper's rule serves as is:
+// for the rows, Naka's last row stands for its anchor; for the actions, the panel does. Without the panel,
+// nothing is placed. Putting a part where it already is does nothing, so a keeper cannot loop on its own
+// insertion. Written against the slice of the DOM they use, so tests drive them on fakes.
 
+import type { ElementLike } from "./dom-like";
 import type { EndTimer } from "./end-poll";
-import { watchPage } from "./fiche-page-watch";
 import type { KeeperPorts } from "./row-keeper";
 import { REPRENDRE_WAIT_MS } from "./row-place";
 
-const INFO_PANEL = "aside.dcf-aside div.dca-panel";
+export type PanelElement = {
+  readonly children: Iterable<object>;
+  readonly parentElement: { readonly children: Iterable<object> } | null;
+  readonly nextElementSibling: object | null;
+  after(node: ElementLike): void;
+  append(...nodes: ElementLike[]): void;
+};
 
-export function createPanelPorts(
-  doc: Document,
-  host: HTMLElement,
-  timer: EndTimer,
+export type PanelPlace = {
+  /** Naka's info panel, or null when the page shows none. */
+  panel(): PanelElement | null;
+  watch(onChange: () => void): () => void;
+  timer: EndTimer;
+};
+
+export function actionsPorts(
+  place: PanelPlace,
+  host: ElementLike,
 ): KeeperPorts {
   return {
     snapshot() {
-      const panel = doc.querySelector(INFO_PANEL);
+      const panel = place.panel();
       const siblings = [...(panel?.parentElement?.children ?? [])];
       if (panel === null || siblings.length === 0) return undefined;
       return {
@@ -28,15 +40,48 @@ export function createPanelPorts(
       };
     },
     apply() {
-      const panel = doc.querySelector(INFO_PANEL);
-      if (panel !== null && panel.nextElementSibling !== host) {
+      const panel = place.panel();
+      if (panel !== null && panel.nextElementSibling !== host)
         panel.after(host);
-      }
     },
     detach() {
       host.remove();
     },
-    watch: (onChange) => watchPage(doc, onChange),
-    timer,
+    watch: place.watch,
+    timer: place.timer,
+  };
+}
+
+/** The index of the first row when all of them follow each other in order, else -1. */
+function rowsAt(children: object[], rows: readonly ElementLike[]): number {
+  const first = children.indexOf(rows[0] as object);
+  const inOrder = rows.every((row, i) => children[first + i] === row);
+  return first >= 0 && inOrder ? first : -1;
+}
+
+export function rowsPorts(
+  place: PanelPlace,
+  rows: readonly ElementLike[],
+): KeeperPorts {
+  const ours = new Set<object>(rows);
+  return {
+    snapshot() {
+      const panel = place.panel();
+      if (panel === null) return undefined;
+      const children = [...panel.children];
+      return {
+        reprendre: children.findLastIndex((child) => !ours.has(child)),
+        host: rowsAt(children, rows),
+        age: REPRENDRE_WAIT_MS,
+      };
+    },
+    apply() {
+      place.panel()?.append(...rows);
+    },
+    detach() {
+      for (const row of rows) row.remove();
+    },
+    watch: place.watch,
+    timer: place.timer,
   };
 }
