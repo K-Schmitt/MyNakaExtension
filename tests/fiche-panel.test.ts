@@ -160,7 +160,7 @@ describe("the title page panel", () => {
     t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: reconnectez-vous sur Naka.`,
+      `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: reconnecte-toi sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
   });
@@ -171,13 +171,13 @@ describe("the title page panel", () => {
     t.ofType("fiche-rate")[0]?.answer({ error: "finish-limit" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: trop de fins de visionnage en une heure, réessayez plus tard.`,
+      `La note n’est pas partie${NB}: trop de fins de visionnage en une heure, réessaie plus tard.`,
     );
     t.controller.rateTitle(4);
     t.ofType("fiche-rate")[1]?.answer(undefined);
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`,
+      `La note n’est pas partie${NB}: ce titre n’a pas pu être noté.`,
     );
   });
 
