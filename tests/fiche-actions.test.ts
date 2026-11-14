@@ -650,3 +650,17 @@ describe("the actions between two views", () => {
     expect(t.built()).toBe(2);
   });
 });
+
+describe("Naka's « Ma liste » the tab could not update (D14)", () => {
+  it("says so under the stars once the button left the screen before the click", async () => {
+    const t = await film(productOf());
+    t.page.maListe = true;
+    t.controller.rateTitle(8);
+    t.page.maListe = undefined;
+    t.ofType("fiche-rate")[0]?.answer({ ok: true, maListe: "tab" });
+    await settle();
+    expect(texts(actionParts(t))).toContain(
+      "Ma liste Naka n’a pas été mise à jour.",
+    );
+  });
+});

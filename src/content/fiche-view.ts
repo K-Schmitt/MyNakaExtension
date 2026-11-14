@@ -55,6 +55,8 @@ export type FicheView = {
   pending?: FichePending;
   /** The last write's ending; the info's read and a season's read have their own flags. */
   outcome?: FicheOutcome;
+  /** The tab could not click Naka's « Ma liste » for the last write: the button had left the screen (D14). */
+  maListeMissed?: true;
   /** The shown season's episode that `pending` (a rating) or `outcome` is about, when one is. */
   ratedEpisode?: number;
   /** The shown season's episodes could not be read. */
