@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { parseSeasonAnswer } from "../src/ext/fiche-answers";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
 import { answerWorld } from "./answer-world";
@@ -107,6 +108,20 @@ describe("fiche-season", () => {
     await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
     const answer = await w.jobs.ficheSeason(TAB, season());
     expect(answer.episodes).toHaveLength(500);
+  });
+
+  it("leaves out an episode the tab cannot read (number 0, a product id that is no id): the others still show and stay issued", async () => {
+    const zero = { ...episode(0), productId: 3100 };
+    const badId = { ...episode(3), productId: 1.5 };
+    const w = seriesWorld([zero, episode(1), badId, episode(2)]);
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    const answer = await w.jobs.ficheSeason(TAB, season());
+    expect(parseSeasonAnswer(answer).episodes.map((e) => e.episode)).toEqual([
+      1, 2,
+    ]);
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3101 })),
+    ).resolves.toEqual({ mine: null, average: null });
   });
 });
 
