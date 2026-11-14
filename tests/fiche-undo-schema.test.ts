@@ -121,6 +121,19 @@ describe("parseFicheUndo", () => {
     expect(parseFicheUndo(structuredClone(r))).toEqual(r);
   });
 
+  it("lets an error other than a bad field through", () => {
+    // Arrange: a value whose read itself throws is no stored record, so it is not read as null.
+    const raw = {
+      ...sample(),
+      get before(): never {
+        throw new RangeError("not a field");
+      },
+    };
+
+    // Act, Assert
+    expect(() => parseFicheUndo(raw)).toThrow(RangeError);
+  });
+
   it("rejects a record missing a key", () => {
     const { at: _, ...rest } = sample();
     expect(parseFicheUndo(rest)).toBeNull();

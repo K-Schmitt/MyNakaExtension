@@ -76,6 +76,14 @@ describe("the undo answer", () => {
       },
     ],
     [
+      "a « vu » step with no date",
+      {
+        partial: { done: [], failed: { kind: "markDone", date: null } },
+        maListe: "none",
+        error: "unavailable",
+      },
+    ],
+    [
       "a step with an extra key",
       {
         partial: { done: [], failed: { kind: "wish", rating: 2 } },
