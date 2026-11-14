@@ -69,6 +69,10 @@ export function fakePorts() {
     shown: undefined as number | undefined,
     visible: [] as number[],
     grid: true,
+    /** Naka's « Ma liste » button: undefined off screen, else whether it is `.is-active`. */
+    maListe: undefined as boolean | undefined,
+    /** The programmatic clicks on it; each one flips it, as Naka's handler does. */
+    clicks: 0,
   };
   const ask = (msg: FicheMessage) =>
     new Promise<never>((resolve) => {
@@ -80,12 +84,19 @@ export function fakePorts() {
     mine: ask,
     rate: ask,
     link: ask,
+    undo: ask,
     shownSeason: () => page.shown,
     hasEpisodeGrid: () => page.grid,
     visibleFirst: (numbers) => [
       ...numbers.filter((n) => page.visible.includes(n)),
       ...numbers.filter((n) => !page.visible.includes(n)),
     ],
+    maListe: () => page.maListe,
+    clickMaListe: () => {
+      if (page.maListe === undefined) return;
+      page.clicks += 1;
+      page.maListe = !page.maListe;
+    },
     render: (view) => {
       views.push(view);
     },

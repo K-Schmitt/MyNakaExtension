@@ -1,6 +1,6 @@
-// What the title page controller needs from the tab: the worker's five fiche answers (already checked,
-// undefined when lost or refused), three readings of the page, the drawing of its view and the
-// announcement of a visit to the page's relay.
+// What the title page controller needs from the tab: the worker's six fiche answers (already checked,
+// undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
+// drawing of its view and the announcement of a visit to the page's relay.
 
 import type {
   FicheInfo,
@@ -14,7 +14,9 @@ import type {
   FicheMineMessage,
   FicheRateMessage,
   FicheSeasonMessage,
+  FicheUndoMessage,
 } from "../ext/fiche-messages";
+import type { UndoAnswer } from "../ext/fiche-undo-answers";
 import type { PageEvent } from "../ext/messages";
 import type { FicheView } from "./fiche-view";
 
@@ -24,12 +26,17 @@ export type FichePorts = {
   mine(msg: FicheMineMessage): Promise<MineAnswer | undefined>;
   rate(msg: FicheRateMessage): Promise<RateAnswer | undefined>;
   link(msg: FicheLinkMessage): Promise<{ ok: true } | undefined>;
+  undo(msg: FicheUndoMessage): Promise<UndoAnswer | undefined>;
   /** The season the page's dropdown names (« Saison 2 » → 2), if one can be read. */
   shownSeason(): number | undefined;
   /** Whether the page shows its episode grid (`div.dcf-ep-grid`). */
   hasEpisodeGrid(): boolean;
   /** These episode numbers, the ones whose boxes are on screen first. */
   visibleFirst(numbers: readonly number[]): number[];
+  /** Naka's « Ma liste » button: undefined when not on screen, else whether it is `.is-active`. */
+  maListe(): boolean | undefined;
+  /** One programmatic click on that button, when it is on screen. */
+  clickMaListe(): void;
   /** The view of the title page, or undefined off a title page. */
   render(view: FicheView | undefined): void;
   /** Asks the page's MAIN relay to post again the events it kept for this title page path. */

@@ -57,7 +57,9 @@ export type MineAnswer = { mine: number | null; average: number | null };
 export type OkAnswer = { ok: true };
 /** The panel's flags once a film's or a series' rating went out; an episode's answer has none. */
 type Paneled = { panel?: PanelFlags };
-export type RateOkAnswer = OkAnswer & Paneled;
+/** A film's live rating with Naka's button on screen: the tab clicks « Ma liste » itself, the client did not. */
+type ListedByTab = { maListe?: "tab" };
+export type RateOkAnswer = OkAnswer & Paneled & ListedByTab;
 /** The rating did not go out. */
 export type NotSentAnswer = { error: JobError };
 /** The rating went out and a later step failed (a film's removal from « Ma liste »). */
@@ -102,7 +104,12 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
 const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
 const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true, average: true });
 const OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
-const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({ ok: true, panel: true });
+const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({
+  ok: true,
+  panel: true,
+  maListe: true,
+});
+const BY_TAB = valuesOf<NonNullable<ListedByTab["maListe"]>>({ tab: true });
 const NOT_SENT_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
 const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
   sent: true,
@@ -218,11 +225,17 @@ function withPanel<T extends object>(answer: T, raw: unknown): T & Paneled {
   return panel === undefined ? answer : { ...answer, panel };
 }
 
+function withListedByTab(answer: RateOkAnswer, raw: unknown): RateOkAnswer {
+  const maListe = whenPresent(raw, (v) => asOneOf(v, BY_TAB, "maListe"));
+  return maListe === undefined ? answer : { ...answer, maListe };
+}
+
 export function parseRateAnswer(raw: unknown): RateAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, RATE_OK_KEYS, "answer");
-    return withPanel({ ok: true as const }, record.panel);
+    const ok = withPanel({ ok: true as const }, record.panel);
+    return withListedByTab(ok, record.maListe);
   }
   const error = asOneOf(record.error, ERROR_CODES, "error");
   if (record.sent === undefined) {

@@ -1,4 +1,4 @@
-// The title page controller's line to the worker: the five fiche messages, each answer checked field by
+// The title page controller's line to the worker: the six fiche messages, each answer checked field by
 // field before the controller sees it. The send function is injected (the entry binds chrome.runtime), so
 // nothing here touches chrome.*. A lost, refused or malformed answer is `undefined`, never a throw.
 
@@ -10,13 +10,14 @@ import {
   parseSeasonAnswer,
 } from "../ext/fiche-answers";
 import type { FicheMessage } from "../ext/fiche-messages";
+import { parseUndoAnswer } from "../ext/fiche-undo-answers";
 import type { FichePorts } from "./fiche-ports";
 
 export type SendFiche = (msg: FicheMessage) => Promise<unknown>;
 
 type WorkerPart = Pick<
   FichePorts,
-  "info" | "season" | "mine" | "rate" | "link"
+  "info" | "season" | "mine" | "rate" | "link" | "undo"
 >;
 
 export function createFicheWorkerPort(send: SendFiche): WorkerPart {
@@ -37,5 +38,6 @@ export function createFicheWorkerPort(send: SendFiche): WorkerPart {
     mine: (msg) => askChecked(msg, parseMineAnswer),
     rate: (msg) => askChecked(msg, parseRateAnswer),
     link: (msg) => askChecked(msg, parseLinkAnswer),
+    undo: (msg) => askChecked(msg, parseUndoAnswer),
   };
 }

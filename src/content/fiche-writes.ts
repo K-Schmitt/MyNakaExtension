@@ -1,10 +1,12 @@
 // The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once,
 // a series after its confirmation, an episode of the shown season, a link to a candidate the worker
-// offered. One write at a time; an answer that comes once the visit is over changes nothing.
+// offered. One write at a time; an answer that comes once the visit is over changes nothing. A film's
+// rating takes it out of Naka's « Ma liste » with Naka's own button when it is on screen (fiche-ma-liste).
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
 import { askInfo } from "./fiche-info-reader";
+import { rateListFields, removedByTab, setMaListe } from "./fiche-ma-liste";
 import {
   contentOf,
   type EpisodePlace,
@@ -36,18 +38,20 @@ async function sendRate(
   msg: FicheRateMessage,
   apply: (rating: number) => void,
   place?: EpisodePlace,
-): Promise<void> {
+): Promise<RateAnswer | undefined> {
   const { page } = scope;
   page.pending = "rating";
   page.outcome = undefined;
   page.ratedEpisode = place;
   scope.show();
-  const ending = endingOf(await scope.ports.rate(msg));
-  if (!scope.live()) return;
+  const answer = await scope.ports.rate(msg);
+  if (!scope.live()) return answer;
+  const ending = endingOf(answer);
   page.pending = undefined;
   page.outcome = ending.outcome;
   if (ending.sent) apply(msg.rating);
   scope.show();
+  return answer;
 }
 
 function rateMessage(
@@ -60,24 +64,29 @@ function rateMessage(
   return { type: "fiche-rate", contentId, target, productId, rating, ...place };
 }
 
-function sendTitleRate(scope: FicheScope, rating: number): void {
+async function sendTitleRate(scope: FicheScope, rating: number) {
   const { page } = scope;
   const product = page.info?.product;
   const contentId = contentOf(page);
   if (product === undefined || contentId === undefined) return;
-  const target = page.title.mediaType === "tv" ? "série" : "film";
-  const msg = rateMessage(contentId, target, product.id, rating);
-  void sendRate(scope, msg, (mine) => {
+  const film = page.title.mediaType === "movie";
+  const target = film ? "film" : "série";
+  const msg = {
+    ...rateMessage(contentId, target, product.id, rating),
+    ...(film ? rateListFields(scope) : {}),
+  };
+  const answer = await sendRate(scope, msg, (mine) => {
     if (page.info?.product?.id !== product.id) return;
     page.info = { ...page.info, product: { ...product, mine } };
   });
+  if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
 }
 
 export function rateTitle(scope: FicheScope, rating: number): void {
   const { page } = scope;
   if (page.pending !== undefined || page.info?.product === undefined) return;
   if (page.title.mediaType === "movie") {
-    sendTitleRate(scope, rating);
+    void sendTitleRate(scope, rating);
     return;
   }
   page.pending = "confirm-series";
@@ -91,7 +100,7 @@ export function confirmSeries(scope: FicheScope): void {
   if (page.pending !== "confirm-series" || rating === undefined) return;
   page.pending = undefined;
   page.seriesRating = undefined;
-  sendTitleRate(scope, rating);
+  void sendTitleRate(scope, rating);
 }
 
 export function cancelSeries(scope: FicheScope): void {

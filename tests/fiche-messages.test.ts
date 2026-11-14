@@ -40,6 +40,8 @@ const VALID = [
   EPISODE,
   { ...FILM, inMaListe: true },
   { ...FILM, inMaListe: false },
+  { ...FILM, inMaListe: true, listByTab: true },
+  { ...FILM, listByTab: false },
   UNDO,
   { ...UNDO, listByTab: true },
   { ...UNDO, listByTab: false },
@@ -80,6 +82,9 @@ describe("title page messages", () => {
     ["« Ma liste » as a number", { ...FILM, inMaListe: 1 }],
     ["« Ma liste » on a series", { ...FILM, target: "série", inMaListe: true }],
     ["« Ma liste » on an episode", { ...EPISODE, inMaListe: false }],
+    ["a rating's listByTab as text", { ...FILM, listByTab: "true" }],
+    ["listByTab on a series", { ...FILM, target: "série", listByTab: true }],
+    ["listByTab on an episode", { ...EPISODE, listByTab: true }],
     ["an extra key on info", { ...INFO, token: "t" }],
     ["an extra key on rate", { ...FILM, tmdbId: 1 }],
     ["an extra key on mine", { ...MINE, x: 1 }],
@@ -333,6 +338,26 @@ describe("the panel's flags in the answers", () => {
     expect(parseRateAnswer(bare)).toEqual(bare);
     const sent = { sent: true, error: "naka-session", panel };
     expect(parseRateAnswer(sent)).toEqual(sent);
+  });
+
+  it("reads « Ma liste » left to the tab on a rating that went out", () => {
+    const tab = { ok: true, maListe: "tab", panel };
+    expect(parseRateAnswer(tab)).toEqual(tab);
+  });
+
+  it.each([
+    ["by the client", { ok: true, maListe: "client" }],
+    ["by nobody", { ok: true, maListe: "none" }],
+    [
+      "on a rating sent with an error",
+      { sent: true, error: "sc-session", maListe: "tab" },
+    ],
+    [
+      "on a rating that did not go out",
+      { error: "sc-session", maListe: "tab" },
+    ],
+  ])("rejects « Ma liste » %s", (_n, raw) => {
+    expect(() => parseRateAnswer(raw)).toThrow();
   });
 
   it.each([
