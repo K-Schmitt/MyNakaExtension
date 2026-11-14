@@ -1,5 +1,9 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  EPISODE_STARS_SHEET,
+  PANEL_STARS_SHEET,
+} from "../src/content/ui/fiche-styles";
 import type { FicheInfo } from "../src/ext/fiche-answers";
 import {
   FILM_PATH,
@@ -127,6 +131,22 @@ describe("the SensCritique rows in Naka's info panel", () => {
     (average as FakeElement).click(true);
     starsOf(deepParts(mine as FakeElement))[2]?.click(true);
     expect(panelClicks).toEqual([]);
+  });
+
+  it("lays the stars on one line, without the « 7/10 » the row has no room for", async () => {
+    const t = await film();
+    const mine = t.kept.ours()[1] as FakeElement;
+    const host = deepParts(mine).find((el) => el.shadowInit.length > 0);
+    const style = host?.shadow.children.find(
+      (c) => c instanceof FakeElement && c.tag === "style",
+    ) as FakeElement | undefined;
+    expect(style?.textContent).toBe(PANEL_STARS_SHEET);
+    expect(PANEL_STARS_SHEET.startsWith(EPISODE_STARS_SHEET)).toBe(true);
+    expect(PANEL_STARS_SHEET).toContain(
+      ".mn-row--stars{flex-wrap:nowrap;justify-content:flex-end;}",
+    );
+    expect(PANEL_STARS_SHEET).toContain(".mn-stars-value{display:none;}");
+    expect(EPISODE_STARS_SHEET).not.toContain("display:none");
   });
 
   it("keeps the series' stars (and the focus on them) while the episode ratings come in", async () => {
