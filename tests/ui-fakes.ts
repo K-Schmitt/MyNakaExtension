@@ -69,7 +69,12 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
   }
 }
 
-type Modifiers = { altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean };
+type Modifiers = {
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
+  pointerType?: string;
+};
 
 export class FakeElement extends FakeNode implements ElementLike {
   textContent: string | null = "";
@@ -156,6 +161,11 @@ export class FakeElement extends FakeNode implements ElementLike {
   /** Bubbles an event from here, through the shadow boundary; true when nothing stopped it. */
   dispatch(type: string, isTrusted: unknown = true, key?: string): boolean {
     return !this.fire(type, isTrusted, key).stopped;
+  }
+
+  /** A pointer event of the given kind (« mouse », « touch »). */
+  pointer(type: string, pointerType: string): void {
+    this.fire(type, true, undefined, { pointerType });
   }
 
   /** A trusted keydown; true when a listener prevented its default action (a scroll, for an arrow). */

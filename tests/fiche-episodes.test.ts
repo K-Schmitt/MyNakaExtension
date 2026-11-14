@@ -463,3 +463,17 @@ describe("an episode rating on its box", () => {
     expect(linesOf(box)).toEqual([]);
   });
 });
+
+describe("the preview on an episode's stars", () => {
+  it("lights the stars up to the hovered one, sends nothing, and the home row's rater has none", async () => {
+    const box = fakeBox("E3");
+    const t = await seasonOne([box]);
+    const before = t.ofType("fiche-rate").length;
+    const stars = starsOf(shadowParts(starsHostOf(box)));
+    stars[4]?.pointer("pointerenter", "mouse");
+    expect(stars.filter((s) => s.className.includes("lit"))).toHaveLength(5);
+    groupOf(box)?.pointer("pointerleave", "mouse");
+    expect(stars.filter((s) => s.className.includes("lit"))).toHaveLength(0);
+    expect(t.ofType("fiche-rate")).toHaveLength(before);
+  });
+});
