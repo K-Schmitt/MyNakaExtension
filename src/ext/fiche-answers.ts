@@ -29,6 +29,8 @@ export type PanelFlags = {
   canUndo: boolean;
   /** Rated, with no critique or recommendation to lose. */
   canRemove: boolean;
+  /** A critique or a recommendation is tied to the product: the panel sends the owner to SensCritique. */
+  protected: boolean;
   /** The product's page, a SensCritique product page only (product-url). */
   url?: string;
 };
@@ -87,11 +89,13 @@ const PRODUCT_KEYS = valuesOf<keyof FicheProduct>({
   label: true,
   canUndo: true,
   canRemove: true,
+  protected: true,
   url: true,
 });
 const PANEL_KEYS = valuesOf<keyof PanelFlags>({
   canUndo: true,
   canRemove: true,
+  protected: true,
   url: true,
 });
 const LABEL_KEYS = valuesOf<keyof ProductLabel>({ title: true, year: true });
@@ -155,6 +159,7 @@ function readFlags(record: Record<string, unknown>, path: string): PanelFlags {
   const flags: PanelFlags = {
     canUndo: asBoolean(record.canUndo, `${path}.canUndo`),
     canRemove: asBoolean(record.canRemove, `${path}.canRemove`),
+    protected: asBoolean(record.protected, `${path}.protected`),
   };
   const url = whenPresent(record.url, (v) => asProductUrl(v, `${path}.url`));
   return url === undefined ? flags : { ...flags, url };

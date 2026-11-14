@@ -18,7 +18,7 @@ import { seriesItem } from "./sw-fakes";
 
 const LABEL = { title: "Solaris", year: 1972 };
 // Rated 7 with nothing to lose, no undo record, no page.
-const FLAGS = { canUndo: false, canRemove: true };
+const FLAGS = { canUndo: false, canRemove: true, protected: false };
 const rated = (universe: number = UNIVERSE.film) => ({
   product: () => ({ rating: 7, average: 6.9, universe, label: LABEL }),
 });
@@ -358,6 +358,7 @@ describe("fiche-info: the panel's flags", () => {
     return {
       canUndo: product?.canUndo,
       canRemove: product?.canRemove,
+      protected: product?.protected,
       url: product?.url,
     };
   };
@@ -371,6 +372,7 @@ describe("fiche-info: the panel's flags", () => {
     expect(await flagsOf(w)).toEqual({
       canUndo: true,
       canRemove: true,
+      protected: false,
       url: URL,
     });
   });
@@ -391,6 +393,7 @@ describe("fiche-info: the panel's flags", () => {
     expect(await flagsOf(w)).toEqual({
       canUndo: false,
       canRemove: true,
+      protected: false,
       url: undefined,
     });
   });
@@ -406,5 +409,18 @@ describe("fiche-info: the panel's flags", () => {
       product: () => ({ rating: 7, universe: 1, label: LABEL, ...over }),
     });
     expect((await flagsOf(w)).canRemove).toBe(removable);
+  });
+
+  it.each([
+    ["a critique", { isReviewed: true }, true],
+    ["a recommendation", { isRecommended: true }, true],
+    ["neither", {}, false],
+    ["no rating and neither", { rating: null }, false],
+  ])("protected with %s: %s", async (_n, over, kept) => {
+    const w = world({
+      state: linkedTo(2005),
+      product: () => ({ rating: 7, universe: 1, label: LABEL, ...over }),
+    });
+    expect((await flagsOf(w)).protected).toBe(kept);
   });
 });

@@ -21,6 +21,7 @@ describe("createFicheWorkerPort", () => {
         label: { title: "Dark" },
         canUndo: false,
         canRemove: false,
+        protected: false,
       },
     };
     const send = ok(answer);

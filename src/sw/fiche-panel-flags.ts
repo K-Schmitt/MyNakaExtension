@@ -1,8 +1,14 @@
 // The title panel's flags (spec §6 decisions 1, 2, 6): « Annuler » while a live undo record names this very
 // title and product, « Retirer la note » for a rated product with no critique or recommendation, and the
-// product's page. Unknown flags fail closed: no undo, no removal, no link.
+// product's page, and whether a critique or recommendation is tied to it. Unknown flags fail closed: no undo,
+// no removal, no link, no protected line.
 
-import { canRemove, type FicheUndo, liveUndo } from "../core/fiche-undo";
+import {
+  canRemove,
+  type FicheUndo,
+  isProtected,
+  liveUndo,
+} from "../core/fiche-undo";
 import type { PanelFlags } from "../ext/fiche-answers";
 import type { ProductState } from "../sc/sc-client";
 import type { JobDeps } from "./job-deps";
@@ -12,10 +18,18 @@ export type PanelState = Pick<
   "rating" | "isReviewed" | "isRecommended" | "url"
 >;
 
-export const NO_PANEL: PanelFlags = { canUndo: false, canRemove: false };
+export const NO_PANEL: PanelFlags = {
+  canUndo: false,
+  canRemove: false,
+  protected: false,
+};
 
 export function panelFlags(state: PanelState, canUndo: boolean): PanelFlags {
-  const flags = { canUndo, canRemove: canRemove(state) };
+  const flags = {
+    canUndo,
+    canRemove: canRemove(state),
+    protected: isProtected(state),
+  };
   return state.url === undefined ? flags : { ...flags, url: state.url };
 }
 
