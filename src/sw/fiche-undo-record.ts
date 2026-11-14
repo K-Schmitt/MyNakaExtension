@@ -6,8 +6,11 @@
 // any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
 // clears the record the same way. A film the worker's client took out of « Ma liste » while the tab could
 // not read the button is noted as listed (ruling R10), so « Annuler » adds it back. A rating answered
-// `{ error }` (its ProductRate did not go out) puts the record it replaced back, even when a film's
-// explicit finish already wrote to SensCritique before that error: this rating's record is then dropped.
+// `{ error }` puts the record it replaced back only when nothing of it was written (D9): a refusal before
+// any write (the binding, the hour's budget, the pre-check, a state read before the first write) or a
+// ProductRate that threw with nothing sent before it (a film with its card, a series). A film whose
+// explicit finish wrote (« vu », out of the wishes, the settled pair, the handled key) keeps this
+// rating's record, so « Annuler » restores it from its before-state.
 
 import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";

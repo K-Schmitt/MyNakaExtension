@@ -9,7 +9,8 @@
 // the series' resolved question (an episode's) then runs once, after the rating, as after the status
 // page's link, whether the rating went out or not: the link is made either way. A series' state is read and
 // kept as the undo record after the link, before its ProductRate (put back as it was when the rating does not
-// go out); its answer carries the panel. An episode's
+// go out: the ProductRate is the series' only write, so nothing was written before it, D9); its answer
+// carries the panel. An episode's
 // rating keeps nothing and answers no panel.
 
 import { contentKeyOf } from "../core/finish-event";
