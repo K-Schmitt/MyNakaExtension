@@ -17,7 +17,7 @@ import {
 } from "./fiche-copy";
 import { type FicheHandlers, ficheStars } from "./fiche-handlers";
 import { type PanelPlace, rowsPorts } from "./fiche-panel-dom";
-import { EPISODE_STARS_SHEET } from "./fiche-styles";
+import { PANEL_STARS_SHEET } from "./fiche-styles";
 import { ROW_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import { type Maker, textLine } from "./rating-render";
 import { createClosedHost } from "./row-host";
@@ -70,7 +70,7 @@ function createRows(ports: FicheRowsPorts) {
     doc,
     "span",
     STARS_DECLARATIONS,
-    EPISODE_STARS_SHEET,
+    PANEL_STARS_SHEET,
   );
   mine.value.appendChild(stars.host);
   const rows = [average.row, mine.row];
