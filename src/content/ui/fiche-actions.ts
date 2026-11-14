@@ -19,7 +19,12 @@ import { createClosedHost } from "./row-host";
 import { createRowKeeper } from "./row-keeper";
 
 const ACTIONS_CLASS = "mn-fiche-actions";
-const HOST_DECLARATIONS = ["all: initial", "display: block"];
+// `all: initial` resets `color-scheme` too: set back to dark, a scrolling candidate list keeps a dark bar.
+const HOST_DECLARATIONS = [
+  "all: initial",
+  "color-scheme: dark",
+  "display: block",
+];
 
 export type FicheActionsPorts = PanelPlace & {
   doc: Pick<DocLike, "createElement">;
