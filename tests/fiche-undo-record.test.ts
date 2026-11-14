@@ -234,3 +234,115 @@ describe("fiche-rate keeps what a series rating changes", () => {
     expect(stored(w)).toEqual(older);
   });
 });
+
+/** The record of an earlier rating, still live. */
+const earlier = () =>
+  filmRecord({
+    at: NOW - 60_000,
+    before: { ...filmRecord().before, rating: 3 },
+  });
+
+describe("a rating refused before any SensCritique write keeps the earlier « Annuler »", () => {
+  it("a film refused by the binding: the earlier record is saved again", async () => {
+    const w = world({ username: "intruder" });
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    expect(answer).toEqual({ error: "other-account" });
+    expect(w.writes()).toEqual([]);
+    expect(stored(w)).toEqual(earlier());
+  });
+
+  it("a film rated: the new record replaces the earlier one", async () => {
+    const w = world();
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    expect(stored(w)).toEqual(filmRecord());
+  });
+
+  it("a film rated whose list removal failed: the new record is kept", async () => {
+    const w = world({
+      playlist: () => {
+        throw new Error("down");
+      },
+    });
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    expect(answer).toMatchObject({ sent: true, error: "unavailable" });
+    expect(stored(w)).toEqual(filmRecord());
+  });
+
+  it("a series refused by the binding: the earlier record is saved again", async () => {
+    const w = world({ state: linkedTo(13), username: "intruder" });
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+
+    const answer = await w.jobs.ficheRate(TAB, seriesRate());
+
+    expect(answer).toEqual({ error: "other-account" });
+    expect(w.writes()).toEqual([]);
+    expect(stored(w)).toEqual(earlier());
+  });
+
+  it("a series rated: the new record replaces the earlier one", async () => {
+    const w = world({ state: linkedTo(13) });
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+
+    await w.jobs.ficheRate(TAB, seriesRate());
+
+    expect(stored(w)).toMatchObject({ productId: 13, role: "série", at: NOW });
+  });
+});
+
+describe("fiche-rate keeps what a series rating changes, before its ProductRate", () => {
+  it("stores the series' record before the ProductRate", async () => {
+    const kept: unknown[] = [];
+    const w: World = world({
+      state: linkedTo(13),
+      sc: {
+        rate: async () => {
+          kept.push(stored(w));
+        },
+      },
+    });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+
+    await w.jobs.ficheRate(TAB, seriesRate());
+
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toMatchObject({ productId: 13, role: "série", at: NOW });
+  });
+
+  it("a failed state read: the series is still rated, no record kept, no undo offered", async () => {
+    const w = world({
+      state: linkedTo(13),
+      sc: {
+        productState: async () => {
+          throw new ScUnavailableError("x");
+        },
+      },
+    });
+    w.area.data.set("ficheUndo", earlier());
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+
+    const answer = await w.jobs.ficheRate(TAB, seriesRate());
+
+    expect(w.sk.calls.filter((c) => c.startsWith("rate:"))).toEqual([
+      "rate:13:8",
+    ]);
+    expect(stored(w)).toBeNull();
+    expect(answer).toEqual({
+      ok: true,
+      panel: { canUndo: false, canRemove: false, protected: false },
+    });
+  });
+});

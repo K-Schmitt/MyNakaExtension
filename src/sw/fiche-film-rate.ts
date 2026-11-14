@@ -6,7 +6,7 @@
 // question is not run: rateJob's explicit finish is of the same key. A stored card that would rate another
 // product than the one issued refuses the write before any request. Once the link holds, the film's state is
 // read and kept as the undo record (fiche-undo-record), before any SensCritique write: after the link's
-// checks, so a refused link still sends nothing. An answer of a rating that went out carries the panel.
+// checks, so a refused link still sends nothing. A rating that does not go out puts the older record back. An answer of a rating that went out carries the panel.
 // With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal);
 // without it, a film the client removed is noted as listed on the undo record (ruling R10).
 
@@ -19,7 +19,7 @@ import { linkForRating } from "./fiche-link-pair";
 import { leaveNakaList } from "./fiche-list-removal";
 import { NotIssuedError } from "./fiche-mine-job";
 import { afterRating } from "./fiche-panel-flags";
-import { noteListed, recordBefore } from "./fiche-undo-record";
+import { noteListed, putBackReplaced, recordBefore } from "./fiche-undo-record";
 import type { JobDeps } from "./job-deps";
 import { rateJob } from "./rating-jobs";
 
@@ -41,18 +41,21 @@ export async function rateFilm(
   const { contentId, productId, rating } = msg;
   await assertCardProduct(deps.store, msg);
   await linkForRating(deps.store, { nakaId: contentId, scId: productId });
-  const before = await recordBefore(deps, msg, "film");
+  const kept = await recordBefore(deps, msg, "film");
   const error = await rateJob(deps, {
     type: "rate",
     contentId,
     label: "film",
     rating,
   });
-  if (error !== undefined) return { error };
+  if (error !== undefined) {
+    await putBackReplaced(deps, kept);
+    return { error };
+  }
   const leaving = await leaveNakaList(deps, contentId, msg.listByTab === true);
   // The tab could not read the button: the client's removal tells the record (R10).
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }
-  return { ...leaving.answer, panel: afterRating(before, rating) };
+  return { ...leaving.answer, panel: afterRating(kept.state, rating) };
 }

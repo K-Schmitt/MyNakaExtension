@@ -8,7 +8,8 @@
 // rating settles the pair, so settlePair never makes a pair the sync would skip. A finish that waited on
 // the series' resolved question (an episode's) then runs once, after the rating, as after the status
 // page's link, whether the rating went out or not: the link is made either way. A series' state is read and
-// kept as the undo record after the link, before its ProductRate; its answer carries the panel. An episode's
+// kept as the undo record after the link, before its ProductRate (put back as it was when the rating does not
+// go out); its answer carries the panel. An episode's
 // rating keeps nothing and answers no panel.
 
 import { contentKeyOf } from "../core/finish-event";
@@ -23,7 +24,7 @@ import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import { linkForRating } from "./fiche-link-pair";
 import { afterRating } from "./fiche-panel-flags";
-import { recordBefore } from "./fiche-undo-record";
+import { putBackReplaced, recordBefore } from "./fiche-undo-record";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
 import { sendRating } from "./rating-jobs";
@@ -92,13 +93,16 @@ async function ratedSeries(
   msg: FicheRateMessage,
   pair: Pair,
 ): Promise<RateAnswer> {
-  const before = await recordBefore(deps, msg, "série");
+  const kept = await recordBefore(deps, msg, "série");
   const failed = await sent(deps, msg);
-  if (failed !== undefined) return failed;
+  if (failed !== undefined) {
+    await putBackReplaced(deps, kept);
+    return failed;
+  }
   await deps.store.saveState(settlePair(await deps.store.loadState(), pair));
   const ofContent = (card: RatingCard) => card.contentId === msg.contentId;
   await rateCards(deps, ofContent, "série", msg);
-  return { ok: true, panel: afterRating(before, msg.rating) };
+  return { ok: true, panel: afterRating(kept.state, msg.rating) };
 }
 
 /** `seriesId`: the series' product issued to the tab as the title (fiche-issued's issuedSeries). */
