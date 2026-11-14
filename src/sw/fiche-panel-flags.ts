@@ -1,7 +1,8 @@
 // The title panel's flags (spec §6 decisions 1, 2, 6): « Annuler » while a live undo record names this very
 // title and product, « Retirer la note » for a rated product with no critique or recommendation, and the
-// product's page, and whether a critique or recommendation is tied to it. Unknown flags fail closed: no undo,
-// no removal, no link, no protected line.
+// product's page, and whether a critique or recommendation is tied to its rating (an unrated title has no
+// rating to take off, so no protected line). Unknown flags fail closed: no undo, no removal, no link, no
+// protected line.
 
 import {
   canRemove,
@@ -30,7 +31,7 @@ export function panelFlags(state: PanelState, undoLeftMs: number): PanelFlags {
   const flags: PanelFlags = {
     canUndo: undoLeftMs > 0,
     canRemove: canRemove(state),
-    protected: isProtected(state),
+    protected: state.rating !== null && isProtected(state),
   };
   if (undoLeftMs > 0) flags.undoLeftMs = undoLeftMs;
   return state.url === undefined ? flags : { ...flags, url: state.url };
