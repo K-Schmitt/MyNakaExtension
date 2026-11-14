@@ -18,7 +18,7 @@ import { stateWith } from "./question-fixtures";
 import { episodeCard } from "./rating-fixtures";
 
 const E1: ContentIds = { contentId: 5, season: 1, episode: 1 };
-const REMOVE = "Retirer aussi de vos envies SensCritique";
+const REMOVE = "Retirer aussi de tes envies SensCritique";
 const OFFER: RemovalOffer = {
   kind: "removal",
   key: "removal:sc:21391:112240873",
