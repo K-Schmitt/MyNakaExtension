@@ -111,6 +111,21 @@ describe("fiche-search: the results", () => {
     await expect(w.jobs.ficheLink(TAB, link(12))).rejects.toThrow();
   });
 
+  it("a result of a universe the extension does not know is dropped, and not issued", async () => {
+    // Arrange
+    const odd = { ...solaris(12, 2002), universe: 99 };
+    const w = await pageWorld({
+      sc: { search: async () => [odd, solaris(11, 1972)] },
+    });
+
+    // Act
+    const answer = await w.jobs.ficheSearch(TAB, search());
+
+    // Assert
+    expect(answer.candidates.map((c) => c.id)).toEqual([11]);
+    expect(await w.registry.has(TAB, 5, 12)).toBe(false);
+  });
+
   it("keeps the first 10 results, in SensCritique's order, and issues only those", async () => {
     const fifteen = Array.from({ length: 15 }, (_, i) => filmItem(i + 1));
     const w = await pageWorld({ sc: { search: async () => fifteen } });

@@ -244,6 +244,25 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     expect(t.views.length).toBe(views);
   });
 
+  it("a link from the results answered after the page changed: no info asked again, nothing rendered", async () => {
+    // Arrange
+    const t = await notFound();
+    t.chercher()?.click(true);
+    t.ofType("fiche-search")[0]?.answer(RESULTS);
+    await settle();
+    t.choices()[0]?.click(true);
+    t.controller.path(SERIES_PATH);
+    const views = t.views.length;
+
+    // Act
+    t.ofType("fiche-link")[0]?.answer({ ok: true });
+    await settle();
+
+    // Assert
+    expect(t.ofType("fiche-info")).toHaveLength(1);
+    expect(t.views.length).toBe(views);
+  });
+
   it("says « Rien trouvé pour « {query} » » with U+202F inside the quotes", async () => {
     const t = await notFound();
     t.field().value = " Solyaris ";

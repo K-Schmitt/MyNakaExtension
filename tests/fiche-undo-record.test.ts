@@ -598,3 +598,76 @@ describe("D9: the earlier record comes back only when nothing was written", () =
     expect(stored(w)).toEqual(otherTitle());
   });
 });
+
+describe("D9 when the record could not be kept or read", () => {
+  const storeLost = async () => {
+    throw new Error("storage lost");
+  };
+
+  it("a film whose before-state was not read, its finish wrote, its ProductRate threw: no panel, no record put back", async () => {
+    // Arrange: the first read (the before-state) fails; the finish reads, then writes « vu ».
+    let reads = 0;
+    let now: Partial<ProductState> = { ...UNSEEN };
+    const w = world({
+      product: () => now,
+      sc: {
+        ...failingRate,
+        productState: async () => {
+          reads += 1;
+          if (reads === 1) throw new ScUnavailableError("x");
+          return { ...UNSEEN, ...now };
+        },
+        markDone: async () => {
+          now = { ...now, isDone: true, dateDone: "2026-11-05" };
+        },
+      },
+    });
+    w.area.data.set("ficheUndo", otherTitle());
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert: the finish wrote, so the earlier record is not put back; none undoes this film.
+    expect(w.writes()).toEqual(["markDone:2005:2026-11-05", "rate:2005:8"]);
+    expect(answer).toEqual({ error: "unavailable" });
+    expect(stored(w)).toBeNull();
+  });
+
+  it("a film whose finish wrote, the record then unreadable: its error alone, no panel", async () => {
+    // Arrange
+    const w = world({ sc: failingRate });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    w.jobDeps.store.loadFicheUndo = storeLost;
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert: the finish settled the pair (a write), the ProductRate threw.
+    expect(w.state().settled).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(answer).toEqual({ error: "unavailable" });
+    expect(stored(w)).toEqual(filmRecord());
+  });
+
+  it("a film with a card, the earlier record unreadable, its ProductRate threw: nothing to put back, this film's record stays", async () => {
+    // Arrange
+    const w = world({ sc: failingRate });
+    w.area.data.set("ratings", [filmCardOf5()]);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    w.jobDeps.store.loadFicheUndo = storeLost;
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert
+    expect(answer).toEqual({ error: "unavailable" });
+    expect(w.writes()).toEqual(["rate:2005:8"]);
+    expect(w.area.sets.filter((s) => "ficheUndo" in s)).toEqual([
+      {
+        ficheUndo: filmRecord({
+          local: { handled: false, settled: false, cards: [filmCardOf5()] },
+        }),
+      },
+    ]);
+  });
+});
