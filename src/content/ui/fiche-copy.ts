@@ -54,7 +54,7 @@ const NOT_PUT_BACK: Record<RunStep["kind"], string> = {
   markDoneWithoutDate: `le ${SEEN} n’est pas revenu`,
   undone: `la note et le ${SEEN} n’ont pas été retirés`,
   wish: "le titre n’est pas revenu dans tes envies",
-  maListe: "le film n’est pas revenu dans Ma liste",
+  maListe: "le film n’est pas revenu dans Ma liste Naka",
   localRestore: "l’extension n’a pas repris son état d’avant",
 };
 
@@ -74,7 +74,7 @@ export function labelLine({ title, year }: ProductLabel): string {
 
 /** The rating went out; the removal from « Ma liste » that follows a film's did not. */
 export function sentWithErrorLine(error: JobError): string {
-  return `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: ${RATING_ERROR_LABELS[error]}.`;
+  return `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
 /** A film's rating that did not go out after its explicit finish wrote (D9, ruling R2). */

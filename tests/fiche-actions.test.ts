@@ -296,7 +296,7 @@ describe("the undo and refusal copy", () => {
       `L’annulation s’est arrêtée${NB}: le «${NB}vu${NB}» et sa date ne sont pas revenus, et la suite n’a pas été faite.`,
     );
     expect(partialUndoLine("maListe")).toContain(
-      "le film n’est pas revenu dans Ma liste",
+      "le film n’est pas revenu dans Ma liste Naka",
     );
   });
 
@@ -469,7 +469,7 @@ describe("every step 7 rare state, in the actions host", () => {
     t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `Note envoyée, mais le retrait de Ma liste n’a pas abouti${NB}: reconnectez-vous sur Naka.`,
+      `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnectez-vous sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
   });
