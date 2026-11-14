@@ -329,6 +329,21 @@ describe("title page answers", () => {
   ])("rejects a bad answer %#", (parse) => {
     expect(parse).toThrow();
   });
+
+  it("reads a season of 500 episodes and refuses one of 501", () => {
+    const episodes = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        episode: i + 1,
+        productId: 4000 + i,
+        average: null,
+      }));
+    expect(
+      parseSeasonAnswer({ episodes: episodes(500) }).episodes,
+    ).toHaveLength(500);
+    expect(() => parseSeasonAnswer({ episodes: episodes(501) })).toThrow(
+      "stored state: episodes",
+    );
+  });
 });
 
 describe("the panel's flags in the answers", () => {
