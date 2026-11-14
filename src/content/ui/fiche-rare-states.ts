@@ -75,16 +75,19 @@ function linkParts(
   ];
 }
 
-/** While the info is on its way, the loading line; once its read failed, the line and « Réessayer ». */
+/** The loading line, or once the read failed its line and « Réessayer »; then the last write's line. */
 function infoParts(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
 ): ElementLike[] {
-  if (view.outcome?.kind !== "failed") return [textLine(doc, LOADING_LINE)];
+  const written = outcomeLines(doc, view, INFO_FAILED_LINE);
+  if (view.infoFailed !== true)
+    return [textLine(doc, LOADING_LINE), ...written];
   return [
     textLine(doc, INFO_FAILED_LINE, ERROR_CLASS),
     row(doc, [button(doc, RETRY_LABEL, BUTTON_CLASS, handlers.retry)]),
+    ...written,
   ];
 }
 

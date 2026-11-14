@@ -38,21 +38,25 @@ export async function askInfo(scope: FicheScope): Promise<void> {
   const msg = page.infoMessage;
   if (msg === undefined) return;
   page.info = undefined;
+  page.infoFailed = undefined;
   watchUndoExpiry(scope);
   const answer = await scope.ports.info(msg);
   if (!scope.live()) return;
-  if (answer === undefined) page.outcome = { kind: "failed" };
+  if (answer === undefined) page.infoFailed = true;
   else page.info = answer;
   watchUndoExpiry(scope);
   scope.show();
   considerSeason(scope);
 }
 
-/** « Réessayer »: the visit's fiche-info once more, only after its last read failed (never while one is on its way). */
+/**
+ * « Réessayer »: the visit's fiche-info once more, only after its last read failed (never while one is on
+ * its way, nor while a write is). The last write's line stays (spec §4: what an undo did not put back).
+ */
 export function retryInfo(scope: FicheScope): void {
   const { page } = scope;
-  if (page.info !== undefined || page.outcome?.kind !== "failed") return;
-  page.outcome = undefined;
-  scope.show();
+  if (page.info !== undefined || page.infoFailed !== true) return;
+  if (page.pending !== undefined) return;
   void askInfo(scope);
+  scope.show();
 }

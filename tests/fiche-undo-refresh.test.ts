@@ -105,7 +105,8 @@ describe("the panel read again after « Annuler » or « Retirer la note » on a
 
     // Assert
     expect(t.last()?.info).toBeUndefined();
-    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+    expect(t.last()?.infoFailed).toBe(true);
+    expect(t.last()?.outcome).toBeUndefined();
     expect(t.last()?.episodes.size).toBe(0);
     expect(t.last()?.pending).toBeUndefined();
   });
