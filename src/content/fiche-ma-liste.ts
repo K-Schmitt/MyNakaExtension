@@ -38,9 +38,13 @@ export function givenBackByTab(answer: UndoAnswer | undefined): boolean {
   return answer.partial.done.some((step) => step.kind === "maListe");
 }
 
-/** One click when the visit goes on and the button is on screen but not `wanted` (true: in the list). */
+/** One click when the visit goes on and the button is on screen but not `wanted` (true: in the list); the
+ * button gone from the screen meanwhile, the panel says « Ma liste » was not updated (D14). */
 export function setMaListe(scope: FicheScope, wanted: boolean): void {
   if (!scope.live() || !stillOnTitle(scope)) return;
   const now = scope.ports.maListe();
-  if (now !== undefined && now !== wanted) scope.ports.clickMaListe();
+  if (now === undefined) {
+    scope.page.maListeMissed = true;
+    scope.show();
+  } else if (now !== wanted) scope.ports.clickMaListe();
 }

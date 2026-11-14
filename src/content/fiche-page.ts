@@ -27,6 +27,8 @@ export type FichePage = {
   /** The token of the info's read on its way, if one is: an older read's end leaves a newer one's. */
   infoReading?: object;
   outcome?: FicheOutcome;
+  /** Naka's « Ma liste » the tab had to click left the screen first (D14): its line, until the next write. */
+  maListeMissed?: true;
   pending?: FichePending;
   /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */
   ratedEpisode?: EpisodePlace;
@@ -72,6 +74,7 @@ export function viewOf(page: FichePage): FicheView {
   if (page.season !== undefined) view.season = page.season;
   if (page.pending !== undefined) view.pending = page.pending;
   if (page.outcome !== undefined) view.outcome = page.outcome;
+  if (page.maListeMissed === true) view.maListeMissed = true;
   if (page.season !== undefined && page.failedSeason === page.season) {
     view.seasonFailed = true;
   }
@@ -87,6 +90,12 @@ export function viewOf(page: FichePage): FicheView {
 
 function nakaTitle(msg: FicheInfoMessage | undefined): string | undefined {
   return msg?.title ?? msg?.originalTitle;
+}
+
+/** A new write or search starts: the last one's ending lines go. */
+export function forgetEnding(page: FichePage): void {
+  page.outcome = undefined;
+  page.maListeMissed = undefined;
 }
 
 export function contentOf(page: FichePage): number | undefined {

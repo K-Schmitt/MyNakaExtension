@@ -8,6 +8,7 @@ import type { FicheProduct } from "../../ext/fiche-answers";
 import type { FichePending, FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
 import {
+  MA_LISTE_MISSED_LINE,
   PROTECTED_LINE,
   REMOVE_LABEL,
   REMOVING_LINE,
@@ -74,6 +75,9 @@ function lines(doc: Maker, view: FicheView, product: FicheProduct) {
   const texts = [
     ...(showsProtected(product) ? [textLine(doc, PROTECTED_LINE)] : []),
     ...(pending === undefined ? [] : [textLine(doc, pending)]),
+    ...(view.maListeMissed === true
+      ? [textLine(doc, MA_LISTE_MISSED_LINE)]
+      : []),
   ];
   const shown = new Set(texts.map((line) => line.textContent));
   const outcome = outcomeLines(doc, view, NOT_RATED_LINE);
