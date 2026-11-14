@@ -130,6 +130,43 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     expect(t.ofType("fiche-search")).toEqual([]);
   });
 
+  it("sends no search on a title SensCritique found, nor on a « choose » page", async () => {
+    const found = await notFound(FILM_PATH, linked(55, 7));
+    found.controller.search("Solyaris");
+    expect(found.ofType("fiche-search")).toEqual([]);
+    const choose = await notFound(FILM_PATH, {
+      state: "choose",
+      candidates: [{ id: 80, title: "Solyaris", year: 1972, type: "film" }],
+    });
+    choose.controller.search("Solyaris");
+    expect(choose.ofType("fiche-search")).toEqual([]);
+  });
+
+  it("sends no search while a link is on its way", async () => {
+    const t = await notFound();
+    t.chercher()?.click(true);
+    t.ofType("fiche-search")[0]?.answer(RESULTS);
+    await settle();
+    t.choices()[0]?.click(true);
+    expect(t.ofType("fiche-link")).toHaveLength(1);
+    t.controller.search("Solyaris");
+    t.chercher()?.click(true);
+    expect(t.ofType("fiche-search")).toHaveLength(1);
+  });
+
+  it("pre-fills the field with Naka's original title when the page gave no title", async () => {
+    const t = fakeUi(FILM_PATH);
+    t.controller.event(
+      ficheEvent({ title: undefined, originalTitle: "Solyaris" }),
+    );
+    t.ofType("fiche-info")[0]?.answer(NOT_FOUND);
+    await settle();
+    const host = t.kept.actions();
+    const parts = host === undefined ? [] : deepParts(host.shadow);
+    const field = parts.find((p) => p.tag === "input") as Field | undefined;
+    expect(field?.value).toBe("Solyaris");
+  });
+
   it("sends no second search while one is pending (R1)", async () => {
     const t = await notFound();
     const field = t.field();
@@ -233,12 +270,13 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
   it("keeps the field's keys and input from Naka's page", async () => {
     const t = await notFound();
     const seen: string[] = [];
-    for (const type of ["keydown", "keyup", "keypress", "input"]) {
+    const types = ["keydown", "keyup", "keypress", "beforeinput", "input"];
+    for (const type of types) {
       t.kept.aside.addEventListener(type, () => seen.push(type));
     }
     t.field().press("s");
     t.field().press("Enter");
-    for (const type of ["keyup", "keypress", "input"]) {
+    for (const type of ["keyup", "keypress", "beforeinput", "input"]) {
       t.field().dispatch(type, true, "s");
     }
     expect(seen).toEqual([]);
