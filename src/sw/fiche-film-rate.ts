@@ -7,6 +7,7 @@
 // product than the one issued refuses the write before any request. Once the link holds, the film's state is
 // read and kept as the undo record (fiche-undo-record), before any SensCritique write: after the link's
 // checks, so a refused link still sends nothing. An answer of a rating that went out carries the panel.
+// With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal).
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -47,6 +48,6 @@ export async function rateFilm(
     rating,
   });
   if (error !== undefined) return { error };
-  const answer = await leaveNakaList(deps, contentId);
+  const answer = await leaveNakaList(deps, contentId, msg.listByTab === true);
   return { ...answer, panel: afterRating(before, rating) };
 }

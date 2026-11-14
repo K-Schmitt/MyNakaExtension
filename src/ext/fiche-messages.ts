@@ -42,6 +42,8 @@ export type FicheMessage =
       episode?: number;
       /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
       inMaListe?: boolean;
+      /** A film's only: the button is on screen, so the tab clicks it itself (`maListe: "tab"`). */
+      listByTab?: boolean;
     }
   | { type: "fiche-link"; contentId: number; productId: number }
   | {
@@ -127,7 +129,11 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   season: true,
   episode: true,
   inMaListe: true,
+  listByTab: true,
 });
+/** The rating's fields of Naka's « Ma liste » button: a film's only. */
+type FilmOnlyKey = Extract<keyof FicheRateMessage, "inMaListe" | "listByTab">;
+const FILM_ONLY = valuesOf<FilmOnlyKey>({ inMaListe: true, listByTab: true });
 
 export function isFicheType(type: string): type is FicheType {
   return FICHE_TYPES.some((known) => known === type);
@@ -152,14 +158,19 @@ function parseInfo(record: Record<string, unknown>): FicheInfoMessage {
   return message;
 }
 
-// « Ma liste » is a film's: present on another target, it refuses the message.
+// « Ma liste » is a film's: present on another target, a field of it refuses the message.
 function withMaListe(
   message: FicheRateMessage,
-  raw: unknown,
+  record: Record<string, unknown>,
 ): FicheRateMessage {
-  if (raw === undefined) return message;
-  if (message.target !== "film") return fail("inMaListe");
-  return { ...message, inMaListe: asBoolean(raw, "inMaListe") };
+  let read = message;
+  for (const key of FILM_ONLY) {
+    const raw = record[key];
+    if (raw === undefined) continue;
+    if (message.target !== "film") return fail(key);
+    read = { ...read, [key]: asBoolean(raw, key) };
+  }
+  return read;
 }
 
 function parseRate(record: Record<string, unknown>): FicheRateMessage {
@@ -175,7 +186,7 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
   const place = target === "épisode";
   const hasPlace = record.season !== undefined || record.episode !== undefined;
   if (!place) {
-    return hasPlace ? fail("season") : withMaListe(base, record.inMaListe);
+    return hasPlace ? fail("season") : withMaListe(base, record);
   }
   return withMaListe(
     {
@@ -183,7 +194,7 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
       season: asId(record.season, "season"),
       episode: asId(record.episode, "episode"),
     },
-    record.inMaListe,
+    record,
   );
 }
 

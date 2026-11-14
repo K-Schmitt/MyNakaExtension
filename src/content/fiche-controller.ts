@@ -9,6 +9,7 @@ import { parseTitlePath, type TitlePath } from "./fiche-path";
 import type { FicheInput, FichePorts, TitlePageEvent } from "./fiche-ports";
 import { createReadQueue, type ReadQueue } from "./fiche-read-queue";
 import { considerSeason, noteSeason, retrySeason } from "./fiche-season-reader";
+import { undoTitle } from "./fiche-undo-writes";
 import {
   cancelSeries,
   confirmSeries,
@@ -23,6 +24,8 @@ export type FicheController = FicheInput & {
   cancelSeries(): void;
   rateEpisode(episode: number, rating: number): void;
   link(productId: number): void;
+  /** « Annuler »: puts back what the title's last rating changed. */
+  undo(): void;
 };
 
 function onSeason(
@@ -87,5 +90,6 @@ export function createFicheController(ports: FichePorts): FicheController {
     rateEpisode: (episode, rating) =>
       on((scope) => rateEpisode(scope, episode, rating))(),
     link: (productId) => on((scope) => void link(scope, productId))(),
+    undo: on((scope) => void undoTitle(scope)),
   };
 }

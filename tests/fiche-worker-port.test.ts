@@ -99,4 +99,22 @@ describe("createFicheWorkerPort", () => {
     });
     expect(send).toHaveBeenCalledWith(rate);
   });
+
+  it("sends fiche-undo as given and returns the checked answer", async () => {
+    const undo = {
+      type: "fiche-undo",
+      contentId: 5,
+      productId: 3,
+      listByTab: true,
+    } as const;
+    const send = ok({ ok: true, maListe: "tab" });
+    expect(await createFicheWorkerPort(send).undo(undo)).toEqual({
+      ok: true,
+      maListe: "tab",
+    });
+    expect(send).toHaveBeenCalledWith(undo);
+    expect(
+      await createFicheWorkerPort(ok({ ok: true, maListe: "x" })).undo(undo),
+    ).toBeUndefined();
+  });
 });
