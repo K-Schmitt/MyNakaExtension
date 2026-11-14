@@ -123,6 +123,18 @@ describe("a film rating and Naka's « Ma liste » button", () => {
     expect(t.last()?.maListeMissed).toBeUndefined();
   });
 
+  it("« Annuler » after it takes the line away too", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    t.page.maListe = undefined;
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.last()?.maListeMissed).toBe(true);
+    t.controller.undo();
+    expect(t.last()?.pending).toBe("undo");
+    expect(t.last()?.maListeMissed).toBeUndefined();
+  });
+
   it.each([
     ["simulation (no « tab »)", { ok: true }],
     ["sent with an error", { sent: true, error: "naka-session" }],
