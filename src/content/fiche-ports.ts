@@ -1,6 +1,6 @@
 // What the title page controller needs from the tab: the worker's eight fiche answers (already checked,
 // undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
-// drawing of its view and the announcement of a visit to the page's relay.
+// drawing of its view, the announcement of a visit to the page's relay and the page's timer.
 
 import type {
   FicheInfo,
@@ -22,6 +22,7 @@ import type {
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import type { PageEvent } from "../ext/messages";
 import type { FicheView } from "./fiche-view";
+import type { EndTimer } from "./ui/end-poll";
 
 export type FichePorts = {
   info(msg: FicheInfoMessage): Promise<FicheInfo | undefined>;
@@ -46,6 +47,8 @@ export type FichePorts = {
   render(view: FicheView | undefined): void;
   /** Asks the page's MAIN relay to post again the events it kept for this title page path. */
   announceVisit(path: string): void;
+  /** The page's timer: « Annuler » stops being offered when its record times out. */
+  timer: EndTimer;
 };
 
 export type TitlePageEvent = Extract<PageEvent, { kind: "fiche" | "season" }>;

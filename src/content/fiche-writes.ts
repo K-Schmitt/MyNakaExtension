@@ -18,6 +18,7 @@ import {
 } from "./fiche-page";
 import { searchOffers } from "./fiche-search";
 import { forgetSeasons } from "./fiche-season-reader";
+import { watchUndoExpiry } from "./fiche-undo-expiry";
 import type { FicheOutcome } from "./fiche-view";
 
 type Ending = { sent: boolean; outcome?: FicheOutcome };
@@ -82,6 +83,7 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
     if (page.info?.product?.id !== product.id) return;
     const flags = sent !== undefined && "panel" in sent ? sent.panel : {};
     page.info = { ...page.info, product: { ...product, mine, ...flags } };
+    watchUndoExpiry(scope);
   });
   if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
 }

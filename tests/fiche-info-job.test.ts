@@ -388,6 +388,20 @@ describe("fiche-info: the panel's flags", () => {
     expect((await flagsOf(w)).canUndo).toBe(false);
   });
 
+  it("says how long the live record still undoes the product", async () => {
+    const w = world({ state: linkedTo(2005) });
+    w.area.data.set("ficheUndo", undo());
+    const product = (await w.jobs.ficheInfo(TAB, info())).product;
+    expect(product?.undoLeftMs).toBe(540_000);
+  });
+
+  it("gives no time once the record has timed out", async () => {
+    const w = world({ state: linkedTo(2005) });
+    w.area.data.set("ficheUndo", undo({ at: NOW - 600_000 }));
+    const product = (await w.jobs.ficheInfo(TAB, info())).product;
+    expect(product?.undoLeftMs).toBeUndefined();
+  });
+
   it("no record, no page: no undo, no link", async () => {
     const w = world({ state: linkedTo(2005) });
     expect(await flagsOf(w)).toEqual({

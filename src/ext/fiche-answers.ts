@@ -1,6 +1,7 @@
 // The worker's answers to the title page messages, read by the Naka tab. They cross a messaging boundary,
 // so each is checked field by field: a parser returns a fresh object with only the known keys, or throws.
 
+import { UNDO_WINDOW_MS } from "../core/fiche-undo";
 import type { QuestionCandidate } from "../core/state";
 import type { ProductLabel } from "../sc/product-label";
 import { isProductUrl } from "../sc/product-url";
@@ -27,6 +28,8 @@ import { ERROR_CODES } from "./run-record-schema";
 export type PanelFlags = {
   /** A live undo record names this title and this product. */
   canUndo: boolean;
+  /** With `canUndo` only: the milliseconds that record stays live, at most UNDO_WINDOW_MS. */
+  undoLeftMs?: number;
   /** Rated, with no critique or recommendation to lose. */
   canRemove: boolean;
   /** A critique or a recommendation is tied to the product: the panel sends the owner to SensCritique. */
@@ -92,12 +95,14 @@ const PRODUCT_KEYS = valuesOf<keyof FicheProduct>({
   mine: true,
   label: true,
   canUndo: true,
+  undoLeftMs: true,
   canRemove: true,
   protected: true,
   url: true,
 });
 const PANEL_KEYS = valuesOf<keyof PanelFlags>({
   canUndo: true,
+  undoLeftMs: true,
   canRemove: true,
   protected: true,
   url: true,
@@ -159,6 +164,12 @@ function asProductUrl(raw: unknown, path: string): string {
   return isProductUrl(url) ? url : fail(path);
 }
 
+// From 1 ms to the whole window, and only next to an offered « Annuler ».
+function asUndoLeft(raw: unknown, canUndo: boolean, path: string): number {
+  const left = asInt(raw, 1, path);
+  return canUndo && left <= UNDO_WINDOW_MS ? left : fail(path);
+}
+
 /** The flags held by `record` (a product, or a rating's panel), checked under `path`. */
 function readFlags(record: Record<string, unknown>, path: string): PanelFlags {
   const flags: PanelFlags = {
@@ -166,6 +177,10 @@ function readFlags(record: Record<string, unknown>, path: string): PanelFlags {
     canRemove: asBoolean(record.canRemove, `${path}.canRemove`),
     protected: asBoolean(record.protected, `${path}.protected`),
   };
+  const left = whenPresent(record.undoLeftMs, (v) =>
+    asUndoLeft(v, flags.canUndo, `${path}.undoLeftMs`),
+  );
+  if (left !== undefined) flags.undoLeftMs = left;
   const url = whenPresent(record.url, (v) => asProductUrl(v, `${path}.url`));
   return url === undefined ? flags : { ...flags, url };
 }

@@ -10,6 +10,7 @@ import type { FicheInput, FichePorts, TitlePageEvent } from "./fiche-ports";
 import { createReadQueue, type ReadQueue } from "./fiche-read-queue";
 import { searchTitle } from "./fiche-search";
 import { considerSeason, noteSeason, retrySeason } from "./fiche-season-reader";
+import { stopUndoExpiry } from "./fiche-undo-expiry";
 import { removeTitle, undoTitle } from "./fiche-undo-writes";
 import {
   cancelSeries,
@@ -68,6 +69,7 @@ export function createFicheController(ports: FichePorts): FicheController {
     const left = current;
     currentPath = pathname;
     reads.cancel();
+    if (left !== undefined) stopUndoExpiry(left);
     const title = parseTitlePath(pathname);
     current = title === undefined ? undefined : visit(title);
     if (current !== undefined) {

@@ -8,6 +8,7 @@ import {
   type FicheUndo,
   isProtected,
   liveUndo,
+  UNDO_WINDOW_MS,
 } from "../core/fiche-undo";
 import type { PanelFlags } from "../ext/fiche-answers";
 import type { ProductState } from "../sc/sc-client";
@@ -24,12 +25,14 @@ export const NO_PANEL: PanelFlags = {
   protected: false,
 };
 
-export function panelFlags(state: PanelState, canUndo: boolean): PanelFlags {
-  const flags = {
-    canUndo,
+/** `undoLeftMs`: how long the undo record stays live, 0 without one. */
+export function panelFlags(state: PanelState, undoLeftMs: number): PanelFlags {
+  const flags: PanelFlags = {
+    canUndo: undoLeftMs > 0,
     canRemove: canRemove(state),
     protected: isProtected(state),
   };
+  if (undoLeftMs > 0) flags.undoLeftMs = undoLeftMs;
   return state.url === undefined ? flags : { ...flags, url: state.url };
 }
 
@@ -45,6 +48,16 @@ export function undoLive(
   return live !== undefined && live.productId === title.productId;
 }
 
+/** How long the stored record still undoes this product of this title: 0 when it does not. */
+export function undoLeft(
+  record: FicheUndo | null,
+  title: TitleIds,
+  now: number,
+): number {
+  if (record === null || !undoLive(record, title, now)) return 0;
+  return record.at + UNDO_WINDOW_MS - now;
+}
+
 /** The flags of a product read now, with the undo record as stored. */
 export async function storedFlags(
   deps: Pick<JobDeps, "store" | "now">,
@@ -52,7 +65,7 @@ export async function storedFlags(
   state: PanelState,
 ): Promise<PanelFlags> {
   const record = await deps.store.loadFicheUndo();
-  return panelFlags(state, undoLive(record, title, deps.now()));
+  return panelFlags(state, undoLeft(record, title, deps.now()));
 }
 
 /** The flags once a rating went out: undo when its record was kept, removal judged on the new rating. */
@@ -62,5 +75,5 @@ export function afterRating(
 ): PanelFlags {
   return before === undefined
     ? NO_PANEL
-    : panelFlags({ ...before, rating }, true);
+    : panelFlags({ ...before, rating }, UNDO_WINDOW_MS);
 }

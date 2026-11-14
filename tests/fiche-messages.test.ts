@@ -374,6 +374,28 @@ describe("the panel's flags in the answers", () => {
     expect(() => parseFicheInfo(product(over))).toThrow();
   });
 
+  it.each([
+    ["one millisecond", 1],
+    ["the whole window", 600_000],
+  ])("reads how long « Annuler » stays offered: %s", (_n, left) => {
+    const raw = product({ canUndo: true, undoLeftMs: left });
+    expect(parseFicheInfo(raw)).toEqual(raw);
+    const ok = { ok: true, panel: { ...panel, undoLeftMs: left } };
+    expect(parseRateAnswer(ok)).toEqual(ok);
+  });
+
+  it.each([
+    ["no time left", { canUndo: true, undoLeftMs: 0 }],
+    ["more than the window", { canUndo: true, undoLeftMs: 600_001 }],
+    ["a fraction of a millisecond", { canUndo: true, undoLeftMs: 1.5 }],
+    ["a text time", { canUndo: true, undoLeftMs: "5" }],
+    ["a time without « Annuler »", { canUndo: false, undoLeftMs: 5000 }],
+  ])("rejects a product with %s", (_n, over) => {
+    expect(() => parseFicheInfo(product(over))).toThrow();
+    const raw = { ok: true, panel: { ...panel, ...over } };
+    expect(() => parseRateAnswer(raw)).toThrow();
+  });
+
   it("reads the flags on a rating that went out, with and without a page", () => {
     const ok = { ok: true, panel };
     expect(parseRateAnswer(ok)).toEqual(ok);

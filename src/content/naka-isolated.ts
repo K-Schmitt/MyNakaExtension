@@ -74,6 +74,7 @@ const fiche = createFicheController({
   // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
   announceVisit: (path) => window.postMessage(visitMessage(path), NAKA_ORIGIN),
+  timer: pageTimer,
 });
 
 listenToPauses(document, {
