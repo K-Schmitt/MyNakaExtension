@@ -24,6 +24,8 @@ export type RunStep = Exclude<UndoStep, { kind: "refused-protected" }>;
 export type UndoOkAnswer = { ok: true; maListe: UndoMaListe };
 export type UndoPartialAnswer = {
   partial: { done: RunStep[]; failed: RunStep };
+  /** Who gave « Ma liste » back before the failure: the tab still clicks on "tab". */
+  maListe: UndoMaListe;
   error: JobError;
 };
 /** Refused with no write: a critique or recommendation to keep, the ten minutes gone, nothing to remove. */
@@ -75,6 +77,7 @@ const BARE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "wish" }>>({
 const OK_KEYS = valuesOf<keyof UndoOkAnswer>({ ok: true, maListe: true });
 const PARTIAL_KEYS = valuesOf<keyof UndoPartialAnswer>({
   partial: true,
+  maListe: true,
   error: true,
 });
 const STEPS_KEYS = valuesOf<keyof UndoPartialAnswer["partial"]>({
@@ -110,6 +113,7 @@ function parsePartial(record: Record<string, unknown>): UndoPartialAnswer {
       done: asList(steps.done, "partial.done", parseStep),
       failed: parseStep(steps.failed, "partial.failed"),
     },
+    maListe: asOneOf(record.maListe, MA_LISTE, "maListe"),
     error: asOneOf(record.error, ERROR_CODES, "error"),
   };
 }

@@ -13,7 +13,7 @@ import type { ProductState } from "../sc/sc-client";
 import { checkBinding } from "./binding";
 import type { FicheAsker } from "./fiche-info-job";
 import { issuedTitle } from "./fiche-issued";
-import { type CardTitle, rerateCards } from "./fiche-local-restore";
+import { type CardTitle, unrateCards } from "./fiche-local-restore";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
 
@@ -43,9 +43,9 @@ async function removeOnSc(
   }
 }
 
-async function unrateCards(deps: JobDeps, title: CardTitle): Promise<void> {
+async function unrateTitle(deps: JobDeps, title: CardTitle): Promise<void> {
   try {
-    await rerateCards(deps.store, title, { rating: null, ask: false });
+    await unrateCards(deps.store, title);
   } catch {
     // See the header: the removal went out.
   }
@@ -59,6 +59,6 @@ export async function ficheRemoveJob(
   const role = await issuedTitle(asker, contentId, productId);
   const failed = await removeOnSc(deps, productId);
   if (failed !== undefined) return failed;
-  await unrateCards(deps, { role, contentId, productId });
+  await unrateTitle(deps, { role, contentId, productId });
   return { ok: true };
 }

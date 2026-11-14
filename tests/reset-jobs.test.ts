@@ -114,6 +114,7 @@ describe("reset", () => {
         isWished: true,
         inMaListe: true,
       },
+      local: { handled: false, settled: false, cards: [] },
     });
 
     // Act

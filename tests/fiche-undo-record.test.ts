@@ -66,6 +66,7 @@ const filmRecord = (over: Partial<FicheUndo> = {}): FicheUndo => ({
     isWished: false,
     inMaListe: true,
   },
+  local: { handled: false, settled: false, cards: [] },
   ...over,
 });
 

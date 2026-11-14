@@ -21,10 +21,12 @@ describe("the undo answer", () => {
         ],
         failed: { kind: "wish" },
       },
+      maListe: "none",
       error: "unavailable",
     },
     {
       partial: { done: [], failed: { kind: "markDoneWithoutDate" } },
+      maListe: "none",
       error: "other-account",
     },
     {
@@ -32,6 +34,7 @@ describe("the undo answer", () => {
         done: [{ kind: "maListe" }],
         failed: { kind: "localRestore" },
       },
+      maListe: "tab",
       error: "stored-state",
     },
   ])("reads %j as itself", (raw) => {
@@ -46,12 +49,13 @@ describe("the undo answer", () => {
     ["a bad error", { error: "nope" }],
     [
       "a partial without its error",
-      { partial: { done: [], failed: { kind: "wish" } } },
+      { partial: { done: [], failed: { kind: "wish" } }, maListe: "none" },
     ],
     [
       "a refused-protected step",
       {
         partial: { done: [], failed: { kind: "refused-protected" } },
+        maListe: "none",
         error: "unavailable",
       },
     ],
@@ -59,6 +63,7 @@ describe("the undo answer", () => {
       "a rating of 11",
       {
         partial: { done: [], failed: { kind: "rate", rating: 11 } },
+        maListe: "none",
         error: "unavailable",
       },
     ],
@@ -66,6 +71,7 @@ describe("the undo answer", () => {
       "a bad date",
       {
         partial: { done: [], failed: { kind: "markDone", date: "2 mars" } },
+        maListe: "none",
         error: "unavailable",
       },
     ],
@@ -73,6 +79,7 @@ describe("the undo answer", () => {
       "a step with an extra key",
       {
         partial: { done: [], failed: { kind: "wish", rating: 2 } },
+        maListe: "none",
         error: "unavailable",
       },
     ],
@@ -80,10 +87,26 @@ describe("the undo answer", () => {
       "a done list of text",
       {
         partial: { done: "undone", failed: { kind: "wish" } },
+        maListe: "none",
         error: "unavailable",
       },
     ],
     ["not a record", "ok"],
+    [
+      "a partial without « Ma liste »",
+      {
+        partial: { done: [], failed: { kind: "wish" } },
+        error: "unavailable",
+      },
+    ],
+    [
+      "a partial with a bad « Ma liste »",
+      {
+        partial: { done: [], failed: { kind: "wish" } },
+        maListe: "page",
+        error: "unavailable",
+      },
+    ],
   ])("rejects %s", (_name, raw) => {
     expect(() => parseUndoAnswer(raw)).toThrow();
   });

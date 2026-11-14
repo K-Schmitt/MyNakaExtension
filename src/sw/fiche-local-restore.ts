@@ -1,29 +1,35 @@
-// The extension's own state after « Annuler » and « Retirer la note » (spec §7). The undo record holds the
-// product's SensCritique state before the rating, not the extension's: what is put back is what that state
-// decides. Storage only, and an undo's very last step (spec §8), so no removal offer or question can
-// appear between its SensCritique and Naka steps.
-// - A title not seen before the rating is unfinished again: its pair is no longer settled (the sync acts
-//   on it again, as before its finish), and a film is no longer handled, its card gone (forgetHandledJob),
-//   so a later end of viewing marks it seen again.
-// - A title seen before stays handled and settled.
-// - The link stays: a link is not a rating's to undo.
-// - Each card target naming the product gets its old rating back (the film's, or the série target of every
-//   card of the series); the extension's own given rating goes. A target left unrated is asked again
-//   (pending) when its card asks for it: a film always, a series once it is finished. A removal leaves it
-//   unasked: the owner just took the rating away.
+// The extension's own state of a title after « Annuler » and « Retirer la note » (spec §7, ruling R8).
+// « Annuler » puts back exactly what the undo record kept before the rating, as its very last step (spec
+// §8: no removal offer or question appears between its SensCritique and Naka steps):
+// - the settled pair and, for a film, its handled key, each in or out as they were (a waiting finish, a
+//   question's finish and the stored title are left as they are now);
+// - the title's cards as stored: each kept card replaced by its copy, and a film's card that did not exist
+//   then (made by the rating's finish) removed. A series' rating makes no card: none is removed.
+// The link stays; lastFinish, the spent finish slot and a question the link resolved stay too.
+// « Retirer la note » only takes the rating off the cards naming the product.
 
-import type { FicheUndo, UndoRole } from "../core/fiche-undo";
-import type { RatingCard, RatingLabel } from "../core/rating-cards";
-import { samePair, unsettlePair } from "../core/state";
+import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
+import { contentKeyOf } from "../core/finish-event";
+import {
+  type RatingCard,
+  type RatingLabel,
+  upsertCard,
+} from "../core/rating-cards";
+import {
+  isHandled,
+  markHandled,
+  type SyncState,
+  samePair,
+  settlePair,
+  unsettlePair,
+} from "../core/state";
 import type { Store } from "../ext/store";
-import { forgetHandledJob } from "./forget-handled-job";
 
 export type CardTitle = {
   role: UndoRole;
   contentId: number;
   productId: number;
 };
-type Rerate = { rating: number | null; ask: boolean };
 type LocalStore = Pick<
   Store,
   "loadState" | "saveState" | "loadRatings" | "saveRatings"
@@ -31,60 +37,80 @@ type LocalStore = Pick<
 
 const LABEL: Record<UndoRole, RatingLabel> = { film: "film", série: "série" };
 
-function names(card: RatingCard, title: CardTitle): boolean {
-  const label = LABEL[title.role];
+const filmKey = (contentId: number): string => contentKeyOf({ contentId });
+
+/** A card the title's rating may change: the film's card of its key, or a série target naming the product. */
+export function isTitleCard(card: RatingCard, title: CardTitle): boolean {
+  if (title.role === "film") return card.key === filmKey(title.contentId);
   return (
     card.contentId === title.contentId &&
     card.targets.some(
-      (t) => t.label === label && t.productId === title.productId,
+      (t) => t.label === "série" && t.productId === title.productId,
     )
   );
 }
 
-function asksAgain(card: RatingCard, label: RatingLabel, rerate: Rerate) {
-  if (!rerate.ask || rerate.rating !== null) return false;
-  return label === "film" || card.seriesFinished;
-}
-
-function rerated(card: RatingCard, title: CardTitle, rerate: Rerate) {
-  const label = LABEL[title.role];
-  const { [label]: _dropped, ...given } = card.given;
-  const targets = card.targets.map((t) =>
-    t.label === label ? { ...t, current: rerate.rating } : t,
-  );
-  const asked = asksAgain(card, label, rerate) ? [label] : [];
-  const pending = targets
-    .map((t) => t.label)
-    .filter((l) => card.pending.includes(l) || asked.includes(l));
-  return { ...card, given, targets, pending };
-}
-
-/** Sets the product's rating on every card target naming it; saves only when a card names it. */
-export async function rerateCards(
-  store: Pick<Store, "loadRatings" | "saveRatings">,
-  title: CardTitle,
-  rerate: Rerate,
-): Promise<void> {
-  const cards = await store.loadRatings();
-  if (!cards.some((card) => names(card, title))) return;
-  await store.saveRatings(
-    cards.map((card) =>
-      names(card, title) ? rerated(card, title, rerate) : card,
-    ),
-  );
-}
-
-async function unfinish(store: LocalStore, title: CardTitle): Promise<void> {
-  const state = await store.loadState();
+export function isSettled(state: SyncState, title: CardTitle): boolean {
   const pair = { nakaId: title.contentId, scId: title.productId };
-  if (state.settled.some((settled) => samePair(settled, pair))) {
-    await store.saveState(unsettlePair(state, pair));
+  return state.settled.some((settled) => samePair(settled, pair));
+}
+
+/** Whether the film's key is handled; a series' content key never is. */
+export function isTitleHandled(state: SyncState, title: CardTitle): boolean {
+  return title.role === "film" && isHandled(state, filmKey(title.contentId));
+}
+
+function unmarkHandled(state: SyncState, key: string): SyncState {
+  const handled = state.handled.filter((k) => k !== key);
+  if (state.handledTitles === undefined) return { ...state, handled };
+  const { [key]: _gone, ...titles } = state.handledTitles;
+  return { ...state, handled, handledTitles: titles };
+}
+
+function withSettled(state: SyncState, title: CardTitle, settled: boolean) {
+  if (isSettled(state, title) === settled) return state;
+  const pair = { nakaId: title.contentId, scId: title.productId };
+  return settled ? settlePair(state, pair) : unsettlePair(state, pair);
+}
+
+function withHandled(state: SyncState, title: CardTitle, handled: boolean) {
+  if (title.role !== "film" || isTitleHandled(state, title) === handled) {
+    return state;
   }
-  if (title.role !== "film") return;
-  await forgetHandledJob(store, {
-    type: "forget-handled",
-    contentId: title.contentId,
-  });
+  const key = filmKey(title.contentId);
+  return handled ? markHandled(state, key) : unmarkHandled(state, key);
+}
+
+async function restoreState(
+  store: LocalStore,
+  title: CardTitle,
+  local: UndoLocal,
+) {
+  const state = await store.loadState();
+  const next = withHandled(
+    withSettled(state, title, local.settled),
+    title,
+    local.handled,
+  );
+  if (next !== state) await store.saveState(next);
+}
+
+function restoredCards(
+  cards: RatingCard[],
+  title: CardTitle,
+  kept: RatingCard[],
+) {
+  const madeSince = (card: RatingCard) =>
+    title.role === "film" &&
+    isTitleCard(card, title) &&
+    !kept.some((k) => k.key === card.key);
+  const current = cards
+    .filter((card) => !madeSince(card))
+    .map((card) => kept.find((k) => k.key === card.key) ?? card);
+  const missing = kept.filter(
+    (k) => !current.some((card) => card.key === k.key),
+  );
+  return missing.reduce(upsertCard, current);
 }
 
 /** The undo's `localRestore` step. */
@@ -97,6 +123,35 @@ export async function restoreLocal(
     contentId: record.contentId,
     productId: record.productId,
   };
-  if (!record.before.isDone) await unfinish(store, title);
-  await rerateCards(store, title, { rating: record.before.rating, ask: true });
+  await restoreState(store, title, record.local);
+  const cards = await store.loadRatings();
+  const next = restoredCards(cards, title, record.local.cards);
+  const changed =
+    next.length !== cards.length || next.some((card, i) => card !== cards[i]);
+  if (changed) await store.saveRatings(next);
+}
+
+function unrated(card: RatingCard, label: RatingLabel, productId: number) {
+  const { [label]: _dropped, ...given } = card.given;
+  const targets = card.targets.map((t) =>
+    t.label === label && t.productId === productId
+      ? { ...t, current: null }
+      : t,
+  );
+  return { ...card, given, targets };
+}
+
+/** « Retirer la note »: every card target naming the product loses its rating; nothing is asked again. */
+export async function unrateCards(
+  store: Pick<Store, "loadRatings" | "saveRatings">,
+  title: CardTitle,
+): Promise<void> {
+  const cards = await store.loadRatings();
+  if (!cards.some((card) => isTitleCard(card, title))) return;
+  const label = LABEL[title.role];
+  await store.saveRatings(
+    cards.map((card) =>
+      isTitleCard(card, title) ? unrated(card, label, title.productId) : card,
+    ),
+  );
 }

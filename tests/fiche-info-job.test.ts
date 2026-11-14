@@ -350,6 +350,7 @@ describe("fiche-info: the panel's flags", () => {
       isWished: false,
       inMaListe: null,
     },
+    local: { handled: false, settled: false, cards: [] },
     ...over,
   });
   const flagsOf = async (w: ReturnType<typeof world>) => {
