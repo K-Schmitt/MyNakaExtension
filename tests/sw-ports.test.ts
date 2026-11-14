@@ -202,6 +202,10 @@ describe("sync ports: writes in live mode", () => {
         universe: 1,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       }),
     });
     const { ports } = syncWorld("live", sc);
@@ -233,6 +237,10 @@ describe("sync ports: writes in simulation", () => {
         universe: 4,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
         label: { title: "Dark", year: 2017 },
       }),
     });
@@ -256,6 +264,10 @@ describe("sync ports: writes in simulation", () => {
         universe: 32,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       }),
     });
     const { ports, planned } = syncWorld("simulation", sc);
@@ -271,6 +283,10 @@ describe("sync ports: writes in simulation", () => {
         universe: 1,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       }),
     });
     const { ports, planned } = syncWorld("simulation", sc);
@@ -469,6 +485,10 @@ describe("finish ports", () => {
         universe: 1,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       }),
       seasonInfo: async () => ({ seasonProductId: 4001, episodes: [] }),
     });
@@ -479,6 +499,10 @@ describe("finish ports", () => {
       universe: 1,
       rating: null,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     });
     await ports.unwish(1001);
     await ports.markDone(1001, "2026-11-04");

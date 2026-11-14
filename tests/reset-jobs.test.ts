@@ -99,6 +99,32 @@ describe("reset", () => {
     expect(w.area.data.get("ficheLinks")).toEqual({});
   });
 
+  it("forgets the undo record: an « Annuler » after a reset must not restore a pre-reset state", async () => {
+    // Arrange
+    const w = answerWorld({ settings: FULL });
+    w.area.data.set("ficheUndo", {
+      contentId: 5,
+      productId: 2005,
+      role: "film",
+      at: NOW,
+      before: {
+        rating: null,
+        isDone: false,
+        dateDone: null,
+        isWished: true,
+        inMaListe: true,
+      },
+      local: { handled: false, settled: false, cards: [] },
+    });
+
+    // Act
+    await w.jobs.reset();
+
+    // Assert
+    expect(w.area.data.get("ficheUndo")).toBeNull();
+    expect(w.area.ops).not.toContain("get:ficheUndo");
+  });
+
   it("writes the default settings in simulation when the settings are unreadable", async () => {
     const w = answerWorld({ settings: FULL });
     w.area.data.set("settings", { mode: "nonsense" });

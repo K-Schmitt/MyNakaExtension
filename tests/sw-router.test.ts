@@ -227,6 +227,10 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
       return { mine: 6, average: null };
     },
+    ficheSearch: async (tabId, msg) => {
+      calls.push(`fiche-search:${tabId}:${JSON.stringify(msg)}`);
+      return { candidates: [] };
+    },
     ficheRate: async (tabId, msg) => {
       calls.push(`fiche-rate:${tabId}:${JSON.stringify(msg)}`);
       return { ok: true };
@@ -235,8 +239,13 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-link:${tabId}:${JSON.stringify(msg)}`);
       return { ok: true };
     },
-    dropFicheTab: async (tabId) => {
-      calls.push(`drop-fiche-tab:${tabId}`);
+    ficheUndo: async (tabId, msg) => {
+      calls.push(`fiche-undo:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true, maListe: "tab" };
+    },
+    ficheRemove: async (tabId, msg) => {
+      calls.push(`fiche-remove:${tabId}:${JSON.stringify(msg)}`);
+      return { refused: "protected" };
     },
     ...over,
   };
@@ -259,8 +268,7 @@ function router(over: Partial<Jobs> = {}) {
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, (answer) => answers.push(answer));
-  const dropTab = (tabId: number) => r.dropTab(tabId);
-  return { ...recorded, ...clock, answers, send, dropTab, time };
+  return { ...recorded, ...clock, answers, send, time };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -2366,7 +2374,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
     expect(w.answers).toHaveLength(1);
     expect(toStatusView(w.answers[0], localFormat("UTC"))).toEqual({
       kind: "ready",
-      headline: `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      headline: `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
       mode: "simulation",
       switchLabel: "Activer les écritures",
       switchDisabled: false,
@@ -2538,6 +2546,31 @@ describe("router: the title page messages", () => {
     ]);
   });
 
+  it("fiche-search is answered outside the queue, for the sending tab, with its query trimmed", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    const typed = { type: "fiche-search", contentId: 5, query: " Solaris " };
+    expect(r.send(typed, FICHE_TAB)).toBe(true);
+    await settle();
+    const trimmed = { ...typed, query: "Solaris" };
+    expect(r.calls).toEqual([`fiche-search:42:${JSON.stringify(trimmed)}`]);
+    expect(r.answers).toEqual([{ candidates: [] }]);
+    release();
+  });
+
+  it("a fiche-search from the status page is ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    const typed = { type: "fiche-search", contentId: 5, query: "Solaris" };
+    expect(r.send(typed, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+  });
+
   it("a fiche-season above season 100 is refused: no job, no answer", async () => {
     const r = router();
     expect(r.send({ ...FICHE_SEASON, season: 101 }, FICHE_TAB)).toBe(false);
@@ -2614,6 +2647,52 @@ describe("router: the title page messages", () => {
     expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
   });
 
+  const FICHE_UNDO = {
+    type: "fiche-undo",
+    contentId: 5,
+    productId: 2005,
+    listByTab: true,
+  };
+  const FICHE_REMOVE = { type: "fiche-remove", contentId: 5, productId: 2005 };
+
+  it("fiche-undo and fiche-remove wait on the one queue and are answered with their job's answer", async () => {
+    // Arrange
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+
+    // Act
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    expect(r.send(FICHE_UNDO, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_REMOVE, FICHE_TAB)).toBe(true);
+    await settle();
+    const before = [...r.calls];
+    release();
+    await settle();
+
+    // Assert
+    expect(before).toEqual([]);
+    expect(r.calls).toEqual([
+      `fiche-undo:42:${JSON.stringify(FICHE_UNDO)}`,
+      `fiche-remove:42:${JSON.stringify(FICHE_REMOVE)}`,
+    ]);
+    expect(r.answers).toEqual([
+      { ok: true, maListe: "tab" },
+      { refused: "protected" },
+    ]);
+  });
+
+  it("fiche-undo and fiche-remove from the status page are ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    expect(r.send(FICHE_UNDO, page)).toBe(false);
+    expect(r.send(FICHE_REMOVE, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
+  });
+
   it("a fiche write that rejects is answered undefined", async () => {
     const r = router({
       ficheLink: async () => {
@@ -2632,11 +2711,5 @@ describe("router: the title page messages", () => {
     expect(r.send(FICHE_LINK, page)).toBe(false);
     await settle();
     expect(r.calls).toEqual([]);
-  });
-
-  it("a removed tab drops its issued products", () => {
-    const r = router();
-    r.dropTab(42);
-    expect(r.calls).toEqual(["drop-fiche-tab:42"]);
   });
 });

@@ -46,7 +46,7 @@ describe("ratingView", () => {
   it("a saison with start 8: choice 8 marked and the start line", () => {
     const view = ratingView(episodeCard(), "saison", 8);
     expect(view.heading).toBe(`Noter la saison 1 de «${NB}Une série${NB}»`);
-    expect(view.start).toBe(`Moyenne de vos épisodes${NB}: 8`);
+    expect(view.start).toBe(`Moyenne de tes épisodes${NB}: 8`);
     expect(view.choices.filter((c) => c.marked)).toEqual([
       { value: 8, marked: true },
     ]);
@@ -57,7 +57,7 @@ describe("ratingView", () => {
       targets: [target("épisode", 6), target("saison", null)],
     });
     const view = ratingView(card, "épisode");
-    expect(view.current).toBe(`Votre note actuelle${NB}: 6`);
+    expect(view.current).toBe(`Ta note actuelle${NB}: 6`);
     expect(view.choices.find((c) => c.value === 6)?.marked).toBe(true);
   });
 
@@ -70,13 +70,13 @@ describe("ratingView", () => {
     expect(view.choices.filter((c) => c.marked)).toEqual([
       { value: 6, marked: true },
     ]);
-    expect(view.current).toBe(`Votre note actuelle${NB}: 6`);
-    expect(view.start).toBe(`Moyenne de vos épisodes${NB}: 8`);
+    expect(view.current).toBe(`Ta note actuelle${NB}: 6`);
+    expect(view.start).toBe(`Moyenne de tes épisodes${NB}: 8`);
   });
 
   it("a série not finished: the warning", () => {
     const view = ratingView(episodeCard({ seriesFinished: false }), "série");
-    expect(view.warning).toContain("n'est pas finie sur Naka");
+    expect(view.warning).toContain("n’est pas finie sur Naka");
   });
 
   it("a série finished: no warning; an épisode never has one", () => {
@@ -90,7 +90,7 @@ describe("ratingView", () => {
 
   it("a série start line says saisons", () => {
     const view = ratingView(episodeCard(), "série", 7);
-    expect(view.start).toBe(`Moyenne de vos saisons${NB}: 7`);
+    expect(view.start).toBe(`Moyenne de tes saisons${NB}: 7`);
   });
 
   it("a failure of this label gives the error line; of another label, none", () => {
@@ -98,7 +98,7 @@ describe("ratingView", () => {
       failed: { label: "saison", error: "sc-session", at: 5 },
     });
     expect(ratingView(card, "saison").error).toBe(
-      `La note n'est pas partie${NB}: reconnectez-vous sur SensCritique.`,
+      `La note n’est pas partie${NB}: reconnecte-toi sur SensCritique.`,
     );
     expect(ratingView(card, "épisode").error).toBeUndefined();
   });

@@ -74,6 +74,17 @@ describe("attachSheet, fallback path", () => {
     expect(root.children).toEqual([style]);
   });
 
+  it("names the root's focused element", () => {
+    const doc = new FakeDoc();
+    const root = new FakeShadow();
+    const out = attachSheet(doc, root, CSS, () => undefined);
+    const field = doc.createElement("input") as FakeElement;
+    out.replaceChildren(field);
+    expect(out.activeElement).toBeNull();
+    field.focus();
+    expect(out.activeElement).toBe(field);
+  });
+
   it("appendChild delegates to the root", () => {
     const doc = new FakeDoc();
     const root = new FakeShadow();

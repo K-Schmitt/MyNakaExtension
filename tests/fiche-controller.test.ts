@@ -125,7 +125,8 @@ describe("the title page it follows", () => {
     t.controller.event(ficheEvent());
     t.ofType("fiche-info")[0]?.answer(undefined);
     await settle();
-    expect(t.last()?.outcome).toEqual({ kind: "failed" });
+    expect(t.last()?.infoFailed).toBe(true);
+    expect(t.last()?.outcome).toBeUndefined();
   });
 });
 

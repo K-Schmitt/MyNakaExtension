@@ -51,7 +51,7 @@ export const LOADING_VIEW: StatusView = {
 
 const NO_ENGINE_VIEW: StatusView = {
   kind: "no-engine",
-  message: "Le moteur ne répond pas, rouvrez cette page",
+  message: "Le moteur ne répond pas, rouvre cette page",
 };
 
 const UNKNOWN_MODE = "Mode inconnu";

@@ -1,10 +1,16 @@
 // The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once,
 // a series after its confirmation, an episode of the shown season, a link to a candidate the worker
-// offered. One write at a time; an answer that comes once the visit is over changes nothing.
+// offered (step 7's or a search's). One write at a time; an answer that comes once the visit is over
+// changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is
+// on screen (fiche-ma-liste).
+// A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer la note », the link).
+// A film's rating that did not go out after its explicit finish wrote brings them too (D9, ruling R2): the
+// flags apply, the stars keep the owner's rating, and its own line says « Annuler » puts the title back.
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
 import { askInfo } from "./fiche-info-reader";
+import { rateListFields, removedByTab, setMaListe } from "./fiche-ma-liste";
 import {
   contentOf,
   type EpisodePlace,
@@ -12,10 +18,12 @@ import {
   storeEpisodes,
   withMine,
 } from "./fiche-page";
+import { searchOffers } from "./fiche-search";
 import { forgetSeasons } from "./fiche-season-reader";
+import { watchUndoExpiry } from "./fiche-undo-expiry";
 import type { FicheOutcome } from "./fiche-view";
 
-type Ending = { sent: boolean; outcome?: FicheOutcome };
+type Ending = { sent: boolean; outcome?: FicheOutcome; flagged?: boolean };
 
 // The worker's answer says whether the rating went out: `{ sent: true, error }` when a later step failed.
 function endingOf(answer: RateAnswer | undefined): Ending {
@@ -27,6 +35,9 @@ function endingOf(answer: RateAnswer | undefined): Ending {
       outcome: { kind: "sent-with-error", error: answer.error },
     };
   }
+  if (answer.panel !== undefined) {
+    return { sent: false, outcome: { kind: "finish-wrote" }, flagged: true };
+  }
   return { sent: false, outcome: { kind: "not-sent", error: answer.error } };
 }
 
@@ -34,20 +45,24 @@ function endingOf(answer: RateAnswer | undefined): Ending {
 async function sendRate(
   scope: FicheScope,
   msg: FicheRateMessage,
-  apply: (rating: number) => void,
+  /** `rating` undefined: the rating did not go out, only the answer's flags apply. */
+  apply: (rating: number | undefined, answer: RateAnswer | undefined) => void,
   place?: EpisodePlace,
-): Promise<void> {
+): Promise<RateAnswer | undefined> {
   const { page } = scope;
   page.pending = "rating";
   page.outcome = undefined;
   page.ratedEpisode = place;
   scope.show();
-  const ending = endingOf(await scope.ports.rate(msg));
-  if (!scope.live()) return;
+  const answer = await scope.ports.rate(msg);
+  if (!scope.live()) return answer;
+  const ending = endingOf(answer);
   page.pending = undefined;
   page.outcome = ending.outcome;
-  if (ending.sent) apply(msg.rating);
+  if (ending.sent) apply(msg.rating, answer);
+  else if (ending.flagged === true) apply(undefined, answer);
   scope.show();
+  return answer;
 }
 
 function rateMessage(
@@ -60,24 +75,32 @@ function rateMessage(
   return { type: "fiche-rate", contentId, target, productId, rating, ...place };
 }
 
-function sendTitleRate(scope: FicheScope, rating: number): void {
+async function sendTitleRate(scope: FicheScope, rating: number) {
   const { page } = scope;
   const product = page.info?.product;
   const contentId = contentOf(page);
   if (product === undefined || contentId === undefined) return;
-  const target = page.title.mediaType === "tv" ? "série" : "film";
-  const msg = rateMessage(contentId, target, product.id, rating);
-  void sendRate(scope, msg, (mine) => {
+  const film = page.title.mediaType === "movie";
+  const target = film ? "film" : "série";
+  const msg = {
+    ...rateMessage(contentId, target, product.id, rating),
+    ...(film ? rateListFields(scope) : {}),
+  };
+  const answer = await sendRate(scope, msg, (mine, sent) => {
     if (page.info?.product?.id !== product.id) return;
-    page.info = { ...page.info, product: { ...product, mine } };
+    const flags = sent !== undefined && "panel" in sent ? sent.panel : {};
+    const rated = { ...product, mine: mine ?? product.mine, ...flags };
+    page.info = { ...page.info, product: rated };
+    watchUndoExpiry(scope);
   });
+  if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
 }
 
 export function rateTitle(scope: FicheScope, rating: number): void {
   const { page } = scope;
   if (page.pending !== undefined || page.info?.product === undefined) return;
   if (page.title.mediaType === "movie") {
-    sendTitleRate(scope, rating);
+    void sendTitleRate(scope, rating);
     return;
   }
   page.pending = "confirm-series";
@@ -91,7 +114,7 @@ export function confirmSeries(scope: FicheScope): void {
   if (page.pending !== "confirm-series" || rating === undefined) return;
   page.pending = undefined;
   page.seriesRating = undefined;
-  sendTitleRate(scope, rating);
+  void sendTitleRate(scope, rating);
 }
 
 export function cancelSeries(scope: FicheScope): void {
@@ -115,7 +138,8 @@ export function rateEpisode(
   if (season === undefined || contentId === undefined) return;
   const place = { season, episode };
   const msg = rateMessage(contentId, "épisode", known.productId, rating, place);
-  const apply = (mine: number) => {
+  const apply = (mine: number | undefined) => {
+    if (mine === undefined) return;
     const episodes = page.read.get(season) ?? new Map();
     storeEpisodes(page, season, withMine(episodes, episode, mine));
   };
@@ -124,6 +148,7 @@ export function rateEpisode(
 
 function offered(scope: FicheScope, productId: number): boolean {
   const { info } = scope.page;
+  if (searchOffers(scope.page, productId)) return true;
   if (info?.state !== "choose") return false;
   return (info.candidates ?? []).some((known) => known.id === productId);
 }
@@ -149,6 +174,7 @@ export async function link(scope: FicheScope, productId: number) {
     scope.show();
     return;
   }
+  page.search = undefined;
   forgetSeasons(scope);
   await askInfo(scope);
 }
