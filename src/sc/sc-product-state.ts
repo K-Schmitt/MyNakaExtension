@@ -12,6 +12,7 @@
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
 // recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
+import { isIsoDate } from "../ext/field-checks";
 import { readAverage } from "./average-rating";
 import { type ProductLabel, readProductLabel } from "./product-label";
 import { productUrlOf } from "./product-url";
@@ -34,8 +35,6 @@ export type ProductState = {
   /** The product's page on SensCritique, absolute; undefined unless the path has the known shape (product-url). */
   url: string | undefined;
 };
-
-const DATE_DONE = /^\d{4}-\d{2}-\d{2}$/;
 
 const UNEXPECTED =
   "SensCritique ProductCurrentUserInfos: unexpected product state";
@@ -83,9 +82,7 @@ function ratingOf(infos: Record<string, unknown>): number | null {
 
 function dateDoneOf(infos: Record<string, unknown>): string | null {
   const { dateDone } = infos;
-  return typeof dateDone === "string" && DATE_DONE.test(dateDone)
-    ? dateDone
-    : null;
+  return typeof dateDone === "string" && isIsoDate(dateDone) ? dateDone : null;
 }
 
 export function readProductState(

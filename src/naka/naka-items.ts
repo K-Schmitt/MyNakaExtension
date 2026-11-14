@@ -1,6 +1,7 @@
 // Mapping of Naka catalogue entries and of the playlist id list. Both fail closed or drop what they cannot trust.
 
 import { imageOf, type TitleImage } from "../core/title-image";
+import { isIsoDate } from "../ext/field-checks";
 import { NakaUnavailableError } from "./naka-errors";
 import { isPositiveId } from "./naka-input";
 import { isRecord } from "./naka-transport";
@@ -20,8 +21,6 @@ export type NakaItem = {
   image?: TitleImage;
 };
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
@@ -37,7 +36,7 @@ export function toItem(entry: unknown): NakaItem | undefined {
   if (mediaType !== "tv" && mediaType !== "movie") return undefined;
   const item: NakaItem = { contentId: id, tmdbId, mediaType, title };
   if (nonEmpty(originalTitle)) item.originalTitle = originalTitle;
-  if (typeof releaseDate === "string" && ISO_DATE.test(releaseDate)) {
+  if (typeof releaseDate === "string" && isIsoDate(releaseDate)) {
     item.releaseDate = releaseDate;
   }
   if (isPositiveId(numberOfSeasons)) item.numberOfSeasons = numberOfSeasons;

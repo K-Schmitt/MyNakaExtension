@@ -1,7 +1,7 @@
 // Runtime guards on what the caller hands to the client, run before any session read and any request.
 // The types are not enough at runtime: a bad id ends up in a request body, a bad date in a mutation.
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+import { isIsoDate } from "../ext/field-checks";
 
 export function checkProductId(value: number): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -23,7 +23,7 @@ export function checkRating(value: number): void {
 
 // YYYY-MM-DD and a real calendar day: 2026-02-30 does not round-trip.
 export function checkIsoDate(value: string): void {
-  if (!ISO_DATE.test(value)) {
+  if (!isIsoDate(value)) {
     throw new RangeError("date must look like YYYY-MM-DD");
   }
   const [year, month, day] = value.split("-").map(Number);

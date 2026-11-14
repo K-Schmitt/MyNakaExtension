@@ -15,6 +15,7 @@ import {
   asRecord,
   asString,
   fail,
+  isIsoDate,
   onlyKeys,
   valuesOf,
 } from "./field-checks";
@@ -22,7 +23,6 @@ import { parseRatings } from "./rating-schema";
 import { StoredStateError } from "./stored-error";
 
 const MAX_RATING = 10;
-const DATE_DONE = /^\d{4}-\d{2}-\d{2}$/;
 
 const ROLES = valuesOf<UndoRole>({ film: true, série: true });
 const RECORD_KEYS = valuesOf<keyof FicheUndo>({
@@ -55,7 +55,7 @@ function asRating(raw: unknown, path: string): number | null {
 export function asDateDone(raw: unknown, path: string): string | null {
   if (raw === null) return null;
   const date = asString(raw, path);
-  return DATE_DONE.test(date) ? date : fail(path);
+  return isIsoDate(date) ? date : fail(path);
 }
 
 function asNullableBoolean(raw: unknown, path: string): boolean | null {
