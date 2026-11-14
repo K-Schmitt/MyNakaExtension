@@ -643,3 +643,22 @@ describe("the actions between two views", () => {
     expect(t.built()).toBe(2);
   });
 });
+
+describe("a title star click and the star's visibility (D7)", () => {
+  it("watches the info row's stars", async () => {
+    const t = await film();
+    expect(t.stars.watched).toBeGreaterThan(0);
+  });
+
+  it("sends nothing for a trusted click while the stars are reported hidden, and rates once they are visible", async () => {
+    const t = await film();
+    t.stars.hidden = true;
+    star(t.parts(), 8)?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    t.stars.hidden = false;
+    star(t.parts(), 8)?.click(true);
+    expect(t.ofType("fiche-rate").map((c) => c.msg)).toMatchObject([
+      { type: "fiche-rate", rating: 8 },
+    ]);
+  });
+});

@@ -397,6 +397,16 @@ describe("an episode rating on its box", () => {
     return { t, three, four };
   };
 
+  it("sends nothing for a trusted click on an episode's stars reported hidden (D7)", async () => {
+    const { t, three } = await twoBoxes();
+    t.stars.hidden = true;
+    starOf(three, 6)?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    t.stars.hidden = false;
+    starOf(three, 6)?.click(true);
+    expect(t.ofType("fiche-rate")).toHaveLength(1);
+  });
+
   it("dims the box's stars and marks them busy while it is sent; a second click sends nothing", async () => {
     const { t, three, four } = await twoBoxes();
     starOf(three, 6)?.click(true);

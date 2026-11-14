@@ -109,11 +109,17 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
   const doc = new FakeDoc();
   const kept = fakeAside(path.includes("/tv/") ? SERIES_ROWS : FILM_ROWS);
   const watchers = new Set<() => void>();
+  /** What IntersectionObserver v2 last said of every star row (D7): `hidden` refuses their clicks. */
+  const stars = { hidden: false, watched: 0 };
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: idleTimer,
     boxes: () => boxes.map((b) => b.port),
+    seen: () => {
+      stars.watched += 1;
+      return () => !stars.hidden;
+    },
     watch: (fn) => {
       const watcher = () => fn();
       watchers.add(watcher);
@@ -134,6 +140,7 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     ...fake,
     controller,
     kept,
+    stars,
     pageChanged: () => {
       for (const watcher of [...watchers]) watcher();
     },

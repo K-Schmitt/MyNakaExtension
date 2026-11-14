@@ -14,6 +14,7 @@ import { BADGE_SHEET, EPISODE_STARS_SHEET } from "./fiche-styles";
 import { NOT_RATED_LINE } from "./rating-copy";
 import { ERROR_CLASS, textLine } from "./rating-render";
 import { createClosedHost } from "./row-host";
+import type { SeenWatch } from "./star-visibility";
 
 type Host = { host: ElementLike; root: ShadowRootLike };
 
@@ -70,8 +71,14 @@ const keyOf = (
   { busy, line }: BoxWrite,
 ) => JSON.stringify([n, productId, average, mine, title, busy, line]);
 
+/** What drawing a box's values needs: the maker of our elements, and the stars' visibility watch (D7). */
+export type DecorPorts = {
+  doc: Pick<DocLike, "createElement">;
+  seen: SeenWatch;
+};
+
 function starsOf(
-  doc: Pick<DocLike, "createElement">,
+  { doc, seen }: DecorPorts,
   n: number,
   episode: FicheEpisode,
   handlers: FicheHandlers,
@@ -80,7 +87,7 @@ function starsOf(
   const name =
     episode.title === undefined ? undefined : episodeStarsName(episode.title);
   const onChoose = (value: number) => handlers.rateEpisode(n, value);
-  const stars = ficheStars(doc, episode.mine, onChoose, name);
+  const stars = ficheStars(doc, episode.mine, onChoose, seen, name);
   if (write.busy) stars.setAttribute("aria-busy", "true");
   if (write.line === undefined) return [stars];
   return [stars, textLine(doc, write.line, ERROR_CLASS)];
@@ -88,7 +95,7 @@ function starsOf(
 
 /** Draws the episode's values in the hosts, unless they already show them. */
 export function drawDecor(
-  doc: Pick<DocLike, "createElement">,
+  ports: DecorPorts,
   decor: EpisodeDecor,
   n: number,
   episode: FicheEpisode,
@@ -98,13 +105,14 @@ export function drawDecor(
   const key = keyOf(n, episode, write);
   if (decor.drawn?.key === key && decor.drawn.handlers === handlers) return;
   decor.drawn = { key, handlers };
+  const { doc } = ports;
   decor.badge.root.replaceChildren(
     ...(episode.average === null
       ? []
       : [textLine(doc, frenchAverage(episode.average), BADGE_CLASS)]),
   );
   decor.stars.root.replaceChildren(
-    ...starsOf(doc, n, episode, handlers, write),
+    ...starsOf(ports, n, episode, handlers, write),
   );
 }
 

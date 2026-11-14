@@ -22,6 +22,7 @@ import { ROW_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import { type Maker, textLine } from "./rating-render";
 import { createClosedHost } from "./row-host";
 import { createRowKeeper } from "./row-keeper";
+import type { SeenWatch } from "./star-visibility";
 
 const NAKA_ROW_CLASS = "dcf-info-row";
 const STARS_DECLARATIONS = [
@@ -32,6 +33,7 @@ const STARS_DECLARATIONS = [
 
 export type FicheRowsPorts = PanelPlace & {
   doc: Pick<DocLike, "createElement">;
+  seen: SeenWatch;
 };
 
 function infoRow(doc: Maker, label: string) {
@@ -52,13 +54,14 @@ function averageText(product: FicheProduct | undefined): string {
 }
 
 function starsOf(
-  doc: Maker,
+  ports: Pick<FicheRowsPorts, "doc" | "seen">,
   product: FicheProduct | undefined,
   handlers: FicheHandlers,
 ): ElementLike {
+  const { doc, seen } = ports;
   if (product === undefined) return textLine(doc, NO_VALUE);
   const name = episodeStarsName(labelLine(product.label));
-  return ficheStars(doc, product.mine, handlers.rateTitle, name);
+  return ficheStars(doc, product.mine, handlers.rateTitle, seen, name);
 }
 
 // Made on the first show, never while the tab's entry runs (the title page may never come).
@@ -97,7 +100,7 @@ export function createFicheRows(ports: FicheRowsPorts): {
       const key = JSON.stringify([product?.id, product?.mine, product?.label]);
       if (drawn?.key !== key || drawn.handlers !== handlers) {
         drawn = { key, handlers };
-        made.stars.replaceChildren(starsOf(ports.doc, product, handlers));
+        made.stars.replaceChildren(starsOf(ports, product, handlers));
       }
       made.keeper.start();
     },
