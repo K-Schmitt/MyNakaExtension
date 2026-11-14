@@ -54,6 +54,7 @@ import { ficheRemoveJob } from "./fiche-remove-job";
 import { ficheSearchJob } from "./fiche-search-job";
 import { ficheSeasonJob } from "./fiche-season-job";
 import { createTabTurns } from "./fiche-tab-turns";
+import { forgettingUndo, forgetUndoOf } from "./fiche-undo-forget";
 import { ficheUndoJob } from "./fiche-undo-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
@@ -178,7 +179,7 @@ export function createJobs(
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
       quietly(async () => {
-        await finishJob(deps, msg);
+        await forgettingUndo(deps, msg.contentId, (d) => finishJob(d, msg));
       }),
     retryPending: async (since) => {
       try {
@@ -199,7 +200,7 @@ export function createJobs(
       quietly(() => settingsJob(deps.store, thresholds, pause)),
     rate: (msg) =>
       quietly(async () => {
-        await rateJob(deps, msg);
+        await forgettingUndo(deps, msg.contentId, (d) => rateJob(d, msg));
       }),
     dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
@@ -212,9 +213,16 @@ export function createJobs(
     requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
     forget: () => quietly(() => forgetJob(deps.store)),
     reset: () => quietly(() => resetJob(deps.store)),
-    forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
+    forgetHandled: (msg) =>
+      quietly(async () => {
+        await forgetHandledJob(deps.store, msg);
+        await forgetUndoOf(deps.store, msg.contentId);
+      }),
     forgetHandledFromTab: (msg) =>
-      quietly(() => forgetFromTabJob(deps.store, deps.now, msg)),
+      quietly(async () => {
+        await forgetFromTabJob(deps.store, deps.now, msg);
+        await forgetUndoOf(deps.store, msg.contentId);
+      }),
     cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
     handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),
     searchTitles: (msg) => answerSearch(deps, msg),
