@@ -26,7 +26,7 @@ const OFFER: RemovalOffer = {
   pair: { nakaId: 21391, scId: 112240873 },
   title: "Un Job Mortel",
 };
-const REMOVE = "Retirer aussi de vos envies SensCritique";
+const REMOVE = "Retirer aussi de tes envies SensCritique";
 
 function pollAt(i: number): number {
   const ms = END_POLL_MS[i];
