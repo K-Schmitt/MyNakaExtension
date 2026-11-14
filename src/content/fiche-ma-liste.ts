@@ -9,8 +9,8 @@
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import type { UndoAnswer } from "../ext/fiche-undo-answers";
+import { stillOnTitle } from "./fiche-address";
 import type { FicheScope } from "./fiche-page";
-import { parseTitlePath } from "./fiche-path";
 
 type RateListFields = Pick<FicheRateMessage, "inMaListe" | "listByTab">;
 
@@ -36,14 +36,6 @@ export function givenBackByTab(answer: UndoAnswer | undefined): boolean {
   if ("ok" in answer) return answer.maListe === "tab";
   if (!("partial" in answer) || answer.maListe !== "tab") return false;
   return answer.partial.done.some((step) => step.kind === "maListe");
-}
-
-// The address is polled once a second: right after Naka moved to another title, the visit is still live
-// while the page already shows the next title's button.
-function stillOnTitle(scope: FicheScope): boolean {
-  const shown = parseTitlePath(scope.ports.pathname());
-  const { title } = scope.page;
-  return shown?.tmdbId === title.tmdbId && shown.mediaType === title.mediaType;
 }
 
 /** One click when the visit goes on and the button is on screen but not `wanted` (true: in the list). */
