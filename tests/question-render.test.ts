@@ -59,7 +59,7 @@ describe("the question block", () => {
     expect(
       all.some(
         (el) =>
-          el.textContent === `Retirer aussi de vos envies SensCritique${NB}?`,
+          el.textContent === `Retirer aussi de tes envies SensCritique${NB}?`,
       ),
     ).toBe(true);
   });

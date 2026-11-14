@@ -50,11 +50,11 @@ describe("the rating copy, code point by code point", () => {
   });
 
   it("current, start and warning", () => {
-    expect(currentLine(7)).toBe(`Votre note actuelle${NB}: 7`);
-    expect(seasonStartLine(8)).toBe(`Moyenne de vos épisodes${NB}: 8`);
-    expect(seriesStartLine(6)).toBe(`Moyenne de vos saisons${NB}: 6`);
+    expect(currentLine(7)).toBe(`Ta note actuelle${NB}: 7`);
+    expect(seasonStartLine(8)).toBe(`Moyenne de tes épisodes${NB}: 8`);
+    expect(seriesStartLine(6)).toBe(`Moyenne de tes saisons${NB}: 6`);
     expect(SERIES_WARNING).toBe(
-      `Noter la série la retire de vos envies SensCritique, et elle n'est pas finie sur Naka. Envoyer quand même${NB}?`,
+      `Noter la série la retire de tes envies SensCritique, et elle n’est pas finie sur Naka. Envoyer quand même${NB}?`,
     );
   });
 
@@ -65,7 +65,7 @@ describe("the rating copy, code point by code point", () => {
       fermer: "Fermer",
     });
     expect([SEND_LABEL, CANCEL_LABEL]).toEqual(["Envoyer", "Annuler"]);
-    expect(OTHER_LABELS.épisode).toBe("Noter l'épisode");
+    expect(OTHER_LABELS.épisode).toBe("Noter l’épisode");
     expect(OTHER_LABELS.saison).toBe("Noter la saison");
     expect(OTHER_LABELS.série).toBe("Noter la série");
   });
@@ -73,16 +73,16 @@ describe("the rating copy, code point by code point", () => {
   it("the sending and unreachable lines", () => {
     expect(SENDING_LINE).toBe("Envoi de la note\u2026");
     expect(UNREACHABLE_LINE).toBe(
-      `La note n'est pas partie${NB}: l'extension ne répond pas.`,
+      `La note n’est pas partie${NB}: l’extension ne répond pas.`,
     );
   });
 
   it("the lines of a card-less rating that did not go", () => {
     expect(NEEDS_CHOICE_LINE).toBe(
-      `La note n'est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`,
+      `La note n’est pas partie${NB}: plusieurs titres correspondent sur SensCritique.`,
     );
     expect(NOT_RATED_LINE).toBe(
-      `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`,
+      `La note n’est pas partie${NB}: ce titre n’a pas pu être noté.`,
     );
   });
 
@@ -92,16 +92,16 @@ describe("the rating copy, code point by code point", () => {
 
   it("the rating error labels, word for word", () => {
     expect(RATING_ERROR_LABELS).toEqual({
-      "no-naka-tab": "ouvrez ou rechargez un onglet Naka",
-      "sc-session": "reconnectez-vous sur SensCritique",
-      "naka-session": "reconnectez-vous sur Naka",
+      "no-naka-tab": "ouvre ou recharge un onglet Naka",
+      "sc-session": "reconnecte-toi sur SensCritique",
+      "naka-session": "reconnecte-toi sur Naka",
       "other-account": "un autre compte est connecté que celui enregistré",
-      "stored-state": "l'état enregistré est illisible",
-      unavailable: "le site ne répond pas, réessayez plus tard",
+      "stored-state": "l’état enregistré est illisible",
+      unavailable: "le site ne répond pas, réessaie plus tard",
       "finish-limit":
-        "trop de fins de visionnage en une heure, réessayez plus tard",
-      "naka-list-empty": "Ma liste Naka a été lue vide, rien n'a été retiré",
-      "naka-tab-changed": "l'onglet Naka a changé de page, réessayez",
+        "trop de fins de visionnage en une heure, réessaie plus tard",
+      "naka-list-empty": "Ma liste Naka a été lue vide, rien n’a été retiré",
+      "naka-tab-changed": "l’onglet Naka a changé de page, réessaie",
       "naka-content-unknown":
         "ce contenu est inconnu de Naka ou d\u2019un autre type",
     });
@@ -110,14 +110,14 @@ describe("the rating copy, code point by code point", () => {
   it("the error line is the rating label of the code, not the status page's", () => {
     for (const code of CODES) {
       expect(errorLine(code)).toBe(
-        `La note n'est pas partie${NB}: ${RATING_ERROR_LABELS[code]}.`,
+        `La note n’est pas partie${NB}: ${RATING_ERROR_LABELS[code]}.`,
       );
     }
     expect(errorLine("sc-session")).toBe(
-      `La note n'est pas partie${NB}: reconnectez-vous sur SensCritique.`,
+      `La note n’est pas partie${NB}: reconnecte-toi sur SensCritique.`,
     );
     expect(JOB_ERROR_LABELS["sc-session"]).toBe(
-      "Reconnectez-vous sur SensCritique",
+      "Reconnecte-toi sur SensCritique",
     );
   });
 
@@ -126,7 +126,7 @@ describe("the rating copy, code point by code point", () => {
   });
 
   it("the check finds a plain space before a sign (control)", () => {
-    expect(typographyFaults("Votre note actuelle : 7")).toHaveLength(1);
+    expect(typographyFaults("Ta note actuelle : 7")).toHaveLength(1);
     expect(typographyFaults("Noter « Alien »")).toHaveLength(2);
     expect(typographyFaults("quand même ?")).toHaveLength(1);
   });

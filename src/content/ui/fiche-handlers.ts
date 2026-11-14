@@ -3,6 +3,7 @@
 import type { FicheController } from "../fiche-controller";
 import type { DocLike, ElementLike } from "./dom-like";
 import { type Star, starRater } from "./star-rater";
+import type { SeenWatch } from "./star-visibility";
 
 export type FicheHandlers = Pick<
   FicheController,
@@ -19,16 +20,22 @@ export type FicheHandlers = Pick<
 
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-/** Ten stars (hover preview on), the owner's rating marked once known; `name` names them (« Note » without). */
+/** Ten stars (hover preview on), the owner's rating marked once known; `name` names them (« Note » without).
+ * A click counts only while `seen` says the group is visible (D7); `slot` is the place the row is drawn in. */
 export function ficheStars(
   doc: Pick<DocLike, "createElement">,
   mine: number | null | undefined,
   onChoose: (value: number) => void,
+  seen: { watch: SeenWatch; slot: object },
   name?: string,
 ): ElementLike {
   const stars: Star[] = VALUES.map((value) => ({
     value,
     marked: value === mine,
   }));
-  return starRater(doc, stars, onChoose, name, true);
+  return starRater(doc, stars, onChoose, {
+    ...(name === undefined ? {} : { name }),
+    preview: true,
+    watch: (group) => seen.watch(group, seen.slot),
+  });
 }
