@@ -23,9 +23,11 @@ export function fichePagePorts(doc: Document, timer: EndTimer): FicheUiPorts {
     timer,
     boxes: () => episodeBoxes(doc),
     watch: (onChange) => watchPage(doc, onChange),
-    // One observer for the page's star rows (D7); the content script's window has the page's observer.
+    // One observer for the page's star rows (D7): the isolated world's own constructor, which a page script
+    // cannot patch.
     seen: createSeenWatch(
       intersectionObserverV2(window as unknown as ObserverWindow),
+      () => performance.now(),
     ),
   };
 }

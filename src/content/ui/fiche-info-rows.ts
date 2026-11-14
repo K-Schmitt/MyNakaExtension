@@ -55,13 +55,15 @@ function averageText(product: FicheProduct | undefined): string {
 
 function starsOf(
   ports: Pick<FicheRowsPorts, "doc" | "seen">,
+  slot: object,
   product: FicheProduct | undefined,
   handlers: FicheHandlers,
 ): ElementLike {
   const { doc, seen } = ports;
   if (product === undefined) return textLine(doc, NO_VALUE);
   const name = episodeStarsName(labelLine(product.label));
-  return ficheStars(doc, product.mine, handlers.rateTitle, seen, name);
+  const watch = { watch: seen, slot };
+  return ficheStars(doc, product.mine, handlers.rateTitle, watch, name);
 }
 
 // Made on the first show, never while the tab's entry runs (the title page may never come).
@@ -100,7 +102,7 @@ export function createFicheRows(ports: FicheRowsPorts): {
       const key = JSON.stringify([product?.id, product?.mine, product?.label]);
       if (drawn?.key !== key || drawn.handlers !== handlers) {
         drawn = { key, handlers };
-        made.stars.replaceChildren(starsOf(ports, product, handlers));
+        made.stars.replaceChildren(starsOf(ports, made, product, handlers));
       }
       made.keeper.start();
     },
