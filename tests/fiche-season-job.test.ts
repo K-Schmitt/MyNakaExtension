@@ -111,6 +111,26 @@ describe("fiche-season", () => {
     expect(answer.episodes).toHaveLength(500);
   });
 
+  it("a failed read of the tab's current season rejects, and issues no episode", async () => {
+    const w = answerWorld({
+      state: linkedTo(3000),
+      naka: nakaSays({ mediaType: "tv" }),
+      product: () => ({ universe: UNIVERSE.serie, label: { title: "Dark" } }),
+      sc: {
+        seasonInfo: async () => {
+          throw new Error("season read 4242");
+        },
+      },
+    });
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    await expect(w.jobs.ficheSeason(TAB, season())).rejects.toThrow(
+      "season read 4242",
+    );
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3101 })),
+    ).rejects.toThrow();
+  });
+
   it("leaves out an episode the tab cannot read (number 0, a product id that is no id): the others still show and stay issued", async () => {
     const zero = { ...episode(0), productId: 3100 };
     const badId = { ...episode(3), productId: 1.5 };
