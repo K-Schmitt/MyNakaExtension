@@ -78,6 +78,13 @@ const star = (parts: FakeElement[], value: number) =>
 const linkOf = (parts: FakeElement[]) => parts.find((p) => p.tag === "a");
 
 describe("the actions under Naka's info panel", () => {
+  it("draws the native controls dark: the reset of the host sets its color scheme back (the candidates scroll)", async () => {
+    const t = await film();
+    const css = (t.kept.actions() as FakeElement).style.cssText;
+    expect(css).toContain("all: initial !important");
+    expect(css).toContain("color-scheme: dark !important");
+  });
+
   it("offers « Annuler » while the undo record is live, never « Retirer la note » next to it", async () => {
     const t = await film(productOf({ canUndo: true, canRemove: true }));
     const parts = actionParts(t);
@@ -641,6 +648,20 @@ describe("the actions between two views", () => {
     const later = { ...filmView(7), later: "drawn" } as FicheView;
     t.shown.show(later, handlers);
     expect(t.built()).toBe(2);
+  });
+});
+
+describe("Naka's « Ma liste » the tab could not update (D14)", () => {
+  it("says so under the stars once the button left the screen before the click", async () => {
+    const t = await film(productOf());
+    t.page.maListe = true;
+    t.controller.rateTitle(8);
+    t.page.maListe = undefined;
+    t.ofType("fiche-rate")[0]?.answer({ ok: true, maListe: "tab" });
+    await settle();
+    expect(texts(actionParts(t))).toContain(
+      "Ma liste Naka n’a pas été mise à jour.",
+    );
   });
 });
 

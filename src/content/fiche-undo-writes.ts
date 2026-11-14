@@ -9,7 +9,7 @@ import type { FicheUndoMessage } from "../ext/fiche-messages";
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import { readInfo } from "./fiche-info-reader";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
-import { contentOf, type FicheScope } from "./fiche-page";
+import { contentOf, type FicheScope, forgetEnding } from "./fiche-page";
 import { considerSeason, forgetSeasons } from "./fiche-season-reader";
 import { watchUndoExpiry } from "./fiche-undo-expiry";
 import type { FicheOutcome, UndoAction } from "./fiche-view";
@@ -43,7 +43,7 @@ export function undoOutcome(
 function begin(scope: FicheScope, action: UndoAction): void {
   const { page } = scope;
   page.pending = action;
-  page.outcome = undefined;
+  forgetEnding(page);
   page.ratedEpisode = undefined;
   scope.show();
 }

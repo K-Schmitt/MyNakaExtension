@@ -43,6 +43,8 @@ export type FichePorts = {
   maListe(): boolean | undefined;
   /** One programmatic click on that button, when it is on screen. */
   clickMaListe(): void;
+  /** The tab's address path now; `path` learns it only at the next poll. */
+  pathname(): string;
   /** The view of the title page, or undefined off a title page. */
   render(view: FicheView | undefined): void;
   /** Asks the page's MAIN relay to post again the events it kept for this title page path. */
