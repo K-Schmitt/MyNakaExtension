@@ -99,12 +99,21 @@ describe("fiche-rate keeps what a film rating changes", () => {
     });
   });
 
-  it("without « Ma liste » in the message: kept as unknown", async () => {
-    const w = world();
+  it("without « Ma liste » in the message, the film not listed: kept as unknown", async () => {
+    const w = world({ playlist: () => [99] });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
     await w.jobs.ficheRate(TAB, rate());
     expect(stored(w)).toEqual(
       filmRecord({ before: { ...filmRecord().before, inMaListe: null } }),
+    );
+  });
+
+  it("without « Ma liste » in the message, the film removed by the client: kept as listed (R10)", async () => {
+    const w = world();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    await w.jobs.ficheRate(TAB, rate());
+    expect(stored(w)).toEqual(
+      filmRecord({ before: { ...filmRecord().before, inMaListe: true } }),
     );
   });
 

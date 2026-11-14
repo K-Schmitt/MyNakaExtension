@@ -7,7 +7,8 @@
 // product than the one issued refuses the write before any request. Once the link holds, the film's state is
 // read and kept as the undo record (fiche-undo-record), before any SensCritique write: after the link's
 // checks, so a refused link still sends nothing. An answer of a rating that went out carries the panel.
-// With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal).
+// With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal);
+// without it, a film the client removed is noted as listed on the undo record (ruling R10).
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -18,7 +19,7 @@ import { linkForRating } from "./fiche-link-pair";
 import { leaveNakaList } from "./fiche-list-removal";
 import { NotIssuedError } from "./fiche-mine-job";
 import { afterRating } from "./fiche-panel-flags";
-import { recordBefore } from "./fiche-undo-record";
+import { noteListed, recordBefore } from "./fiche-undo-record";
 import type { JobDeps } from "./job-deps";
 import { rateJob } from "./rating-jobs";
 
@@ -48,6 +49,10 @@ export async function rateFilm(
     rating,
   });
   if (error !== undefined) return { error };
-  const answer = await leaveNakaList(deps, contentId, msg.listByTab === true);
-  return { ...answer, panel: afterRating(before, rating) };
+  const leaving = await leaveNakaList(deps, contentId, msg.listByTab === true);
+  // The tab could not read the button: the client's removal tells the record (R10).
+  if (leaving.removed && msg.inMaListe === undefined) {
+    await noteListed(deps, msg);
+  }
+  return { ...leaving.answer, panel: afterRating(before, rating) };
 }

@@ -4,7 +4,8 @@
 // one would undo more than the last rating), and the panel offers no undo. Episode ratings keep nothing.
 // The record also keeps the extension's own state of the title (ruling R8), read in the same job before
 // any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
-// clears the record the same way.
+// clears the record the same way. A film the worker's client took out of « Ma liste » while the tab could
+// not read the button is noted as listed (ruling R10), so « Annuler » adds it back.
 
 import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";
@@ -92,4 +93,21 @@ export async function recordBefore(
   const before = await readBefore(deps, msg.productId);
   await keepUndo(deps, msg, role, before);
   return before;
+}
+
+/** The film was listed: kept only on a record that still names this content and this product (R10). */
+export async function noteListed(
+  deps: JobDeps,
+  { contentId, productId }: FicheRateMessage,
+): Promise<void> {
+  try {
+    const record = await deps.store.loadFicheUndo();
+    if (record?.contentId !== contentId || record.productId !== productId) {
+      return;
+    }
+    const before = { ...record.before, inMaListe: true };
+    await deps.store.saveFicheUndo({ ...record, before });
+  } catch {
+    // The rating went out: the record then simply gives no « Ma liste » back.
+  }
 }
