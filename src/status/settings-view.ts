@@ -8,7 +8,7 @@ import type { ToWorker } from "../ext/messages";
 export const SETTINGS_COPY = {
   pauseFromError: "Un nombre entier de 1 à 99",
   saved: "Réglages enregistrés",
-  waiting: "Réglages en attente d'enregistrement",
+  waiting: "Réglages en attente d’enregistrement",
 } as const;
 
 // U+202F, written as a code point so that it stays visible in the source.

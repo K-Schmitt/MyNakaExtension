@@ -12,7 +12,7 @@
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
 // recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
-import { isIsoDate } from "../ext/field-checks";
+import { isIsoDate } from "../core/iso-date";
 import { readAverage } from "./average-rating";
 import { type ProductLabel, readProductLabel } from "./product-label";
 import { productUrlOf } from "./product-url";

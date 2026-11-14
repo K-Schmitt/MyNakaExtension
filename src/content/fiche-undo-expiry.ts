@@ -1,7 +1,7 @@
 // « Annuler » for 10 minutes (spec §2): the worker says how long its record stays live (`undoLeftMs`); once
 // that time is over on the same page, the tab stops offering it (« Retirer la note » then shows when the
-// worker offered it, and the protected line when the title has one). One timer per visit: every new info
-// replaces it, the end of the visit stops it.
+// worker offered it, and the protected line when the title has one; a D9 line stops naming it). One timer
+// per visit: every new info replaces it, the end of the visit stops it.
 
 import { UNDO_WINDOW_MS } from "../core/fiche-undo";
 import type { FicheScope } from "./fiche-page";
@@ -14,6 +14,9 @@ function expireUndo(scope: FicheScope, token: object): void {
   if (page.info === undefined || product === undefined) return;
   const { undoLeftMs: _left, ...flags } = product;
   page.info = { ...page.info, product: { ...flags, canUndo: false } };
+  if (page.outcome?.kind === "finish-wrote") {
+    page.outcome = { kind: "finish-wrote-expired" };
+  }
   scope.show();
 }
 

@@ -115,10 +115,10 @@ describe("buildQuestionTile, a removal", () => {
       .map((d) => d.textContent);
     expect(lines).toEqual([
       "«\u202FDune\u202F» a quitté Ma liste Naka.",
-      "Retirer aussi de vos envies SensCritique\u202F?",
+      "Retirer aussi de tes envies SensCritique\u202F?",
     ]);
     expect(buttons.map((b) => b.textContent)).toEqual([
-      "Retirer aussi de vos envies SensCritique",
+      "Retirer aussi de tes envies SensCritique",
       "Non",
       "Écarter",
     ]);

@@ -469,7 +469,7 @@ describe("every step 7 rare state, in the actions host", () => {
     t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnectez-vous sur Naka.`,
+      `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnecte-toi sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
   });
@@ -480,13 +480,13 @@ describe("every step 7 rare state, in the actions host", () => {
     t.ofType("fiche-rate")[0]?.answer({ error: "finish-limit" });
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: trop de fins de visionnage en une heure, réessayez plus tard.`,
+      `La note n’est pas partie${NB}: trop de fins de visionnage en une heure, réessaie plus tard.`,
     );
     t.controller.rateTitle(4);
     t.ofType("fiche-rate")[1]?.answer(undefined);
     await settle();
     expect(texts(t.parts())).toContain(
-      `La note n'est pas partie${NB}: ce titre n'a pas pu être noté.`,
+      `La note n’est pas partie${NB}: ce titre n’a pas pu être noté.`,
     );
   });
 
@@ -507,13 +507,41 @@ describe("every step 7 rare state, in the actions host", () => {
     const line = `La note n\u2019est pas partie, mais SensCritique a d\u00e9j\u00e0 marqu\u00e9 le titre vu${NB}: \u00ab${NB}Annuler${NB}\u00bb le remet comme avant.`;
     expect(texts(t.parts())).toContain(line);
     expect(texts(t.parts())).not.toContain(
-      `La note n'est pas partie${NB}: le site ne répond pas, réessayez plus tard.`,
+      `La note n’est pas partie${NB}: le site ne répond pas, réessaie plus tard.`,
     );
     expect(checked(t.parts())).toEqual(["7 sur 10"]);
     buttonNamed(actionParts(t), "Annuler")?.click(true);
     expect(t.ofType("fiche-undo").map((c) => c.msg)).toEqual([
       { type: "fiche-undo", contentId: 5, productId: 55 },
     ]);
+  });
+
+  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause (D9)", async () => {
+    // Arrange
+    const t = await film();
+    star(t.parts(), 9)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      error: "unavailable",
+      panel: {
+        canUndo: true,
+        undoLeftMs: 600_000,
+        canRemove: true,
+        protected: false,
+      },
+    });
+    await settle();
+    const before = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}Annuler${NB}» le remet comme avant.`;
+    expect(texts(t.parts())).toContain(before);
+
+    // Act
+    t.timers.find((timer) => !timer.cleared)?.fire();
+
+    // Assert
+    const after =
+      "La note n’est pas partie, mais SensCritique a déjà marqué le titre vu.";
+    expect(texts(t.parts())).toContain(after);
+    expect(texts(t.parts())).not.toContain(before);
+    expect(buttonNamed(actionParts(t), "Annuler")).toBeUndefined();
   });
 
   it("shows a line for the shown season whose read failed", async () => {
@@ -613,5 +641,26 @@ describe("the actions between two views", () => {
     const later = { ...filmView(7), later: "drawn" } as FicheView;
     t.shown.show(later, handlers);
     expect(t.built()).toBe(2);
+  });
+});
+
+describe("a title star click and the star's visibility (D7)", () => {
+  it("watches the info row's group of stars, the one holding the clicked star", async () => {
+    const t = await film();
+    const watched = t.stars.rows.at(-1);
+    expect(watched?.attributes.role).toBe("radiogroup");
+    expect(watched?.children).toContain(star(t.parts(), 8));
+  });
+
+  it("sends nothing for a trusted click while the stars are reported hidden, and rates once they are visible", async () => {
+    const t = await film();
+    t.stars.hidden = true;
+    star(t.parts(), 8)?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    t.stars.hidden = false;
+    star(t.parts(), 8)?.click(true);
+    expect(t.ofType("fiche-rate").map((c) => c.msg)).toMatchObject([
+      { type: "fiche-rate", rating: 8 },
+    ]);
   });
 });

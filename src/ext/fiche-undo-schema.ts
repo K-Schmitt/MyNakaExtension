@@ -7,6 +7,7 @@ import type {
   UndoLocal,
   UndoRole,
 } from "../core/fiche-undo";
+import { isIsoDate } from "../core/iso-date";
 import {
   asBoolean,
   asId,
@@ -15,7 +16,6 @@ import {
   asRecord,
   asString,
   fail,
-  isIsoDate,
   onlyKeys,
   valuesOf,
 } from "./field-checks";

@@ -109,11 +109,25 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
   const doc = new FakeDoc();
   const kept = fakeAside(path.includes("/tv/") ? SERIES_ROWS : FILM_ROWS);
   const watchers = new Set<() => void>();
+  /** The star rows watched for D7, and what IntersectionObserver v2 last said of them: `hidden` refuses
+   * every row's clicks, `hiddenRows` only those rows'. */
+  const stars = {
+    hidden: false,
+    hiddenRows: new Set<unknown>(),
+    rows: [] as FakeElement[],
+    /** The slot each watched row was drawn in, in the same order as `rows`. */
+    slots: [] as object[],
+  };
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: idleTimer,
     boxes: () => boxes.map((b) => b.port),
+    seen: (row, slot) => {
+      stars.rows.push(row as FakeElement);
+      stars.slots.push(slot);
+      return () => !stars.hidden && !stars.hiddenRows.has(row);
+    },
     watch: (fn) => {
       const watcher = () => fn();
       watchers.add(watcher);
@@ -134,6 +148,7 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     ...fake,
     controller,
     kept,
+    stars,
     pageChanged: () => {
       for (const watcher of [...watchers]) watcher();
     },
