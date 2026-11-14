@@ -2,7 +2,7 @@
 // under the info panel (280 px wide), the average badge on an episode's thumb, the stars under its title.
 
 import { themeCss } from "../../ui/theme-tokens";
-import { BLOCK_RULES } from "./block-styles";
+import { BLOCK_RULES, REDUCED_MOTION_RULE } from "./block-styles";
 import { CHOICE_RULES } from "./row-styles";
 
 const v = (name: string): string => `var(--mn-${name})`;
@@ -32,9 +32,12 @@ const EPISODE_STARS_RULES = [
 
 export const PANEL_SHEET: string =
   themeCss(":host") +
-  [...BLOCK_RULES, ...CHOICE_RULES, ...PANEL_RULES].join("");
+  [...BLOCK_RULES, ...CHOICE_RULES, ...PANEL_RULES, REDUCED_MOTION_RULE].join(
+    "",
+  );
 
 export const BADGE_SHEET: string = themeCss(":host") + BADGE_RULES.join("");
 
 export const EPISODE_STARS_SHEET: string =
-  themeCss(":host") + [...BLOCK_RULES, ...EPISODE_STARS_RULES].join("");
+  themeCss(":host") +
+  [...BLOCK_RULES, ...EPISODE_STARS_RULES, REDUCED_MOTION_RULE].join("");
