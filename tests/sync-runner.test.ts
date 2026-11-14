@@ -21,14 +21,15 @@ vi.mock("../src/core/resolver", async (importOriginal) => {
   };
 });
 
-import { resolveNakaIds, resolveScIds } from "../src/core/resolver";
-import {
-  MAX_RESOLVE_PER_RUN,
-  MAX_WRITES_PER_RUN,
-  runSync,
-  type SyncPorts,
-  type SyncReport,
-} from "../src/core/sync-runner";
+import type { SyncPorts, SyncReport } from "../src/core/sync-runner";
+
+// Without isolation, another file may have loaded sync-runner bound to the real resolver: load it
+// again, so that it sees the mock above.
+vi.resetModules();
+const { resolveNakaIds, resolveScIds } = await import("../src/core/resolver");
+const { MAX_RESOLVE_PER_RUN, MAX_WRITES_PER_RUN, runSync } = await import(
+  "../src/core/sync-runner"
+);
 
 const p = (n: number): Pair => ({ nakaId: n, scId: n + 1000 });
 const range = (from: number, to: number): number[] =>
