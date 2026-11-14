@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { parseSeasonAnswer } from "../src/ext/fiche-answers";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
+import { NotIssuedError } from "../src/sw/fiche-mine-job";
 import { answerWorld } from "./answer-world";
 import {
   info,
@@ -122,6 +123,9 @@ describe("fiche-season", () => {
     await expect(
       w.jobs.ficheMine(TAB, mine({ productId: 3101 })),
     ).resolves.toEqual({ mine: null, average: null });
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3100 })),
+    ).rejects.toThrow(NotIssuedError);
   });
 });
 
