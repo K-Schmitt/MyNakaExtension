@@ -452,6 +452,25 @@ describe("fiche-rate: an episode", () => {
     expect(w.state()).toEqual(state);
   });
 
+  it("a failed rate: its error answered, its card's épisode left as it was", async () => {
+    const w = filmWorld({
+      state: linkedTo(13),
+      sc: {
+        rate: async () => {
+          throw new ScUnavailableError("x");
+        },
+      },
+    });
+    w.area.data.set("ratings", [episodeCard()]);
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({
+      error: "unavailable",
+    });
+    expect(w.cards()[0]?.targets).toEqual(episodeCard().targets);
+    expect(w.state()).toEqual(linkedTo(13));
+  });
+
   it("no card: rated, no card made", async () => {
     const w = filmWorld({ state: linkedTo(13) });
     await w.registry.open(TAB, 5, seriesTitle(13), []);
