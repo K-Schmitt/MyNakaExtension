@@ -52,17 +52,22 @@ async function keptSettings(store: SettingsStore): Promise<Settings> {
 }
 
 /**
- * « Réinitialiser »: the sync state, the ratings and the title page links are replaced, never loaded, so
- * that a store that no longer parses is repaired. The settings that matter stay; unreadable ones become
+ * « Réinitialiser »: the sync state, the ratings, the title page links and the undo record are replaced,
+ * never loaded, so that a store that no longer parses is repaired (an « Annuler » after a reset would put
+ * back a local state from before it). The settings that matter stay; unreadable ones become
  * the defaults. They are saved FIRST: a failed save after an emptied state would leave the live mode over
  * an empty state.
  */
 export async function resetJob(
   store: SettingsStore &
-    Pick<Store, "saveState" | "saveRatings" | "saveFicheLinks">,
+    Pick<
+      Store,
+      "saveState" | "saveRatings" | "saveFicheLinks" | "saveFicheUndo"
+    >,
 ): Promise<void> {
   await store.saveSettings(await keptSettings(store));
   await store.saveState(emptyState());
   await store.saveRatings([]);
   await store.saveFicheLinks({});
+  await store.saveFicheUndo(null);
 }

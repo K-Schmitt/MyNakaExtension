@@ -38,8 +38,6 @@ export type { Respond };
 export type Router = {
   /** true when `respond` will be called later (Chrome keeps the channel open). */
   handle(raw: unknown, sender: Sender, respond: Respond): boolean;
-  /** A closed tab: what the worker issued to it for its title page is forgotten. */
-  dropTab(tabId: number): void;
 };
 
 export type RouterDeps = {
@@ -227,6 +225,9 @@ export function createRouter(deps: RouterDeps): Router {
       case "fiche-mine":
       case "fiche-rate":
       case "fiche-link":
+      case "fiche-undo":
+      case "fiche-remove":
+      case "fiche-search":
         return routeFiche((job) => queue.run(job), jobs, msg, tabId, respond);
     }
   }
@@ -238,10 +239,6 @@ export function createRouter(deps: RouterDeps): Router {
       const role = isTrustedSender(sender, deps.extensionId);
       if (role === undefined || !allowedFor(role, msg)) return false;
       return dispatch(msg, respond, role, sender.tab?.id);
-    },
-    dropTab(tabId) {
-      // A session area that cannot be written leaves the entry until it is replaced: no error of the worker.
-      jobs.dropFicheTab(tabId).catch(ignore);
     },
   };
 }

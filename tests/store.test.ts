@@ -207,3 +207,45 @@ describe("fiche links store", () => {
     expect(await store.loadState()).toEqual(sample());
   });
 });
+
+describe("fiche undo store", () => {
+  const undo = {
+    contentId: 7,
+    productId: 99,
+    role: "film" as const,
+    at: 1_700_000_000_000,
+    before: {
+      rating: null,
+      isDone: false,
+      dateDone: null,
+      isWished: true,
+      inMaListe: true,
+    },
+    local: { handled: false, settled: false, cards: [] },
+  };
+
+  it("loads no record when the key is absent", async () => {
+    expect(await createStore(fakeArea().area).loadFicheUndo()).toBeNull();
+  });
+
+  it("round-trips the record under the key ficheUndo", async () => {
+    const { area, data } = fakeArea();
+    const store = createStore(area);
+    await store.saveFicheUndo(undo);
+    expect(data.get("ficheUndo")).toEqual(undo);
+    expect(await store.loadFicheUndo()).toEqual(undo);
+  });
+
+  it("clears the record by saving null", async () => {
+    const { area } = fakeArea();
+    const store = createStore(area);
+    await store.saveFicheUndo(undo);
+    await store.saveFicheUndo(null);
+    expect(await store.loadFicheUndo()).toBeNull();
+  });
+
+  it("reads a corrupt record as null instead of rejecting", async () => {
+    const store = createStore(fakeArea({ ficheUndo: { x: 1 } }).area);
+    expect(await store.loadFicheUndo()).toBeNull();
+  });
+});

@@ -1,6 +1,8 @@
+import type { FicheUndo } from "../core/fiche-undo";
 import type { RatingCard } from "../core/rating-cards";
 import { emptyState, type SyncState } from "../core/state";
 import { type FicheLinks, parseFicheLinks } from "./fiche-links-schema";
+import { parseFicheUndo } from "./fiche-undo-schema";
 import { parseRatings } from "./rating-schema";
 import { parseSettings, type Settings } from "./settings";
 import { parseState } from "./state-schema";
@@ -19,12 +21,17 @@ export type Store = {
   saveRatings(cards: RatingCard[]): Promise<void>;
   loadFicheLinks(): Promise<FicheLinks>;
   saveFicheLinks(links: FicheLinks): Promise<void>;
+  /** The one undo record; a corrupt value reads as null. */
+  loadFicheUndo(): Promise<FicheUndo | null>;
+  /** Replaces the undo record; null clears it. */
+  saveFicheUndo(record: FicheUndo | null): Promise<void>;
 };
 
 const RATINGS_KEY = "ratings";
 const STATE_KEY = "state";
 const SETTINGS_KEY = "settings";
 const FICHE_LINKS_KEY = "ficheLinks";
+const FICHE_UNDO_KEY = "ficheUndo";
 
 // Only an absent key means a first install; a stored value that does not parse rejects.
 async function read(area: StorageArea, key: string): Promise<unknown> {
@@ -58,6 +65,12 @@ export function createStore(area: StorageArea): Store {
     },
     async saveFicheLinks(links) {
       await area.set({ [FICHE_LINKS_KEY]: links });
+    },
+    async loadFicheUndo() {
+      return parseFicheUndo(await read(area, FICHE_UNDO_KEY));
+    },
+    async saveFicheUndo(record) {
+      await area.set({ [FICHE_UNDO_KEY]: record });
     },
   };
 }
