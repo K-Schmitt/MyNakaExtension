@@ -567,6 +567,69 @@ Q1–Q12 du propriétaire).
   bouton de l'épisode), le format des codes d'épisode, le texte du menu des saisons, l'encadré d'infos d'un film,
   la note d'épisode sur la page de saison SC sans connexion.
 
+## 2026-11-14 — Étape 8 : la note dans l’encadré, annuler, Ma liste ; 8b : recherche, Réessayer
+
+L’étape 8 déplace la note SensCritique dans l’encadré d’infos de la fiche Naka et y ajoute « Annuler » ; l’étape 8b
+ajoute la recherche manuelle quand SC ne trouve rien et un nouvel essai après une lecture perdue. Specs : celle de
+l’étape 8 (§6 et §7) et celle de l’étape 8b (§2), dans `docs/superpowers/specs/`.
+
+**Ce qui change sur la fiche**
+- Les lignes « SensCritique » (moyenne « 6,9 / 10 » ou « — ») et « Ta note » (10 étoiles) sont les deux dernières
+  lignes de `div.dca-panel`, avec les classes de Naka (`dcf-info-row`). Les actions (« Voir sur SensCritique »,
+  « Annuler » ou « Retirer la note », la ligne d’un titre protégé, les états rares de l’étape 7) vivent dans un hôte
+  fermé juste sous l’encadré ; l’ancien bloc séparé n’existe plus. Un gardien remet le tout en place quand Naka
+  redessine l’aside.
+- Aperçu au survol et au focus sur les étoiles de la fiche (encadré et épisodes) ; rien ne part sans clic ; au
+  toucher, pas d’aperçu.
+
+**Annuler (10 minutes) et Retirer la note**
+- Un seul enregistrement stocké (`ficheUndo`), pris dans la même tâche de la file que la note, avant toute écriture
+  SC : l’état SC d’avant (note, vu et date, envie), Ma liste (lu sur le bouton de Naka, ou déduit du retrait fait
+  par le service quand le bouton n’est pas à l’écran) et l’état local exact (fin traitée, paire réglée, cartes).
+  Remplacé à la note suivante ; ignoré après 10 minutes (`UNDO_WINDOW_MS`) ; effacé par une restauration complète,
+  une remise à zéro, un retrait ; remis tel quel quand une note est refusée avant tout envoi.
+- Ordre de restauration : les étapes SC (note d’avant ou « retirer vu » puis vu et sa date), l’envie, Ma liste,
+  l’état local en dernier pour qu’aucune offre de retrait ni question ne surgisse entre deux étapes. Une étape qui
+  échoue arrête la suite et la ligne dit ce qui n’a pas été remis ; une relance repart d’une lecture fraîche et
+  saute ce qui est déjà revenu.
+- Titre protégé (critique ou recommandation sur SC) : jamais de `ProductUndone` ; « Annuler » d’un titre déjà vu ne
+  renvoie que l’ancienne note ; « Retirer la note » est remplacé par la ligne qui envoie sur SC.
+- « Annuler » disparaît de lui-même au bout des 10 minutes.
+
+**Ma liste**
+- Bouton de Naka à l’écran : l’onglet le clique lui-même (une fois, en relisant son état juste avant) et le service
+  n’appelle pas le client ; sinon le client Naka comme avant. En simulation, rien.
+
+**8b**
+- « Pas trouvé sur SensCritique » : un champ prérempli et « Chercher » ; les résultats du même type que le titre
+  (10 au plus) sont émis comme candidats de la page ; un clic de confiance relie. Une recherche à la fois par
+  onglet. « Réessayer » relit la fiche sans recharger.
+- Le service n’écoute plus la fermeture des onglets : le registre reste borné à 50 onglets (`MAX_FICHE_TABS`) et se
+  remet à zéro à chaque fiche.
+
+**Limites connues** (acceptées par la relecture finale de la nuit du 2026-11-14)
+- `dateDone` n’est vérifiée qu’en forme (YYYY-MM-DD) ; elle ne vient que de SC.
+- Une note de film depuis l’encadré lit l’état SC deux fois (l’enregistrement, puis la fin explicite) : environ 2 s
+  de plus.
+- Non remis par « Annuler » : la dernière fin, la place du budget dépensée, une question que la liaison a résolue ;
+  la liaison reste.
+- Une carte remise d’un bloc annule aussi une note d’épisode ou de saison donnée pendant les 10 minutes, que SC
+  garde.
+- Remettre une carte évincée peut évincer la plus ancienne d’un autre titre (borne des cartes).
+- Le bouton Ma liste de Naka fait foi même s’il est en retard sur la liste réelle.
+- Les lignes dans l’encadré sont dans le DOM de la page : un script de Naka peut lire la moyenne SC (publique) ; les
+  étoiles et les actions sont en racine fermée, et un clic non fiable n’écrit rien.
+- L’aperçu au survol par CSS existait déjà dans la rangée d’accueil et le bloc de pause (inchangé).
+- Une recherche fait perdre le focus au champ, et ce qui est tapé pendant la recherche est remplacé.
+- Une recherche qui finit après une relecture de la même fiche ajoute ses résultats à la nouvelle page (même
+  contenu, candidats seulement).
+- Un film sans carte dont la note SC échoue après la fin explicite (vu et retrait des envies déjà partis) perd son
+  « Annuler » : l’ancien enregistrement est remis (décision laissée au propriétaire, nuit du 2026-11-14, D9).
+- Après une annulation, une lecture perdue de la fiche affiche « SensCritique n’a pas pu être lu », « Réessayer » et
+  la ligne de l’annulation, qui reste.
+- À vérifier à la recette dans Brave : le rendu réel des lignes avec le CSS de Naka ; l’effet d’un clic
+  programmatique sur le bouton Ma liste ; les raccourcis clavier du lecteur pendant la frappe dans le champ.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
