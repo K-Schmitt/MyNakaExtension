@@ -59,6 +59,6 @@ export async function rateFilm(
   }
   return {
     ...leaving.answer,
-    panel: afterRating(kept.state, rating, kept.record !== undefined),
+    panel: afterRating(kept.state, rating, kept.record, deps.now()),
   };
 }
