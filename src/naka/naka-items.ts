@@ -1,7 +1,7 @@
 // Mapping of Naka catalogue entries and of the playlist id list. Both fail closed or drop what they cannot trust.
 
+import { isIsoDate } from "../core/iso-date";
 import { imageOf, type TitleImage } from "../core/title-image";
-import { isIsoDate } from "../ext/field-checks";
 import { NakaUnavailableError } from "./naka-errors";
 import { isPositiveId } from "./naka-input";
 import { isRecord } from "./naka-transport";
