@@ -3,6 +3,8 @@ import type {
   FicheLinkMessage,
   FicheSearchMessage,
 } from "../src/ext/fiche-messages";
+import { ficheSearchJob } from "../src/sw/fiche-search-job";
+import type { TabTurn } from "../src/sw/fiche-tab-turns";
 import { answerWorld, type WorldOpts } from "./answer-world";
 import {
   filmTitle,
@@ -249,6 +251,34 @@ describe("one fiche-search in flight per tab", () => {
     expect(newer.candidates.map((c) => c.id)).toEqual([12]);
     expect(await w.registry.has(TAB, 5, 11)).toBe(false);
     expect(await w.registry.has(TAB, 5, 12)).toBe(true);
+  });
+
+  it("a search superseded once its read was checked issues nothing", async () => {
+    let read = false;
+    let checks = 0;
+    const w = await pageWorld({
+      sc: {
+        search: async () => {
+          read = true;
+          return [solaris(11, 1972)];
+        },
+      },
+    });
+    // Live for its reads and the check of their answer; a newer search starts right after.
+    const turn: TabTurn = {
+      live: () => {
+        if (!read) return true;
+        checks += 1;
+        return checks === 1;
+      },
+      end: () => undefined,
+    };
+    const asker = { registry: w.registry, tabId: TAB };
+
+    const answer = await ficheSearchJob(w.jobDeps, asker, search(), turn);
+
+    expect(answer).toEqual({ candidates: [] });
+    expect(await w.registry.has(TAB, 5, 11)).toBe(false);
   });
 
   it("another tab's search is unaffected", async () => {
