@@ -262,6 +262,13 @@ describe("the title page panel", () => {
     expect(panelParts(t.kept)).toEqual([]);
     expect(t.kept.detached).toBe(1);
   });
+
+  it("draws the native controls dark: the reset of the host sets its color scheme back (the candidate list scrolls)", async () => {
+    const t = await film();
+    const css = t.kept.host?.style.cssText ?? "";
+    expect(css).toContain("all: initial !important");
+    expect(css).toContain("color-scheme: dark !important");
+  });
 });
 
 describe("the panel between two views", () => {
