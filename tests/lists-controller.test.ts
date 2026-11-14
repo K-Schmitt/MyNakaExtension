@@ -177,7 +177,7 @@ describe("a failed poll", () => {
     t.world.lists = { ...LISTS, lastAnswer: { ...MOOT, seq: 5 } };
     await t.controller.load();
     expect(t.last().note).toBe(
-      `Rien à retirer${NB}: ce titre n'y est déjà plus.`,
+      `Rien à retirer${NB}: ce titre n’y est déjà plus.`,
     );
   });
 });
@@ -320,7 +320,7 @@ describe("answers", () => {
       t.question(LEGACY.key).buttons[0]?.action as never,
     );
     expect(t.question(LEGACY.key).lines).toEqual([
-      `La réponse n'est pas partie${NB}: l'extension ne répond pas.`,
+      `La réponse n’est pas partie${NB}: l’extension ne répond pas.`,
     ]);
     expect(t.question(LEGACY.key).buttons).toHaveLength(1);
   });
@@ -536,14 +536,14 @@ describe("the search", () => {
     t.searches[0]?.resolve({ error: "naka-session" });
     await settle();
     expect(t.unlinked(KEY).search?.message).toBe(
-      `Recherche impossible${NB}: reconnectez-vous sur Naka.`,
+      `Recherche impossible${NB}: reconnecte-toi sur Naka.`,
     );
     void t.controller.act(KEY, { kind: "search" });
     await settle();
     t.searches[1]?.resolve({ nonsense: 1 });
     await settle();
     expect(t.unlinked(KEY).search?.message).toBe(
-      `Recherche impossible${NB}: le site ne répond pas, réessayez plus tard.`,
+      `Recherche impossible${NB}: le site ne répond pas, réessaie plus tard.`,
     );
     void t.controller.act(KEY, { kind: "search" });
     await settle();
