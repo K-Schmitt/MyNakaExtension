@@ -808,4 +808,102 @@ describe("leaving the page with a write on its way", () => {
     expect(t.ofType("fiche-rate")).toEqual([]);
     expect(t.last()?.pending).toBeUndefined();
   });
+
+  it("shows nothing of a link answered after the page was left, and asks no info", async () => {
+    const t = film();
+    t.controller.event(ficheEvent());
+    t.ofType("fiche-info")[0]?.answer({
+      state: "choose",
+      candidates: [{ id: 77, title: "Solaris", type: "film" }],
+    });
+    await settle();
+    t.controller.link(77);
+    t.controller.path("/");
+    const shown = t.views.length;
+    t.ofType("fiche-link")[0]?.answer({ ok: true });
+    await settle();
+    expect(t.views).toHaveLength(shown);
+    expect(t.ofType("fiche-info")).toHaveLength(1);
+  });
+});
+
+describe("the writes it refuses", () => {
+  const candidate = { id: 77, title: "Solaris", type: "film" as const };
+
+  async function answered(info: unknown) {
+    const t = film();
+    t.controller.event(ficheEvent());
+    t.ofType("fiche-info")[0]?.answer(info);
+    await settle();
+    return t;
+  }
+
+  it("keeps a rating on its way pending through an Annuler", async () => {
+    const t = await filmShown();
+    t.controller.rateTitle(8);
+    const shown = t.views.length;
+    t.controller.cancelSeries();
+    expect(t.views).toHaveLength(shown);
+    expect(t.last()?.pending).toBe("rating");
+    t.ofType("fiche-rate")[0]?.answer({ ok: true });
+    await settle();
+    expect(t.last()?.info?.product?.mine).toBe(8);
+  });
+
+  it("sends no second link while one is on its way", async () => {
+    const t = await answered({ state: "choose", candidates: [candidate] });
+    t.controller.link(77);
+    t.controller.link(77);
+    expect(t.ofType("fiche-link")).toHaveLength(1);
+    expect(t.last()?.pending).toBe("link");
+  });
+
+  it("links nothing from a choice that lists no candidates", async () => {
+    const t = await answered({ state: "choose" });
+    t.controller.link(77);
+    expect(t.ofType("fiche-link")).toEqual([]);
+  });
+
+  it("links nothing on a linked title, even one whose answer lists candidates", async () => {
+    const t = await answered({ ...linked(55), candidates: [candidate] });
+    t.controller.link(77);
+    expect(t.ofType("fiche-link")).toEqual([]);
+    expect(t.last()?.pending).toBeUndefined();
+  });
+});
+
+describe("a read and a rating of one episode", () => {
+  it("keeps the rating sent while the episode's read was on its way", async () => {
+    const t = await seasonShown(2, 3);
+    expect(minedIds(t.calls)).toEqual([103]);
+    t.controller.rateEpisode(3, 9);
+    t.ofType("fiche-rate")[0]?.answer({ ok: true });
+    await settle();
+    expect(t.last()?.episodes.get(3)?.mine).toBe(9);
+    t.ofType("fiche-mine")[0]?.answer({ mine: 4, average: 6.5 });
+    await settle();
+    expect(t.last()?.episodes.get(3)).toEqual({
+      productId: 103,
+      average: 7,
+      mine: 9,
+    });
+  });
+});
+
+describe("the info message", () => {
+  it("carries the fiche event's original title and year", () => {
+    const t = film();
+    t.controller.event(ficheEvent({ originalTitle: "Солярис", year: 1972 }));
+    expect(t.ofType("fiche-info").map((call) => call.msg)).toEqual([
+      {
+        type: "fiche-info",
+        contentId: 5,
+        tmdbId: 9005,
+        mediaType: "movie",
+        title: "Solaris",
+        originalTitle: "Солярис",
+        year: 1972,
+      },
+    ]);
+  });
 });
