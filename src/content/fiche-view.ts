@@ -2,6 +2,7 @@
 // their averages (and the owner's own rating once read), the write on its way and how the last one ended.
 
 import type { FicheInfo } from "../ext/fiche-answers";
+import type { RunStep } from "../ext/fiche-undo-answers";
 import type { JobError } from "../ext/job-error";
 
 export type FicheEpisode = {
@@ -19,9 +20,18 @@ export type FicheOutcome =
   /** The rating did not reach SensCritique (the budget, a session…). */
   | { kind: "not-sent"; error: JobError }
   /** The rating reached SensCritique; what came after it (the Ma liste removal) failed. */
-  | { kind: "sent-with-error"; error: JobError };
+  | { kind: "sent-with-error"; error: JobError }
+  /** « Annuler » or « Retirer la note » got no answer, or the worker could not run it. */
+  | { kind: "undo-failed"; action: UndoAction }
+  /** The worker refused it before any write. */
+  | { kind: "undo-refused"; reason: "protected" | "expired" | "unrated" }
+  /** « Annuler » stopped at this step: it and what came after were not put back. */
+  | { kind: "undo-partial"; failed: RunStep["kind"] };
 
-export type FichePending = "rating" | "confirm-series" | "link";
+/** The panel's two writes that take a rating back: « Annuler » and « Retirer la note ». */
+export type UndoAction = "undo" | "remove";
+
+export type FichePending = "rating" | "confirm-series" | "link" | UndoAction;
 
 export type FicheView = {
   mediaType: "movie" | "tv";

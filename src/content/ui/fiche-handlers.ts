@@ -6,7 +6,13 @@ import { type Star, starRater } from "./star-rater";
 
 export type FicheHandlers = Pick<
   FicheController,
-  "rateTitle" | "confirmSeries" | "cancelSeries" | "rateEpisode" | "link"
+  | "rateTitle"
+  | "confirmSeries"
+  | "cancelSeries"
+  | "rateEpisode"
+  | "link"
+  | "undo"
+  | "remove"
 >;
 
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
