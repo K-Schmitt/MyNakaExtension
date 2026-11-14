@@ -361,8 +361,7 @@ describe("the hover preview of the stars", () => {
       doc,
       stars,
       choose,
-      undefined,
-      preview,
+      preview === undefined ? {} : { preview },
     ) as FakeElement;
     const group = wrap.children[0] as FakeElement;
     const buttons = group.children as FakeElement[];

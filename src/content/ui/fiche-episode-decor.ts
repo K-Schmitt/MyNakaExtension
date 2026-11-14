@@ -79,6 +79,7 @@ export type DecorPorts = {
 
 function starsOf(
   { doc, seen }: DecorPorts,
+  slot: object,
   n: number,
   episode: FicheEpisode,
   handlers: FicheHandlers,
@@ -87,7 +88,8 @@ function starsOf(
   const name =
     episode.title === undefined ? undefined : episodeStarsName(episode.title);
   const onChoose = (value: number) => handlers.rateEpisode(n, value);
-  const stars = ficheStars(doc, episode.mine, onChoose, seen, name);
+  const watch = { watch: seen, slot };
+  const stars = ficheStars(doc, episode.mine, onChoose, watch, name);
   if (write.busy) stars.setAttribute("aria-busy", "true");
   if (write.line === undefined) return [stars];
   return [stars, textLine(doc, write.line, ERROR_CLASS)];
@@ -112,7 +114,7 @@ export function drawDecor(
       : [textLine(doc, frenchAverage(episode.average), BADGE_CLASS)]),
   );
   decor.stars.root.replaceChildren(
-    ...starsOf(ports, n, episode, handlers, write),
+    ...starsOf(ports, decor, n, episode, handlers, write),
   );
 }
 

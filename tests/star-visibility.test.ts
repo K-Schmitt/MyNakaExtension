@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   createSeenWatch,
+  MIN_VISIBLE_MS,
   type ObserverMaker,
   type VisibilityEntry,
 } from "../src/content/ui/star-visibility";
 
 type Target = { isConnected: boolean; name: string };
 
-function fakeObserver() {
+function world() {
   const observed: Target[] = [];
   const unobserved: Target[] = [];
   let deliver: (entries: VisibilityEntry[]) => void = () => {};
+  const clock = { now: 1000 };
   const make: ObserverMaker = (onEntries) => {
     deliver = onEntries;
     return {
@@ -22,89 +24,133 @@ function fakeObserver() {
       },
     };
   };
-  const entry = (target: Target, isVisible?: boolean): VisibilityEntry =>
-    isVisible === undefined ? { target } : { target, isVisible };
-  return {
-    make,
-    observed,
-    unobserved,
-    send: (...entries: VisibilityEntry[]) => deliver(entries),
-    entry,
+  const watch = createSeenWatch(make, () => clock.now);
+  const send = (target: Target, isVisible?: boolean) =>
+    deliver([isVisible === undefined ? { target } : { target, isVisible }]);
+  const later = (ms: number) => {
+    clock.now += ms;
   };
+  return { watch, observed, unobserved, send, later };
 }
 
 const target = (name: string): Target => ({ isConnected: true, name });
+const slot = () => ({});
 
-describe("createSeenWatch: a star row's last visibility", () => {
+describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
   it("observes the row it is given", () => {
-    const io = fakeObserver();
+    const w = world();
     const row = target("row");
-    createSeenWatch(io.make)(row as never);
-    expect(io.observed).toEqual([row]);
+    w.watch(row as never, slot());
+    expect(w.observed).toEqual([row]);
   });
 
-  it("lets the click count before any entry has come (owner's decision D11)", () => {
-    const io = fakeObserver();
-    const seen = createSeenWatch(io.make)(target("row") as never);
-    expect(seen()).toBe(true);
+  it("counts a click before any entry has come (owner's decision D11)", () => {
+    const w = world();
+    expect(w.watch(target("row") as never, slot())()).toBe(true);
   });
 
-  it("refuses the click while the last entry says hidden, and counts it again once visible", () => {
-    const io = fakeObserver();
+  it("refuses a click while the last entry says hidden", () => {
+    const w = world();
     const row = target("row");
-    const seen = createSeenWatch(io.make)(row as never);
-    io.send(io.entry(row, false));
-    expect(seen()).toBe(false);
-    io.send(io.entry(row, true));
-    expect(seen()).toBe(true);
+    const counts = w.watch(row as never, slot());
+    w.send(row, false);
+    w.later(5000);
+    expect(counts()).toBe(false);
   });
 
-  it("keeps the last of several entries in one batch", () => {
-    const io = fakeObserver();
+  it(`counts a click only once the row has been visible for ${MIN_VISIBLE_MS} ms without a break (owner, 2026-11-14)`, () => {
+    const w = world();
     const row = target("row");
-    const seen = createSeenWatch(io.make)(row as never);
-    io.send(io.entry(row, true), io.entry(row, false));
-    expect(seen()).toBe(false);
+    const counts = w.watch(row as never, slot());
+    w.send(row, false);
+    w.send(row, true);
+    w.later(MIN_VISIBLE_MS - 1);
+    expect(counts()).toBe(false);
+    w.later(1);
+    expect(counts()).toBe(true);
+  });
+
+  it("does not restart the wait on a second visible entry", () => {
+    const w = world();
+    const row = target("row");
+    const counts = w.watch(row as never, slot());
+    w.send(row, true);
+    w.later(MIN_VISIBLE_MS - 10);
+    w.send(row, true);
+    w.later(10);
+    expect(counts()).toBe(true);
+  });
+
+  it("restarts the wait after a hidden entry: a flash between two hidden spells never counts", () => {
+    const w = world();
+    const row = target("row");
+    const counts = w.watch(row as never, slot());
+    w.send(row, true);
+    w.later(MIN_VISIBLE_MS);
+    w.send(row, false);
+    w.send(row, true);
+    w.later(50);
+    expect(counts()).toBe(false);
   });
 
   it("reads each row on its own", () => {
-    const io = fakeObserver();
-    const watch = createSeenWatch(io.make);
+    const w = world();
     const hidden = target("hidden");
     const shown = target("shown");
-    const seenHidden = watch(hidden as never);
-    const seenShown = watch(shown as never);
-    io.send(io.entry(hidden, false), io.entry(shown, true));
-    expect(seenHidden()).toBe(false);
-    expect(seenShown()).toBe(true);
+    const countsHidden = w.watch(hidden as never, slot());
+    const countsShown = w.watch(shown as never, slot());
+    w.send(hidden, false);
+    w.send(shown, true);
+    w.later(MIN_VISIBLE_MS);
+    expect(countsHidden()).toBe(false);
+    expect(countsShown()).toBe(true);
   });
 
-  it("ignores an entry without isVisible (an observer without v2): the click counts", () => {
-    const io = fakeObserver();
+  it("ignores an entry without isVisible (an observer without v2)", () => {
+    const w = world();
     const row = target("row");
-    const seen = createSeenWatch(io.make)(row as never);
-    io.send(io.entry(row, false), io.entry(row));
-    expect(seen()).toBe(false);
+    const counts = w.watch(row as never, slot());
+    w.send(row, false);
+    w.send(row);
+    expect(counts()).toBe(false);
     const other = target("other");
-    const seenOther = createSeenWatch(io.make)(other as never);
-    io.send(io.entry(other));
-    expect(seenOther()).toBe(true);
+    const countsOther = w.watch(other as never, slot());
+    w.send(other);
+    expect(countsOther()).toBe(true);
   });
 
-  it("lets every click count when the browser has no observer", () => {
-    const seen = createSeenWatch(() => undefined)(target("row") as never);
-    expect(seen()).toBe(true);
+  it("counts every click when the browser has no observer", () => {
+    const watch = createSeenWatch(
+      () => undefined,
+      () => 0,
+    );
+    expect(watch(target("row") as never, slot())()).toBe(true);
   });
 
-  it("stops observing a row once it has left the document, and only then", () => {
-    const io = fakeObserver();
-    const watch = createSeenWatch(io.make);
-    const kept = target("kept");
-    const gone = target("gone");
-    watch(kept as never);
-    watch(gone as never);
-    gone.isConnected = false;
-    io.send(io.entry(kept, true), io.entry(gone, false));
-    expect(io.unobserved).toEqual([gone]);
+  it("keeps watching a row taken off the page, so it counts again once put back and seen", () => {
+    const w = world();
+    const row = target("row");
+    row.isConnected = false;
+    const counts = w.watch(row as never, slot());
+    w.send(row, false); // the observer's first entry, the row not placed yet
+    row.isConnected = true;
+    w.send(row, true);
+    w.later(MIN_VISIBLE_MS);
+    expect(counts()).toBe(true);
+    expect(w.unobserved).toEqual([]);
+  });
+
+  it("stops watching a slot's old row once a new row takes its place, and only then", () => {
+    const w = world();
+    const place = slot();
+    const old = target("old");
+    const fresh = target("fresh");
+    w.watch(old as never, place);
+    w.watch(old as never, place);
+    expect(w.unobserved).toEqual([]);
+    w.watch(fresh as never, place);
+    expect(w.unobserved).toEqual([old]);
+    w.watch(target("elsewhere") as never, slot());
+    expect(w.unobserved).toEqual([old]);
   });
 });

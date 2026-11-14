@@ -30,6 +30,7 @@ import {
   starsOf,
   texts,
 } from "./fiche-ui-world";
+import type { FakeElement } from "./ui-fakes";
 
 const episodes = (...list: [number, number | null][]) => ({
   episodes: list.map(([episode, average]) => ({
@@ -405,6 +406,21 @@ describe("an episode rating on its box", () => {
     t.stars.hidden = false;
     starOf(three, 6)?.click(true);
     expect(t.ofType("fiche-rate")).toHaveLength(1);
+  });
+
+  it("refuses only the hidden box's stars: another box's click still rates (D7)", async () => {
+    const { t, three, four } = await twoBoxes();
+    const groupOfThree = t.stars.rows.find((row) =>
+      row.children.includes(starOf(three, 6) as FakeElement),
+    );
+    expect(groupOfThree?.attributes.role).toBe("radiogroup");
+    t.stars.hiddenRows.add(groupOfThree);
+    starOf(three, 6)?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    starOf(four, 7)?.click(true);
+    expect(t.ofType("fiche-rate").map((c) => c.msg)).toMatchObject([
+      { rating: 7 },
+    ]);
   });
 
   it("dims the box's stars and marks them busy while it is sent; a second click sends nothing", async () => {

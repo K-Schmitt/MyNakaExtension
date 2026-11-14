@@ -645,9 +645,11 @@ describe("the actions between two views", () => {
 });
 
 describe("a title star click and the star's visibility (D7)", () => {
-  it("watches the info row's stars", async () => {
+  it("watches the info row's group of stars, the one holding the clicked star", async () => {
     const t = await film();
-    expect(t.stars.watched).toBeGreaterThan(0);
+    const watched = t.stars.rows.at(-1);
+    expect(watched?.attributes.role).toBe("radiogroup");
+    expect(watched?.children).toContain(star(t.parts(), 8));
   });
 
   it("sends nothing for a trusted click while the stars are reported hidden, and rates once they are visible", async () => {
