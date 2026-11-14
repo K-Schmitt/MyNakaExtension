@@ -39,14 +39,16 @@ export type ProtectedFlags = { isReviewed: boolean; isRecommended: boolean };
 
 export const UNDO_WINDOW_MS = 600_000;
 
-/** The record, while it is under ten minutes old and names this title. */
+/** The record, while it is under ten minutes old and names this title. A record from the future (the
+ * clock set back) fails closed: it is never live. */
 export function liveUndo(
   record: FicheUndo | null,
   contentId: number,
   now: number,
 ): FicheUndo | undefined {
   if (record === null || record.contentId !== contentId) return undefined;
-  return now - record.at < UNDO_WINDOW_MS ? record : undefined;
+  const age = now - record.at;
+  return age >= 0 && age < UNDO_WINDOW_MS ? record : undefined;
 }
 
 function isProtected(current: ProtectedFlags): boolean {

@@ -51,6 +51,15 @@ describe("liveUndo", () => {
     expect(liveUndo(record(), 8, AT + 1)).toBeUndefined();
   });
 
+  it("gives the record at the very millisecond it was made", () => {
+    const r = record();
+    expect(liveUndo(r, 7, AT)).toBe(r);
+  });
+
+  it("gives nothing for a record from the future (clock set back)", () => {
+    expect(liveUndo(record(), 7, AT - 1)).toBeUndefined();
+  });
+
   it("gives nothing without a record", () => {
     expect(liveUndo(null, 7, AT + 1)).toBeUndefined();
   });
