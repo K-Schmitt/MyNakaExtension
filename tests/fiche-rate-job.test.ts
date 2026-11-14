@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { UNDO_WINDOW_MS } from "../src/core/fiche-undo";
 import { emptyState, type SyncState } from "../src/core/state";
 import type { FicheRateMessage } from "../src/ext/fiche-messages";
 import type { Settings } from "../src/ext/settings";
 import { ScUnavailableError } from "../src/sc/sc-errors";
 import { createJobQueue } from "../src/sw/job-queue";
+import { answerRemovalOffer } from "../src/sw/question-answers";
 import { createRouter } from "../src/sw/router";
 import { answerWorld, BOUND, NOW, type WorldOpts } from "./answer-world";
 import {
@@ -24,6 +26,16 @@ const rate = (over: Partial<FicheRateMessage> = {}): FicheRateMessage => ({
   ...over,
 });
 const LIVE: Settings = { mode: "live", binding: BOUND };
+// A rating that went out, of a title the world's SensCritique says is unrated and unreviewed, with no page.
+const RATED = {
+  ok: true,
+  panel: {
+    canUndo: true,
+    undoLeftMs: UNDO_WINDOW_MS,
+    canRemove: true,
+    protected: false,
+  },
+};
 const SIMULATION: Settings = { mode: "simulation", binding: BOUND };
 
 // Content 5 is a film on Naka (the world's default item), in « Ma liste » with 99.
@@ -44,7 +56,7 @@ describe("fiche-rate: a film", () => {
   it("linked: one rate, one finish (one slot), then removed from « Ma liste » in live mode", async () => {
     const w = filmWorld();
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
     expect(w.settings().finishWindow?.count).toBe(1);
@@ -62,7 +74,7 @@ describe("fiche-rate: a film", () => {
   it("in simulation: the same rate and finish, and « Ma liste » neither read nor written", async () => {
     const w = filmWorld({ settings: SIMULATION });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toHaveLength(1);
     expect(w.nk.calls).not.toContain("playlistIds");
@@ -72,7 +84,7 @@ describe("fiche-rate: a film", () => {
   it("not in « Ma liste »: rated, and no removal", async () => {
     const w = filmWorld({ playlist: () => [99] });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
   });
 
@@ -86,6 +98,7 @@ describe("fiche-rate: a film", () => {
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
       error: "unavailable",
+      panel: RATED.panel,
     });
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
@@ -94,7 +107,7 @@ describe("fiche-rate: a film", () => {
   it("unlinked: the mapping is written first, then the same path", async () => {
     const w = filmWorld({ state: emptyState() });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
@@ -124,7 +137,7 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().unlinked).toEqual([]);
   });
@@ -144,7 +157,7 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().pending).toEqual([]);
   });
@@ -178,8 +191,10 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
+    // No card: the finish wrote first, so the answer offers « Annuler » (D9, R2).
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       error: "unavailable",
+      panel: expect.objectContaining({ canUndo: true }),
     });
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
     expect(w.cards()[0]?.failed).toMatchObject({ error: "unavailable" });
@@ -208,6 +223,58 @@ describe("fiche-rate: a film", () => {
 const seriesRate = (over: Partial<FicheRateMessage> = {}) =>
   rate({ target: "série", productId: 13, ...over });
 
+describe("fiche-rate: a film whose « Ma liste » button is on screen", () => {
+  const byTab = rate({ inMaListe: true, listByTab: true });
+  // Listed on both sides at run 4: without its settled pair, Naka's removal would offer one on SC.
+  const listedOnBoth: SyncState = {
+    ...linkedTo(2005),
+    run: 4,
+    presence: {
+      naka: [{ id: 5, from: 1, to: 4 }],
+      sc: [{ id: 2005, from: 1, to: 4 }],
+    },
+  };
+
+  it("live: answered « Ma liste » left to the tab, and the client neither reads nor writes it", async () => {
+    const w = filmWorld();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, byTab)).toEqual({
+      ...RATED,
+      maListe: "tab",
+    });
+    expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
+    expect(w.nk.calls).not.toContain("playlistIds");
+    expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
+  });
+
+  it("in simulation: no « Ma liste » left to the tab, and no client call", async () => {
+    const w = filmWorld({ settings: SIMULATION });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, byTab)).toEqual(RATED);
+    expect(w.nk.calls).not.toContain("playlistIds");
+    expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
+  });
+
+  it("listByTab false: today's client removal", async () => {
+    const w = filmWorld();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate({ listByTab: false }))).toEqual(
+      RATED,
+    );
+    expect(w.nk.calls).toContain("removeFromPlaylist:5");
+  });
+
+  it("no removal offer for the film just rated once Naka's click removes it", async () => {
+    const w = filmWorld({ state: listedOnBoth });
+    const offer = () => answerRemovalOffer(w.jobDeps.store, 5, []);
+    expect((await offer()).offer).not.toBeNull();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    await w.jobs.ficheRate(TAB, byTab);
+    expect(w.state().settled).toContainEqual({ nakaId: 5, scId: 2005 });
+    expect((await offer()).offer).toBeNull();
+  });
+});
+
 describe("fiche-rate: a series", () => {
   const cards = () => [
     episodeCard(),
@@ -219,7 +286,7 @@ describe("fiche-rate: a series", () => {
     const w = filmWorld({ state: linkedTo(13) });
     w.area.data.set("ratings", cards());
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(w.writes()).toEqual(["rate:13:8"]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
     expect(w.settings().finishWindow).toBeUndefined();
@@ -248,7 +315,7 @@ describe("fiche-rate: a series", () => {
   it("unlinked: linked first, then rated and settled", async () => {
     const w = filmWorld({ state: emptyState() });
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
   });
@@ -314,7 +381,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
   it("a series whose open question holds an episode finish: rated, settled, then that episode finished once", async () => {
     const w = seriesWorld(question("tv:5:S1E2"));
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:13:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
     expect(w.sk.calls.indexOf("rate:13:8")).toBeLessThan(
@@ -331,7 +398,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
   it("a series whose question holds no finish: rated and settled, no finish", async () => {
     const w = seriesWorld(question());
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(markDones(w.sk.calls)).toEqual([]);
     expect(w.settings().finishWindow).toBeUndefined();
   });
@@ -389,7 +456,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
     expect(w.settings().finishWindow?.count).toBe(1);
   });
@@ -597,7 +664,7 @@ describe("fiche-rate: the route", () => {
     const answer = new Promise((resolve) => {
       expect(router.handle(rate(), sender, resolve)).toBe(true);
     });
-    expect(await answer).toEqual({ ok: true });
+    expect(await answer).toEqual(RATED);
   });
 
   it("a product not issued: answered undefined", async () => {

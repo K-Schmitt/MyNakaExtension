@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import type { FicheUndo } from "../src/core/fiche-undo";
 import { MAX_CANDIDATES } from "../src/core/questions";
 import { UNIVERSE } from "../src/sc/sc-queries";
-import { answerWorld, type WorldOpts } from "./answer-world";
+import { answerWorld, NOW, type WorldOpts } from "./answer-world";
 import {
   filmTitle,
   info,
@@ -16,6 +17,8 @@ import {
 import { seriesItem } from "./sw-fakes";
 
 const LABEL = { title: "Solaris", year: 1972 };
+// Rated 7 with nothing to lose, no undo record, no page.
+const FLAGS = { canUndo: false, canRemove: true, protected: false };
 const rated = (universe: number = UNIVERSE.film) => ({
   product: () => ({ rating: 7, average: 6.9, universe, label: LABEL }),
 });
@@ -29,7 +32,7 @@ describe("fiche-info", () => {
     const answer = await w.jobs.ficheInfo(TAB, info());
     expect(answer).toEqual({
       state: "linked",
-      product: { id: 2005, average: 6.9, mine: 7, label: LABEL },
+      product: { id: 2005, average: 6.9, mine: 7, label: LABEL, ...FLAGS },
     });
     expect(w.nk.calls).toEqual(["contentById:5"]);
     expect(w.sk.calls).toEqual(["productState:2005"]);
@@ -87,7 +90,7 @@ describe("fiche-info", () => {
     const answer = await w.jobs.ficheInfo(TAB, info());
     expect(answer).toEqual({
       state: "matched",
-      product: { id: 11, average: 6.9, mine: 7, label: LABEL },
+      product: { id: 11, average: 6.9, mine: 7, label: LABEL, ...FLAGS },
     });
     expect(w.sk.calls).toEqual(["search:movie:Solaris", "productState:11"]);
     expect(w.limited).toEqual(["limit:naka", "limit:sc", "limit:sc"]);
@@ -330,5 +333,114 @@ describe("one fiche-info in flight per tab", () => {
       state: "matched",
     });
     expect(searches(w.sk.calls)).toHaveLength(2);
+  });
+});
+
+describe("fiche-info: the panel's flags", () => {
+  const URL = "https://www.senscritique.com/film/solaris/2005";
+  const undo = (over: Partial<FicheUndo> = {}): FicheUndo => ({
+    contentId: 5,
+    productId: 2005,
+    role: "film",
+    at: NOW - 60_000,
+    before: {
+      rating: null,
+      isDone: false,
+      dateDone: null,
+      isWished: false,
+      inMaListe: null,
+    },
+    local: { handled: false, settled: false, cards: [] },
+    ...over,
+  });
+  const flagsOf = async (w: ReturnType<typeof world>) => {
+    const product = (await w.jobs.ficheInfo(TAB, info())).product;
+    return {
+      canUndo: product?.canUndo,
+      canRemove: product?.canRemove,
+      protected: product?.protected,
+      url: product?.url,
+    };
+  };
+
+  it("a live record of this title and product: undo offered, with the product's page", async () => {
+    const w = world({
+      state: linkedTo(2005),
+      product: () => ({ rating: 7, universe: 1, label: LABEL, url: URL }),
+    });
+    w.area.data.set("ficheUndo", undo());
+    expect(await flagsOf(w)).toEqual({
+      canUndo: true,
+      canRemove: true,
+      protected: false,
+      url: URL,
+    });
+  });
+
+  it.each([
+    ["of another title", undo({ contentId: 9 })],
+    ["of another product of this title", undo({ productId: 2006 })],
+    ["ten minutes old", undo({ at: NOW - 600_000 })],
+    ["from the future", undo({ at: NOW + 1 })],
+  ])("a record %s: no undo", async (_n, record) => {
+    const w = world({ state: linkedTo(2005) });
+    w.area.data.set("ficheUndo", record);
+    expect((await flagsOf(w)).canUndo).toBe(false);
+  });
+
+  it("says how long the live record still undoes the product", async () => {
+    const w = world({ state: linkedTo(2005) });
+    w.area.data.set("ficheUndo", undo());
+    const product = (await w.jobs.ficheInfo(TAB, info())).product;
+    expect(product?.undoLeftMs).toBe(540_000);
+  });
+
+  it("gives no time once the record has timed out", async () => {
+    const w = world({ state: linkedTo(2005) });
+    w.area.data.set("ficheUndo", undo({ at: NOW - 600_000 }));
+    const product = (await w.jobs.ficheInfo(TAB, info())).product;
+    expect(product?.undoLeftMs).toBeUndefined();
+  });
+
+  it("no record, no page: no undo, no link", async () => {
+    const w = world({ state: linkedTo(2005) });
+    expect(await flagsOf(w)).toEqual({
+      canUndo: false,
+      canRemove: true,
+      protected: false,
+      url: undefined,
+    });
+  });
+
+  it.each([
+    ["no rating", { rating: null }, false],
+    ["a critique", { isReviewed: true }, false],
+    ["a recommendation", { isRecommended: true }, false],
+    ["a rating and nothing to lose", {}, true],
+  ])("removal with %s: %s", async (_n, over, removable) => {
+    const w = world({
+      state: linkedTo(2005),
+      product: () => ({ rating: 7, universe: 1, label: LABEL, ...over }),
+    });
+    expect((await flagsOf(w)).canRemove).toBe(removable);
+  });
+
+  it.each([
+    ["a critique", { isReviewed: true }, true],
+    ["a recommendation", { isRecommended: true }, true],
+    ["neither", {}, false],
+    ["no rating and neither", { rating: null }, false],
+    ["no rating and a critique", { rating: null, isReviewed: true }, false],
+    [
+      "no rating and a recommendation",
+      { rating: null, isRecommended: true },
+      false,
+    ],
+  ])("protected with %s: %s", async (_n, over, kept) => {
+    const w = world({
+      state: linkedTo(2005),
+      product: () => ({ rating: 7, universe: 1, label: LABEL, ...over }),
+    });
+    expect((await flagsOf(w)).protected).toBe(kept);
   });
 });

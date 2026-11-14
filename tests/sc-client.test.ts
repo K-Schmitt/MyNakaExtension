@@ -181,6 +181,13 @@ describe("writes", () => {
     });
   });
 
+  it("markDoneWithoutDate sends exactly one ProductDone", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.markDoneWithoutDate(5);
+    expect(calls.map(operationOf)).toEqual(["ProductDone"]);
+    expect(variablesOf(calls[0] as Call)).toEqual({ productId: 5 });
+  });
+
   it("unmarkDone sends ProductUndone only", async () => {
     const { client, calls } = setup(LOGGED_IN);
     await client.unmarkDone(5);
@@ -1374,6 +1381,10 @@ describe("productState", () => {
         universe,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       });
     },
   );
@@ -1397,13 +1408,21 @@ describe("productState", () => {
       universe: 1,
       rating: 6,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     });
     expect(Object.keys(state).sort()).toEqual([
       "average",
+      "dateDone",
       "isDone",
+      "isRecommended",
+      "isReviewed",
       "isWished",
       "rating",
       "universe",
+      "url",
     ]);
     expect(JSON.stringify(state)).not.toContain("LEAK");
     expect(JSON.stringify(state)).not.toContain(TOKEN);
@@ -1554,6 +1573,10 @@ describe("productState", () => {
           universe: 1,
           rating: 6,
           average: null,
+          dateDone: null,
+          isReviewed: false,
+          isRecommended: false,
+          url: undefined,
         });
       },
     );
@@ -2023,6 +2046,10 @@ describe("productState: the label for the preview", () => {
         universe: 1,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       });
     }
   });

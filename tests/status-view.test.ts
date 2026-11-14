@@ -21,15 +21,15 @@ const COUNTS = { pendingRemovals: 0, openQuestions: 2, unlinked: 1 };
 const ZERO = { pendingRemovals: 0, openQuestions: 0, unlinked: 0 };
 
 const LABELS: Record<JobError, string> = {
-  "no-naka-tab": "Ouvrez ou rechargez un onglet Naka",
-  "sc-session": "Reconnectez-vous sur SensCritique",
-  "naka-session": "Reconnectez-vous sur Naka",
+  "no-naka-tab": "Ouvre ou recharge un onglet Naka",
+  "sc-session": "Reconnecte-toi sur SensCritique",
+  "naka-session": "Reconnecte-toi sur Naka",
   "other-account": "Compte différent de celui enregistré",
   "stored-state": "État enregistré illisible",
   unavailable: "Site indisponible, nouvel essai au prochain passage",
-  "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessayez plus tard`,
-  "naka-list-empty": `Ma liste Naka lue vide${NB}: rien n'a été retiré`,
-  "naka-tab-changed": `L'onglet Naka a changé de page ou a été rechargé${NB}: la suite au prochain passage`,
+  "finish-limit": `Trop de fins de visionnage en une heure${NB}: réessaie plus tard`,
+  "naka-list-empty": `Ma liste Naka lue vide${NB}: rien n’a été retiré`,
+  "naka-tab-changed": `L’onglet Naka a changé de page ou a été rechargé${NB}: la suite au prochain passage`,
   "naka-content-unknown": "Contenu inconnu de Naka ou d\u2019un autre type",
 };
 const CODES = Object.keys(LABELS) as JobError[];
@@ -69,7 +69,7 @@ describe("toStatusView: mode", () => {
   it("says what simulation leaves alone and what it still writes, and offers live", () => {
     const view = ready({ mode: "simulation", counts: COUNTS });
     expect(view.headline).toBe(
-      `Simulation${NB}: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
     );
     expect(view.mode).toBe("simulation");
     expect(view.switchLabel).toBe("Activer les écritures");
@@ -86,7 +86,7 @@ describe("toStatusView: mode", () => {
     expect(view.mode).toBeUndefined();
     expect(view.switchLabel).toBeUndefined();
     expect(view.lines).toContain(
-      `Lecture de l'état impossible${NB}: État enregistré illisible`,
+      `Lecture de l’état impossible${NB}: État enregistré illisible`,
     );
   });
 });
@@ -120,7 +120,7 @@ describe("toStatusView: error labels", () => {
   it.each(CODES)("maps %s on a snapshot error", (code) => {
     const view = ready({ mode: "live", error: code });
     expect(view.lines).toContain(
-      `Lecture de l'état impossible${NB}: ${LABELS[code]}`,
+      `Lecture de l’état impossible${NB}: ${LABELS[code]}`,
     );
   });
 
@@ -130,7 +130,7 @@ describe("toStatusView: error labels", () => {
       lastRun: run({ error: "sc-session" }),
     });
     expect(view.lines).toContain(
-      `Terminée, mais arrêtée en cours${NB}: Reconnectez-vous sur SensCritique`,
+      `Terminée, mais arrêtée en cours${NB}: Reconnecte-toi sur SensCritique`,
     );
   });
 
@@ -484,26 +484,26 @@ describe("the confirmation before going live", () => {
 
   it("with a preview: the cap, and that the page shows the writes before each pass", () => {
     expect(confirmText(3)).toBe(
-      `${ASK} ${NEXT} reprendra les 3 titres de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+      `${ASK} ${NEXT} reprendra les 3 titres de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
   // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
-  it("with one title in the preview: le titre de l'aperçu", () => {
+  it("with one title in the preview: le titre de l’aperçu", () => {
     expect(confirmText(1)).toBe(
-      `${ASK} ${NEXT} reprendra le titre de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+      `${ASK} ${NEXT} reprendra le titre de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
     );
   });
 
-  it("with two titles: les 2 titres de l'aperçu", () => {
+  it("with two titles: les 2 titres de l’aperçu", () => {
     expect(confirmText(2)).toContain(
-      "reprendra les 2 titres de l'aperçu, puis les suivants",
+      "reprendra les 2 titres de l’aperçu, puis les suivants",
     );
   });
 
   it("without a preview: the cap, and where the page shows the writes", () => {
     expect(confirmText(0)).toBe(
-      `${ASK} La page de l'extension montre les écritures prévues au prochain passage.`,
+      `${ASK} La page de l’extension montre les écritures prévues au prochain passage.`,
     );
   });
 });
@@ -546,7 +546,7 @@ describe("toStatusView: what runs now", () => {
 describe("toStatusView: an untrusted answer", () => {
   const NO_ENGINE = {
     kind: "no-engine",
-    message: "Le moteur ne répond pas, rouvrez cette page",
+    message: "Le moteur ne répond pas, rouvre cette page",
   };
 
   it.each([

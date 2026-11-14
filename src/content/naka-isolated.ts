@@ -22,6 +22,7 @@ import { fichePagePorts } from "./ui/fiche-page-ports";
 import { createFicheUi } from "./ui/fiche-ui";
 import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
+import { maListePorts } from "./ui/ma-liste-button";
 import { createWorkerPort } from "./ui/worker-port";
 import { readVideo } from "./video-sample";
 
@@ -69,9 +70,11 @@ const ficheUi = createFicheUi(fichePagePorts(document, pageTimer));
 const fiche = createFicheController({
   ...createFicheWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
   ...gridPorts(document, () => window.innerHeight),
+  ...maListePorts(document),
   // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
   announceVisit: (path) => window.postMessage(visitMessage(path), NAKA_ORIGIN),
+  timer: pageTimer,
 });
 
 listenToPauses(document, {

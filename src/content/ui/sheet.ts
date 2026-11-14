@@ -22,6 +22,9 @@ function withStyleNode(root: ShadowRootLike, style: NodeLike): ShadowRootLike {
   return {
     appendChild: (child) => root.appendChild(child),
     replaceChildren: (...nodes) => root.replaceChildren(style, ...nodes),
+    get activeElement() {
+      return root.activeElement;
+    },
   };
 }
 

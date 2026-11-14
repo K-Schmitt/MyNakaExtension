@@ -175,6 +175,10 @@ async function simulate(seed: number): Promise<string[]> {
         universe: universeOf(id),
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       };
     },
     unwish: async (id) => {
