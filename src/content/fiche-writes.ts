@@ -15,6 +15,7 @@ import {
   contentOf,
   type EpisodePlace,
   type FicheScope,
+  forgetEnding,
   storeEpisodes,
   withMine,
 } from "./fiche-page";
@@ -51,7 +52,7 @@ async function sendRate(
 ): Promise<RateAnswer | undefined> {
   const { page } = scope;
   page.pending = "rating";
-  page.outcome = undefined;
+  forgetEnding(page);
   page.ratedEpisode = place;
   scope.show();
   const answer = await scope.ports.rate(msg);
@@ -159,7 +160,7 @@ export async function link(scope: FicheScope, productId: number) {
   if (page.pending !== undefined || contentId === undefined) return;
   if (!offered(scope, productId)) return;
   page.pending = "link";
-  page.outcome = undefined;
+  forgetEnding(page);
   page.ratedEpisode = undefined;
   scope.show();
   const answer = await scope.ports.link({

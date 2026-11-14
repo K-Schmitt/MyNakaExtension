@@ -4,7 +4,12 @@
 // on one links it, as step 7's choice does. An answer that comes once the visit is over changes nothing.
 
 import { isSearchQuery } from "../ext/fiche-messages";
-import { contentOf, type FichePage, type FicheScope } from "./fiche-page";
+import {
+  contentOf,
+  type FichePage,
+  type FicheScope,
+  forgetEnding,
+} from "./fiche-page";
 
 function canSearch(page: FichePage, query: string): boolean {
   if (page.info?.state !== "notfound" || page.pending !== undefined) {
@@ -23,7 +28,7 @@ export async function searchTitle(
   const contentId = contentOf(page);
   if (contentId === undefined || !canSearch(page, query)) return;
   page.search = { query, state: "searching" };
-  page.outcome = undefined;
+  forgetEnding(page);
   scope.show();
   const msg = { type: "fiche-search", contentId, query } as const;
   const answer = await scope.ports.search(msg);
