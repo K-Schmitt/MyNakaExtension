@@ -94,7 +94,7 @@ describe("the questions of the home row", () => {
     const w = await arrived([], questionsOf(REMOVAL));
     const view = w.questionViewOf(REMOVAL.key);
     expect(view?.heading).toBe(
-      `«${NB}Un Job Mortel${NB}» a quitté vos envies SensCritique.`,
+      `«${NB}Un Job Mortel${NB}» a quitté tes envies SensCritique.`,
     );
     expect(view?.question).toBe(`Retirer aussi de Ma liste Naka${NB}?`);
     expect(view?.choices.map((c) => c.label)).toEqual([

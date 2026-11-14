@@ -11,6 +11,7 @@ import type {
   FicheEpisode,
   FicheOutcome,
   FichePending,
+  FicheSearch,
   FicheView,
 } from "./fiche-view";
 
@@ -21,7 +22,13 @@ export type FichePage = {
   readonly title: TitlePath;
   infoMessage?: FicheInfoMessage;
   info?: FicheInfo;
+  /** The last read of the info was lost: its line and « Réessayer », whatever the last write's outcome. */
+  infoFailed?: true;
+  /** The token of the info's read on its way, if one is: an older read's end leaves a newer one's. */
+  infoReading?: object;
   outcome?: FicheOutcome;
+  /** Naka's « Ma liste » the tab had to click left the screen first (D14): its line, until the next write. */
+  maListeMissed?: true;
   pending?: FichePending;
   /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */
   ratedEpisode?: EpisodePlace;
@@ -40,6 +47,9 @@ export type FichePage = {
   episodes: Episodes;
   /** The seasons read during the visit. */
   readonly read: Map<number, Episodes>;
+  search?: FicheSearch;
+  /** The timer that stops offering « Annuler » when its record times out; its token names the live one. */
+  undoExpiry?: { token: object; handle: unknown };
 };
 
 export type FicheScope = {
@@ -60,17 +70,32 @@ export function viewOf(page: FichePage): FicheView {
     episodes: new Map(page.episodes),
   };
   if (page.info !== undefined) view.info = page.info;
+  if (page.infoFailed === true) view.infoFailed = true;
   if (page.season !== undefined) view.season = page.season;
   if (page.pending !== undefined) view.pending = page.pending;
   if (page.outcome !== undefined) view.outcome = page.outcome;
+  if (page.maListeMissed === true) view.maListeMissed = true;
   if (page.season !== undefined && page.failedSeason === page.season) {
     view.seasonFailed = true;
   }
+  if (page.search !== undefined) view.search = page.search;
+  const fieldText = page.search?.query ?? nakaTitle(page.infoMessage);
+  if (fieldText !== undefined) view.fieldText = fieldText;
   const rated = page.ratedEpisode;
   if (rated !== undefined && rated.season === page.season) {
     view.ratedEpisode = rated.episode;
   }
   return view;
+}
+
+function nakaTitle(msg: FicheInfoMessage | undefined): string | undefined {
+  return msg?.title ?? msg?.originalTitle;
+}
+
+/** A new write or search starts: the last one's ending lines go. */
+export function forgetEnding(page: FichePage): void {
+  page.outcome = undefined;
+  page.maListeMissed = undefined;
 }
 
 export function contentOf(page: FichePage): number | undefined {

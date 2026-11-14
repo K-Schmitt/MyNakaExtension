@@ -7,6 +7,7 @@ import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
 import type {
   FicheInfo,
+  FicheSearchAnswer,
   LinkAnswer,
   MineAnswer,
   RateAnswer,
@@ -17,8 +18,12 @@ import type {
   FicheLinkMessage,
   FicheMineMessage,
   FicheRateMessage,
+  FicheRemoveMessage,
+  FicheSearchMessage,
   FicheSeasonMessage,
+  FicheUndoMessage,
 } from "../ext/fiche-messages";
+import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import type {
   CancelRetryMessage,
   ForgetHandledMessage,
@@ -45,8 +50,12 @@ import { ficheLinkJob } from "./fiche-link-job";
 import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
+import { ficheRemoveJob } from "./fiche-remove-job";
+import { ficheSearchJob } from "./fiche-search-job";
 import { ficheSeasonJob } from "./fiche-season-job";
 import { createTabTurns } from "./fiche-tab-turns";
+import { forgettingUndo, forgetUndoOf } from "./fiche-undo-forget";
+import { ficheUndoJob } from "./fiche-undo-job";
 import { finishJob } from "./finish-job";
 import { forgetFromTabJob, forgetHandledJob } from "./forget-handled-job";
 import {
@@ -131,11 +140,17 @@ export type Jobs = {
   ficheSeason(tabId: number, msg: FicheSeasonMessage): Promise<SeasonAnswer>;
   /** Rejects, with no request, for a product not issued to that tab for that content. */
   ficheMine(tabId: number, msg: FicheMineMessage): Promise<MineAnswer>;
+  /** « Chercher »: rejects, with no request, for a content the tab's page does not show. */
+  ficheSearch(
+    tabId: number,
+    msg: FicheSearchMessage,
+  ): Promise<FicheSearchAnswer>;
   /** The title page's writes, queued: they reject, with no request, for a product not issued to that tab. */
   ficheRate(tabId: number, msg: FicheRateMessage): Promise<RateAnswer>;
   ficheLink(tabId: number, msg: FicheLinkMessage): Promise<LinkAnswer>;
-  /** A closed tab: the products issued to it are forgotten. */
-  dropFicheTab(tabId: number): Promise<void>;
+  /** « Annuler » and « Retirer la note »: they reject, with no request, for a title not issued to that tab. */
+  ficheUndo(tabId: number, msg: FicheUndoMessage): Promise<UndoAnswer>;
+  ficheRemove(tabId: number, msg: FicheRemoveMessage): Promise<RemoveAnswer>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -159,11 +174,12 @@ export function createJobs(
   const asker = (tabId: number) => ({ registry, tabId });
   const infoTurns = createTabTurns();
   const seasonTurns = createTabTurns();
+  const searchTurns = createTabTurns();
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
       quietly(async () => {
-        await finishJob(deps, msg);
+        await forgettingUndo(deps, msg.contentId, (d) => finishJob(d, msg));
       }),
     retryPending: async (since) => {
       try {
@@ -184,7 +200,7 @@ export function createJobs(
       quietly(() => settingsJob(deps.store, thresholds, pause)),
     rate: (msg) =>
       quietly(async () => {
-        await rateJob(deps, msg);
+        await forgettingUndo(deps, msg.contentId, (d) => rateJob(d, msg));
       }),
     dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),
@@ -197,9 +213,16 @@ export function createJobs(
     requeueQuestion: (msg) => quietly(() => requeueJob(deps, msg)),
     forget: () => quietly(() => forgetJob(deps.store)),
     reset: () => quietly(() => resetJob(deps.store)),
-    forgetHandled: (msg) => quietly(() => forgetHandledJob(deps.store, msg)),
+    forgetHandled: (msg) =>
+      quietly(async () => {
+        await forgetHandledJob(deps.store, msg);
+        await forgetUndoOf(deps.store, msg.contentId);
+      }),
     forgetHandledFromTab: (msg) =>
-      quietly(() => forgetFromTabJob(deps.store, deps.now, msg)),
+      quietly(async () => {
+        await forgetFromTabJob(deps.store, deps.now, msg);
+        await forgetUndoOf(deps.store, msg.contentId);
+      }),
     cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
     handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),
     searchTitles: (msg) => answerSearch(deps, msg),
@@ -215,8 +238,11 @@ export function createJobs(
     ficheSeason: (tabId, msg) =>
       ficheSeasonJob(deps, asker(tabId), msg, seasonTurns.start(tabId)),
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
+    ficheSearch: (tabId, msg) =>
+      ficheSearchJob(deps, asker(tabId), msg, searchTurns.start(tabId)),
     ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
     ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),
-    dropFicheTab: (tabId) => registry.drop(tabId),
+    ficheUndo: (tabId, msg) => ficheUndoJob(deps, asker(tabId), msg),
+    ficheRemove: (tabId, msg) => ficheRemoveJob(deps, asker(tabId), msg),
   };
 }

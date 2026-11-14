@@ -11,7 +11,7 @@ export const MODE_TEXT: Record<
 > = {
   simulation: {
     headline:
-      "Simulation\u202F: vos listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.",
+      "Simulation\u202F: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.",
     switchLabel: "Activer les écritures",
   },
   live: {
@@ -31,10 +31,10 @@ const CAP = `Chaque synchronisation fera au plus ${MAX_WRITES_PER_RUN} écriture
 export function confirmText(count: number): string {
   const ask = "Activer les écritures\u202F?";
   if (count === 0) {
-    return `${ask} ${CAP}. La page de l'extension montre les écritures prévues au prochain passage.`;
+    return `${ask} ${CAP}. La page de l’extension montre les écritures prévues au prochain passage.`;
   }
   const next =
     "La prochaine (bouton «\u202FResynchroniser\u202F» ou prochaine ouverture de Naka)";
   const titles = count === 1 ? "le titre" : `les ${count} titres`;
-  return `${ask} ${CAP}. ${next} reprendra ${titles} de l'aperçu, puis les suivants, que cette page montre avant chaque passage.`;
+  return `${ask} ${CAP}. ${next} reprendra ${titles} de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`;
 }

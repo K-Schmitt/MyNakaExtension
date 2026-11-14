@@ -102,6 +102,10 @@ function world(o: Opts = {}) {
       universe: id >= 5000 ? 32 : id === 1007 ? 4 : 1,
       rating: o.rated?.[id] ?? null,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     }),
     seasonInfo: async (id, season) => ({
       seasonProductId: 4000 + id,
@@ -298,6 +302,10 @@ describe("the finish creates the rating card", () => {
         universe: 32,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       };
     },
   });
@@ -587,6 +595,10 @@ describe("rate", () => {
             universe: 32,
             rating: null,
             average: null,
+            dateDone: null,
+            isReviewed: false,
+            isRecommended: false,
+            url: undefined,
           };
         },
       },
@@ -936,6 +948,10 @@ describe("rate a handled title that has no card (Ruling L2)", () => {
             universe: 1,
             rating: null,
             average: null,
+            dateDone: null,
+            isReviewed: false,
+            isRecommended: false,
+            url: undefined,
           }),
         },
       },

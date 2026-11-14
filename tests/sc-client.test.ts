@@ -76,6 +76,9 @@ function userInfos(
   return {
     isDone: false,
     isWished: true,
+    // SensCritique answers both flags (the query asks for them); one missing reads as protected (D13).
+    isReviewed: false,
+    isRecommended: false,
     productId: id,
     rating: null,
     ...extra,
@@ -179,6 +182,13 @@ describe("writes", () => {
       variables: { productId: 5 },
       query: GQL.ProductUnwish,
     });
+  });
+
+  it("markDoneWithoutDate sends exactly one ProductDone", async () => {
+    const { client, calls } = setup(LOGGED_IN);
+    await client.markDoneWithoutDate(5);
+    expect(calls.map(operationOf)).toEqual(["ProductDone"]);
+    expect(variablesOf(calls[0] as Call)).toEqual({ productId: 5 });
   });
 
   it("unmarkDone sends ProductUndone only", async () => {
@@ -1364,7 +1374,14 @@ describe("productState", () => {
   ])(
     "returns isDone %s, isWished %s and the universe %s",
     async (isDone, isWished, universe) => {
-      const infos = { isDone, isWished, productId: 7, rating: null };
+      const infos = {
+        isDone,
+        isWished,
+        isReviewed: false,
+        isRecommended: false,
+        productId: 7,
+        rating: null,
+      };
       const { client } = setup(LOGGED_IN, () =>
         stateReply({ id: 7, universe, currentUserInfos: infos }),
       );
@@ -1374,6 +1391,10 @@ describe("productState", () => {
         universe,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       });
     },
   );
@@ -1397,13 +1418,21 @@ describe("productState", () => {
       universe: 1,
       rating: 6,
       average: null,
+      dateDone: null,
+      isReviewed: false,
+      isRecommended: false,
+      url: undefined,
     });
     expect(Object.keys(state).sort()).toEqual([
       "average",
+      "dateDone",
       "isDone",
+      "isRecommended",
+      "isReviewed",
       "isWished",
       "rating",
       "universe",
+      "url",
     ]);
     expect(JSON.stringify(state)).not.toContain("LEAK");
     expect(JSON.stringify(state)).not.toContain(TOKEN);
@@ -1554,6 +1583,10 @@ describe("productState", () => {
           universe: 1,
           rating: 6,
           average: null,
+          dateDone: null,
+          isReviewed: false,
+          isRecommended: false,
+          url: undefined,
         });
       },
     );
@@ -2023,6 +2056,10 @@ describe("productState: the label for the preview", () => {
         universe: 1,
         rating: null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
       });
     }
   });
