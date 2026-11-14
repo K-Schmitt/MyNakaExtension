@@ -7,6 +7,7 @@ import type { QuestionKey } from "../core/questions";
 import type { Thresholds } from "../core/watch-trigger";
 import type {
   FicheInfo,
+  FicheSearchAnswer,
   LinkAnswer,
   MineAnswer,
   RateAnswer,
@@ -18,6 +19,7 @@ import type {
   FicheMineMessage,
   FicheRateMessage,
   FicheRemoveMessage,
+  FicheSearchMessage,
   FicheSeasonMessage,
   FicheUndoMessage,
 } from "../ext/fiche-messages";
@@ -49,6 +51,7 @@ import { ficheMineJob } from "./fiche-mine-job";
 import { ficheRateJob } from "./fiche-rate-job";
 import { createFicheRegistry, type FicheRegistry } from "./fiche-registry";
 import { ficheRemoveJob } from "./fiche-remove-job";
+import { ficheSearchJob } from "./fiche-search-job";
 import { ficheSeasonJob } from "./fiche-season-job";
 import { createTabTurns } from "./fiche-tab-turns";
 import { ficheUndoJob } from "./fiche-undo-job";
@@ -136,6 +139,11 @@ export type Jobs = {
   ficheSeason(tabId: number, msg: FicheSeasonMessage): Promise<SeasonAnswer>;
   /** Rejects, with no request, for a product not issued to that tab for that content. */
   ficheMine(tabId: number, msg: FicheMineMessage): Promise<MineAnswer>;
+  /** « Chercher »: rejects, with no request, for a content the tab's page does not show. */
+  ficheSearch(
+    tabId: number,
+    msg: FicheSearchMessage,
+  ): Promise<FicheSearchAnswer>;
   /** The title page's writes, queued: they reject, with no request, for a product not issued to that tab. */
   ficheRate(tabId: number, msg: FicheRateMessage): Promise<RateAnswer>;
   ficheLink(tabId: number, msg: FicheLinkMessage): Promise<LinkAnswer>;
@@ -167,6 +175,7 @@ export function createJobs(
   const asker = (tabId: number) => ({ registry, tabId });
   const infoTurns = createTabTurns();
   const seasonTurns = createTabTurns();
+  const searchTurns = createTabTurns();
   return {
     syncJob: (trigger) => quietly(() => syncJob(deps, trigger)),
     finishJob: (msg) =>
@@ -223,6 +232,8 @@ export function createJobs(
     ficheSeason: (tabId, msg) =>
       ficheSeasonJob(deps, asker(tabId), msg, seasonTurns.start(tabId)),
     ficheMine: (tabId, msg) => ficheMineJob(deps, asker(tabId), msg),
+    ficheSearch: (tabId, msg) =>
+      ficheSearchJob(deps, asker(tabId), msg, searchTurns.start(tabId)),
     ficheRate: (tabId, msg) => ficheRateJob(deps, asker(tabId), msg),
     ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),
     ficheUndo: (tabId, msg) => ficheUndoJob(deps, asker(tabId), msg),

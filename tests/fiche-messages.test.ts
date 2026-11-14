@@ -4,6 +4,7 @@ import {
   parseLinkAnswer,
   parseMineAnswer,
   parseRateAnswer,
+  parseSearchAnswer,
   parseSeasonAnswer,
 } from "../src/ext/fiche-answers";
 import { allowedFor, parseToWorker } from "../src/ext/messages";
@@ -22,6 +23,7 @@ const MINE = { type: "fiche-mine", contentId: 5, productId: 77 };
 const LINK = { type: "fiche-link", contentId: 5, productId: 77 };
 const UNDO = { type: "fiche-undo", contentId: 5, productId: 77 };
 const REMOVE = { type: "fiche-remove", contentId: 5, productId: 77 };
+const SEARCH = { type: "fiche-search", contentId: 5, query: "Solaris" };
 const FILM = {
   type: "fiche-rate",
   contentId: 5,
@@ -46,6 +48,8 @@ const VALID = [
   { ...UNDO, listByTab: true },
   { ...UNDO, listByTab: false },
   REMOVE,
+  SEARCH,
+  { ...SEARCH, query: "x".repeat(100) },
 ];
 
 describe("title page messages", () => {
@@ -102,8 +106,23 @@ describe("title page messages", () => {
     ["a text TMDB id", { ...INFO, tmdbId: "1434" }],
     ["season 0", { ...SEASON, season: 0 }],
     ["season 101", { ...SEASON, season: 101 }],
+    ["an empty query", { ...SEARCH, query: "" }],
+    ["a query of spaces only", { ...SEARCH, query: "   " }],
+    ["a 101 character query", { ...SEARCH, query: "x".repeat(101) }],
+    ["a query as a number", { ...SEARCH, query: 7 }],
+    ["a search without a query", { ...SEARCH, query: undefined }],
+    ["a search without a content", { ...SEARCH, contentId: undefined }],
+    ["an extra key on search", { ...SEARCH, universe: "movie" }],
   ])("rejects %s", (_name, msg) => {
     expect(parseToWorker(msg)).toBeUndefined();
+  });
+
+  it("trims the query: 100 characters between spaces is read, trimmed", () => {
+    const padded = { ...SEARCH, query: `  ${"x".repeat(100)}\n` };
+    expect(parseToWorker(padded)).toEqual({
+      ...SEARCH,
+      query: "x".repeat(100),
+    });
   });
 
   it("reads season 100, the most seasons a title can have", () => {
@@ -243,6 +262,22 @@ describe("title page answers", () => {
       error: "naka-session",
     });
     expect(parseLinkAnswer({ ok: true })).toEqual({ ok: true });
+  });
+
+  it("reads a search answer: its candidates, or none", () => {
+    const found = { candidates: [cand, { ...cand, id: 10, year: 2002 }] };
+    expect(parseSearchAnswer(found)).toEqual(found);
+    expect(parseSearchAnswer({ candidates: [] })).toEqual({ candidates: [] });
+  });
+
+  it.each([
+    ["no candidates", {}],
+    ["an extra key", { candidates: [], state: "choose" }],
+    ["a bad candidate", { candidates: [{ ...cand, x: 1 }] }],
+    ["11 candidates", { candidates: Array.from({ length: 11 }, () => cand) }],
+    ["not a record", null],
+  ])("rejects a search answer with %s", (_name, raw) => {
+    expect(() => parseSearchAnswer(raw)).toThrow();
   });
 
   it.each([

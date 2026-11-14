@@ -2,9 +2,9 @@
 // the title page's writes: a write names a product only this registry can vouch for, issued to that tab
 // for that content by one of the worker's own answers, as what the write names (fiche-roles). One title
 // page per tab: `open` (a fiche-info answer: the title, or the candidates of a choice) resets the tab,
-// `issue` (a season answer: its episodes) adds to its current page only. At most MAX_FICHE_TABS tabs (the
-// least recently opened or issued goes first) and MAX_FICHE_PRODUCTS candidates, and as many episodes,
-// per tab (the oldest goes first).
+// `issue` (a season answer: its episodes) and `offer` (a search answer: its candidates) add to its current
+// page only. At most MAX_FICHE_TABS tabs (the least recently opened, issued or offered to goes first) and
+// MAX_FICHE_PRODUCTS candidates, and as many episodes, per tab (the oldest goes first).
 // It lives in chrome.storage.session under one key: memory only, it survives the MV3 worker's restarts,
 // and content scripts cannot read it. Every operation runs after the previous one (one read, one write),
 // so that two answers issued at once both stay.
@@ -35,6 +35,14 @@ export type FicheRegistry = {
     contentId: number,
     episodes: readonly number[],
   ): Promise<void>;
+  /** Adds candidates to the tab's page for that content; nothing when the tab shows another content. */
+  offer(
+    tabId: number,
+    contentId: number,
+    candidates: readonly number[],
+  ): Promise<void>;
+  /** The tab's page is that content's. */
+  shows(tabId: number, contentId: number): Promise<boolean>;
   /** The title's product issued to that tab for that content, if any. */
   titleOf(tabId: number, contentId: number): Promise<FicheTitle | undefined>;
   /** Issued to that tab for that content, whatever it stands for (a read). */
@@ -115,6 +123,16 @@ export function createFicheRegistry(area: StorageArea): FicheRegistry {
         const all = lastProducts([...page.episodes, ...episodes]);
         await save(placed(pages, { ...page, episodes: all }));
       }),
+    offer: (tabId, contentId, candidates) =>
+      serial(async () => {
+        const pages = await load();
+        const page = pageOf(pages, tabId, contentId);
+        if (page === undefined) return;
+        const all = lastProducts([...page.candidates, ...candidates]);
+        await save(placed(pages, { ...page, candidates: all }));
+      }),
+    shows: (tabId, contentId) =>
+      serial(async () => pageOf(await load(), tabId, contentId) !== undefined),
     titleOf: (tabId, contentId) =>
       serial(async () => pageOf(await load(), tabId, contentId)?.title),
     has: (tabId, contentId, productId) =>

@@ -776,6 +776,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     ficheInfo: (tabId, msg) => jobs.ficheInfo(tabId, msg),
     ficheSeason: (tabId, msg) => jobs.ficheSeason(tabId, msg),
     ficheMine: (tabId, msg) => jobs.ficheMine(tabId, msg),
+    ficheSearch: (tabId, msg) => jobs.ficheSearch(tabId, msg),
     ficheRate: (tabId, msg) => jobs.ficheRate(tabId, msg),
     ficheLink: (tabId, msg) => jobs.ficheLink(tabId, msg),
     ficheUndo: (tabId, msg) => jobs.ficheUndo(tabId, msg),
