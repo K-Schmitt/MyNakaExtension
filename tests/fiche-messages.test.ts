@@ -50,6 +50,7 @@ const VALID = [
   REMOVE,
   SEARCH,
   { ...SEARCH, query: "x".repeat(100) },
+  { ...SEARCH, query: "Solaris \u{1F3AC}" },
 ];
 
 describe("title page messages", () => {
@@ -110,6 +111,11 @@ describe("title page messages", () => {
     ["a query of spaces only", { ...SEARCH, query: "   " }],
     ["a 101 character query", { ...SEARCH, query: "x".repeat(101) }],
     ["a query as a number", { ...SEARCH, query: 7 }],
+    ["a query with a lone surrogate", { ...SEARCH, query: "Sol\uD800aris" }],
+    [
+      "a query ending in a lone surrogate",
+      { ...SEARCH, query: "Solaris\uD83C" },
+    ],
     ["a search without a query", { ...SEARCH, query: undefined }],
     ["a search without a content", { ...SEARCH, contentId: undefined }],
     ["an extra key on search", { ...SEARCH, universe: "movie" }],

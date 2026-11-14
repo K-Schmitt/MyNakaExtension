@@ -55,7 +55,7 @@ export type FicheMessage =
       listByTab?: boolean;
     }
   | { type: "fiche-remove"; contentId: number; productId: number }
-  /** « Chercher » on the title page: the owner's own words, trimmed, 1 to MAX_SEARCH_QUERY characters. */
+  /** « Chercher » on the title page: the owner's own words, trimmed, a search query (isSearchQuery). */
   | { type: "fiche-search"; contentId: number; query: string };
 
 export type FicheType = FicheMessage["type"];
@@ -78,6 +78,12 @@ export type FicheSearchMessage = Extract<
 >;
 
 export const MAX_SEARCH_QUERY = 100;
+
+/** A trimmed query either side sends or reads: 1 to MAX_SEARCH_QUERY characters, with no lone surrogate. */
+export function isSearchQuery(query: string): boolean {
+  const sized = query.length >= 1 && query.length <= MAX_SEARCH_QUERY;
+  return sized && query.isWellFormed();
+}
 
 /** Spread into the worker's type list (messages.ts). */
 export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
@@ -232,11 +238,10 @@ function asSeason(raw: unknown): number {
   return season <= MAX_SEASON_COUNT ? season : fail("season");
 }
 
-// The query trimmed, 1 to MAX_SEARCH_QUERY characters once trimmed.
+// The query trimmed, then a search query (isSearchQuery): a broken one costs no SensCritique slot.
 function asQuery(raw: unknown): string {
   const query = asString(raw, "query").trim();
-  const sized = query.length >= 1 && query.length <= MAX_SEARCH_QUERY;
-  return sized ? query : fail("query");
+  return isSearchQuery(query) ? query : fail("query");
 }
 
 function parseSearch(record: Record<string, unknown>): FicheSearchMessage {
