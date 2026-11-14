@@ -63,6 +63,14 @@ export class FakeShadow extends FakeNode implements ShadowRootLike {
   host: FakeElement | null = null;
   adoptedStyleSheets?: unknown[];
 
+  /** As in the DOM: the focused element, while it is in this tree (a removed one lost the focus). */
+  get activeElement(): FakeElement | null {
+    const { focused } = FakeElement;
+    return focused !== null && descendants(this).includes(focused)
+      ? focused
+      : null;
+  }
+
   replaceChildren(...nodes: NodeLike[]): void {
     for (const child of [...this.children]) this.drop(child);
     for (const node of nodes) this.appendChild(node);
@@ -86,6 +94,8 @@ export class FakeElement extends FakeNode implements ElementLike {
   shadow = new FakeShadow();
   focusCount = 0;
   static focused: FakeElement | null = null;
+  /** A text field's caret, as setSelectionRange last put it. */
+  selection?: [number, number];
 
   constructor(readonly tag: string) {
     super();
@@ -116,6 +126,10 @@ export class FakeElement extends FakeNode implements ElementLike {
 
   remove(): void {
     this.parent?.drop(this);
+  }
+
+  setSelectionRange(start: number, end: number): void {
+    this.selection = [start, end];
   }
 
   /**

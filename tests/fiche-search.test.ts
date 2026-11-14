@@ -14,7 +14,7 @@ import {
   starsOf,
   texts,
 } from "./fiche-ui-world";
-import type { FakeElement } from "./ui-fakes";
+import { FakeElement } from "./ui-fakes";
 
 const NB = "\u202F";
 const NOT_FOUND: FicheInfo = { state: "notfound" };
@@ -305,5 +305,60 @@ describe("« Réessayer » under « SensCritique n’a pas pu être lu »", () =
     t.controller.event(ficheEvent());
     t.controller.retry();
     expect(t.ofType("fiche-info")).toHaveLength(1);
+  });
+});
+
+describe("the search field across a redraw", () => {
+  it("is read-only while a search is pending, and writable again with its answer", async () => {
+    const t = await notFound();
+    expect(t.field().attributes.readonly).toBeUndefined();
+    t.chercher()?.click(true);
+    expect(t.field().attributes.readonly).toBe("");
+    t.ofType("fiche-search")[0]?.answer(RESULTS);
+    await settle();
+    expect(t.field().attributes.readonly).toBeUndefined();
+  });
+
+  it("gives the focus back to the new field, caret at the end, when the field had it", async () => {
+    const t = await notFound();
+    const typed = t.field();
+    typed.focus();
+    typed.value = "Solyaris";
+    typed.press("Enter");
+    const searching = t.field();
+    expect(searching).not.toBe(typed);
+    expect(FakeElement.focused).toBe(searching);
+    expect(searching.selection).toEqual([8, 8]);
+    t.ofType("fiche-search")[0]?.answer(RESULTS);
+    await settle();
+    expect(FakeElement.focused).toBe(t.field());
+    expect(t.field().selection).toEqual([8, 8]);
+  });
+
+  it("leaves the focus alone when the field did not have it", async () => {
+    const t = await notFound();
+    t.chercher()?.click(true);
+    expect(t.field().focusCount).toBe(0);
+  });
+});
+
+describe("the search field's pre-fill", () => {
+  async function prefilled(title: string) {
+    const t = fakeUi(FILM_PATH);
+    t.controller.event(ficheEvent({ title }));
+    t.ofType("fiche-info")[0]?.answer(NOT_FOUND);
+    await settle();
+    const host = t.kept.actions();
+    const parts = host === undefined ? [] : deepParts(host.shadow);
+    return (parts.find((p) => p.tag === "input") as Field).value;
+  }
+
+  it("clips Naka's title to 100 characters", async () => {
+    expect(await prefilled("a".repeat(150))).toBe("a".repeat(100));
+  });
+
+  it("never cuts a surrogate pair in two", async () => {
+    const title = `${"a".repeat(99)}\u{1F3AC}b`;
+    expect(await prefilled(title)).toBe("a".repeat(99));
   });
 });
