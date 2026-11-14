@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type FicheUndo, UNDO_WINDOW_MS } from "../src/core/fiche-undo";
 import type { RatingCard } from "../src/core/rating-cards";
+import type { RetryFinish } from "../src/core/retry-finishes";
 import type { SyncState } from "../src/core/state";
 import type {
   FicheRateMessage,
@@ -153,11 +154,13 @@ describe("fiche-undo, end to end after a film rating (one test per row of undoSt
     });
   });
 
-  it("seen without a rating, its date known: undone then marked seen on that date; the card unrated", async () => {
-    // Arrange
+  it("seen without a rating, its date known, never handled: undone, seen on that date; the local state as before the rating", async () => {
+    // Arrange: seen on SensCritique only; the rating's finish handles, settles and makes a card.
     const sc: Sc = { now: { isDone: true, dateDone: "2024-03-02" } };
     const w = world(sc, { playlist: () => [] });
+    const earlier = local(w);
     const mark = await rated(w, sc, { rating: 8 }, rate({ inMaListe: false }));
+    expect(local(w)).not.toEqual(earlier);
 
     // Act
     const answer = await w.jobs.ficheUndo(TAB, undo());
@@ -169,17 +172,58 @@ describe("fiche-undo, end to end after a film rating (one test per row of undoSt
       "unmarkDone:2005",
       "markDone:2005:2024-03-02",
     ]);
-    expect(local(w)).toMatchObject({
+    expect(local(w)).toEqual(earlier);
+    expect(local(w)).toEqual({
       mapping: [PAIR],
-      settled: [PAIR],
-      handled: ["movie:5"],
+      settled: [],
+      handled: [],
+      cards: [],
     });
-    expect(w.cards()[0]).toMatchObject({
+  });
+
+  it("not seen on SensCritique but held locally: handled, its waiting finish and its card all kept as they were", async () => {
+    // Arrange
+    const card = filmCard({
       key: "movie:5",
-      targets: [{ label: "film", productId: 2005, current: null }],
-      pending: ["film"],
-      given: {},
+      contentId: 5,
+      targets: [target("film", null, 2005)],
     });
+    const waiting: RetryFinish = {
+      key: "movie:5",
+      pair: PAIR,
+      evicted: [],
+      question: {
+        kind: "ambiguity",
+        side: "naka",
+        id: 5,
+        title: "Titre 5",
+        candidateIds: [2005],
+      },
+      at: NOW - 5000,
+    };
+    const state: SyncState = {
+      ...linkedTo(2005),
+      handled: ["movie:5"],
+      retryFinishes: [waiting],
+    };
+    const sc: Sc = { now: {} };
+    const w = world(sc, { state, playlist: () => [] });
+    w.area.data.set("ratings", [card]);
+    const earlier = { ...local(w), retry: w.state().retryFinishes };
+    const mark = await rated(w, sc, RATED_SEEN, rate({ inMaListe: false }));
+    expect(w.cards()[0]?.given).toEqual({ film: 8 });
+
+    // Act
+    const answer = await w.jobs.ficheUndo(TAB, undo());
+
+    // Assert
+    expect(answer).toEqual({ ok: true, maListe: "none" });
+    expect(w.sk.calls.slice(mark.sc)).toEqual([
+      "productState:2005",
+      "unmarkDone:2005",
+    ]);
+    expect({ ...local(w), retry: w.state().retryFinishes }).toEqual(earlier);
+    expect(w.cards()).toEqual([card]);
   });
 
   it("seen without a rating nor a date: undone then marked seen without a date", async () => {
@@ -279,6 +323,7 @@ describe("fiche-undo, end to end after a series rating", () => {
     const w = seriesWorld(sc, []);
     await w.registry.open(TAB, 5, seriesTitle(13), []);
     await w.jobs.ficheRate(TAB, seriesRate);
+    sc.now = RATED_SEEN;
     const mark = w.sk.calls.length;
     expect(await w.jobs.ficheUndo(TAB, undo({ productId: 13 }))).toEqual({
       ok: true,
@@ -313,11 +358,77 @@ describe("fiche-undo: a step that fails stops the sequence", () => {
     // Assert
     expect(answer).toEqual({
       partial: { done: [{ kind: "undone" }], failed: { kind: "wish" } },
+      maListe: "none",
       error: "unavailable",
     });
     expect(w.nk.calls.slice(mark.nk)).not.toContain("addToPlaylist:5");
     expect(local(w)).toEqual(before);
     expect(stored(w)).toEqual(record);
+  });
+
+  it("a retry after a failure at wish skips what is back: no second ProductUndone, nor « vu »", async () => {
+    // Arrange: SensCritique as the fakes change it; the first wish fails.
+    const sc: Sc = {
+      now: { isDone: true, dateDone: "2024-03-02", isWished: true },
+    };
+    let wishes = 0;
+    const w = world(sc, {
+      playlist: () => [],
+      sc: {
+        unmarkDone: async () => {
+          sc.now = { ...sc.now, isDone: false, rating: null, dateDone: null };
+        },
+        markDone: async (_id, date) => {
+          sc.now = { ...sc.now, isDone: true, dateDone: date };
+        },
+        wish: async () => {
+          wishes += 1;
+          if (wishes === 1) throw new Error("down");
+          sc.now = { ...sc.now, isWished: true };
+        },
+      },
+    });
+    const earlier = local(w);
+    await rated(
+      w,
+      sc,
+      { rating: 8, isWished: false },
+      rate({ inMaListe: false }),
+    );
+    const first = await w.jobs.ficheUndo(TAB, undo());
+    const mark = w.sk.calls.length;
+
+    // Act
+    const retry = await w.jobs.ficheUndo(TAB, undo());
+
+    // Assert
+    expect(first).toEqual({
+      partial: {
+        done: [{ kind: "undone" }, { kind: "markDone", date: "2024-03-02" }],
+        failed: { kind: "wish" },
+      },
+      maListe: "none",
+      error: "unavailable",
+    });
+    expect(retry).toEqual({ ok: true, maListe: "none" });
+    expect(w.sk.calls.slice(mark)).toEqual(["productState:2005", "wish:2005"]);
+    expect(local(w)).toEqual(earlier);
+    expect(stored(w)).toBeNull();
+  });
+
+  it("a record that cannot be cleared after every step ran: still answered ok", async () => {
+    const sc: Sc = { now: {} };
+    const w = world(sc, { playlist: () => [] });
+    await rated(w, sc, RATED_SEEN, rate({ inMaListe: false }));
+    const set = w.area.set;
+    w.area.set = async (items) => {
+      if ("ficheUndo" in items) throw new Error("storage");
+      await set(items);
+    };
+    expect(await w.jobs.ficheUndo(TAB, undo())).toEqual({
+      ok: true,
+      maListe: "none",
+    });
   });
 
   it("the binding of another account: answered with its code before any write, the record kept", async () => {
@@ -349,6 +460,7 @@ describe("fiche-undo: « Ma liste »", () => {
       isWished: false,
       inMaListe: true,
     },
+    local: { handled: false, settled: false, cards: [] },
   };
   const ready = async (settings: Settings) => {
     const w = world({ now: RATED_SEEN }, { settings, playlist: () => [] });
@@ -413,6 +525,7 @@ describe("fiche-undo: refused before any request", () => {
       isWished: false,
       inMaListe: null,
     },
+    local: { handled: false, settled: false, cards: [] },
   };
 
   it("an expired record (10 minutes old)", async () => {

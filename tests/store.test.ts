@@ -221,6 +221,7 @@ describe("fiche undo store", () => {
       isWished: true,
       inMaListe: true,
     },
+    local: { handled: false, settled: false, cards: [] },
   };
 
   it("loads no record when the key is absent", async () => {

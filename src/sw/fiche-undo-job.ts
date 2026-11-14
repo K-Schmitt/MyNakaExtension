@@ -3,9 +3,11 @@
 // a live undo record names that title, that product and that role. The product's state is read again:
 // undoSteps refuses a title whose critique or recommendation ProductUndone could erase (answered
 // `refused: "protected"`, no write). The binding is checked before the first write; then the steps run in
-// order, the first failure stopping them: the answer names the steps done and the one that failed, and
-// the record is kept so the owner can try again. Once every step ran the record is cleared. In
-// simulation the « Ma liste » step is dropped: everything else is sent.
+// order, the first failure stopping them: the answer names the steps done and the one that failed (and
+// who gave « Ma liste » back so far), and the record is kept so the owner can try again; the retry plans
+// from the state read then, skipping what is already back (undoSteps, ruling R9). Once every step ran the
+// record is cleared: a clear that fails still answers ok, the steps being done (it then simply expires).
+// In simulation the « Ma liste » step is dropped: everything else is sent.
 
 import { type FicheUndo, type UndoStep, undoSteps } from "../core/fiche-undo";
 import type { FicheUndoMessage } from "../ext/fiche-messages";
@@ -43,7 +45,7 @@ async function liveRecord(
   return live && record?.role === role ? record : undefined;
 }
 
-/** undoSteps on the product's state read now; undefined when the title is protected. */
+/** undoSteps on the product's state read now (R9); undefined when the title is protected. */
 async function plan(
   deps: JobDeps,
   record: FicheUndo,
@@ -62,7 +64,11 @@ async function runAll(run: StepRun, steps: RunStep[]): Promise<UndoAnswer> {
     try {
       maListe = (await runStep(run, step)) ?? maListe;
     } catch (error) {
-      return { partial: { done, failed: step }, error: toJobError(error) };
+      return {
+        partial: { done, failed: step },
+        maListe,
+        error: toJobError(error),
+      };
     }
     done = [...done, step];
   }
@@ -87,6 +93,14 @@ async function restored(
   }
 }
 
+async function forget(deps: JobDeps): Promise<void> {
+  try {
+    await deps.store.saveFicheUndo(null);
+  } catch {
+    // See the header: the record expires within ten minutes.
+  }
+}
+
 export async function ficheUndoJob(
   deps: JobDeps,
   asker: FicheAsker,
@@ -96,6 +110,6 @@ export async function ficheUndoJob(
   const record = await liveRecord(deps, msg, role);
   if (record === undefined) return { refused: "expired" };
   const answer = await restored(deps, msg, record);
-  if ("ok" in answer) await deps.store.saveFicheUndo(null);
+  if ("ok" in answer) await forget(deps);
   return answer;
 }

@@ -2,10 +2,19 @@
 // through the SC limiter just before a film's or a series' rating, and kept as the one undo record,
 // replacing any older one. A failed read never stops the rating: the record is then cleared (an older
 // one would undo more than the last rating), and the panel offers no undo. Episode ratings keep nothing.
+// The record also keeps the extension's own state of the title (ruling R8), read in the same job before
+// any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
+// clears the record the same way.
 
-import type { FicheUndo, UndoRole } from "../core/fiche-undo";
+import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import type { ProductState } from "../sc/sc-client";
+import {
+  type CardTitle,
+  isSettled,
+  isTitleCard,
+  isTitleHandled,
+} from "./fiche-local-restore";
 import type { JobDeps } from "./job-deps";
 
 /** The product's state before the rating, or undefined when SensCritique did not give it. */
@@ -20,11 +29,30 @@ async function readBefore(
   }
 }
 
+/** The title's local state now, or undefined when the store cannot give it. */
+async function readLocal(
+  deps: JobDeps,
+  title: CardTitle,
+): Promise<UndoLocal | undefined> {
+  try {
+    const state = await deps.store.loadState();
+    const cards = await deps.store.loadRatings();
+    return {
+      handled: isTitleHandled(state, title),
+      settled: isSettled(state, title),
+      cards: cards.filter((card) => isTitleCard(card, title)),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function recordOf(
   deps: JobDeps,
   msg: FicheRateMessage,
   role: UndoRole,
   state: ProductState,
+  local: UndoLocal,
 ): FicheUndo {
   return {
     contentId: msg.contentId,
@@ -38,17 +66,20 @@ function recordOf(
       isWished: state.isWished,
       inMaListe: role === "film" ? (msg.inMaListe ?? null) : null,
     },
+    local,
   };
 }
 
-/** Stores the record of this rating, or clears any when the state was not read. */
+/** Stores the record of this rating, or clears any when a state was not read. */
 async function keepUndo(
   deps: JobDeps,
   msg: FicheRateMessage,
   role: UndoRole,
   before: ProductState | undefined,
 ): Promise<void> {
-  const record = before && recordOf(deps, msg, role, before);
+  const title = { role, contentId: msg.contentId, productId: msg.productId };
+  const local = before && (await readLocal(deps, title));
+  const record = before && local && recordOf(deps, msg, role, before, local);
   await deps.store.saveFicheUndo(record ?? null);
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FicheUndo } from "../src/core/fiche-undo";
 import { parseFicheUndo } from "../src/ext/fiche-undo-schema";
+import { episodeCard } from "./rating-fixtures";
 
 function sample(): FicheUndo {
   return {
@@ -14,6 +15,11 @@ function sample(): FicheUndo {
       dateDone: "2026-11-02",
       isWished: false,
       inMaListe: null,
+    },
+    local: {
+      handled: false,
+      settled: true,
+      cards: [episodeCard({ contentId: 7 })],
     },
   };
 }
@@ -87,6 +93,32 @@ describe("parseFicheUndo", () => {
 
   it("rejects an unknown key on the before-state", () => {
     expect(parseFicheUndo(withBefore({ extra: 1 }))).toBeNull();
+  });
+
+  it("rejects a corrupt local state: a bad card, a missing card list, an extra key, no local", () => {
+    // Arrange
+    const r = sample();
+    const badCard = { ...r.local, cards: [{ key: "x" }] };
+    const { cards: _, ...noCards } = r.local;
+    const { local: _l, ...noLocal } = r;
+
+    // Act, Assert
+    expect(parseFicheUndo({ ...r, local: badCard })).toBeNull();
+    expect(parseFicheUndo({ ...r, local: noCards })).toBeNull();
+    expect(parseFicheUndo({ ...r, local: { ...r.local, x: 1 } })).toBeNull();
+    expect(
+      parseFicheUndo({ ...r, local: { ...r.local, handled: 1 } }),
+    ).toBeNull();
+    expect(parseFicheUndo(noLocal)).toBeNull();
+  });
+
+  it("round-trips a film record with no card", () => {
+    const r: FicheUndo = {
+      ...sample(),
+      role: "film",
+      local: { handled: true, settled: false, cards: [] },
+    };
+    expect(parseFicheUndo(structuredClone(r))).toEqual(r);
   });
 
   it("rejects a record missing a key", () => {

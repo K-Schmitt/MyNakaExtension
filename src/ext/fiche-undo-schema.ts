@@ -1,7 +1,12 @@
 // Validates the one stored undo record (key ficheUndo). Absent, null or corrupt all read as no record:
 // an undo is a convenience, so a bad value only drops it and never breaks the store.
 
-import type { FicheUndo, UndoBefore, UndoRole } from "../core/fiche-undo";
+import type {
+  FicheUndo,
+  UndoBefore,
+  UndoLocal,
+  UndoRole,
+} from "../core/fiche-undo";
 import {
   asBoolean,
   asId,
@@ -13,6 +18,7 @@ import {
   onlyKeys,
   valuesOf,
 } from "./field-checks";
+import { parseRatings } from "./rating-schema";
 import { StoredStateError } from "./stored-error";
 
 const MAX_RATING = 10;
@@ -25,6 +31,12 @@ const RECORD_KEYS = valuesOf<keyof FicheUndo>({
   role: true,
   at: true,
   before: true,
+  local: true,
+});
+const LOCAL_KEYS = valuesOf<keyof UndoLocal>({
+  handled: true,
+  settled: true,
+  cards: true,
 });
 const BEFORE_KEYS = valuesOf<keyof UndoBefore>({
   rating: true,
@@ -65,6 +77,19 @@ function checkBefore(raw: unknown): UndoBefore {
   };
 }
 
+function checkLocal(raw: unknown): UndoLocal {
+  const local = asRecord(raw, "ficheUndo.local");
+  onlyKeys(local, LOCAL_KEYS, "ficheUndo.local");
+  return {
+    handled: asBoolean(local.handled, "ficheUndo.local.handled"),
+    settled: asBoolean(local.settled, "ficheUndo.local.settled"),
+    cards:
+      local.cards === undefined
+        ? fail("ficheUndo.local.cards")
+        : parseRatings(local.cards),
+  };
+}
+
 function checkFicheUndo(raw: unknown): FicheUndo {
   const record = asRecord(raw, "ficheUndo");
   onlyKeys(record, RECORD_KEYS, "ficheUndo");
@@ -74,6 +99,7 @@ function checkFicheUndo(raw: unknown): FicheUndo {
     role: asOneOf(record.role, ROLES, "ficheUndo.role"),
     at: asInt(record.at, 0, "ficheUndo.at"),
     before: checkBefore(record.before),
+    local: checkLocal(record.local),
   };
 }
 
