@@ -1,6 +1,6 @@
 // The episodes of one season of the title page (fiche-season): only for the series product issued to
 // the asking tab for that content (none yet, or a film's: no episodes, no request). One public season page
-// read through the SC limiter; each episode product is issued to the tab, at most MAX_SEASON_EPISODES,
+// read through the SC limiter; each episode product the tab can read is issued to it, at most MAX_SEASON_EPISODES,
 // each with its SensCritique title when it has one (at most MAX_TEXT characters). One fiche-season per tab
 // is in flight: a newer one of the same tab supersedes it (fiche-tab-turns); its read still waiting is
 // then skipped when its slot comes, and it answers no episodes and issues nothing.
@@ -14,6 +14,14 @@ import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import type { JobDeps } from "./job-deps";
 
 export const MAX_SEASON_EPISODES = 500;
+
+const isId = (n: number): boolean => Number.isSafeInteger(n) && n >= 1;
+
+// The tab reads an episode number and a product id as positive safe integers and refuses the whole answer
+// otherwise (and the registry's stored form refuses such an id): an episode SensCritique lists as E0, or
+// under an id that is none, is left out, never issued.
+const isShowable = (found: ScEpisode): boolean =>
+  isId(found.episode) && isId(found.productId);
 
 function toSeasonEpisode(found: ScEpisode): SeasonEpisode {
   const episode: SeasonEpisode = {
@@ -52,7 +60,10 @@ async function answered(
   if (title?.type !== "serie") return { episodes: [] };
   const found = await readEpisodes(deps, title.productId, msg, turn);
   if (found === undefined) return { episodes: [] };
-  const episodes = found.slice(0, MAX_SEASON_EPISODES).map(toSeasonEpisode);
+  const episodes = found
+    .filter(isShowable)
+    .slice(0, MAX_SEASON_EPISODES)
+    .map(toSeasonEpisode);
   const ids = episodes.map((episode) => episode.productId);
   await asker.registry.issue(asker.tabId, msg.contentId, ids);
   return { episodes };
