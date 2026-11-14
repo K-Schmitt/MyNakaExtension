@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { FicheUndo } from "../src/core/fiche-undo";
 import type { FicheRemoveMessage } from "../src/ext/fiche-messages";
 import type { Settings } from "../src/ext/settings";
 import type { ProductState } from "../src/sc/sc-client";
-import { answerWorld, BOUND, type WorldOpts } from "./answer-world";
+import { answerWorld, BOUND, NOW, type WorldOpts } from "./answer-world";
 import { filmTitle, linkedTo, seriesTitle, TAB } from "./fiche-fixtures";
 import { filmCard, target } from "./rating-fixtures";
 
@@ -151,5 +152,53 @@ describe("fiche-remove", () => {
       error: "unavailable",
     });
     expect(w.cards()).toEqual([filmOf5]);
+  });
+});
+
+describe("fiche-remove and the undo record", () => {
+  const record = (contentId: number, productId: number): FicheUndo => ({
+    contentId,
+    productId,
+    role: "film",
+    at: NOW - 1000,
+    before: {
+      rating: 6,
+      isDone: true,
+      dateDone: "2024-03-02",
+      isWished: false,
+      inMaListe: null,
+    },
+    local: { handled: false, settled: false, cards: [] },
+  });
+  const stored = (w: ReturnType<typeof world>) => w.area.data.get("ficheUndo");
+
+  it("a removal that went out clears the record of this title", async () => {
+    // Arrange
+    const w = world(RATED);
+    w.area.data.set("ficheUndo", record(5, 2005));
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRemove(TAB, remove());
+
+    // Assert
+    expect(answer).toEqual({ ok: true });
+    expect(stored(w)).toBeNull();
+  });
+
+  it("a removal that went out leaves the record of another title", async () => {
+    const w = world(RATED);
+    w.area.data.set("ficheUndo", record(9, 99));
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    await w.jobs.ficheRemove(TAB, remove());
+    expect(stored(w)).toEqual(record(9, 99));
+  });
+
+  it("a refused removal leaves the record of this title", async () => {
+    const w = world(RATED, { username: "intruder" });
+    w.area.data.set("ficheUndo", record(5, 2005));
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    await w.jobs.ficheRemove(TAB, remove());
+    expect(stored(w)).toEqual(record(5, 2005));
   });
 });
