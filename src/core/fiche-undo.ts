@@ -70,7 +70,8 @@ export function liveUndo(
   return age >= 0 && age < UNDO_WINDOW_MS ? record : undefined;
 }
 
-function isProtected(current: ProtectedFlags): boolean {
+/** A critique or a recommendation SensCritique could lose with the seen mark (decision 6). */
+export function isProtected(current: ProtectedFlags): boolean {
   return current.isReviewed || current.isRecommended;
 }
 

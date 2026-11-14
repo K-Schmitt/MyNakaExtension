@@ -95,7 +95,12 @@ describe("fiche-rate keeps what a film rating changes", () => {
     expect(w.sk.calls[0]).toBe("productState:2005");
     expect(answer).toEqual({
       ok: true,
-      panel: { canUndo: true, canRemove: true, url: FILM_URL },
+      panel: {
+        canUndo: true,
+        canRemove: true,
+        protected: false,
+        url: FILM_URL,
+      },
     });
   });
 
@@ -132,7 +137,12 @@ describe("fiche-rate keeps what a film rating changes", () => {
     await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       ok: true,
-      panel: { canUndo: true, canRemove: false, url: FILM_URL },
+      panel: {
+        canUndo: true,
+        canRemove: false,
+        protected: true,
+        url: FILM_URL,
+      },
     });
   });
 
@@ -161,7 +171,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
     expect(stored(w)).toBeNull();
     expect(answer).toEqual({
       ok: true,
-      panel: { canUndo: false, canRemove: false },
+      panel: { canUndo: false, canRemove: false, protected: false },
     });
   });
 
@@ -175,7 +185,12 @@ describe("fiche-rate keeps what a film rating changes", () => {
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
       error: "unavailable",
-      panel: { canUndo: true, canRemove: true, url: FILM_URL },
+      panel: {
+        canUndo: true,
+        canRemove: true,
+        protected: false,
+        url: FILM_URL,
+      },
     });
   });
 
@@ -197,7 +212,7 @@ describe("fiche-rate keeps what a series rating changes", () => {
     await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({
       ok: true,
-      panel: { canUndo: true, canRemove: true },
+      panel: { canUndo: true, canRemove: true, protected: false },
     });
     expect(stored(w)).toEqual(
       filmRecord({

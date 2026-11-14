@@ -45,6 +45,7 @@ const productOf = (over: Partial<FicheProduct> = {}): FicheInfo => ({
     label: { title: "Solaris", year: 1972 },
     canUndo: false,
     canRemove: false,
+    protected: false,
     ...over,
   },
 });
@@ -91,13 +92,80 @@ describe("the actions under Naka's info panel", () => {
     expect(buttonNamed(parts, "Annuler")).toBeUndefined();
   });
 
-  it("shows the protected line instead of « Retirer la note » for a rated title it cannot remove", async () => {
-    const t = await film(productOf({ mine: 7, canRemove: false }));
+  it("shows the protected line instead of « Retirer la note » for a protected title", async () => {
+    const t = await film(productOf({ mine: 7, protected: true }));
     const parts = actionParts(t);
     expect(buttonNamed(parts, "Retirer la note")).toBeUndefined();
     expect(texts(parts)).toContain(
       `Une critique ou une recommandation y est liée${NB}: retire la note sur SensCritique.`,
     );
+  });
+
+  it("shows no protected line for a rated title the worker says is not protected", async () => {
+    const t = await film(productOf({ mine: 7 }));
+    expect(texts(actionParts(t))).not.toContain(PROTECTED_LINE);
+  });
+
+  it("shows no protected line while « Annuler » is offered", async () => {
+    const t = await film(productOf({ canUndo: true, protected: true }));
+    expect(texts(actionParts(t))).not.toContain(PROTECTED_LINE);
+    expect(buttonNamed(actionParts(t), "Annuler")).toBeDefined();
+  });
+
+  it("shows no protected line after a rating whose before-state read failed (no flags kept)", async () => {
+    const t = await film();
+    star(t.parts(), 8)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      ok: true,
+      panel: { canUndo: false, canRemove: false, protected: false },
+    });
+    await settle();
+    expect(checked(t.parts())).toEqual(["8 sur 10"]);
+    expect(texts(actionParts(t))).not.toContain(PROTECTED_LINE);
+  });
+
+  it.each([
+    ["an undo", "undo", { canUndo: true }, "Annuler"],
+    ["a removal", "remove", { canRemove: true }, "Retirer la note"],
+  ] as const)(
+    "disables the buttons while %s is on its way",
+    async (_n, action, flags, label) => {
+      const t = await film(productOf({ ...flags, url: URL }));
+      expect(
+        buttonNamed(actionParts(t), label)?.attributes.disabled,
+      ).toBeUndefined();
+      if (action === "undo") t.controller.undo();
+      else t.controller.remove();
+      const pressed = buttonNamed(actionParts(t), label);
+      expect(pressed?.attributes).toMatchObject({
+        disabled: "",
+        "aria-disabled": "true",
+      });
+    },
+  );
+
+  it("disables « Retirer la note » while a rating is on its way", async () => {
+    const t = await film(productOf({ canRemove: true }));
+    t.controller.rateTitle(8);
+    expect(
+      buttonNamed(actionParts(t), "Retirer la note")?.attributes[
+        "aria-disabled"
+      ],
+    ).toBe("true");
+  });
+
+  it("offers neither « Annuler » nor « Retirer la note » when the info is not read again after an undo", async () => {
+    const t = await film(productOf({ canUndo: true, canRemove: true }));
+    t.controller.undo();
+    t.ofType("fiche-undo")[0]?.answer({ ok: true, maListe: "none" });
+    await settle();
+    t.ofType("fiche-info")[1]?.answer(undefined);
+    await settle();
+    const parts = actionParts(t);
+    expect(buttonNamed(parts, "Annuler")).toBeUndefined();
+    expect(buttonNamed(parts, "Retirer la note")).toBeUndefined();
+    expect(texts(parts)).not.toContain(UNDOING_LINE);
+    expect(texts(parts)).not.toContain(PROTECTED_LINE);
   });
 
   it("shows neither button nor protected line for a title not rated", async () => {
@@ -384,7 +452,7 @@ describe("every step 7 rare state, in the actions host", () => {
     star(t.parts(), 8)?.click(true);
     t.ofType("fiche-rate")[0]?.answer({
       ok: true,
-      panel: { canUndo: true, canRemove: true, url: URL },
+      panel: { canUndo: true, canRemove: true, protected: false, url: URL },
     });
     await settle();
     expect(buttonNamed(actionParts(t), "Annuler")).toBeDefined();
@@ -485,5 +553,33 @@ describe("the actions between two views", () => {
     t.shown.hide();
     t.shown.show({ ...filmView(7), pending: "undo" }, { ...handlers });
     expect(t.built()).toBe(4);
+  });
+
+  it("builds them again when a write starts, ends or fails", () => {
+    const t = actions();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show({ ...filmView(7), pending: "rating" }, handlers);
+    t.shown.show(filmView(8), handlers);
+    t.shown.show(
+      { ...filmView(8), outcome: { kind: "not-sent", error: "sc-session" } },
+      handlers,
+    );
+    expect(t.built()).toBe(4);
+  });
+
+  it("builds them again for a season line, and when the season changes, its line staying", () => {
+    const t = actions();
+    t.shown.show(filmView(7), handlers);
+    t.shown.show({ ...filmView(7), season: 2, seasonFailed: true }, handlers);
+    t.shown.show({ ...filmView(7), season: 3, seasonFailed: true }, handlers);
+    expect(t.built()).toBe(3);
+  });
+
+  it("compares a field of the view it does not name yet", () => {
+    const t = actions();
+    t.shown.show(filmView(7), handlers);
+    const later = { ...filmView(7), later: "drawn" } as FicheView;
+    t.shown.show(later, handlers);
+    expect(t.built()).toBe(2);
   });
 });

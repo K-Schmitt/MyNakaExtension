@@ -44,7 +44,15 @@ function scLink(doc: Maker, url: string): ElementLike {
   return link;
 }
 
-function writeButtons(
+/** While a write is on its way, the controller refuses another: the button says so. */
+function disabledWhile(view: FicheView, el: ElementLike): ElementLike {
+  if (view.pending === undefined) return el;
+  el.setAttribute("disabled", "");
+  el.setAttribute("aria-disabled", "true");
+  return el;
+}
+
+function writeButton(
   doc: Maker,
   product: FicheProduct,
   handlers: FicheHandlers,
@@ -55,16 +63,16 @@ function writeButtons(
   return [button(doc, REMOVE_LABEL, BUTTON_CLASS, handlers.remove)];
 }
 
-/** Rated, yet neither undone nor removable: a critique or recommendation holds the rating (decision 6). */
-function isProtected(product: FicheProduct): boolean {
-  return product.mine !== null && !product.canUndo && !product.canRemove;
+/** The worker's word (decision 6); « Annuler » stays offered over it, since it never loses a critique. */
+function showsProtected(product: FicheProduct): boolean {
+  return product.protected && !product.canUndo;
 }
 
 function lines(doc: Maker, view: FicheView, product: FicheProduct) {
   const pending =
     view.pending === undefined ? undefined : PENDING_LINES[view.pending];
   const texts = [
-    ...(isProtected(product) ? [textLine(doc, PROTECTED_LINE)] : []),
+    ...(showsProtected(product) ? [textLine(doc, PROTECTED_LINE)] : []),
     ...(pending === undefined ? [] : [textLine(doc, pending)]),
   ];
   const shown = new Set(texts.map((line) => line.textContent));
@@ -81,7 +89,7 @@ export function productActions(
   if (view.pending === "confirm-series") return seriesConfirm(doc, handlers);
   const buttons = [
     ...(product.url === undefined ? [] : [scLink(doc, product.url)]),
-    ...writeButtons(doc, product, handlers),
+    ...writeButton(doc, product, handlers).map((el) => disabledWhile(view, el)),
   ];
   return [
     ...(buttons.length > 0 ? [row(doc, buttons)] : []),

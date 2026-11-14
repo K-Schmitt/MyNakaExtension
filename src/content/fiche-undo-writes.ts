@@ -44,11 +44,20 @@ function begin(scope: FicheScope, action: UndoAction): void {
   scope.show();
 }
 
+/** Fails closed: without fresh flags, neither « Annuler » nor « Retirer la note » stays offered. */
+function dropWriteFlags(scope: FicheScope): void {
+  const { info } = scope.page;
+  if (info?.product === undefined) return;
+  const product = { ...info.product, canUndo: false, canRemove: false };
+  scope.page.info = { ...info, product };
+}
+
 async function refreshInfo(scope: FicheScope): Promise<void> {
   const msg = scope.page.infoMessage;
-  if (msg === undefined) return;
-  const info = await scope.ports.info(msg);
-  if (scope.live() && info !== undefined) scope.page.info = info;
+  const info = msg === undefined ? undefined : await scope.ports.info(msg);
+  if (!scope.live()) return;
+  if (info === undefined) dropWriteFlags(scope);
+  else scope.page.info = info;
 }
 
 // The line shows at once; the write stays pending until the fresh flags are in, so no stale « Annuler »

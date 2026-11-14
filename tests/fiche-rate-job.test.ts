@@ -26,7 +26,10 @@ const rate = (over: Partial<FicheRateMessage> = {}): FicheRateMessage => ({
 });
 const LIVE: Settings = { mode: "live", binding: BOUND };
 // A rating that went out, of a title the world's SensCritique says is unrated and unreviewed, with no page.
-const RATED = { ok: true, panel: { canUndo: true, canRemove: true } };
+const RATED = {
+  ok: true,
+  panel: { canUndo: true, canRemove: true, protected: false },
+};
 const SIMULATION: Settings = { mode: "simulation", binding: BOUND };
 
 // Content 5 is a film on Naka (the world's default item), in « Ma liste » with 99.

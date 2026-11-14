@@ -6,6 +6,7 @@ import {
   ficheEvent,
   linked,
   SERIES_PATH,
+  seasonEvent,
   seriesEvent,
   settle,
 } from "./fiche-controller-fakes";
@@ -18,7 +19,7 @@ import {
   starsOf,
   texts,
 } from "./fiche-ui-world";
-import type { FakeElement } from "./ui-fakes";
+import { FakeElement } from "./ui-fakes";
 
 const product = (over: Partial<NonNullable<FicheInfo["product"]>> = {}) => ({
   state: "linked" as const,
@@ -29,6 +30,7 @@ const product = (over: Partial<NonNullable<FicheInfo["product"]>> = {}) => ({
     label: { title: "Solaris", year: 1972 },
     canUndo: false,
     canRemove: true,
+    protected: false,
     ...over,
   },
 });
@@ -52,6 +54,10 @@ async function series() {
 /** The label of each of the panel's rows, in order: the first span's text. */
 const rowLabels = (panel: FakeElement) =>
   panel.children.map((row) => (row.children[0] as FakeElement).textContent);
+
+/** The title's stars, in the « Ta note » row. */
+const titleStars = (t: ReturnType<typeof fakeUi>) =>
+  starsOf(deepParts(t.kept.ours()[1] as FakeElement));
 
 const valueSpan = (row: FakeElement | undefined) =>
   row?.children[1] as FakeElement | undefined;
@@ -121,6 +127,59 @@ describe("the SensCritique rows in Naka's info panel", () => {
     (average as FakeElement).click(true);
     starsOf(deepParts(mine as FakeElement))[2]?.click(true);
     expect(panelClicks).toEqual([]);
+  });
+
+  it("keeps the series' stars (and the focus on them) while the episode ratings come in", async () => {
+    const t = fakeUi(SERIES_PATH);
+    t.page.shown = 1;
+    t.controller.event(seriesEvent());
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-info")[0]?.answer(linked(66, 5));
+    await settle();
+    t.ofType("fiche-season")[0]?.answer({
+      episodes: [{ episode: 1, productId: 101, average: 7 }],
+    });
+    await settle();
+    const before = titleStars(t)[4];
+    before?.focus();
+    t.ofType("fiche-mine")[0]?.answer({ mine: 6, average: null });
+    await settle();
+    expect(t.last()?.episodes.get(1)?.mine).toBe(6);
+    expect(titleStars(t)[4]).toBe(before);
+    expect(FakeElement.focused).toBe(before);
+  });
+
+  it("keeps the stars through an undo on its way and its ending", async () => {
+    const t = await film(product({ canUndo: true }));
+    const before = titleStars(t)[2];
+    t.controller.undo();
+    expect(t.last()?.pending).toBe("undo");
+    expect(titleStars(t)[2]).toBe(before);
+    t.ofType("fiche-undo")[0]?.answer({ refused: "expired" });
+    await settle();
+    expect(t.last()?.outcome?.kind).toBe("undo-refused");
+    expect(titleStars(t)[2]).toBe(before);
+  });
+
+  it("builds the stars again when the rating or the product changes", async () => {
+    const t = await film(product({ canUndo: true }));
+    const first = titleStars(t)[2];
+    t.controller.undo();
+    t.ofType("fiche-undo")[0]?.answer({ ok: true, maListe: "none" });
+    await settle();
+    t.ofType("fiche-info")[1]?.answer(product({ mine: 6 }));
+    await settle();
+    const second = titleStars(t)[2];
+    expect(second).not.toBe(first);
+    expect(checked(deepParts(t.kept.ours()[1] as FakeElement))).toEqual([
+      "6 sur 10",
+    ]);
+    t.controller.undo();
+    t.ofType("fiche-undo")[1]?.answer({ ok: true, maListe: "none" });
+    await settle();
+    t.ofType("fiche-info")[2]?.answer(product({ id: 56, mine: 6 }));
+    await settle();
+    expect(titleStars(t)[2]).not.toBe(second);
   });
 
   it("sends the rating on a trusted star click only", async () => {

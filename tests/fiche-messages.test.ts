@@ -122,7 +122,7 @@ describe("title page messages", () => {
 });
 
 const SC_URL = "https://www.senscritique.com/film/solaris/2005";
-const FLAGS = { canUndo: false, canRemove: false };
+const FLAGS = { canUndo: false, canRemove: false, protected: false };
 
 describe("title page answers", () => {
   const cand = { id: 9, title: "A", type: "serie" };
@@ -148,6 +148,7 @@ describe("title page answers", () => {
         label: { title: "Solaris", year: 1972 },
         canUndo: true,
         canRemove: true,
+        protected: false,
         url: SC_URL,
       },
     };
@@ -301,7 +302,12 @@ describe("the panel's flags in the answers", () => {
       ...over,
     },
   });
-  const panel = { canUndo: true, canRemove: false, url: SC_URL };
+  const panel = {
+    canUndo: true,
+    canRemove: false,
+    protected: true,
+    url: SC_URL,
+  };
 
   it.each([
     ["a film page", SC_URL],
@@ -316,6 +322,8 @@ describe("the panel's flags in the answers", () => {
     ["no removal flag", { canRemove: undefined }],
     ["a text undo flag", { canUndo: "true" }],
     ["a numeric removal flag", { canRemove: 1 }],
+    ["no protected flag", { protected: undefined }],
+    ["a text protected flag", { protected: "false" }],
     ["a page of another site", { url: "https://x.com/film/a/1" }],
     ["a protocol-relative page", { url: "//www.senscritique.com/film/a/1" }],
     ["a script page", { url: "javascript:alert(1)" }],
@@ -334,7 +342,10 @@ describe("the panel's flags in the answers", () => {
   it("reads the flags on a rating that went out, with and without a page", () => {
     const ok = { ok: true, panel };
     expect(parseRateAnswer(ok)).toEqual(ok);
-    const bare = { ok: true, panel: { canUndo: false, canRemove: false } };
+    const bare = {
+      ok: true,
+      panel: { canUndo: false, canRemove: false, protected: false },
+    };
     expect(parseRateAnswer(bare)).toEqual(bare);
     const sent = { sent: true, error: "naka-session", panel };
     expect(parseRateAnswer(sent)).toEqual(sent);
@@ -364,6 +375,10 @@ describe("the panel's flags in the answers", () => {
     ["on a rating that did not go out", { error: "sc-session", panel }],
     ["without the undo flag", { ok: true, panel: { canRemove: true } }],
     ["without the removal flag", { ok: true, panel: { canUndo: true } }],
+    [
+      "without the protected flag",
+      { ok: true, panel: { canUndo: true, canRemove: true } },
+    ],
     ["with an extra key", { ok: true, panel: { ...panel, x: 1 } }],
     [
       "with a foreign page",

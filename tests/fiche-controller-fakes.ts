@@ -50,6 +50,7 @@ export const linked = (id: number, mine: number | null = null): FicheInfo => ({
     label: { title: "Solaris" },
     canUndo: false,
     canRemove: false,
+    protected: false,
   },
 });
 
