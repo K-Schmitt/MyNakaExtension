@@ -57,5 +57,8 @@ export async function rateFilm(
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }
-  return { ...leaving.answer, panel: afterRating(kept.state, rating) };
+  return {
+    ...leaving.answer,
+    panel: afterRating(kept.state, rating, kept.record !== undefined),
+  };
 }
