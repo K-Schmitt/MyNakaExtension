@@ -25,6 +25,8 @@ const intervals: { ms: number; fn: () => void }[] = [];
 const pageListeners: { type: string; fn: PageListener }[] = [];
 const documentListeners: { type: string; fn: unknown; capture: boolean }[] = [];
 const requests: { url: string; init: RequestInit }[] = [];
+// What the entry sent while it loaded, kept apart from what later tests make it send.
+const sentAtLoad: unknown[] = [];
 
 const page = {
   addEventListener: (type: string, fn: PageListener) => {
@@ -84,7 +86,10 @@ beforeAll(async () => {
       text: async () => JSON.stringify({ contentIds: [1, 2], limit: 500 }),
     };
   });
+  // Without isolation, the entry may already be loaded by another file: run it again on this page.
+  vi.resetModules();
   await import("../src/content/naka-isolated");
+  sentAtLoad.push(...toWorker);
 });
 
 afterAll(() => {
@@ -100,7 +105,7 @@ function ask(msg: unknown, sender: object = { id: EXT }) {
 
 describe("isolated-world entry", () => {
   it("says naka-ready once, at load", () => {
-    expect(toWorker).toEqual([{ type: "naka-ready" }]);
+    expect(sentAtLoad).toEqual([{ type: "naka-ready" }]);
   });
 
   it("binds one runtime listener, one page listener, the URL poll and the sampler", () => {
@@ -117,13 +122,15 @@ describe("isolated-world entry", () => {
   });
 
   it("runs the worker's calls with the page's token, sent only to the Naka API", async () => {
+    const before = requests.length;
     const call = ask({ type: "naka-call", call: "playlistIds" });
     expect(call.async).toBe(true);
     await settle();
     expect(call.answers).toEqual([{ ok: true, value: [1, 2] }]);
-    expect(requests).toHaveLength(1);
-    expect(requests[0]?.url).toBe("https://naka.cx/api/v1/playlist/ids");
-    const headers = requests[0]?.init.headers as Record<string, string>;
+    const sent = requests.slice(before);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.url).toBe("https://naka.cx/api/v1/playlist/ids");
+    const headers = sent[0]?.init.headers as Record<string, string>;
     expect(headers.authorization).toBe(`Bearer ${TOKEN}`);
   });
 

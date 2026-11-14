@@ -46,6 +46,8 @@ beforeAll(async () => {
       return null;
     },
   });
+  // Without isolation, the entry may already be loaded by another file: run it again on this page.
+  vi.resetModules();
   await import("../src/page/naka-main");
 });
 
@@ -56,15 +58,18 @@ afterAll(() => {
 describe("MAIN-world entry", () => {
   it("replaces the page's fetch with a wrapper that calls it as it was called", async () => {
     expect(page.fetch).not.toBe(pageFetch);
+    const before = calls.length;
     const init = { method: "POST", body: "{}" };
     await page.fetch("/api/v1/playlist", init);
-    expect(calls).toEqual([["/api/v1/playlist", init]]);
-    expect(calls[0]?.[1]).toBe(init);
+    expect(calls.slice(before)).toEqual([["/api/v1/playlist", init]]);
+    expect(calls[before]?.[1]).toBe(init);
   });
 
   it("posts the page event to its own window, for https://naka.cx only", async () => {
+    const before = posts.length;
+    await page.fetch("/api/v1/playlist", { method: "POST", body: "{}" });
     await settle();
-    expect(posts).toEqual([
+    expect(posts.slice(before)).toEqual([
       [{ channel: "mynaka/1", kind: "playlist" }, "https://naka.cx"],
     ]);
   });

@@ -69,13 +69,38 @@ const fakeChrome = {
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
+// The file's one naka-ready, sent at setup: an automatic run waits out its gap, so a second one would
+// start nothing, and the status test reads the record this one leaves.
+const atNakaReady = {
+  returned: true,
+  queries: [] as unknown[],
+  sends: [] as unknown[][],
+  fetched: [] as string[],
+};
+
+async function sendNakaReady(): Promise<void> {
+  const listener = listeners[0] as Listener;
+  atNakaReady.returned = listener(
+    { type: "naka-ready" },
+    NAKA_TAB,
+    () => undefined,
+  );
+  await settle();
+  atNakaReady.queries = [...queries];
+  atNakaReady.sends = [...sends];
+  atNakaReady.fetched = [...fetched];
+}
+
 beforeAll(async () => {
   vi.stubGlobal("chrome", fakeChrome);
   vi.stubGlobal("fetch", async (url: string) => {
     fetched.push(url);
     return { ok: true, status: 200, text: async () => "<html></html>" };
   });
+  // Without isolation, the entry may already be loaded by another file: bind it again to this fake.
+  vi.resetModules();
   await import("../src/sw/main");
+  await sendNakaReady();
 });
 
 afterAll(() => {
@@ -103,15 +128,18 @@ describe("service worker entry", () => {
     expect(removedListeners).toHaveLength(0);
   });
 
-  it("asks the top frame of the first Naka tab that has an id and is not discarded", async () => {
-    const listener = listeners[0] as Listener;
-    expect(listener({ type: "naka-ready" }, NAKA_TAB, () => undefined)).toBe(
-      false,
-    );
-    await settle();
-    expect(queries[0]).toEqual({ url: "https://naka.cx/*", discarded: false });
-    expect(sends[0]).toEqual([5, { type: "naka-account" }, { frameId: 0 }]);
-    expect(fetched).toEqual(["https://www.senscritique.com/"]);
+  it("asks the top frame of the first Naka tab that has an id and is not discarded", () => {
+    expect(atNakaReady.returned).toBe(false);
+    expect(atNakaReady.queries[0]).toEqual({
+      url: "https://naka.cx/*",
+      discarded: false,
+    });
+    expect(atNakaReady.sends[0]).toEqual([
+      5,
+      { type: "naka-account" },
+      { frameId: 0 },
+    ]);
+    expect(atNakaReady.fetched).toEqual(["https://www.senscritique.com/"]);
   });
 
   it("answers the status page, and stores through chrome.storage.local", async () => {
