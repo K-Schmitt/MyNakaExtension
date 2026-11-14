@@ -14,6 +14,7 @@
 
 import { readAverage } from "./average-rating";
 import { type ProductLabel, readProductLabel } from "./product-label";
+import { productUrlOf } from "./product-url";
 import { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
 import { type Envelope, isRecord } from "./sc-transport";
 
@@ -30,13 +31,11 @@ export type ProductState = {
   dateDone: string | null;
   isReviewed: boolean;
   isRecommended: boolean;
-  /** The product's page on SensCritique, absolute; undefined unless the path has the known shape. */
+  /** The product's page on SensCritique, absolute; undefined unless the path has the known shape (product-url). */
   url: string | undefined;
 };
 
-const SC_ORIGIN = "https://www.senscritique.com";
 const DATE_DONE = /^\d{4}-\d{2}-\d{2}$/;
-const PRODUCT_PATH = /^\/[a-z_]+\/[A-Za-z0-9_-]+\/\d+(\/S\d+)?$/;
 
 const UNEXPECTED =
   "SensCritique ProductCurrentUserInfos: unexpected product state";
@@ -89,13 +88,6 @@ function dateDoneOf(infos: Record<string, unknown>): string | null {
     : null;
 }
 
-function urlOf(product: Record<string, unknown>): string | undefined {
-  const { url } = product;
-  return typeof url === "string" && PRODUCT_PATH.test(url)
-    ? `${SC_ORIGIN}${url}`
-    : undefined;
-}
-
 export function readProductState(
   envelope: Envelope,
   productId: number,
@@ -116,7 +108,7 @@ export function readProductState(
     dateDone: dateDoneOf(infos),
     isReviewed: infos.isReviewed === true,
     isRecommended: infos.isRecommended === true,
-    url: urlOf(product),
+    url: productUrlOf(product.url),
     ...(label === undefined ? {} : { label }),
   };
 }

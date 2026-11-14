@@ -3,14 +3,17 @@
 
 import type { QuestionCandidate } from "../core/state";
 import type { ProductLabel } from "../sc/product-label";
+import { isProductUrl } from "../sc/product-url";
 import { parseOfferCandidates } from "./candidate-schema";
 import { asText, asYear } from "./fiche-page-events";
 import {
+  asBoolean,
   asId,
   asInt,
   asList,
   asOneOf,
   asRecord,
+  asString,
   fail,
   onlyKeys,
   valuesOf,
@@ -20,7 +23,16 @@ import type { JobError } from "./job-error";
 import { asRating } from "./rating-schema";
 import { ERROR_CODES } from "./run-record-schema";
 
-export type FicheProduct = {
+/** The title panel's actions (spec §6): « Annuler », « Retirer la note », « Voir sur SensCritique ». */
+export type PanelFlags = {
+  /** A live undo record names this title and this product. */
+  canUndo: boolean;
+  /** Rated, with no critique or recommendation to lose. */
+  canRemove: boolean;
+  /** The product's page, a SensCritique product page only (product-url). */
+  url?: string;
+};
+export type FicheProduct = PanelFlags & {
   id: number;
   average: number | null;
   mine: number | null;
@@ -43,11 +55,14 @@ export type SeasonAnswer = { episodes: SeasonEpisode[] };
 /** The owner's rating of one product and its public average, read together (authenticated). */
 export type MineAnswer = { mine: number | null; average: number | null };
 export type OkAnswer = { ok: true };
+/** The panel's flags once a film's or a series' rating went out; an episode's answer has none. */
+type Paneled = { panel?: PanelFlags };
+export type RateOkAnswer = OkAnswer & Paneled;
 /** The rating did not go out. */
 export type NotSentAnswer = { error: JobError };
 /** The rating went out and a later step failed (a film's removal from « Ma liste »). */
-export type SentWithErrorAnswer = { sent: true; error: JobError };
-export type RateAnswer = OkAnswer | NotSentAnswer | SentWithErrorAnswer;
+export type SentWithErrorAnswer = { sent: true; error: JobError } & Paneled;
+export type RateAnswer = RateOkAnswer | NotSentAnswer | SentWithErrorAnswer;
 export type LinkAnswer = OkAnswer;
 
 const MAX_AVERAGE = 10;
@@ -68,6 +83,14 @@ const PRODUCT_KEYS = valuesOf<keyof FicheProduct>({
   average: true,
   mine: true,
   label: true,
+  canUndo: true,
+  canRemove: true,
+  url: true,
+});
+const PANEL_KEYS = valuesOf<keyof PanelFlags>({
+  canUndo: true,
+  canRemove: true,
+  url: true,
 });
 const LABEL_KEYS = valuesOf<keyof ProductLabel>({ title: true, year: true });
 const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
@@ -79,10 +102,12 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
 const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
 const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true, average: true });
 const OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
+const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({ ok: true, panel: true });
 const NOT_SENT_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
 const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
   sent: true,
   error: true,
+  panel: true,
 });
 
 function asAverage(raw: unknown, path: string): number {
@@ -113,6 +138,27 @@ function parseLabel(raw: unknown): ProductLabel {
   return label;
 }
 
+function asProductUrl(raw: unknown, path: string): string {
+  const url = asString(raw, path);
+  return isProductUrl(url) ? url : fail(path);
+}
+
+/** The flags held by `record` (a product, or a rating's panel), checked under `path`. */
+function readFlags(record: Record<string, unknown>, path: string): PanelFlags {
+  const flags: PanelFlags = {
+    canUndo: asBoolean(record.canUndo, `${path}.canUndo`),
+    canRemove: asBoolean(record.canRemove, `${path}.canRemove`),
+  };
+  const url = whenPresent(record.url, (v) => asProductUrl(v, `${path}.url`));
+  return url === undefined ? flags : { ...flags, url };
+}
+
+function parsePanel(raw: unknown): PanelFlags {
+  const record = asRecord(raw, "panel");
+  onlyKeys(record, PANEL_KEYS, "panel");
+  return readFlags(record, "panel");
+}
+
 function parseProduct(raw: unknown): FicheProduct {
   const record = asRecord(raw, "product");
   onlyKeys(record, PRODUCT_KEYS, "product");
@@ -121,6 +167,7 @@ function parseProduct(raw: unknown): FicheProduct {
     average: nullableAverage(record.average, "product.average"),
     mine: nullableRating(record.mine, "product.mine"),
     label: parseLabel(record.label),
+    ...readFlags(record, "product"),
   };
 }
 
@@ -166,11 +213,16 @@ export function parseMineAnswer(raw: unknown): MineAnswer {
   };
 }
 
+function withPanel<T extends object>(answer: T, raw: unknown): T & Paneled {
+  const panel = whenPresent(raw, parsePanel);
+  return panel === undefined ? answer : { ...answer, panel };
+}
+
 export function parseRateAnswer(raw: unknown): RateAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
-    onlyKeys(record, OK_KEYS, "answer");
-    return { ok: true };
+    onlyKeys(record, RATE_OK_KEYS, "answer");
+    return withPanel({ ok: true as const }, record.panel);
   }
   const error = asOneOf(record.error, ERROR_CODES, "error");
   if (record.sent === undefined) {
@@ -178,7 +230,8 @@ export function parseRateAnswer(raw: unknown): RateAnswer {
     return { error };
   }
   onlyKeys(record, SENT_WITH_ERROR_KEYS, "answer");
-  return record.sent === true ? { sent: true, error } : fail("sent");
+  if (record.sent !== true) return fail("sent");
+  return withPanel({ sent: true as const, error }, record.panel);
 }
 
 export function parseLinkAnswer(raw: unknown): LinkAnswer {

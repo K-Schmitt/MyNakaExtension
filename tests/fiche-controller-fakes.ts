@@ -43,7 +43,14 @@ export const minedIds = (calls: readonly Call[]) =>
 
 export const linked = (id: number, mine: number | null = null): FicheInfo => ({
   state: "linked",
-  product: { id, average: 6.9, mine, label: { title: "Solaris" } },
+  product: {
+    id,
+    average: 6.9,
+    mine,
+    label: { title: "Solaris" },
+    canUndo: false,
+    canRemove: false,
+  },
 });
 
 export const seasonOf = (...numbers: number[]) => ({
