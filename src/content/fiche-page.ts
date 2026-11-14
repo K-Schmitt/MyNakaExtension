@@ -24,6 +24,8 @@ export type FichePage = {
   info?: FicheInfo;
   /** The last read of the info was lost: its line and « Réessayer », whatever the last write's outcome. */
   infoFailed?: true;
+  /** The token of the info's read on its way, if one is: an older read's end leaves a newer one's. */
+  infoReading?: object;
   outcome?: FicheOutcome;
   pending?: FichePending;
   /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */
