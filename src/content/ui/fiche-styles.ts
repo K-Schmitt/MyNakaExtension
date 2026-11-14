@@ -25,6 +25,8 @@ const EPISODE_STARS_RULES = [
   `.mn-row--stars{margin-top:0;gap:${v("space-1")};}`,
   `.mn-row--stars[aria-busy="true"]{opacity:.5;}`,
   `.mn-star{font-size:16px;min-width:0;padding:0 1px;}`,
+  `.mn-stars[data-previewing] .mn-star{color:${v("color-star-empty")};}`,
+  `.mn-stars[data-previewing] .mn-star.mn-star--lit{color:${v("color-star-filled")};}`,
 ];
 
 export const ACTIONS_SHEET: string =

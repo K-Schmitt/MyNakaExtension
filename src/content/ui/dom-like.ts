@@ -4,6 +4,7 @@
 export type ClickEvent = { isTrusted: boolean };
 export type EventLike = ClickEvent & {
   key?: string;
+  pointerType?: string;
   altKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
