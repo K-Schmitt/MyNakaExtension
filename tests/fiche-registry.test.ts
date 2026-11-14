@@ -60,6 +60,32 @@ describe("fiche registry", () => {
     expect(await r.titleOf(1, 11)).toEqual(seriesTitle(600));
   });
 
+  it("shows names the tab's current page only", async () => {
+    const { r } = fresh();
+    await r.open(1, 10, undefined, []);
+    expect(await r.shows(1, 10)).toBe(true);
+    expect(await r.shows(1, 11)).toBe(false);
+    expect(await r.shows(2, 10)).toBe(false);
+  });
+
+  it("offer adds candidates to the tab's current page, the earlier ones kept", async () => {
+    const { r } = fresh();
+    await r.open(1, 10, seriesTitle(500), [100]);
+    await r.offer(1, 10, [101, 102]);
+    expect(await r.issuedAs(1, 10, 100, "candidate")).toBe(true);
+    expect(await r.issuedAs(1, 10, 101, "candidate")).toBe(true);
+    expect(await r.issuedAs(1, 10, 102, "candidate")).toBe(true);
+    expect(await r.titleOf(1, 10)).toEqual(seriesTitle(500));
+  });
+
+  it("offer for another content than the tab's page issues nothing", async () => {
+    const { r } = fresh();
+    await r.open(1, 11, undefined, []);
+    await r.offer(1, 10, [100]);
+    expect(await r.has(1, 10, 100)).toBe(false);
+    expect(await r.has(1, 11, 100)).toBe(false);
+  });
+
   it("open resets the tab: nothing issued before stays (same content or another)", async () => {
     const { r } = fresh();
     await r.open(1, 10, undefined, [100, 101]);
@@ -70,15 +96,6 @@ describe("fiche registry", () => {
     expect(await r.has(1, 10, 500)).toBe(false);
     expect(await r.titleOf(1, 10)).toBeUndefined();
     expect(await r.has(1, 11, 200)).toBe(true);
-  });
-
-  it("drop forgets the tab, and only that tab", async () => {
-    const { r } = fresh();
-    await r.open(1, 10, seriesTitle(500), []);
-    await r.open(2, 10, seriesTitle(500), []);
-    await r.drop(1);
-    expect(await r.has(1, 10, 500)).toBe(false);
-    expect(await r.has(2, 10, 500)).toBe(true);
   });
 
   it("a fresh registry over the same area still knows the issued products (a worker restart)", async () => {

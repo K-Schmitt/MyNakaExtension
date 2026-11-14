@@ -14,7 +14,15 @@ describe("createFicheWorkerPort", () => {
   it("sends fiche-info as given and returns the checked info", async () => {
     const answer = {
       state: "linked",
-      product: { id: 9, average: 6.9, mine: null, label: { title: "Dark" } },
+      product: {
+        id: 9,
+        average: 6.9,
+        mine: null,
+        label: { title: "Dark" },
+        canUndo: false,
+        canRemove: false,
+        protected: false,
+      },
     };
     const send = ok(answer);
     expect(await createFicheWorkerPort(send).info(INFO)).toEqual(answer);
@@ -91,5 +99,40 @@ describe("createFicheWorkerPort", () => {
       error: "unavailable",
     });
     expect(send).toHaveBeenCalledWith(rate);
+  });
+
+  it("sends fiche-undo as given and returns the checked answer", async () => {
+    const undo = {
+      type: "fiche-undo",
+      contentId: 5,
+      productId: 3,
+      listByTab: true,
+    } as const;
+    const send = ok({ ok: true, maListe: "tab" });
+    expect(await createFicheWorkerPort(send).undo(undo)).toEqual({
+      ok: true,
+      maListe: "tab",
+    });
+    expect(send).toHaveBeenCalledWith(undo);
+    expect(
+      await createFicheWorkerPort(ok({ ok: true, maListe: "x" })).undo(undo),
+    ).toBeUndefined();
+  });
+
+  it("sends fiche-search as given and returns the checked results", async () => {
+    const search = {
+      type: "fiche-search",
+      contentId: 5,
+      query: "Dark",
+    } as const;
+    const candidates = [{ id: 4, title: "Dark", year: 2017, type: "serie" }];
+    const send = ok({ candidates });
+    expect(await createFicheWorkerPort(send).search(search)).toEqual({
+      candidates,
+    });
+    expect(send).toHaveBeenCalledWith(search);
+    expect(
+      await createFicheWorkerPort(ok({ candidates: "x" })).search(search),
+    ).toBeUndefined();
   });
 });

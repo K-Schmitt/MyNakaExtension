@@ -44,12 +44,12 @@ describe("questionView", () => {
     const view = questionView(removal(), ["fermer"]);
     expect(view.heading).toBe(`«${NB}Dune${NB}» a quitté Ma liste Naka.`);
     expect(view.question).toBe(
-      `Retirer aussi de vos envies SensCritique${NB}?`,
+      `Retirer aussi de tes envies SensCritique${NB}?`,
     );
     expect(view.choices).toEqual([
       {
         choice: { kind: "remove" },
-        label: "Retirer aussi de vos envies SensCritique",
+        label: "Retirer aussi de tes envies SensCritique",
       },
       { choice: { kind: "keep" }, label: "Non" },
     ]);

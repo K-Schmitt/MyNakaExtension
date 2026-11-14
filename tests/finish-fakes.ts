@@ -160,6 +160,10 @@ export function world(o: Opts = {}) {
         isWished,
         rating: rating ?? null,
         average: null,
+        dateDone: null,
+        isReviewed: false,
+        isRecommended: false,
+        url: undefined,
         universe: universeOf(id),
       };
     },

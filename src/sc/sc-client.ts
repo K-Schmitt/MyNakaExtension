@@ -40,6 +40,7 @@ export type ScClient = {
   wish(productId: number): Promise<void>;
   unwish(productId: number): Promise<void>;
   markDone(productId: number, isoDate: string): Promise<void>;
+  markDoneWithoutDate(productId: number): Promise<void>;
   unmarkDone(productId: number): Promise<void>;
   rate(productId: number, rating: number): Promise<void>;
   productState(productId: number): Promise<ProductState>;
@@ -135,6 +136,7 @@ export function createScClient(deps: ScDeps): ScClient {
     wish: (productId) => oneStep(deps, "ProductWish", productId),
     unwish: (productId) => oneStep(deps, "ProductUnwish", productId),
     markDone: (productId, isoDate) => markDone(deps, productId, isoDate),
+    markDoneWithoutDate: (productId) => oneStep(deps, "ProductDone", productId),
     unmarkDone: (productId) => oneStep(deps, "ProductUndone", productId),
     rate: (productId, rating) => rate(deps, productId, rating),
     productState: (productId) => productState(deps, productId),
