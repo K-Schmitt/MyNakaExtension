@@ -4,7 +4,9 @@
 // the rate path is answered and stops there: no list removal; an error of the list removal is answered
 // `{ sent: true, error }` (the rating went out). A finish that waited on the film's
 // question is not run: rateJob's explicit finish is of the same key. A stored card that would rate another
-// product than the one issued refuses the write before any request.
+// product than the one issued refuses the write before any request. Once the link holds, the film's state is
+// read and kept as the undo record (fiche-undo-record), before any SensCritique write: after the link's
+// checks, so a refused link still sends nothing. An answer of a rating that went out carries the panel.
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -14,6 +16,8 @@ import type { Store } from "../ext/store";
 import { linkForRating } from "./fiche-link-pair";
 import { leaveNakaList } from "./fiche-list-removal";
 import { NotIssuedError } from "./fiche-mine-job";
+import { afterRating } from "./fiche-panel-flags";
+import { recordBefore } from "./fiche-undo-record";
 import type { JobDeps } from "./job-deps";
 import { rateJob } from "./rating-jobs";
 
@@ -35,6 +39,7 @@ export async function rateFilm(
   const { contentId, productId, rating } = msg;
   await assertCardProduct(deps.store, msg);
   await linkForRating(deps.store, { nakaId: contentId, scId: productId });
+  const before = await recordBefore(deps, msg, "film");
   const error = await rateJob(deps, {
     type: "rate",
     contentId,
@@ -42,5 +47,6 @@ export async function rateFilm(
     rating,
   });
   if (error !== undefined) return { error };
-  return leaveNakaList(deps, contentId);
+  const answer = await leaveNakaList(deps, contentId);
+  return { ...answer, panel: afterRating(before, rating) };
 }

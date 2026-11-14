@@ -3,12 +3,12 @@
 // The binding is checked first; a film not in the list (or an empty list) is left alone. The rating has
 // gone out by then: a failure here is answered `{ sent: true, error }`.
 
-import type { RateAnswer } from "../ext/fiche-answers";
+import type { RateOkAnswer, SentWithErrorAnswer } from "../ext/fiche-answers";
 import { checkBinding } from "./binding";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
 import { toJobError } from "./to-job-error";
 
-const OK: RateAnswer = { ok: true };
+const OK: RateOkAnswer = { ok: true };
 
 async function removeListed(deps: JobDeps, contentId: number): Promise<void> {
   const settings = await deps.store.loadSettings();
@@ -22,7 +22,7 @@ async function removeListed(deps: JobDeps, contentId: number): Promise<void> {
 export async function leaveNakaList(
   deps: JobDeps,
   contentId: number,
-): Promise<RateAnswer> {
+): Promise<RateOkAnswer | SentWithErrorAnswer> {
   try {
     await removeListed(deps, contentId);
     return OK;

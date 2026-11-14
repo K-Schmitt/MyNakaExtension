@@ -36,6 +36,8 @@ const VALID = [
   FILM,
   { ...FILM, target: "série" },
   EPISODE,
+  { ...FILM, inMaListe: true },
+  { ...FILM, inMaListe: false },
 ];
 
 describe("title page messages", () => {
@@ -68,6 +70,10 @@ describe("title page messages", () => {
     ["épisode without episode", { ...EPISODE, episode: undefined }],
     ["épisode without season", { ...EPISODE, season: undefined }],
     ["film with a season", { ...FILM, season: 1 }],
+    ["« Ma liste » as text", { ...FILM, inMaListe: "true" }],
+    ["« Ma liste » as a number", { ...FILM, inMaListe: 1 }],
+    ["« Ma liste » on a series", { ...FILM, target: "série", inMaListe: true }],
+    ["« Ma liste » on an episode", { ...EPISODE, inMaListe: false }],
     ["an extra key on info", { ...INFO, token: "t" }],
     ["an extra key on rate", { ...FILM, tmdbId: 1 }],
     ["an extra key on mine", { ...MINE, x: 1 }],
@@ -99,13 +105,22 @@ describe("title page messages", () => {
   });
 });
 
+const SC_URL = "https://www.senscritique.com/film/solaris/2005";
+const FLAGS = { canUndo: false, canRemove: false };
+
 describe("title page answers", () => {
   const cand = { id: 9, title: "A", type: "serie" };
 
   it("reads a FicheInfo", () => {
     const info = {
       state: "linked",
-      product: { id: 3, average: 7.4, mine: null, label: { title: "Dark" } },
+      product: {
+        id: 3,
+        average: 7.4,
+        mine: null,
+        label: { title: "Dark" },
+        ...FLAGS,
+      },
     };
     expect(parseFicheInfo(info)).toEqual(info);
     const labelled = {
@@ -115,6 +130,9 @@ describe("title page answers", () => {
         average: null,
         mine: 8,
         label: { title: "Solaris", year: 1972 },
+        canUndo: true,
+        canRemove: true,
+        url: SC_URL,
       },
     };
     expect(parseFicheInfo(labelled)).toEqual(labelled);
@@ -252,5 +270,71 @@ describe("title page answers", () => {
     () => parseLinkAnswer({ ok: true, x: 1 }),
   ])("rejects a bad answer %#", (parse) => {
     expect(parse).toThrow();
+  });
+});
+
+describe("the panel's flags in the answers", () => {
+  const product = (over: Record<string, unknown> = {}) => ({
+    state: "linked",
+    product: {
+      id: 3,
+      average: null,
+      mine: 8,
+      label: { title: "Solaris" },
+      ...FLAGS,
+      ...over,
+    },
+  });
+  const panel = { canUndo: true, canRemove: false, url: SC_URL };
+
+  it.each([
+    ["a film page", SC_URL],
+    ["a season page", "https://www.senscritique.com/serie/dark/13/S2"],
+  ])("reads the product's flags with %s", (_n, url) => {
+    const raw = product({ canUndo: true, canRemove: true, url });
+    expect(parseFicheInfo(raw)).toEqual(raw);
+  });
+
+  it.each([
+    ["no undo flag", { canUndo: undefined }],
+    ["no removal flag", { canRemove: undefined }],
+    ["a text undo flag", { canUndo: "true" }],
+    ["a numeric removal flag", { canRemove: 1 }],
+    ["a page of another site", { url: "https://x.com/film/a/1" }],
+    ["a protocol-relative page", { url: "//www.senscritique.com/film/a/1" }],
+    ["a script page", { url: "javascript:alert(1)" }],
+    ["a page with ..", { url: "https://www.senscritique.com/film/../1" }],
+    ["a relative page", { url: "/film/solaris/2005" }],
+    ["an empty page", { url: "" }],
+    [
+      "a page over 300 characters",
+      { url: `https://www.senscritique.com/film/${"a".repeat(270)}/1` },
+    ],
+    ["a numeric page", { url: 5 }],
+  ])("rejects a product with %s", (_n, over) => {
+    expect(() => parseFicheInfo(product(over))).toThrow();
+  });
+
+  it("reads the flags on a rating that went out, with and without a page", () => {
+    const ok = { ok: true, panel };
+    expect(parseRateAnswer(ok)).toEqual(ok);
+    const bare = { ok: true, panel: { canUndo: false, canRemove: false } };
+    expect(parseRateAnswer(bare)).toEqual(bare);
+    const sent = { sent: true, error: "naka-session", panel };
+    expect(parseRateAnswer(sent)).toEqual(sent);
+  });
+
+  it.each([
+    ["on a rating that did not go out", { error: "sc-session", panel }],
+    ["without the undo flag", { ok: true, panel: { canRemove: true } }],
+    ["without the removal flag", { ok: true, panel: { canUndo: true } }],
+    ["with an extra key", { ok: true, panel: { ...panel, x: 1 } }],
+    [
+      "with a foreign page",
+      { ok: true, panel: { ...panel, url: "https://x.com/a/b/1" } },
+    ],
+    ["not a record", { ok: true, panel: true }],
+  ])("rejects a panel %s", (_n, raw) => {
+    expect(() => parseRateAnswer(raw)).toThrow();
   });
 });

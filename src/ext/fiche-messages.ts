@@ -4,6 +4,7 @@
 
 import { asText, asYear, MAX_SEASON_COUNT } from "./fiche-page-events";
 import {
+  asBoolean,
   asId,
   asOneOf,
   fail,
@@ -38,6 +39,8 @@ export type FicheMessage =
       rating: number;
       season?: number;
       episode?: number;
+      /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
+      inMaListe?: boolean;
     }
   | { type: "fiche-link"; contentId: number; productId: number };
 
@@ -105,6 +108,7 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   rating: true,
   season: true,
   episode: true,
+  inMaListe: true,
 });
 
 export function isFicheType(type: string): type is FicheType {
@@ -130,6 +134,16 @@ function parseInfo(record: Record<string, unknown>): FicheInfoMessage {
   return message;
 }
 
+// « Ma liste » is a film's: present on another target, it refuses the message.
+function withMaListe(
+  message: FicheRateMessage,
+  raw: unknown,
+): FicheRateMessage {
+  if (raw === undefined) return message;
+  if (message.target !== "film") return fail("inMaListe");
+  return { ...message, inMaListe: asBoolean(raw, "inMaListe") };
+}
+
 function parseRate(record: Record<string, unknown>): FicheRateMessage {
   onlyKeys(record, RATE_KEYS, "message");
   const target = asOneOf(record.target, TARGETS, "target");
@@ -142,12 +156,17 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
   };
   const place = target === "épisode";
   const hasPlace = record.season !== undefined || record.episode !== undefined;
-  if (!place) return hasPlace ? fail("season") : base;
-  return {
-    ...base,
-    season: asId(record.season, "season"),
-    episode: asId(record.episode, "episode"),
-  };
+  if (!place) {
+    return hasPlace ? fail("season") : withMaListe(base, record.inMaListe);
+  }
+  return withMaListe(
+    {
+      ...base,
+      season: asId(record.season, "season"),
+      episode: asId(record.episode, "episode"),
+    },
+    record.inMaListe,
+  );
 }
 
 function parseProduct(

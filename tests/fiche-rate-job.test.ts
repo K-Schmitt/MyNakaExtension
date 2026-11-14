@@ -24,6 +24,8 @@ const rate = (over: Partial<FicheRateMessage> = {}): FicheRateMessage => ({
   ...over,
 });
 const LIVE: Settings = { mode: "live", binding: BOUND };
+// A rating that went out, of a title the world's SensCritique says is unrated and unreviewed, with no page.
+const RATED = { ok: true, panel: { canUndo: true, canRemove: true } };
 const SIMULATION: Settings = { mode: "simulation", binding: BOUND };
 
 // Content 5 is a film on Naka (the world's default item), in « Ma liste » with 99.
@@ -44,7 +46,7 @@ describe("fiche-rate: a film", () => {
   it("linked: one rate, one finish (one slot), then removed from « Ma liste » in live mode", async () => {
     const w = filmWorld();
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
     expect(w.settings().finishWindow?.count).toBe(1);
@@ -62,7 +64,7 @@ describe("fiche-rate: a film", () => {
   it("in simulation: the same rate and finish, and « Ma liste » neither read nor written", async () => {
     const w = filmWorld({ settings: SIMULATION });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toHaveLength(1);
     expect(w.nk.calls).not.toContain("playlistIds");
@@ -72,7 +74,7 @@ describe("fiche-rate: a film", () => {
   it("not in « Ma liste »: rated, and no removal", async () => {
     const w = filmWorld({ playlist: () => [99] });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
   });
 
@@ -86,6 +88,7 @@ describe("fiche-rate: a film", () => {
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
       error: "unavailable",
+      panel: RATED.panel,
     });
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
@@ -94,7 +97,7 @@ describe("fiche-rate: a film", () => {
   it("unlinked: the mapping is written first, then the same path", async () => {
     const w = filmWorld({ state: emptyState() });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
@@ -124,7 +127,7 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().unlinked).toEqual([]);
   });
@@ -144,7 +147,7 @@ describe("fiche-rate: a film", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
     expect(w.state().pending).toEqual([]);
   });
@@ -219,7 +222,7 @@ describe("fiche-rate: a series", () => {
     const w = filmWorld({ state: linkedTo(13) });
     w.area.data.set("ratings", cards());
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(w.writes()).toEqual(["rate:13:8"]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
     expect(w.settings().finishWindow).toBeUndefined();
@@ -248,7 +251,7 @@ describe("fiche-rate: a series", () => {
   it("unlinked: linked first, then rated and settled", async () => {
     const w = filmWorld({ state: emptyState() });
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
     expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
   });
@@ -314,7 +317,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
   it("a series whose open question holds an episode finish: rated, settled, then that episode finished once", async () => {
     const w = seriesWorld(question("tv:5:S1E2"));
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(rates(w.sk.calls)).toEqual(["rate:13:8"]);
     expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
     expect(w.sk.calls.indexOf("rate:13:8")).toBeLessThan(
@@ -331,7 +334,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
   it("a series whose question holds no finish: rated and settled, no finish", async () => {
     const w = seriesWorld(question());
     await w.registry.open(TAB, 5, seriesTitle(13), []);
-    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(RATED);
     expect(markDones(w.sk.calls)).toEqual([]);
     expect(w.settings().finishWindow).toBeUndefined();
   });
@@ -389,7 +392,7 @@ describe("fiche-rate: a linked title's waiting finish", () => {
       },
     });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
-    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({ ok: true });
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
     expect(markDones(w.sk.calls)).toEqual(["markDone:2005:2026-11-05"]);
     expect(w.settings().finishWindow?.count).toBe(1);
   });
@@ -578,7 +581,7 @@ describe("fiche-rate: the route", () => {
     const answer = new Promise((resolve) => {
       expect(router.handle(rate(), sender, resolve)).toBe(true);
     });
-    expect(await answer).toEqual({ ok: true });
+    expect(await answer).toEqual(RATED);
   });
 
   it("a product not issued: answered undefined", async () => {

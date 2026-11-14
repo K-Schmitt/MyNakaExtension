@@ -64,6 +64,8 @@ describe("the title page panel", () => {
         average: 6.9,
         mine: 7,
         label: { title: "Solaris", year: 1972 },
+        canUndo: false,
+        canRemove: true,
       },
     });
     const parts = t.parts();
@@ -94,6 +96,8 @@ describe("the title page panel", () => {
         average: null,
         mine: null,
         label: { title: "Solaris" },
+        canUndo: false,
+        canRemove: false,
       },
     });
     expect(texts(t.parts())).toContain("Pas encore de moyenne");
