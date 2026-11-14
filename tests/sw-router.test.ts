@@ -235,6 +235,14 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-link:${tabId}:${JSON.stringify(msg)}`);
       return { ok: true };
     },
+    ficheUndo: async (tabId, msg) => {
+      calls.push(`fiche-undo:${tabId}:${JSON.stringify(msg)}`);
+      return { ok: true, maListe: "tab" };
+    },
+    ficheRemove: async (tabId, msg) => {
+      calls.push(`fiche-remove:${tabId}:${JSON.stringify(msg)}`);
+      return { refused: "protected" };
+    },
     dropFicheTab: async (tabId) => {
       calls.push(`drop-fiche-tab:${tabId}`);
     },
@@ -2612,6 +2620,52 @@ describe("router: the title page messages", () => {
       `fiche-link:42:${JSON.stringify(FICHE_LINK)}`,
     ]);
     expect(r.answers).toEqual([{ ok: true }, { ok: true }]);
+  });
+
+  const FICHE_UNDO = {
+    type: "fiche-undo",
+    contentId: 5,
+    productId: 2005,
+    listByTab: true,
+  };
+  const FICHE_REMOVE = { type: "fiche-remove", contentId: 5, productId: 2005 };
+
+  it("fiche-undo and fiche-remove wait on the one queue and are answered with their job's answer", async () => {
+    // Arrange
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+
+    // Act
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    expect(r.send(FICHE_UNDO, FICHE_TAB)).toBe(true);
+    expect(r.send(FICHE_REMOVE, FICHE_TAB)).toBe(true);
+    await settle();
+    const before = [...r.calls];
+    release();
+    await settle();
+
+    // Assert
+    expect(before).toEqual([]);
+    expect(r.calls).toEqual([
+      `fiche-undo:42:${JSON.stringify(FICHE_UNDO)}`,
+      `fiche-remove:42:${JSON.stringify(FICHE_REMOVE)}`,
+    ]);
+    expect(r.answers).toEqual([
+      { ok: true, maListe: "tab" },
+      { refused: "protected" },
+    ]);
+  });
+
+  it("fiche-undo and fiche-remove from the status page are ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    expect(r.send(FICHE_UNDO, page)).toBe(false);
+    expect(r.send(FICHE_REMOVE, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
   });
 
   it("a fiche write that rejects is answered undefined", async () => {

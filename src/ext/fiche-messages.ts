@@ -42,7 +42,15 @@ export type FicheMessage =
       /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
       inMaListe?: boolean;
     }
-  | { type: "fiche-link"; contentId: number; productId: number };
+  | { type: "fiche-link"; contentId: number; productId: number }
+  | {
+      type: "fiche-undo";
+      contentId: number;
+      productId: number;
+      /** Naka's « Ma liste » button is on screen: the tab clicks it itself (`maListe: "tab"`). */
+      listByTab?: boolean;
+    }
+  | { type: "fiche-remove"; contentId: number; productId: number };
 
 export type FicheType = FicheMessage["type"];
 export type FicheInfoMessage = Extract<FicheMessage, { type: "fiche-info" }>;
@@ -53,6 +61,12 @@ export type FicheSeasonMessage = Extract<
 export type FicheMineMessage = Extract<FicheMessage, { type: "fiche-mine" }>;
 export type FicheRateMessage = Extract<FicheMessage, { type: "fiche-rate" }>;
 export type FicheLinkMessage = Extract<FicheMessage, { type: "fiche-link" }>;
+export type FicheUndoMessage = Extract<FicheMessage, { type: "fiche-undo" }>;
+export type FicheRemoveMessage = Extract<
+  FicheMessage,
+  { type: "fiche-remove" }
+>;
+type ProductMessage = FicheMineMessage | FicheLinkMessage | FicheRemoveMessage;
 
 /** Spread into the worker's type list (messages.ts). */
 export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
@@ -61,6 +75,8 @@ export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
   "fiche-mine": true,
   "fiche-rate": true,
   "fiche-link": true,
+  "fiche-undo": true,
+  "fiche-remove": true,
 };
 const FICHE_TYPES = valuesOf<FicheType>(FICHE_TYPE_FLAGS);
 
@@ -70,6 +86,8 @@ export const FICHE_SENDERS: Record<FicheType, readonly SenderRole[]> = {
   "fiche-mine": ["naka-tab"],
   "fiche-rate": ["naka-tab"],
   "fiche-link": ["naka-tab"],
+  "fiche-undo": ["naka-tab"],
+  "fiche-remove": ["naka-tab"],
 };
 
 const TARGETS = valuesOf<FicheTarget>({
@@ -99,6 +117,12 @@ const PRODUCT_KEYS = valuesOf<keyof FicheMineMessage>({
   type: true,
   contentId: true,
   productId: true,
+});
+const UNDO_KEYS = valuesOf<keyof FicheUndoMessage>({
+  type: true,
+  contentId: true,
+  productId: true,
+  listByTab: true,
 });
 const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   type: true,
@@ -170,15 +194,28 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
 }
 
 function parseProduct(
-  type: "fiche-mine" | "fiche-link",
+  type: ProductMessage["type"],
   record: Record<string, unknown>,
-): FicheMineMessage | FicheLinkMessage {
+): ProductMessage {
   onlyKeys(record, PRODUCT_KEYS, "message");
   return {
     type,
     contentId: asId(record.contentId, "contentId"),
     productId: asId(record.productId, "productId"),
   };
+}
+
+function parseUndo(record: Record<string, unknown>): FicheUndoMessage {
+  onlyKeys(record, UNDO_KEYS, "message");
+  const message: FicheUndoMessage = {
+    type: "fiche-undo",
+    contentId: asId(record.contentId, "contentId"),
+    productId: asId(record.productId, "productId"),
+  };
+  const listByTab = whenPresent(record.listByTab, (v) =>
+    asBoolean(v, "listByTab"),
+  );
+  return listByTab === undefined ? message : { ...message, listByTab };
 }
 
 // A season a title can have, 1 to MAX_SEASON_COUNT: each season is one SensCritique read.
@@ -203,6 +240,8 @@ export function parseFicheMessage(
       };
     case "fiche-rate":
       return parseRate(record);
+    case "fiche-undo":
+      return parseUndo(record);
     default:
       return parseProduct(type, record);
   }
