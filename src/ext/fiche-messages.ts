@@ -8,6 +8,7 @@ import {
   asBoolean,
   asId,
   asOneOf,
+  asString,
   fail,
   onlyKeys,
   valuesOf,
@@ -53,7 +54,9 @@ export type FicheMessage =
       /** Naka's « Ma liste » button is on screen: the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
     }
-  | { type: "fiche-remove"; contentId: number; productId: number };
+  | { type: "fiche-remove"; contentId: number; productId: number }
+  /** « Chercher » on the title page: the owner's own words, trimmed, 1 to MAX_SEARCH_QUERY characters. */
+  | { type: "fiche-search"; contentId: number; query: string };
 
 export type FicheType = FicheMessage["type"];
 export type FicheInfoMessage = Extract<FicheMessage, { type: "fiche-info" }>;
@@ -69,6 +72,12 @@ export type FicheRemoveMessage = Extract<
   FicheMessage,
   { type: "fiche-remove" }
 >;
+export type FicheSearchMessage = Extract<
+  FicheMessage,
+  { type: "fiche-search" }
+>;
+
+export const MAX_SEARCH_QUERY = 100;
 
 /** Spread into the worker's type list (messages.ts). */
 export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
@@ -79,6 +88,7 @@ export const FICHE_TYPE_FLAGS: Record<FicheType, true> = {
   "fiche-link": true,
   "fiche-undo": true,
   "fiche-remove": true,
+  "fiche-search": true,
 };
 const FICHE_TYPES = valuesOf<FicheType>(FICHE_TYPE_FLAGS);
 
@@ -90,6 +100,7 @@ export const FICHE_SENDERS: Record<FicheType, readonly SenderRole[]> = {
   "fiche-link": ["naka-tab"],
   "fiche-undo": ["naka-tab"],
   "fiche-remove": ["naka-tab"],
+  "fiche-search": ["naka-tab"],
 };
 
 const TARGETS = valuesOf<FicheTarget>({
@@ -130,6 +141,11 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   episode: true,
   inMaListe: true,
   listByTab: true,
+});
+const SEARCH_KEYS = valuesOf<keyof FicheSearchMessage>({
+  type: true,
+  contentId: true,
+  query: true,
 });
 /** The rating's fields of Naka's « Ma liste » button: a film's only. */
 type FilmOnlyKey = Extract<keyof FicheRateMessage, "inMaListe" | "listByTab">;
@@ -216,6 +232,22 @@ function asSeason(raw: unknown): number {
   return season <= MAX_SEASON_COUNT ? season : fail("season");
 }
 
+// The query trimmed, 1 to MAX_SEARCH_QUERY characters once trimmed.
+function asQuery(raw: unknown): string {
+  const query = asString(raw, "query").trim();
+  const sized = query.length >= 1 && query.length <= MAX_SEARCH_QUERY;
+  return sized ? query : fail("query");
+}
+
+function parseSearch(record: Record<string, unknown>): FicheSearchMessage {
+  onlyKeys(record, SEARCH_KEYS, "message");
+  return {
+    type: "fiche-search",
+    contentId: asId(record.contentId, "contentId"),
+    query: asQuery(record.query),
+  };
+}
+
 export function parseFicheMessage(
   type: FicheType,
   record: Record<string, unknown>,
@@ -236,6 +268,8 @@ export function parseFicheMessage(
       return parseUndo(record);
     case "fiche-remove":
       return parseRemove(record);
+    case "fiche-search":
+      return parseSearch(record);
     default:
       return parseProduct(type, record);
   }

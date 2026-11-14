@@ -68,6 +68,10 @@ export type NotSentAnswer = { error: JobError };
 export type SentWithErrorAnswer = { sent: true; error: JobError } & Paneled;
 export type RateAnswer = RateOkAnswer | NotSentAnswer | SentWithErrorAnswer;
 export type LinkAnswer = OkAnswer;
+/** « Chercher »'s results, at most MAX_SEARCH_RESULTS, each issued to the tab as a candidate. */
+export type FicheSearchAnswer = { candidates: QuestionCandidate[] };
+
+export const MAX_SEARCH_RESULTS = 10;
 
 const MAX_AVERAGE = 10;
 const MAX_EPISODES = 500;
@@ -108,6 +112,7 @@ const EPISODE_KEYS = valuesOf<keyof SeasonEpisode>({
 const SEASON_KEYS = valuesOf<keyof SeasonAnswer>({ episodes: true });
 const MINE_KEYS = valuesOf<keyof MineAnswer>({ mine: true, average: true });
 const OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
+const SEARCH_KEYS = valuesOf<keyof FicheSearchAnswer>({ candidates: true });
 const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({
   ok: true,
   panel: true,
@@ -256,4 +261,13 @@ export function parseLinkAnswer(raw: unknown): LinkAnswer {
   const record = asRecord(raw, "answer");
   onlyKeys(record, OK_KEYS, "answer");
   return record.ok === true ? { ok: true } : fail("ok");
+}
+
+export function parseSearchAnswer(raw: unknown): FicheSearchAnswer {
+  const record = asRecord(raw, "answer");
+  onlyKeys(record, SEARCH_KEYS, "answer");
+  const candidates = parseOfferCandidates(record.candidates, "candidates");
+  return candidates.length > MAX_SEARCH_RESULTS
+    ? fail("candidates")
+    : { candidates };
 }

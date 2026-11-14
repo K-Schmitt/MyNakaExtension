@@ -227,6 +227,10 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-mine:${tabId}:${JSON.stringify(msg)}`);
       return { mine: 6, average: null };
     },
+    ficheSearch: async (tabId, msg) => {
+      calls.push(`fiche-search:${tabId}:${JSON.stringify(msg)}`);
+      return { candidates: [] };
+    },
     ficheRate: async (tabId, msg) => {
       calls.push(`fiche-rate:${tabId}:${JSON.stringify(msg)}`);
       return { ok: true };
@@ -2544,6 +2548,31 @@ describe("router: the title page messages", () => {
       { episodes: [] },
       { mine: 6, average: null },
     ]);
+  });
+
+  it("fiche-search is answered outside the queue, for the sending tab, with its query trimmed", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const r = router({ setMode: () => held });
+    r.send({ type: "set-mode", mode: "live" }, STATUS_PAGE);
+    const typed = { type: "fiche-search", contentId: 5, query: " Solaris " };
+    expect(r.send(typed, FICHE_TAB)).toBe(true);
+    await settle();
+    const trimmed = { ...typed, query: "Solaris" };
+    expect(r.calls).toEqual([`fiche-search:42:${JSON.stringify(trimmed)}`]);
+    expect(r.answers).toEqual([{ candidates: [] }]);
+    release();
+  });
+
+  it("a fiche-search from the status page is ignored", async () => {
+    const r = router();
+    const page = { ...STATUS_PAGE, tab: { id: 42, url: STATUS_URL } };
+    const typed = { type: "fiche-search", contentId: 5, query: "Solaris" };
+    expect(r.send(typed, page)).toBe(false);
+    await settle();
+    expect(r.calls).toEqual([]);
   });
 
   it("a fiche-season above season 100 is refused: no job, no answer", async () => {

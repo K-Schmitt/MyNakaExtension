@@ -80,6 +80,7 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     ficheInfo: async () => ({ state: "notfound" }),
     ficheSeason: async () => ({ episodes: [] }),
     ficheMine: async () => ({ mine: null, average: null }),
+    ficheSearch: async () => ({ candidates: [] }),
     ficheRate: async () => ({ ok: true }),
     ficheLink: async () => ({ ok: true }),
     ficheUndo: async () => ({ ok: true, maListe: "none" }),

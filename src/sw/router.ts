@@ -229,6 +229,7 @@ export function createRouter(deps: RouterDeps): Router {
       case "fiche-link":
       case "fiche-undo":
       case "fiche-remove":
+      case "fiche-search":
         return routeFiche((job) => queue.run(job), jobs, msg, tabId, respond);
     }
   }
