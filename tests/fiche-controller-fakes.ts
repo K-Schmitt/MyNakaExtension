@@ -75,6 +75,8 @@ export function fakePorts() {
     /** The programmatic clicks on it; each one flips it, as Naka's handler does. */
     clicks: 0,
   };
+  /** The page timer's timers; `fire` runs one even once cleared, as a late call would. */
+  const timers: { ms: number; cleared: boolean; fire(): void }[] = [];
   const ask = (msg: FicheMessage) =>
     new Promise<never>((resolve) => {
       calls.push({ msg, answer: resolve as (value: unknown) => void });
@@ -106,11 +108,21 @@ export function fakePorts() {
     announceVisit: (path) => {
       announced.push(path);
     },
+    timer: {
+      set: (fn, ms) => {
+        const timer = { ms, cleared: false, fire: fn };
+        timers.push(timer);
+        return timer;
+      },
+      clear: (handle) => {
+        (handle as { cleared: boolean }).cleared = true;
+      },
+    },
   };
   const ofType = (type: FicheMessage["type"]) =>
     calls.filter((call) => call.msg.type === type);
   const last = () => views[views.length - 1];
-  return { ports, calls, views, page, ofType, last, announced };
+  return { ports, calls, views, page, ofType, last, announced, timers };
 }
 
 /** Lets every resolved answer reach the controller. */

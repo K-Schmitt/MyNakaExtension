@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { UNDO_WINDOW_MS } from "../src/core/fiche-undo";
 import { emptyState, type SyncState } from "../src/core/state";
 import type { FicheRateMessage } from "../src/ext/fiche-messages";
 import type { Settings } from "../src/ext/settings";
@@ -28,7 +29,12 @@ const LIVE: Settings = { mode: "live", binding: BOUND };
 // A rating that went out, of a title the world's SensCritique says is unrated and unreviewed, with no page.
 const RATED = {
   ok: true,
-  panel: { canUndo: true, canRemove: true, protected: false },
+  panel: {
+    canUndo: true,
+    undoLeftMs: UNDO_WINDOW_MS,
+    canRemove: true,
+    protected: false,
+  },
 };
 const SIMULATION: Settings = { mode: "simulation", binding: BOUND };
 

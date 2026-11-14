@@ -6,6 +6,7 @@ import type { FicheScope } from "./fiche-page";
 import type { TitlePageEvent } from "./fiche-ports";
 import { considerSeason } from "./fiche-season-reader";
 import { keepContent } from "./fiche-seen-seasons";
+import { watchUndoExpiry } from "./fiche-undo-expiry";
 
 type FicheEventOf = Extract<TitlePageEvent, { kind: "fiche" }>;
 
@@ -37,10 +38,12 @@ export async function askInfo(scope: FicheScope): Promise<void> {
   const msg = page.infoMessage;
   if (msg === undefined) return;
   page.info = undefined;
+  watchUndoExpiry(scope);
   const answer = await scope.ports.info(msg);
   if (!scope.live()) return;
   if (answer === undefined) page.outcome = { kind: "failed" };
   else page.info = answer;
+  watchUndoExpiry(scope);
   scope.show();
   considerSeason(scope);
 }

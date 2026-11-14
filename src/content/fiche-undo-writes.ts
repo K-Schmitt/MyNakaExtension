@@ -10,6 +10,7 @@ import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
 import { contentOf, type FicheScope } from "./fiche-page";
 import { considerSeason, forgetSeasons } from "./fiche-season-reader";
+import { watchUndoExpiry } from "./fiche-undo-expiry";
 import type { FicheOutcome, UndoAction } from "./fiche-view";
 
 type TitleIds = { contentId: number; productId: number };
@@ -55,6 +56,7 @@ async function refreshInfo(scope: FicheScope): Promise<void> {
   if (!scope.live()) return;
   forgetSeasons(scope);
   scope.page.info = info;
+  watchUndoExpiry(scope);
   if (info === undefined) scope.page.outcome = { kind: "failed" };
   considerSeason(scope);
 }

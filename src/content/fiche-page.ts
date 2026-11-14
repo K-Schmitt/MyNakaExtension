@@ -42,6 +42,8 @@ export type FichePage = {
   /** The seasons read during the visit. */
   readonly read: Map<number, Episodes>;
   search?: FicheSearch;
+  /** The timer that stops offering « Annuler » when its record times out; its token names the live one. */
+  undoExpiry?: { token: object; handle: unknown };
 };
 
 export type FicheScope = {

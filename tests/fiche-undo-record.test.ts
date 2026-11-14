@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FicheUndo } from "../src/core/fiche-undo";
+import { type FicheUndo, UNDO_WINDOW_MS } from "../src/core/fiche-undo";
 import type { FicheRateMessage } from "../src/ext/fiche-messages";
 import type { Settings } from "../src/ext/settings";
 import type { ProductState } from "../src/sc/sc-client";
@@ -97,6 +97,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
       ok: true,
       panel: {
         canUndo: true,
+        undoLeftMs: UNDO_WINDOW_MS,
         canRemove: true,
         protected: false,
         url: FILM_URL,
@@ -139,6 +140,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
       ok: true,
       panel: {
         canUndo: true,
+        undoLeftMs: UNDO_WINDOW_MS,
         canRemove: false,
         protected: true,
         url: FILM_URL,
@@ -187,6 +189,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
       error: "unavailable",
       panel: {
         canUndo: true,
+        undoLeftMs: UNDO_WINDOW_MS,
         canRemove: true,
         protected: false,
         url: FILM_URL,
@@ -212,7 +215,12 @@ describe("fiche-rate keeps what a series rating changes", () => {
     await w.registry.open(TAB, 5, seriesTitle(13), []);
     expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual({
       ok: true,
-      panel: { canUndo: true, canRemove: true, protected: false },
+      panel: {
+        canUndo: true,
+        undoLeftMs: UNDO_WINDOW_MS,
+        canRemove: true,
+        protected: false,
+      },
     });
     expect(stored(w)).toEqual(
       filmRecord({
