@@ -150,8 +150,6 @@ export type Jobs = {
   /** « Annuler » and « Retirer la note »: they reject, with no request, for a title not issued to that tab. */
   ficheUndo(tabId: number, msg: FicheUndoMessage): Promise<UndoAnswer>;
   ficheRemove(tabId: number, msg: FicheRemoveMessage): Promise<RemoveAnswer>;
-  /** A closed tab: the products issued to it are forgotten. */
-  dropFicheTab(tabId: number): Promise<void>;
 };
 
 async function quietly(job: () => Promise<void>): Promise<void> {
@@ -238,6 +236,5 @@ export function createJobs(
     ficheLink: (tabId, msg) => ficheLinkJob(deps, asker(tabId), msg),
     ficheUndo: (tabId, msg) => ficheUndoJob(deps, asker(tabId), msg),
     ficheRemove: (tabId, msg) => ficheRemoveJob(deps, asker(tabId), msg),
-    dropFicheTab: (tabId) => registry.drop(tabId),
   };
 }

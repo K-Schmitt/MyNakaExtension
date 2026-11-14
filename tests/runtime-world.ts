@@ -781,7 +781,6 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     ficheLink: (tabId, msg) => jobs.ficheLink(tabId, msg),
     ficheUndo: (tabId, msg) => jobs.ficheUndo(tabId, msg),
     ficheRemove: (tabId, msg) => jobs.ficheRemove(tabId, msg),
-    dropFicheTab: (tabId) => jobs.dropFicheTab(tabId),
     statusSnapshot: () => {
       checkInvoked(w, "status");
       if (gen === w.gen && w.current !== undefined)

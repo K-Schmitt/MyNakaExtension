@@ -85,7 +85,6 @@ function fakeJobs(over: Partial<Jobs> = {}): Jobs {
     ficheLink: async () => ({ ok: true }),
     ficheUndo: async () => ({ ok: true, maListe: "none" }),
     ficheRemove: async () => ({ ok: true }),
-    dropFicheTab: async () => undefined,
     ...over,
   };
 }
