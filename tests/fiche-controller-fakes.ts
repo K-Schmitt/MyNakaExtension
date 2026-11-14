@@ -85,6 +85,7 @@ export function fakePorts() {
     rate: ask,
     link: ask,
     undo: ask,
+    remove: ask,
     shownSeason: () => page.shown,
     hasEpisodeGrid: () => page.grid,
     visibleFirst: (numbers) => [

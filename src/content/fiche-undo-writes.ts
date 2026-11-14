@@ -1,30 +1,94 @@
-// « Annuler » from the title page (spec §6): the worker puts back what the last rating changed. The tab
-// sends it for the shown product, never while another write is on its way, and gives the film back to
-// Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste). The answer is returned
-// for the panel, which shows what was put back.
+// « Annuler » and « Retirer la note » from the title page (spec §6): the worker puts back what the last
+// rating changed, or takes the rating off. The tab sends either for the shown product, never while another
+// write is on its way (its `pending` turns a double click into one message), and gives the film back to
+// Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste). The answer's line stays
+// shown; the info is then asked again, since these answers carry no panel flags (ruling R11).
 
 import type { FicheUndoMessage } from "../ext/fiche-messages";
-import type { UndoAnswer } from "../ext/fiche-undo-answers";
+import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
 import { contentOf, type FicheScope } from "./fiche-page";
+import type { FicheOutcome, UndoAction } from "./fiche-view";
 
-function undoMessage(scope: FicheScope): FicheUndoMessage | undefined {
+type TitleIds = { contentId: number; productId: number };
+
+function shownTitle(scope: FicheScope): TitleIds | undefined {
   const { page } = scope;
   const product = page.info?.product;
   const contentId = contentOf(page);
   if (page.pending !== undefined) return undefined;
   if (product === undefined || contentId === undefined) return undefined;
-  const film = page.title.mediaType === "movie";
-  const list = film ? undoListField(scope) : {};
-  return { type: "fiche-undo", contentId, productId: product.id, ...list };
+  return { contentId, productId: product.id };
+}
+
+/** The line an answer leaves: none once it all went through. */
+export function undoOutcome(
+  answer: UndoAnswer | RemoveAnswer | undefined,
+  action: UndoAction,
+): FicheOutcome | undefined {
+  if (answer === undefined) return { kind: "undo-failed", action };
+  if ("ok" in answer) return undefined;
+  if ("refused" in answer)
+    return { kind: "undo-refused", reason: answer.refused };
+  if ("partial" in answer) {
+    return { kind: "undo-partial", failed: answer.partial.failed.kind };
+  }
+  return { kind: "undo-failed", action };
+}
+
+function begin(scope: FicheScope, action: UndoAction): void {
+  const { page } = scope;
+  page.pending = action;
+  page.outcome = undefined;
+  page.ratedEpisode = undefined;
+  scope.show();
+}
+
+async function refreshInfo(scope: FicheScope): Promise<void> {
+  const msg = scope.page.infoMessage;
+  if (msg === undefined) return;
+  const info = await scope.ports.info(msg);
+  if (scope.live() && info !== undefined) scope.page.info = info;
+}
+
+// The line shows at once; the write stays pending until the fresh flags are in, so no stale « Annuler »
+// can be clicked between the answer and the new info.
+async function end(
+  scope: FicheScope,
+  action: UndoAction,
+  answer: UndoAnswer | RemoveAnswer | undefined,
+): Promise<void> {
+  if (!scope.live()) return;
+  scope.page.outcome = undoOutcome(answer, action);
+  scope.show();
+  await refreshInfo(scope);
+  if (!scope.live()) return;
+  scope.page.pending = undefined;
+  scope.show();
 }
 
 export async function undoTitle(
   scope: FicheScope,
 ): Promise<UndoAnswer | undefined> {
-  const msg = undoMessage(scope);
-  if (msg === undefined) return undefined;
+  const title = shownTitle(scope);
+  if (title === undefined) return undefined;
+  const film = scope.page.title.mediaType === "movie";
+  const msg: FicheUndoMessage = {
+    type: "fiche-undo",
+    ...title,
+    ...(film ? undoListField(scope) : {}),
+  };
+  begin(scope, "undo");
   const answer = await scope.ports.undo(msg);
   if (msg.listByTab === true && givenBackByTab(answer)) setMaListe(scope, true);
+  await end(scope, "undo", answer);
   return answer;
+}
+
+export async function removeTitle(scope: FicheScope): Promise<void> {
+  const title = shownTitle(scope);
+  if (title === undefined) return;
+  begin(scope, "remove");
+  const answer = await scope.ports.remove({ type: "fiche-remove", ...title });
+  await end(scope, "remove", answer);
 }

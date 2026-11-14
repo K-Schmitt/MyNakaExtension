@@ -2,6 +2,7 @@
 // a series after its confirmation, an episode of the shown season, a link to a candidate the worker
 // offered. One write at a time; an answer that comes once the visit is over changes nothing. A film's
 // rating takes it out of Naka's « Ma liste » with Naka's own button when it is on screen (fiche-ma-liste).
+// A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer la note », the link).
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
@@ -36,7 +37,7 @@ function endingOf(answer: RateAnswer | undefined): Ending {
 async function sendRate(
   scope: FicheScope,
   msg: FicheRateMessage,
-  apply: (rating: number) => void,
+  apply: (rating: number, answer: RateAnswer | undefined) => void,
   place?: EpisodePlace,
 ): Promise<RateAnswer | undefined> {
   const { page } = scope;
@@ -49,7 +50,7 @@ async function sendRate(
   const ending = endingOf(answer);
   page.pending = undefined;
   page.outcome = ending.outcome;
-  if (ending.sent) apply(msg.rating);
+  if (ending.sent) apply(msg.rating, answer);
   scope.show();
   return answer;
 }
@@ -75,9 +76,10 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
     ...rateMessage(contentId, target, product.id, rating),
     ...(film ? rateListFields(scope) : {}),
   };
-  const answer = await sendRate(scope, msg, (mine) => {
+  const answer = await sendRate(scope, msg, (mine, sent) => {
     if (page.info?.product?.id !== product.id) return;
-    page.info = { ...page.info, product: { ...product, mine } };
+    const flags = sent !== undefined && "panel" in sent ? sent.panel : {};
+    page.info = { ...page.info, product: { ...product, mine, ...flags } };
   });
   if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
 }

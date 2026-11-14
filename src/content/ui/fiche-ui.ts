@@ -1,26 +1,30 @@
-// The title page UI the controller renders into: the panel block and the episode boxes, both taken off
-// when the tab leaves the title page (an undefined view).
+// The title page UI the controller renders into: our two rows in Naka's info panel, the actions right after
+// it and the episode boxes, all taken off when the tab leaves the title page (an undefined view).
 
 import type { FicheView } from "../fiche-view";
+import { createFicheActions, type FicheActionsPorts } from "./fiche-actions";
 import { createFicheEpisodes, type FicheEpisodesPorts } from "./fiche-episodes";
 import type { FicheHandlers } from "./fiche-handlers";
-import { createFichePanel, type FichePanelPorts } from "./fiche-panel";
+import { createFicheRows } from "./fiche-info-rows";
 
-export type FicheUiPorts = FichePanelPorts & FicheEpisodesPorts;
+export type FicheUiPorts = FicheActionsPorts & FicheEpisodesPorts;
 
 export function createFicheUi(ports: FicheUiPorts): {
   render(view: FicheView | undefined, handlers: FicheHandlers): void;
 } {
-  const panel = createFichePanel(ports);
+  const rows = createFicheRows(ports);
+  const actions = createFicheActions(ports);
   const episodes = createFicheEpisodes(ports);
   return {
     render(view, handlers) {
       if (view === undefined) {
-        panel.hide();
+        rows.hide();
+        actions.hide();
         episodes.clear();
         return;
       }
-      panel.show(view, handlers);
+      rows.show(view, handlers);
+      actions.show(view, handlers);
       episodes.draw(view, handlers);
     },
   };

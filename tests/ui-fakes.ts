@@ -26,6 +26,37 @@ export class FakeNode implements NodeLike {
     this.children = this.children.filter((c) => c !== child);
     child.parent = null;
   }
+
+  /** Puts `child` right after `ref`, one of this node's children; moves it like appendChild. */
+  insertAfter(child: FakeNode, ref: FakeNode): void {
+    child.parent?.drop(child);
+    child.parent = this;
+    this.children.splice(this.children.indexOf(ref) + 1, 0, child);
+  }
+
+  get parentElement(): FakeElement | null {
+    return this.parent instanceof FakeElement ? this.parent : null;
+  }
+
+  get nextElementSibling(): FakeElement | null {
+    const siblings = this.parent?.children ?? [];
+    const after = siblings.slice(siblings.indexOf(this) + 1);
+    return (
+      after.find((s): s is FakeElement => s instanceof FakeElement) ?? null
+    );
+  }
+
+  after(...nodes: NodeLike[]): void {
+    let at: FakeNode = this;
+    for (const node of nodes) {
+      this.parent?.insertAfter(node as FakeNode, at);
+      at = node as FakeNode;
+    }
+  }
+
+  append(...nodes: NodeLike[]): void {
+    for (const node of nodes) this.appendChild(node);
+  }
 }
 
 export class FakeShadow extends FakeNode implements ShadowRootLike {

@@ -1,4 +1,4 @@
-// What the title page controller needs from the tab: the worker's six fiche answers (already checked,
+// What the title page controller needs from the tab: the worker's seven fiche answers (already checked,
 // undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
 // drawing of its view and the announcement of a visit to the page's relay.
 
@@ -13,10 +13,11 @@ import type {
   FicheLinkMessage,
   FicheMineMessage,
   FicheRateMessage,
+  FicheRemoveMessage,
   FicheSeasonMessage,
   FicheUndoMessage,
 } from "../ext/fiche-messages";
-import type { UndoAnswer } from "../ext/fiche-undo-answers";
+import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import type { PageEvent } from "../ext/messages";
 import type { FicheView } from "./fiche-view";
 
@@ -27,6 +28,7 @@ export type FichePorts = {
   rate(msg: FicheRateMessage): Promise<RateAnswer | undefined>;
   link(msg: FicheLinkMessage): Promise<{ ok: true } | undefined>;
   undo(msg: FicheUndoMessage): Promise<UndoAnswer | undefined>;
+  remove(msg: FicheRemoveMessage): Promise<RemoveAnswer | undefined>;
   /** The season the page's dropdown names (« Saison 2 » → 2), if one can be read. */
   shownSeason(): number | undefined;
   /** Whether the page shows its episode grid (`div.dcf-ep-grid`). */
