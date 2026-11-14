@@ -8,6 +8,8 @@ export type EventLike = ClickEvent & {
   altKey?: boolean;
   ctrlKey?: boolean;
   metaKey?: boolean;
+  /** A key pressed while an input method composes a character. */
+  isComposing?: boolean;
   stopPropagation(): void;
   preventDefault(): void;
 };

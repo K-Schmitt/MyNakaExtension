@@ -15,6 +15,10 @@ const ACTIONS_RULES = [
   `.mn-fiche-actions .mn-title{font:${v("text-body")} ${v("font")};font-weight:600;}`,
   `.mn-fiche-actions .mn-choices{max-height:240px;}`,
   `.mn-thumb img{display:block;width:100%;height:100%;object-fit:cover;}`,
+  `.mn-search{flex-wrap:nowrap;gap:${v("space-2")};}`,
+  `.mn-field{flex:1 1 auto;min-width:0;box-sizing:border-box;font:inherit;color:${v("color-text")};background:${v("color-surface-raised")};border:1px solid ${v("color-border")};border-radius:${v("radius-sm")};padding:6px 8px;}`,
+  `.mn-field::placeholder{color:${v("color-text-secondary")};}`,
+  `.mn-field:focus-visible{outline:2px solid ${v("color-accent-text")};outline-offset:2px;}`,
 ];
 
 const BADGE_RULES = [

@@ -1,11 +1,12 @@
-// The step 7 states the actions host shows instead of, or under, its buttons: loading, the candidates to
-// link with their posters, « Pas trouvé », a series' confirmation, the write's and the season's error lines.
-// Texts go through textContent; every button acts on a trusted click only.
+// The step 7 states the actions host shows instead of, or under, its buttons: loading, its failure with
+// « Réessayer », the candidates to link with their posters, « Pas trouvé » with its search (step 8b), a
+// series' confirmation, the write's and the season's error lines. Texts go through textContent; every
+// button acts on a trusted click only.
 
-import { thumbUrl } from "../../core/image-urls";
 import type { QuestionCandidate } from "../../core/state";
 import type { FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
+import { candidateChoices } from "./fiche-candidate-choice";
 import {
   INFO_FAILED_LINE,
   LINK_FAILED_LINE,
@@ -14,13 +15,15 @@ import {
   LOADING_LINE,
   NOT_FOUND_LINE,
   outcomeLine,
+  RETRY_LABEL,
   SERIES_CONFIRM,
   seasonFailedLine,
 } from "./fiche-copy";
 import type { FicheHandlers } from "./fiche-handlers";
-import { candidateLabel } from "./question-copy";
-import { candidateButton } from "./question-tile";
+import { searchParts } from "./fiche-search-parts";
 import {
+  BUTTON_CLASS,
+  button,
   confirmRow,
   ERROR_CLASS,
   type Maker,
@@ -29,8 +32,6 @@ import {
   textLine,
   WARNING_CLASS,
 } from "./rating-render";
-
-const CHOICES_CLASS = "mn-choices";
 
 /** The line of the last write's ending; `failed` names what an unanswered rating or link was. */
 export function outcomeLines(doc: Maker, view: FicheView, failed: string) {
@@ -57,23 +58,6 @@ export function seriesConfirm(
   ];
 }
 
-function candidateChoice(
-  doc: Maker,
-  candidate: QuestionCandidate,
-  handlers: FicheHandlers,
-): ElementLike {
-  const image = thumbUrl(candidate.image);
-  return candidateButton(
-    doc,
-    {
-      choice: { kind: "candidate", id: candidate.id },
-      label: candidateLabel(candidate),
-      ...(image === undefined ? {} : { image }),
-    },
-    { onChoose: () => handlers.link(candidate.id) },
-  );
-}
-
 function linkParts(
   doc: Maker,
   view: FicheView,
@@ -83,14 +67,35 @@ function linkParts(
   const choices =
     view.pending === "link"
       ? textLine(doc, LINKING_LINE)
-      : row(
-          doc,
-          candidates.map((c) => candidateChoice(doc, c, handlers)),
-          CHOICES_CLASS,
-        );
+      : candidateChoices(doc, candidates, handlers);
   return [
     textLine(doc, LINK_HEADING, TITLE_CLASS),
     choices,
+    ...outcomeLines(doc, view, LINK_FAILED_LINE),
+  ];
+}
+
+/** While the info is on its way, the loading line; once its read failed, the line and « Réessayer ». */
+function infoParts(
+  doc: Maker,
+  view: FicheView,
+  handlers: FicheHandlers,
+): ElementLike[] {
+  if (view.outcome?.kind !== "failed") return [textLine(doc, LOADING_LINE)];
+  return [
+    textLine(doc, INFO_FAILED_LINE, ERROR_CLASS),
+    row(doc, [button(doc, RETRY_LABEL, BUTTON_CLASS, handlers.retry)]),
+  ];
+}
+
+function notFoundParts(
+  doc: Maker,
+  view: FicheView,
+  handlers: FicheHandlers,
+): ElementLike[] {
+  return [
+    textLine(doc, NOT_FOUND_LINE),
+    ...searchParts(doc, view, handlers),
     ...outcomeLines(doc, view, LINK_FAILED_LINE),
   ];
 }
@@ -102,16 +107,9 @@ export function rareParts(
   handlers: FicheHandlers,
 ): ElementLike[] {
   const { info } = view;
-  if (info === undefined) {
-    const failed = view.outcome?.kind === "failed";
-    return [
-      failed
-        ? textLine(doc, INFO_FAILED_LINE, ERROR_CLASS)
-        : textLine(doc, LOADING_LINE),
-    ];
-  }
+  if (info === undefined) return infoParts(doc, view, handlers);
   if (info.state === "choose") {
     return linkParts(doc, view, info.candidates ?? [], handlers);
   }
-  return [textLine(doc, NOT_FOUND_LINE)];
+  return notFoundParts(doc, view, handlers);
 }

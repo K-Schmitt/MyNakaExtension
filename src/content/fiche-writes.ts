@@ -1,7 +1,8 @@
 // The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once,
 // a series after its confirmation, an episode of the shown season, a link to a candidate the worker
-// offered. One write at a time; an answer that comes once the visit is over changes nothing. A film's
-// rating takes it out of Naka's « Ma liste » with Naka's own button when it is on screen (fiche-ma-liste).
+// offered (step 7's or a search's). One write at a time; an answer that comes once the visit is over
+// changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is
+// on screen (fiche-ma-liste).
 // A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer la note », the link).
 
 import type { RateAnswer } from "../ext/fiche-answers";
@@ -15,6 +16,7 @@ import {
   storeEpisodes,
   withMine,
 } from "./fiche-page";
+import { searchOffers } from "./fiche-search";
 import { forgetSeasons } from "./fiche-season-reader";
 import type { FicheOutcome } from "./fiche-view";
 
@@ -135,6 +137,7 @@ export function rateEpisode(
 
 function offered(scope: FicheScope, productId: number): boolean {
   const { info } = scope.page;
+  if (searchOffers(scope.page, productId)) return true;
   if (info?.state !== "choose") return false;
   return (info.candidates ?? []).some((known) => known.id === productId);
 }
@@ -160,6 +163,7 @@ export async function link(scope: FicheScope, productId: number) {
     scope.show();
     return;
   }
+  page.search = undefined;
   forgetSeasons(scope);
   await askInfo(scope);
 }
