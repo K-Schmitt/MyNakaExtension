@@ -12,8 +12,11 @@ import { PANEL_SHEET } from "./fiche-styles";
 import { createClosedHost } from "./row-host";
 import { createRowKeeper, type KeeperPorts } from "./row-keeper";
 
+// The reset also resets `color-scheme`: set back to dark, as on the home row, so that the candidate
+// list's scrollbar stays dark.
 const PANEL_DECLARATIONS = [
   "all: initial",
+  "color-scheme: dark",
   "display: block",
   "margin: 16px 0 0",
 ];
