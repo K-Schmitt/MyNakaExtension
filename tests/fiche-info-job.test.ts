@@ -430,6 +430,12 @@ describe("fiche-info: the panel's flags", () => {
     ["a recommendation", { isRecommended: true }, true],
     ["neither", {}, false],
     ["no rating and neither", { rating: null }, false],
+    ["no rating and a critique", { rating: null, isReviewed: true }, false],
+    [
+      "no rating and a recommendation",
+      { rating: null, isRecommended: true },
+      false,
+    ],
   ])("protected with %s: %s", async (_n, over, kept) => {
     const w = world({
       state: linkedTo(2005),
