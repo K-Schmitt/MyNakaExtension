@@ -54,7 +54,6 @@ export type FicheRegistry = {
     productId: number,
     role: FicheRole,
   ): Promise<boolean>;
-  drop(tabId: number): Promise<void>;
 };
 
 function lastProducts(ids: readonly number[]): number[] {
@@ -144,12 +143,6 @@ export function createFicheRegistry(area: StorageArea): FicheRegistry {
       serial(async () => {
         const page = pageOf(await load(), tabId, contentId);
         return page !== undefined && standsFor(page, productId, role);
-      }),
-    drop: (tabId) =>
-      serial(async () => {
-        const pages = await load();
-        const kept = pages.filter((page) => page.tabId !== tabId);
-        if (kept.length !== pages.length) await save(kept);
       }),
   };
 }

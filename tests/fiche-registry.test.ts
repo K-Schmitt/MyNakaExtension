@@ -98,15 +98,6 @@ describe("fiche registry", () => {
     expect(await r.has(1, 11, 200)).toBe(true);
   });
 
-  it("drop forgets the tab, and only that tab", async () => {
-    const { r } = fresh();
-    await r.open(1, 10, seriesTitle(500), []);
-    await r.open(2, 10, seriesTitle(500), []);
-    await r.drop(1);
-    expect(await r.has(1, 10, 500)).toBe(false);
-    expect(await r.has(2, 10, 500)).toBe(true);
-  });
-
   it("a fresh registry over the same area still knows the issued products (a worker restart)", async () => {
     const { area, r } = fresh();
     await r.open(1, 10, seriesTitle(500), [100]);
