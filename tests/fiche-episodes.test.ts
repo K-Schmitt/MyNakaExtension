@@ -408,6 +408,22 @@ describe("an episode rating on its box", () => {
     expect(t.ofType("fiche-rate")).toHaveLength(1);
   });
 
+  it("draws each box's stars in a slot of its own, kept when the box is drawn again (D7)", async () => {
+    const { t, three, four } = await twoBoxes();
+    const slotOf = (b: FakeBox) =>
+      t.stars.slots.filter((_, i) =>
+        t.stars.rows[i]?.children.includes(starOf(b, 6) as FakeElement),
+      )[0];
+    const first = slotOf(three);
+    expect(first).toBeDefined();
+    expect(slotOf(four)).toBeDefined();
+    expect(slotOf(four)).not.toBe(first);
+    starOf(three, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({ ok: true });
+    await settle();
+    expect(slotOf(three)).toBe(first);
+  });
+
   it("refuses only the hidden box's stars: another box's click still rates (D7)", async () => {
     const { t, three, four } = await twoBoxes();
     const groupOfThree = t.stars.rows.find((row) =>
