@@ -76,6 +76,9 @@ function userInfos(
   return {
     isDone: false,
     isWished: true,
+    // SensCritique answers both flags (the query asks for them); one missing reads as protected (D13).
+    isReviewed: false,
+    isRecommended: false,
     productId: id,
     rating: null,
     ...extra,
@@ -1371,7 +1374,14 @@ describe("productState", () => {
   ])(
     "returns isDone %s, isWished %s and the universe %s",
     async (isDone, isWished, universe) => {
-      const infos = { isDone, isWished, productId: 7, rating: null };
+      const infos = {
+        isDone,
+        isWished,
+        isReviewed: false,
+        isRecommended: false,
+        productId: 7,
+        rating: null,
+      };
       const { client } = setup(LOGGED_IN, () =>
         stateReply({ id: 7, universe, currentUserInfos: infos }),
       );
