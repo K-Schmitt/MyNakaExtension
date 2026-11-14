@@ -103,6 +103,16 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     expect(t.ofType("fiche-search")).toHaveLength(1);
   });
 
+  it("sends nothing for a query with a lone surrogate, but sends a well-formed emoji", async () => {
+    const t = await notFound();
+    t.field().value = "Sol\uD800aris";
+    t.chercher()?.click(true);
+    expect(t.ofType("fiche-search")).toEqual([]);
+    t.field().value = "Solaris \u{1F3AC}";
+    t.chercher()?.click(true);
+    expect(t.ofType("fiche-search")).toHaveLength(1);
+  });
+
   it("sends it on a trusted Enter in the field, never on an untrusted one", async () => {
     const t = await notFound();
     t.field().value = "Solyaris";

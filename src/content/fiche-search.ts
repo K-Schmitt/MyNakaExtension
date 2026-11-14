@@ -3,7 +3,7 @@
 // Searching is a read: its results are candidates the worker issued to this tab, and only a trusted click
 // on one links it, as step 7's choice does. An answer that comes once the visit is over changes nothing.
 
-import { MAX_SEARCH_QUERY } from "../ext/fiche-messages";
+import { isSearchQuery } from "../ext/fiche-messages";
 import { contentOf, type FichePage, type FicheScope } from "./fiche-page";
 
 function canSearch(page: FichePage, query: string): boolean {
@@ -11,7 +11,7 @@ function canSearch(page: FichePage, query: string): boolean {
     return false;
   }
   if (page.search?.state === "searching") return false;
-  return query.length >= 1 && query.length <= MAX_SEARCH_QUERY;
+  return isSearchQuery(query);
 }
 
 export async function searchTitle(
