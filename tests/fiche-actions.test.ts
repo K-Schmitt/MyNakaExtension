@@ -516,6 +516,34 @@ describe("every step 7 rare state, in the actions host", () => {
     ]);
   });
 
+  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause (D9)", async () => {
+    // Arrange
+    const t = await film();
+    star(t.parts(), 9)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      error: "unavailable",
+      panel: {
+        canUndo: true,
+        undoLeftMs: 600_000,
+        canRemove: true,
+        protected: false,
+      },
+    });
+    await settle();
+    const before = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}Annuler${NB}» le remet comme avant.`;
+    expect(texts(t.parts())).toContain(before);
+
+    // Act
+    t.timers.find((timer) => !timer.cleared)?.fire();
+
+    // Assert
+    const after =
+      "La note n’est pas partie, mais SensCritique a déjà marqué le titre vu.";
+    expect(texts(t.parts())).toContain(after);
+    expect(texts(t.parts())).not.toContain(before);
+    expect(buttonNamed(actionParts(t), "Annuler")).toBeUndefined();
+  });
+
   it("shows a line for the shown season whose read failed", async () => {
     const t = fakeUi(SERIES_PATH);
     t.page.shown = 2;
