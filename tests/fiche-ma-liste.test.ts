@@ -87,13 +87,52 @@ describe("a film rating and Naka's « Ma liste » button", () => {
     expect(t.page.clicks).toBe(0);
   });
 
-  it("gone from the screen when the answer comes: no click", async () => {
+  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated (D14)", async () => {
     const t = await filmWith(true);
     t.controller.rateTitle(8);
     t.page.maListe = undefined;
     t.ofType("fiche-rate")[0]?.answer(BY_TAB);
     await settle();
     expect(t.page.clicks).toBe(0);
+    expect(t.last()?.maListeMissed).toBe(true);
+  });
+
+  it.each([
+    ["clicked", true, BY_TAB],
+    ["already in the wanted state", false, BY_TAB],
+    ["left to the worker (no button at the start)", undefined, { ok: true }],
+    ["not sent", true, { error: "sc-session" }],
+  ])(
+    "a rating whose Ma liste was %s: no such line",
+    async (_n, maListe, answer) => {
+      const t = await filmRated(maListe, answer);
+      expect(t.last()).toBeDefined();
+      expect(t.last()?.maListeMissed).toBeUndefined();
+    },
+  );
+
+  it("the next write takes the line away", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    t.page.maListe = undefined;
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.last()?.maListeMissed).toBe(true);
+    t.controller.rateTitle(6);
+    expect(t.last()?.pending).toBe("rating");
+    expect(t.last()?.maListeMissed).toBeUndefined();
+  });
+
+  it("« Annuler » after it takes the line away too", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    t.page.maListe = undefined;
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.last()?.maListeMissed).toBe(true);
+    t.controller.undo();
+    expect(t.last()?.pending).toBe("undo");
+    expect(t.last()?.maListeMissed).toBeUndefined();
   });
 
   it.each([
@@ -114,6 +153,16 @@ describe("a film rating and Naka's « Ma liste » button", () => {
     t.ofType("fiche-rate")[0]?.answer(BY_TAB);
     await settle();
     expect(t.page.clicks).toBe(0);
+  });
+
+  it("the address moved before the tab polled it: no click on the next title's button", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    t.page.path = "/content/movie/9999";
+    t.ofType("fiche-rate")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.page.clicks).toBe(0);
+    expect(t.page.maListe).toBe(true);
   });
 
   it("a series rating: no « Ma liste » field and no click", async () => {
@@ -146,6 +195,20 @@ describe("an undo and Naka's « Ma liste » button", () => {
   it("the button already active: no click", async () => {
     const t = await filmUndone(true, BY_TAB);
     expect(t.page.clicks).toBe(0);
+    expect(t.last()?.maListeMissed).toBeUndefined();
+  });
+
+  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated (D14)", async () => {
+    const t = await filmWith(false);
+    t.controller.undo();
+    t.page.maListe = undefined;
+    t.ofType("fiche-undo")[0]?.answer(BY_TAB);
+    await settle();
+    t.ofType("fiche-info")[1]?.answer(linked(55));
+    await settle();
+    expect(t.page.clicks).toBe(0);
+    expect(t.last()?.pending).toBeUndefined();
+    expect(t.last()?.maListeMissed).toBe(true);
   });
 
   it("no button: no listByTab, and no click", async () => {
@@ -185,6 +248,16 @@ describe("an undo and Naka's « Ma liste » button", () => {
   ])("an undo answered %s: no click", async (_n, answer) => {
     const t = await filmUndone(false, answer);
     expect(t.page.clicks).toBe(0);
+  });
+
+  it("the address moved before the tab polled it: no click on the next title's button", async () => {
+    const t = await filmWith(false);
+    t.controller.undo();
+    t.page.path = "/content/movie/9999";
+    t.ofType("fiche-undo")[0]?.answer(BY_TAB);
+    await settle();
+    expect(t.page.clicks).toBe(0);
+    expect(t.page.maListe).toBe(false);
   });
 
   it("sends nothing while a rating is on its way", async () => {

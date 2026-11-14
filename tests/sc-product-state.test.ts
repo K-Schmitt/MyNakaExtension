@@ -50,10 +50,23 @@ describe("readProductState: what an undo restores", () => {
     expect(stateOf({ [key]: value })[key]).toBe(value);
   });
 
-  it("gives false for absent isReviewed and isRecommended", () => {
-    const state = stateOf();
+  // Fails closed (owner decision D13, 2026-11-14): a flag SensCritique did not answer as a boolean
+  // counts as a critique or recommendation, so nothing that could drop one is offered.
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ['the string "false"', "false"],
+    ["0", 0],
+  ])("reads isReviewed and isRecommended %s as protected", (_name, value) => {
+    const state = stateOf({ isReviewed: value, isRecommended: value });
+    expect(state.isReviewed).toBe(true);
+    expect(state.isRecommended).toBe(true);
+  });
+
+  it("reads one unknown flag as protected without touching the other", () => {
+    const state = stateOf({ isReviewed: false, isRecommended: null });
     expect(state.isReviewed).toBe(false);
-    expect(state.isRecommended).toBe(false);
+    expect(state.isRecommended).toBe(true);
   });
 
   it.each([
