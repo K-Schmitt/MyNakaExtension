@@ -92,7 +92,7 @@ async function answered(
   const candidates = await whileLive(turn, () =>
     searched({ ...deps, limiters }, msg),
   );
-  if (candidates === undefined) return NONE;
+  if (candidates === undefined || !turn.live()) return NONE;
   const ids = candidates.map((candidate) => candidate.id);
   await registry.offer(tabId, msg.contentId, ids);
   return { candidates };
