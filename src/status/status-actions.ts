@@ -12,9 +12,9 @@ export const ACTION_COPY = {
 
 export const CONFIRM_TEXT: Record<LocalAction, string> = {
   forget:
-    "Oublier les comptes liés efface seulement le lien enregistré entre votre compte SensCritique et votre compte Naka. Aucun jeton n'est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?",
+    "Oublier les comptes liés efface seulement le lien enregistré entre ton compte SensCritique et ton compte Naka. Aucun jeton n’est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?",
   reset:
-    "Réinitialiser efface l'état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu'ajouter, sans la mémoire des retraits\u202F: un titre retiré d'un côté et encore présent de l'autre y reviendrait. Vérifiez l'aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?",
+    "Réinitialiser efface l’état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu’ajouter, sans la mémoire des retraits\u202F: un titre retiré d’un côté et encore présent de l’autre y reviendrait. Vérifie l’aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?",
 };
 
 const PENDING_LINES: Record<LocalAction, string> = {
