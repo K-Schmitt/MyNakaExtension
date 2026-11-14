@@ -30,7 +30,7 @@ const UNDO: FicheUndoMessage = {
 const OTHER = filmCard({ targets: [target("film", null, 21)] });
 
 /** Film 5 rated 8 from its page; SensCritique then shows it seen and rated. */
-async function ratedOnItsPage() {
+async function ratedOnItsPage(cards = [OTHER]) {
   const sc = { now: {} as Partial<ProductState> };
   const w = answerWorld({
     state: linkedTo(2005),
@@ -38,7 +38,7 @@ async function ratedOnItsPage() {
     playlist: () => [],
     product: () => ({ ...BLANK, ...sc.now }),
   });
-  w.area.data.set("ratings", [OTHER]);
+  w.area.data.set("ratings", cards);
   await w.registry.open(TAB, 5, filmTitle(2005), []);
   const msg = {
     type: "fiche-rate",
@@ -93,6 +93,30 @@ describe("the title page's undo after a later write of the same title", () => {
     await w.jobs[job]({ type: "forget-handled", contentId: 5 });
 
     // Assert
+    expect(w.area.data.get("ficheUndo")).toBeNull();
+  });
+
+  it("a finish that writes clears this content's undo record", async () => {
+    // Arrange: the film's card already exists, so its page's rating sends only the ProductRate and leaves the
+    // film unfinished; its finish then marks it seen.
+    const card = filmCard({
+      key: "movie:5",
+      contentId: 5,
+      targets: [target("film", null, 2005)],
+    });
+    const w = await ratedOnItsPage([OTHER, card]);
+    expect(w.state().handled).not.toContain("movie:5");
+
+    // Act
+    await w.jobs.finishJob({
+      type: "finished",
+      source: "threshold",
+      progress: 0.95,
+      contentId: 5,
+    });
+
+    // Assert
+    expect(w.state().handled).toContain("movie:5");
     expect(w.area.data.get("ficheUndo")).toBeNull();
   });
 
