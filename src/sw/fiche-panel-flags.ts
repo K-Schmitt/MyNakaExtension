@@ -69,12 +69,17 @@ export async function storedFlags(
   return panelFlags(state, undoLeft(record, title, deps.now()));
 }
 
-/** The flags once a rating went out: undo only when its record was stored, removal judged on the new rating. */
+/**
+ * The flags once a rating went out: undo only when its record was stored, for what is left of its window
+ * now (the record was made before the write), removal judged on the new rating.
+ */
 export function afterRating(
   before: PanelState | undefined,
   rating: number,
-  recorded: boolean,
+  record: FicheUndo | undefined,
+  now: number,
 ): PanelFlags {
   if (before === undefined) return NO_PANEL;
-  return panelFlags({ ...before, rating }, recorded ? UNDO_WINDOW_MS : 0);
+  const left = record === undefined ? 0 : undoLeft(record, record, now);
+  return panelFlags({ ...before, rating }, left);
 }

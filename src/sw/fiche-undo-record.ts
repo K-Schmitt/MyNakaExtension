@@ -5,8 +5,9 @@
 // The record also keeps the extension's own state of the title (ruling R8), read in the same job before
 // any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
 // clears the record the same way. A film the worker's client took out of « Ma liste » while the tab could
-// not read the button is noted as listed (ruling R10), so « Annuler » adds it back. A rating refused before
-// any SensCritique write (its `{ error }` answer) puts the record it replaced back.
+// not read the button is noted as listed (ruling R10), so « Annuler » adds it back. A rating answered
+// `{ error }` (its ProductRate did not go out) puts the record it replaced back, even when a film's
+// explicit finish already wrote to SensCritique before that error: this rating's record is then dropped.
 
 import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";

@@ -104,7 +104,7 @@ async function ratedSeries(
   await rateCards(deps, ofContent, "série", msg);
   return {
     ok: true,
-    panel: afterRating(kept.state, msg.rating, kept.record !== undefined),
+    panel: afterRating(kept.state, msg.rating, kept.record, deps.now()),
   };
 }
 

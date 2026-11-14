@@ -105,6 +105,29 @@ describe("fiche-rate keeps what a film rating changes", () => {
     });
   });
 
+  it("offers « Annuler » for what is left of the window once the rating answers", async () => {
+    // Arrange: the ProductRate takes 4 seconds.
+    let clock = NOW;
+    const w = world({
+      sc: {
+        rate: async () => {
+          clock += 4000;
+        },
+      },
+    });
+    w.jobDeps.now = () => clock;
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert
+    expect(stored(w)).toMatchObject({ at: NOW });
+    expect(answer).toMatchObject({
+      panel: { canUndo: true, undoLeftMs: UNDO_WINDOW_MS - 4000 },
+    });
+  });
+
   it("without « Ma liste » in the message, the film not listed: kept as unknown", async () => {
     const w = world({ playlist: () => [99] });
     await w.registry.open(TAB, 5, filmTitle(2005), []);
