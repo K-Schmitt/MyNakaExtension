@@ -99,9 +99,8 @@ describe("service worker entry", () => {
     expect(answers).toEqual([undefined]);
   });
 
-  it("listens to closed tabs once, and a closed tab is no error", () => {
-    expect(removedListeners).toHaveLength(1);
-    expect(() => removedListeners[0]?.(5)).not.toThrow();
+  it("does not listen to closed tabs: the worker is not woken by each tab close", () => {
+    expect(removedListeners).toHaveLength(0);
   });
 
   it("asks the top frame of the first Naka tab that has an id and is not discarded", async () => {

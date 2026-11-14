@@ -78,10 +78,11 @@ describe("fiche-mine", () => {
     });
   });
 
-  it("a closed tab forgets its products", async () => {
+  it("a write from a tab whose page was reset is refused", async () => {
     const w = linkedWorld();
     await w.jobs.ficheInfo(TAB, info());
-    await w.jobs.dropFicheTab(TAB);
+    // The tab moved to another title page: the same area, a page reset (a new fiche-info) for content 6.
+    await createFicheRegistry(w.session).open(TAB, 6, undefined, []);
     w.sk.calls.length = 0;
     await expect(w.jobs.ficheMine(TAB, mine())).rejects.toThrow();
     expect(w.sk.calls).toEqual([]);

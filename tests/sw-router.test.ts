@@ -247,9 +247,6 @@ function recordingJobs(over: Partial<Jobs> = {}) {
       calls.push(`fiche-remove:${tabId}:${JSON.stringify(msg)}`);
       return { refused: "protected" };
     },
-    dropFicheTab: async (tabId) => {
-      calls.push(`drop-fiche-tab:${tabId}`);
-    },
     ...over,
   };
   return { jobs, calls, snapshot };
@@ -271,8 +268,7 @@ function router(over: Partial<Jobs> = {}) {
   });
   const send = (msg: unknown, sender: object) =>
     r.handle(msg, sender, (answer) => answers.push(answer));
-  const dropTab = (tabId: number) => r.dropTab(tabId);
-  return { ...recorded, ...clock, answers, send, dropTab, time };
+  return { ...recorded, ...clock, answers, send, time };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -2715,11 +2711,5 @@ describe("router: the title page messages", () => {
     expect(r.send(FICHE_LINK, page)).toBe(false);
     await settle();
     expect(r.calls).toEqual([]);
-  });
-
-  it("a removed tab drops its issued products", () => {
-    const r = router();
-    r.dropTab(42);
-    expect(r.calls).toEqual(["drop-fiche-tab:42"]);
   });
 });
