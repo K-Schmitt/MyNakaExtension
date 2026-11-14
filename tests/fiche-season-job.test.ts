@@ -108,6 +108,26 @@ describe("fiche-season", () => {
     const answer = await w.jobs.ficheSeason(TAB, season());
     expect(answer.episodes).toHaveLength(500);
   });
+
+  it("a failed read of the tab's current season rejects, and issues no episode", async () => {
+    const w = answerWorld({
+      state: linkedTo(3000),
+      naka: nakaSays({ mediaType: "tv" }),
+      product: () => ({ universe: UNIVERSE.serie, label: { title: "Dark" } }),
+      sc: {
+        seasonInfo: async () => {
+          throw new Error("season read 4242");
+        },
+      },
+    });
+    await w.jobs.ficheInfo(TAB, info({ mediaType: "tv" }));
+    await expect(w.jobs.ficheSeason(TAB, season())).rejects.toThrow(
+      "season read 4242",
+    );
+    await expect(
+      w.jobs.ficheMine(TAB, mine({ productId: 3101 })),
+    ).rejects.toThrow();
+  });
 });
 
 // Season s, episode n is SensCritique product 3100 + 10 s + n; season 1's read waits until released.
