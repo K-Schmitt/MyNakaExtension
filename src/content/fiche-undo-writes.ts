@@ -7,6 +7,7 @@
 
 import type { FicheUndoMessage } from "../ext/fiche-messages";
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
+import { readInfo } from "./fiche-info-reader";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
 import { contentOf, type FicheScope } from "./fiche-page";
 import { considerSeason, forgetSeasons } from "./fiche-season-reader";
@@ -52,7 +53,7 @@ function begin(scope: FicheScope, action: UndoAction): void {
 // shows, with « Réessayer », and the answer's line stays next to it (spec §4).
 async function refreshInfo(scope: FicheScope): Promise<void> {
   const msg = scope.page.infoMessage;
-  const info = msg === undefined ? undefined : await scope.ports.info(msg);
+  const info = msg === undefined ? undefined : await readInfo(scope, msg);
   if (!scope.live()) return;
   forgetSeasons(scope);
   scope.page.info = info;
