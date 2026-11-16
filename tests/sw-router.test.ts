@@ -616,6 +616,14 @@ describe("router: trusted messages become jobs", () => {
     expect(r.answers).toEqual([r.snapshot]);
   });
 
+  it("a status page whose url has a fragment is answered", async () => {
+    const r = router();
+    const url = `${STATUS_URL}#reglages`;
+    r.send({ type: "status" }, { id: EXT, url, tab: { url } });
+    await settle();
+    expect(r.answers).toEqual([r.snapshot]);
+  });
+
   it("a status page without a tab is trusted too", async () => {
     const r = router();
     r.send({ type: "status" }, { id: EXT, url: STATUS_URL });
