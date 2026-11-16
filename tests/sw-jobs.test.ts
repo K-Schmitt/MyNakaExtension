@@ -706,6 +706,44 @@ describe("sync job: automatic triggers", () => {
   });
 });
 
+describe("sync job: the first run waits for a click", () => {
+  it.each(["naka-ready", "playlist"] as const)(
+    "%s with firstRunPending does nothing and saves nothing",
+    async (trigger) => {
+      const w = world({ settings: { mode: "live", firstRunPending: true } });
+      await w.jobs.syncJob(trigger);
+      expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+      expect(w.nk.calls).toEqual([]);
+      expect(w.traffic.sent).toEqual([]);
+    },
+  );
+
+  it("the button with firstRunPending runs and clears the marker", async () => {
+    const w = world({ settings: { mode: "live", firstRunPending: true } });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("ok");
+    expect(w.settings().firstRunPending).toBeUndefined();
+  });
+
+  it("a failed first click keeps firstRunPending", async () => {
+    const w = world({
+      settings: { mode: "live", firstRunPending: true },
+      account: () => undefined,
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("failed");
+    expect(w.settings().firstRunPending).toBe(true);
+  });
+
+  it("stored settings without firstRunPending: the automatic run starts", async () => {
+    const at = NOW - AUTO_RUN_GAP_MS;
+    const w = world({ settings: { mode: "live", lastAutoRunAt: at } });
+    await w.jobs.syncJob("naka-ready");
+    expect(w.settings().lastRun?.trigger).toBe("naka-ready");
+    expect(w.settings().lastAutoRunAt).toBe(NOW);
+  });
+});
+
 describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
   // One Naka tab: with several, a dead one is passed over (see "one Naka tab per job").
   function closingTab(closeAfter: string | undefined, tabStaysListed = false) {

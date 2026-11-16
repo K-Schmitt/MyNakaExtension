@@ -249,6 +249,16 @@ describe("statusSnapshot: the ratings waiting", () => {
   });
 });
 
+describe("statusSnapshot: the first run", () => {
+  it("carries firstRunPending when the settings have it, and only then", async () => {
+    const { store } = await storeWith(stateWith({}));
+    await store.saveSettings({ mode: "live" });
+    expect((await statusSnapshot(store)).firstRunPending).toBeUndefined();
+    await store.saveSettings({ mode: "live", firstRunPending: true });
+    expect((await statusSnapshot(store)).firstRunPending).toBe(true);
+  });
+});
+
 describe("answerRemovalOffer", () => {
   const offerOf = async (state = mappedAt5(), answering: string[] = []) => {
     const { store } = await storeWith(state);
