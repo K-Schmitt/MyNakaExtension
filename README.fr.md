@@ -147,9 +147,8 @@ npm run check   # Biome (lint + format), tsc sur src et tests, Vitest, puis le b
 
 TypeScript strict, sans framework d’interface, sans dépendance à l’exécution. En plus des tests
 unitaires, la synchronisation des listes est vérifiée par une simulation aléatoire de milliers
-d’historiques, dont les règles de sécurité jugent ce que le monde simulé a fait. Les décisions, les
-options écartées et les limites connues sont tenues dans [NOTES.md](NOTES.md) ; les changements par
-version sont dans [CHANGELOG.md](CHANGELOG.md) (en anglais).
+d’historiques, dont les règles de sécurité jugent ce que le monde simulé a fait. Les limites connues
+sont listées plus bas ; les changements par version sont dans [CHANGELOG.md](CHANGELOG.md) (en anglais).
 
 ## Avertissement
 
