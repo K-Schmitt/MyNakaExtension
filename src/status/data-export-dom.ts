@@ -3,6 +3,8 @@
 
 import { exportFileName, exportText } from "./data-export";
 
+export const EXPORT_FAILED = "L’export a échoué. Réessaie dans un instant.";
+
 export type ExportStorage = {
   get(keys: null): Promise<Record<string, unknown>>;
 };
@@ -15,15 +17,20 @@ export function mountExport(
   storage: ExportStorage,
   download: (name: string, text: string) => void,
   version: string,
+  note: (text: string) => void,
   now: () => Date = () => new Date(),
 ): void {
   const button = doc.getElementById("export");
   if (button === null) throw new Error("status.html: missing #export");
   button.addEventListener("click", () => {
-    void storage.get(null).then((stored) => {
-      const at = now();
-      download(exportFileName(at), exportText(stored, version, at));
-    });
+    note("");
+    void storage
+      .get(null)
+      .then((stored) => {
+        const at = now();
+        download(exportFileName(at), exportText(stored, version, at));
+      })
+      .catch(() => note(EXPORT_FAILED));
   });
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exportFileName, exportText } from "../src/status/data-export";
-import { mountExport } from "../src/status/data-export-dom";
+import { EXPORT_FAILED, mountExport } from "../src/status/data-export-dom";
 import { FakeElement } from "./ui-fakes";
 
 const NOW = new Date(2026, 0, 5, 14, 30);
@@ -48,7 +48,14 @@ describe("exportText", () => {
   });
 
   it("never carries a credential", () => {
-    const text = exportText(FULL, "1", NOW).toLowerCase();
+    const hostile = {
+      ...FULL,
+      sc_auth: "secret-1",
+      token: "secret-2",
+      authorization: "secret-3",
+    };
+    const text = exportText(hostile, "1", NOW).toLowerCase();
+    expect(text).not.toContain("secret");
     expect(text).not.toContain("sc_auth");
     expect(text).not.toContain("authorization");
   });
@@ -63,6 +70,7 @@ describe("mountExport", () => {
       { get: async () => FULL },
       (name, text) => calls.push([name, text]),
       "1.2.3",
+      () => {},
       () => NOW,
     );
     button.click(true);
@@ -70,5 +78,29 @@ describe("mountExport", () => {
     expect(calls).toEqual([
       [exportFileName(NOW), exportText(FULL, "1.2.3", NOW)],
     ]);
+  });
+
+  it("says so and downloads nothing when the read fails", async () => {
+    const button = new FakeElement("button");
+    const notes: string[] = [];
+    let downloads = 0;
+    mountExport(
+      { getElementById: () => button },
+      {
+        get: async () => {
+          throw new Error("boom");
+        },
+      },
+      () => {
+        downloads += 1;
+      },
+      "1",
+      (text) => notes.push(text),
+      () => NOW,
+    );
+    button.click(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(downloads).toBe(0);
+    expect(notes).toEqual(["", EXPORT_FAILED]);
   });
 });
