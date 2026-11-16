@@ -37,11 +37,16 @@ les blocs affichés sur Naka ne sont donc pas capturés ici.
 L’extension n’est distribuée que sur GitHub (pas de boutique de navigateur).
 
 1. Télécharge `MyNakaExtension-<version>.zip` depuis la dernière
-   [Release](https://github.com/K-Schmitt/MyNakaExtension/releases/latest) et décompresse-le.
+   [Release](https://github.com/K-Schmitt/MyNakaExtension/releases/latest) et décompresse-le dans un
+   nouveau dossier.
 2. Ouvre `brave://extensions` (ou `chrome://extensions`) et active le **Mode développeur**.
 3. Clique sur **Charger l’extension non empaquetée** et choisis le dossier décompressé.
 4. Sois connecté à SensCritique dans le même navigateur et garde un onglet Naka ouvert : l’extension
    agit avec tes propres sessions.
+
+Pour mettre à jour, remplace les fichiers de ce même dossier par ceux de la nouvelle version, puis clique
+sur le bouton de rechargement (flèche circulaire) de la carte de l’extension. Un autre dossier charge une
+seconde extension, au stockage vide.
 
 À l’installation, les écritures sont actives, mais la première synchronisation t’attend : clique sur
 « Resynchroniser » dans la page de l’extension (elle ne fait qu’ajouter, 10 écritures au plus). Active
