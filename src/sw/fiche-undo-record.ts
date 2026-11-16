@@ -4,8 +4,8 @@
 // the last rating), and the panel offers no undo. Episode ratings keep nothing. The record also keeps the
 // extension's own state of the title, read in the same job before any write: the handled key, the settled
 // pair, the title's cards as stored. A local read that fails clears the record the same way. A film the
-// worker's client took out of « Ma liste » while the tab could not read the button is noted as listed, so «
-// Annuler » adds it back. A rating answered `{ error }` puts the record it replaced back only when nothing of
+// worker's client took out of « Ma liste » while the tab could not read the button is noted as listed, so
+// « Annuler » adds it back. A rating answered `{ error }` puts the record it replaced back only when nothing of
 // it was written (write-watch): a refusal before any write (the binding, the hour's budget, the pre-check, a
 // state read before the first write) or a ProductRate that threw with nothing sent before it (a film with its
 // card, a series). A film whose explicit finish wrote (« vu », out of the wishes, the settled pair, the
