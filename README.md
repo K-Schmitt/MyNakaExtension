@@ -37,11 +37,16 @@ itself are not captured here.
 The extension is distributed on GitHub only (no browser store).
 
 1. Download `MyNakaExtension-<version>.zip` from the latest
-   [Release](https://github.com/K-Schmitt/MyNakaExtension/releases/latest) and unzip it.
+   [Release](https://github.com/K-Schmitt/MyNakaExtension/releases/latest) and unzip it into a new
+   folder.
 2. Open `brave://extensions` (or `chrome://extensions`) and turn on **Developer mode**.
 3. Click **Load unpacked** (« Charger l'extension non empaquetée ») and pick the unzipped folder.
 4. Be logged in to SensCritique in the same browser, and keep a Naka tab open: the extension acts
    through your own sessions.
+
+To update, replace the files in that same folder with the new version's, then click the reload button
+(circular arrow) on the extension's card. A different folder loads a second extension, with empty
+storage.
 
 On a fresh install, writes are on, but the first sync waits for you: click « Resynchroniser » on the
 extension's page (it adds only, at most 10 writes). Turn on simulation in Réglages first if you want to
