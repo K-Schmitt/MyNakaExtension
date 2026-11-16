@@ -219,9 +219,54 @@ summary:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button {
+  button,
+  [role="switch"]::after {
     transition: none;
   }
+}
+
+/* The switch: a track and a thumb drawn by one pseudo-element, driven by aria-checked alone. */
+[role="switch"] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mn-space-3);
+}
+
+[role="switch"]::after {
+  content: "";
+  width: 40px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 1px solid var(--mn-color-border);
+  border-radius: var(--mn-radius-pill);
+  background-color: var(--mn-color-bg);
+  background-image: radial-gradient(
+    circle,
+    var(--mn-color-text-secondary) 0 7px,
+    transparent 7.5px
+  );
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: left center;
+  transition:
+    background-position var(--mn-motion),
+    background-color var(--mn-motion);
+}
+
+[role="switch"][aria-checked="true"]::after {
+  background-color: var(--mn-color-accent);
+  border-color: var(--mn-color-accent);
+  background-image: radial-gradient(
+    circle,
+    var(--mn-color-on-accent) 0 7px,
+    transparent 7.5px
+  );
+  background-position: right center;
+}
+
+[role="switch"]:focus-visible {
+  outline: 2px solid var(--mn-color-accent-text);
+  outline-offset: 2px;
 }
 
 [role="tablist"] {
