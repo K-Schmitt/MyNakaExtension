@@ -71,7 +71,7 @@ const keyOf = (
   { busy, line }: BoxWrite,
 ) => JSON.stringify([n, productId, average, mine, title, busy, line]);
 
-/** What drawing a box's values needs: the maker of our elements, and the stars' visibility watch (D7). */
+/** What drawing a box's values needs: the maker of our elements, and the stars' visibility watch. */
 export type DecorPorts = {
   doc: Pick<DocLike, "createElement">;
   seen: SeenWatch;

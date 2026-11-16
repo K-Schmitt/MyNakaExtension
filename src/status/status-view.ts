@@ -16,7 +16,7 @@ import {
   runLine,
   snapshotErrorLine,
 } from "./status-lines";
-import { MODE_TEXT } from "./status-mode-copy";
+import { FIRST_RUN_LINE, MODE_TEXT } from "./status-mode-copy";
 import { bindingLine, countLines } from "./status-owner-lines";
 
 export type StatusView =
@@ -26,19 +26,22 @@ export type StatusView =
       kind: "ready";
       headline: string;
       mode?: Mode;
-      switchLabel?: string;
-      /** A mode change waits in the worker: a second click would stack another (Ruling 22). */
+      /** The « Mode simulation » switch: on in simulation, off in live and when the mode is unknown. */
+      simulationOn: boolean;
+      /** The first pass waits for a click: what it will do, shown above « Resynchroniser ». */
+      firstRunLine?: string;
+      /** A mode change waits in the worker: a second click would stack another. */
       switchDisabled: boolean;
       /** A forget or a reset waits in the worker: both buttons stay disabled (a second would stack). */
       actionsDisabled: boolean;
-      /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
+      /** A job runs or a mode change waits: the page asks again soon. */
       inProgress: boolean;
       /** A settings change waits or runs in the worker: the values shown may be the old ones. */
       settingsPending: boolean;
       previewCount: number;
       lines: string[];
       preview: string[];
-      /** The next pass's deferred writes, in both modes. */
+      /** The next pass's deferred writes: listed in simulation only, like the preview. */
       next: string[];
       /** The « Réglages » section; absent while the settings cannot be read. */
       settings?: SettingsView;
@@ -103,8 +106,9 @@ function previewLines(snapshot: StatusSnapshot): string[] {
   return (snapshot.lastRun?.preview ?? []).map(previewLine);
 }
 
-// The next pass's deferred writes, in both modes.
+// The next pass's deferred writes: shown with the preview under the switch, so in simulation only.
 function nextLines(snapshot: StatusSnapshot): string[] {
+  if (snapshot.mode !== "simulation") return [];
   return (snapshot.lastRun?.next ?? []).map(previewLine);
 }
 
@@ -134,9 +138,24 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
     preview,
     next: nextLines(snapshot),
   };
-  if (snapshot.mode === undefined) return { ...base, headline: UNKNOWN_MODE };
+  if (snapshot.mode === undefined) {
+    return { ...base, headline: UNKNOWN_MODE, simulationOn: false };
+  }
   const text = MODE_TEXT[snapshot.mode];
-  return { ...base, ...text, mode: snapshot.mode };
+  return {
+    ...base,
+    ...text,
+    mode: snapshot.mode,
+    ...(snapshot.firstRunPending
+      ? { firstRunLine: FIRST_RUN_LINE[snapshot.mode] }
+      : {}),
+    simulationOn: snapshot.mode === "simulation",
+  };
+}
+
+// The « Simulation » section explains a switch: hidden while loading, without an engine or with the mode unknown.
+export function showsSimulation(view: StatusView): boolean {
+  return view.kind === "ready" && view.mode !== undefined;
 }
 
 export function toStatusView(raw: unknown, format: StatusFormat): StatusView {

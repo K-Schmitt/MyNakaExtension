@@ -1,4 +1,4 @@
-// The link a star click confirms (Q11), checked like a link by hand before any request. Refused, with
+// The link a star click confirms, checked like a link by hand before any request. Refused, with
 // nothing saved, when the content is mapped to another product (a sync changed it since the page was
 // answered), when the product is mapped to another content, or when a settled pair holds either side
 // (heldBySettled: the sync would skip both pairs forever). A title already linked to that product is

@@ -16,17 +16,15 @@ import { type MediaType, matchTitle } from "../core/title-match";
 import type { FicheInfo } from "../ext/fiche-answers";
 import type { FicheInfoMessage } from "../ext/fiche-messages";
 import type { NakaItem } from "../naka/naka-client";
+import type { FicheAsker } from "./fiche-asker";
 import { linkedProduct } from "./fiche-link-lookup";
 import type { TitleIds } from "./fiche-panel-flags";
 import { readFicheProduct } from "./fiche-product";
-import type { FicheRegistry } from "./fiche-registry";
 import type { FicheTitle } from "./fiche-registry-schema";
 import { searchFiche } from "./fiche-search";
 import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { readNakaItem } from "./read-ports";
-
-export type FicheAsker = { registry: FicheRegistry; tabId: number };
 
 type Resolved = { info: FicheInfo; title?: FicheTitle; candidates: number[] };
 

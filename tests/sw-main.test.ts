@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-// The service worker entry against a fake `chrome`: what it binds, and how (Ruling 9).
+// The service worker entry against a fake `chrome`: what it binds, and how.
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
 const PLAYER = "https://naka.cx/player?id=3&type=movie";
 const NAKA_TAB = { id: EXT, url: PLAYER, frameId: 0, tab: { url: PLAYER } };
@@ -19,7 +19,7 @@ const removedListeners: ((tabId: number) => void)[] = [];
 const opened = { count: 0, fail: false };
 const queries: unknown[] = [];
 const sends: unknown[][] = [];
-const stored = new Map<string, unknown>();
+const stored = new Map<string, unknown>([["settings", { mode: "simulation" }]]);
 const sessionReads: string[] = [];
 const fetched: string[] = [];
 
@@ -165,7 +165,7 @@ describe("service worker entry", () => {
   });
 });
 
-// M8: the toolbar button opens the status page, which is the extension's options page.
+// The toolbar button opens the status page, which is the extension's options page.
 describe("the toolbar button", () => {
   it("one click opens the status page once", async () => {
     expect(clicks).toHaveLength(1);
@@ -194,7 +194,7 @@ describe("the toolbar button", () => {
   it("needs no new permission: the button has no popup, the status page is the options page", () => {
     const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
     expect(manifest.permissions).toEqual(["storage"]);
-    expect(manifest.action).toEqual({});
+    expect(manifest.action?.default_popup).toBeUndefined();
     expect(manifest.options_page).toBe("status.html");
   });
 });

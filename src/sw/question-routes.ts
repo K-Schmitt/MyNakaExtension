@@ -24,7 +24,7 @@ export type QuestionRoutes = {
 type Queued = { key: QuestionKey; msg: AnswerMessage };
 
 /** The answer queue's key of a message: the question's key, or `hide:` and the question's key. */
-export function queueKeyOf(msg: AnswerMessage): QuestionKey {
+function queueKeyOf(msg: AnswerMessage): QuestionKey {
   switch (msg.type) {
     case "answer-question":
       return ambiguityTarget(msg);
@@ -39,7 +39,7 @@ export function queueKeyOf(msg: AnswerMessage): QuestionKey {
   }
 }
 
-/** The key of the row a queued answer locks: a requeue locks its legacy question's row (R1). */
+/** The key of the row a queued answer locks: a requeue locks its legacy question's row. */
 function rowKeyOf(key: QuestionKey): QuestionKey {
   return key.startsWith("requeue:")
     ? `ambiguity:${key.slice("requeue:".length)}`

@@ -23,7 +23,7 @@ export async function answerHandledTitles(
   const cards = await store.loadRatings();
   return {
     titles: handledTitles(state, cards),
-    // P3: a cancel still queued already took the line away on the page; a reload must not bring it back.
+    // A cancel still queued already took the line away on the page; a reload must not bring it back.
     waiting: waitingTitles(state, cards).filter(
       (t) => !cancelling.includes(t.key),
     ),

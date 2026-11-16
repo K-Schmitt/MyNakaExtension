@@ -398,7 +398,7 @@ describe("an episode rating on its box", () => {
     return { t, three, four };
   };
 
-  it("sends nothing for a trusted click on an episode's stars reported hidden (D7)", async () => {
+  it("sends nothing for a trusted click on an episode's stars reported hidden", async () => {
     const { t, three } = await twoBoxes();
     t.stars.hidden = true;
     starOf(three, 6)?.click(true);
@@ -408,7 +408,43 @@ describe("an episode rating on its box", () => {
     expect(t.ofType("fiche-rate")).toHaveLength(1);
   });
 
-  it("draws each box's stars in a slot of its own, kept when the box is drawn again (D7)", async () => {
+  const starsSlotOf = (
+    t: Awaited<ReturnType<typeof twoBoxes>>["t"],
+    b: FakeBox,
+  ) =>
+    t.stars.slots.find((_, i) =>
+      t.stars.rows[i]?.children.includes(starOf(b, 6) as FakeElement),
+    );
+
+  it("stops watching a box's stars when the tab leaves the title page", async () => {
+    const { t, three, four } = await twoBoxes();
+    const slots = [starsSlotOf(t, three), starsSlotOf(t, four)];
+    t.controller.path("/");
+    expect(t.stars.released).toEqual(expect.arrayContaining(slots));
+  });
+
+  it("stops watching a box's stars once Naka drops the box", async () => {
+    const three = fakeBox("S1 E3");
+    const four = fakeBox("S1 E4");
+    const boxes = [three, four];
+    const t = await seasonOne(boxes, episodes([3, 7.4], [4, 6.8]));
+    const slot = t.stars.slots.find((_, i) =>
+      t.stars.rows[i]?.children.includes(starOf(three, 6) as FakeElement),
+    );
+    boxes.splice(0, 1);
+    t.pageChanged();
+    expect(t.stars.released).toEqual([slot]);
+  });
+
+  it("stops watching a box's stars when Naka rewrites its code for another season", async () => {
+    const { t, three } = await twoBoxes();
+    const slot = starsSlotOf(t, three);
+    three.codeSpan.textContent = "S2 E3";
+    t.pageChanged();
+    expect(t.stars.released).toEqual([slot]);
+  });
+
+  it("draws each box's stars in a slot of its own, kept when the box is drawn again", async () => {
     const { t, three, four } = await twoBoxes();
     const slotOf = (b: FakeBox) =>
       t.stars.slots.filter((_, i) =>
@@ -424,7 +460,7 @@ describe("an episode rating on its box", () => {
     expect(slotOf(three)).toBe(first);
   });
 
-  it("refuses only the hidden box's stars: another box's click still rates (D7)", async () => {
+  it("refuses only the hidden box's stars: another box's click still rates", async () => {
     const { t, three, four } = await twoBoxes();
     const groupOfThree = t.stars.rows.find((row) =>
       row.children.includes(starOf(three, 6) as FakeElement),
@@ -487,6 +523,21 @@ describe("an episode rating on its box", () => {
     await settle();
     expect(busyOf(three)).toEqual([]);
     expect(linesOf(three)).toEqual([]);
+    expect(checked(shadowParts(starsHostOf(three)))).toEqual(["6 sur 10"]);
+  });
+
+  it("an episode whose rating went out but was not saved: its box says so, and shows the rating", async () => {
+    const { t, three } = await twoBoxes();
+    starOf(three, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      sent: true,
+      step: "local-save",
+      error: "unavailable",
+    });
+    await settle();
+    expect(linesOf(three)).toEqual([
+      "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.",
+    ]);
     expect(checked(shadowParts(starsHostOf(three)))).toEqual(["6 sur 10"]);
   });
 

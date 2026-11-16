@@ -5,9 +5,9 @@
 // in a local variable and in the returned session only. The page holds the token, so every failure is a
 // fixed message (here or in `send`) with no cause: no error carries any text of the page.
 
+import { nextDataText } from "./next-data";
 import { ScUnavailableError } from "./sc-errors";
 import { type Fetch, isRecord, type ScSession, send } from "./sc-transport";
-import { nextDataText } from "./season-episodes";
 
 type Fields = Record<string, unknown>;
 

@@ -1,6 +1,7 @@
-// The worker's jobs, as the router queues them. A job never rejects: it records its own failure where
-// it can. A failure it cannot record (the settings unreadable, the store down) leaves storage as it was:
-// overwriting unreadable settings would drop the binding.
+// The worker's jobs, as the router queues them. The list, finish and answer jobs never reject: each records
+// its own failure where it can (the title page jobs and the store reads reject, as their docs say). A failure it
+// cannot record (the settings unreadable, the store down) leaves storage as it was: overwriting unreadable
+// settings would drop the binding.
 
 import type { FinishedMessage } from "../content/playback-tracker";
 import type { QuestionKey } from "../core/questions";
@@ -95,9 +96,9 @@ export type { Trigger } from "./sync-job";
 export type Jobs = {
   syncJob(trigger: Trigger): Promise<void>;
   finishJob(msg: FinishedMessage): Promise<void>;
-  /** I2: true when a retry step would try an entry (read-only); the router tracks a finish only then. */
+  /** True when a retry step would try an entry (read-only); the router tracks a finish only then. */
   retryPending(since: number): Promise<boolean>;
-  /** I2: retries the first waiting finish when a sync queued at `since` ran and succeeded; true: queue another step. */
+  /** Retries the first waiting finish when a sync queued at `since` ran and succeeded; true: queue another step. */
   retryNext(since: number): Promise<boolean>;
   setMode(mode: Mode): Promise<void>;
   setSettings(thresholds: Thresholds, pauseFromPercent: number): Promise<void>;
@@ -107,21 +108,21 @@ export type Jobs = {
   answerQuestion(msg: AnswerQuestionMessage): Promise<void>;
   answerRemoval(msg: AnswerRemovalMessage): Promise<void>;
   hideQuestion(msg: HideQuestionMessage): Promise<void>;
-  /** B6: the link by hand, and the question asked again. */
+  /** The link by hand from the status page, and the question asked again. */
   linkTitle(msg: LinkTitleMessage): Promise<void>;
   requeueQuestion(msg: RequeueQuestionMessage): Promise<void>;
   /** The page's local actions: storage only, never a site. */
   forget(): Promise<void>;
   reset(): Promise<void>;
-  /** B8b: a handled title forgotten (an unticked « vu », or the page's « Oublier »): storage only. */
+  /** A handled title forgotten (an unticked « vu », or the page's « Oublier »): storage only. */
   forgetHandled(msg: ForgetHandledMessage): Promise<void>;
-  /** I2: « Annuler » on a waiting finish: the link undone, the question asked again; storage only. */
+  /** « Annuler » on a waiting finish: the link undone, the question asked again; storage only. */
   cancelRetry(msg: CancelRetryMessage): Promise<void>;
   /** The handled and waiting titles for the page: read-only, outside the queue; `cancelling`: keys with a queued cancel. */
   handledTitles(cancelling: string[]): Promise<HandledTitlesAnswer>;
   /** The same, asked by a Naka tab: counted against the hour's budget of forgets. */
   forgetHandledFromTab(msg: ForgetHandledMessage): Promise<void>;
-  /** No job: read-only, answered outside the queue (Ruling 20). */
+  /** No job: read-only, answered outside the queue. */
   statusSnapshot(): Promise<StatusSnapshot>;
   /** No job either: read-only, rejects when the store cannot be read. */
   ratingCard(msg: RatingCardMessage): Promise<CardAnswer>;
@@ -215,13 +216,15 @@ export function createJobs(
     reset: () => quietly(() => resetJob(deps.store)),
     forgetHandled: (msg) =>
       quietly(async () => {
-        await forgetHandledJob(deps.store, msg);
-        await forgetUndoOf(deps.store, msg.contentId);
+        if (await forgetHandledJob(deps.store, msg)) {
+          await forgetUndoOf(deps.store, msg.contentId);
+        }
       }),
     forgetHandledFromTab: (msg) =>
       quietly(async () => {
-        await forgetFromTabJob(deps.store, deps.now, msg);
-        await forgetUndoOf(deps.store, msg.contentId);
+        if (await forgetFromTabJob(deps.store, deps.now, msg)) {
+          await forgetUndoOf(deps.store, msg.contentId);
+        }
       }),
     cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
     handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),

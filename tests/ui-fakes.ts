@@ -5,6 +5,11 @@ import type {
   NodeLike,
   ShadowRootLike,
 } from "../src/content/ui/dom-like";
+import type { RowWatch } from "../src/content/ui/draw-watch";
+import {
+  createSeenWatch,
+  type VisibilityEntry,
+} from "../src/content/ui/star-visibility";
 
 // Minimal DOM fakes: elements record their text, children, attributes and listeners; appendChild moves.
 export class FakeNode implements NodeLike {
@@ -221,3 +226,42 @@ export function descendants(node: FakeNode): FakeElement[] {
     ...descendants(c),
   ]);
 }
+
+/**
+ * IntersectionObserver v2 behind the real visibility watch: `observed` holds the rows watched now, `report` says
+ * every one of them visible or hidden, `later` moves the watch's clock.
+ */
+export function fakeVisibility() {
+  const observed = new Set<unknown>();
+  let deliver: (entries: VisibilityEntry[]) => void = () => {};
+  let clock = 0;
+  const seen = createSeenWatch(
+    (onEntries) => {
+      deliver = onEntries;
+      return {
+        observe: (el) => observed.add(el),
+        unobserve: (el) => observed.delete(el),
+      };
+    },
+    () => clock,
+  );
+  return {
+    seen,
+    observed,
+    report: (isVisible: boolean) =>
+      deliver([...observed].map((target) => ({ target, isVisible }))),
+    later: (ms: number) => {
+      clock += ms;
+    },
+  };
+}
+
+/** A visibility watch for tests about something else: every click counts. */
+export const COUNTS: RowWatch = () => () => true;
+
+/** A visibility watch as in a browser without IntersectionObserver v2: every click counts. */
+export const noObserverWatch = () =>
+  createSeenWatch(
+    () => undefined,
+    () => 0,
+  );

@@ -57,7 +57,7 @@ describe("answer-removal, removeFrom sc, remove", () => {
     });
   });
 
-  it("reads the Naka account first: no write is the job's first Naka call (Ruling 22)", async () => {
+  it("reads the Naka account first: no write is the job's first Naka call", async () => {
     const w = world(withItem("sc"));
     await w.jobs.answerRemoval(msg("sc", true));
     expect(w.traffic.sent).toEqual([
@@ -102,7 +102,7 @@ describe("answer-removal, removeFrom sc, remove", () => {
     expect(w.writes()).toEqual(["unwish:1021"]);
   });
 
-  it("in simulation mode, the removal writes the same way (design §2.8)", async () => {
+  it("in simulation mode, the removal writes the same way (answers work in both modes)", async () => {
     const w = world(withItem("sc"), { settings: { mode: "simulation" } });
     await w.jobs.answerRemoval(msg("sc", true));
     expect(w.writes()).toEqual(["unwish:1021"]);
@@ -154,7 +154,7 @@ describe("answer-removal with no stored item: the block right after a removal on
     expect(outcomeOf(w)?.outcome).toBe("done");
   });
 
-  it("the snapshot does not stand for Naka's presence: refused, zero writes (Ruling 16)", async () => {
+  it("the snapshot does not stand for Naka's presence: refused, zero writes", async () => {
     const w = world(
       listedAt5({
         presence: { naka: [], sc: [{ id: 1021, from: 1, to: 5 }] },
@@ -311,7 +311,7 @@ describe("an empty Naka list is a failed read, never « gone »", () => {
     });
   });
 
-  it("(c) removeFrom naka with an item: failed with naka-list-empty, zero writes, the question still open (Ruling 15)", async () => {
+  it("(c) removeFrom naka with an item: failed with naka-list-empty, zero writes, the question still open", async () => {
     const before = withItem("naka");
     const w = world(before, {
       ...empty,
@@ -389,7 +389,7 @@ describe("answer-removal: the binding and the tabs", () => {
     expect(outcomeOf(w)?.error).toBe("stored-state");
   });
 
-  it("Ruling 22: the first tab rejects the account read, the second is pinned, the write goes to it, and a rejected write is never tried on another tab", async () => {
+  it("the first tab rejects the account read, the second is pinned, the write goes to it, and a rejected write is never tried on another tab", async () => {
     const sentTo: string[] = [];
     let writeFails = false;
     const tabs = (real: TabsPort): TabsPort => ({
@@ -585,7 +585,7 @@ describe("Review Focus 1: forged answers never remove, link or finish", () => {
   });
 });
 
-describe("a stale snapshot pair (fuzz seed 4312)", () => {
+describe("a stale snapshot pair (a case a fuzz test found)", () => {
   it("is refused: Naka's presence ended at run 6 of 8, so the pair was not listed on both at the last run", async () => {
     const start = stateWith({
       run: 8,

@@ -1,6 +1,6 @@
 // The worker's answers to « Annuler » (fiche-undo) and « Retirer la note » (fiche-remove), read by the Naka
 // tab and checked field by field like the other title page answers (fiche-answers). A partial undo names
-// the steps done and the step that failed, so the tab can say what was not put back (spec §4).
+// the steps done and the step that failed, so the tab can say what was not put back.
 
 import type { UndoStep } from "../core/fiche-undo";
 import type { NotSentAnswer, OkAnswer } from "./fiche-answers";

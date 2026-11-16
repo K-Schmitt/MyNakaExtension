@@ -6,16 +6,17 @@ import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
-import type { VideoSample } from "../naka-tab";
+import type { VideoSample } from "../video-sample";
 import { askOrNothing, questionOf } from "./end-poll";
 import { createQuestionHost, type HostPorts } from "./question-host";
-import { createRatingSession, type SessionPorts } from "./rating-session";
+import { createRatingSession } from "./rating-session";
+import type { SessionPorts } from "./session-ports";
 import { labelOf } from "./session-views";
 import { viewOnlyCard, viewOnlyLabel } from "./view-only-card";
 
 // Naka's next-episode zone: from here a pause is the end of the viewing, not a moment to rate.
-export const PAUSE_END_ZONE = 0.98;
-export const PAUSE_AFTER_URL_MS = 3000;
+const PAUSE_END_ZONE = 0.98;
+const PAUSE_AFTER_URL_MS = 3000;
 // Naka's page makes each pause reach a capture listener twice.
 export const DOUBLE_PAUSE_MS = 1000;
 

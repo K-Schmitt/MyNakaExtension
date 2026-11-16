@@ -55,7 +55,7 @@ describe("seasonFactsOf", () => {
 describe("seasonFactsOf with Naka's announced episode count", () => {
   const AIRING = { seasons: [1], episodeCounts: { 1: 7 } };
 
-  it("gives the unreleased episodes to the last season (VisionQuest: 7 released of 8)", () => {
+  it("gives the unreleased episodes to the last season (Severance: 7 released of 8)", () => {
     expect(seasonFactsOf(AIRING, 1, 1, 8)).toEqual({
       episodesInSeason: 8,
       lastSeason: 1,

@@ -4,6 +4,7 @@
 // from Naka's own item, never from the event. The channel is the caller's, to avoid an import cycle with
 // messages.ts.
 
+import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 import {
   asId,
   asInt,
@@ -57,8 +58,6 @@ const MEDIA_TYPES = valuesOf<FicheEvent<string>["mediaType"]>({
   tv: true,
 });
 export const MAX_TEXT = 200;
-export const MIN_YEAR = 1800;
-export const MAX_YEAR = 2100;
 export const MAX_SEASON_COUNT = 100;
 
 export function asText(raw: unknown, path: string): string {

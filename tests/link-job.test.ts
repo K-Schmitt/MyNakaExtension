@@ -124,8 +124,12 @@ describe("link-title", () => {
     expect(w.settings().lastAnswer).toMatchObject({ outcome: "done" });
   });
 
-  it("simulation mode (the default settings): the same mapping and done", async () => {
-    const w = answerWorld({ state: unlinkedFilm(), ...sc(1) });
+  it("simulation mode (stored settings): the same mapping and done", async () => {
+    const w = answerWorld({
+      state: unlinkedFilm(),
+      settings: { mode: "simulation" },
+      ...sc(1),
+    });
     await w.jobs.linkTitle(link());
     expect(w.settings().mode).toBe("simulation");
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
@@ -191,6 +195,31 @@ describe("link-title", () => {
     expect(w.settings().finishWindow?.count).toBe(1);
     expect(w.settings().lastAnswer).toMatchObject({
       target: "link:naka:5",
+      outcome: "done",
+    });
+  });
+
+  it("the answer log unsaveable after the link: the waiting finish still runs once", async () => {
+    const state = stateWith({
+      pending: [
+        ambiguity(5, { candidateIds: [], candidates: [], finish: "movie:5" }),
+      ],
+    });
+    const w = answerWorld({ state, settings: LIVE, ...sc(1) });
+    const realSet = w.area.set;
+    let refused = false;
+    w.area.set = async (items) => {
+      if ("settings" in items && !refused) {
+        refused = true;
+        throw new Error("quota");
+      }
+      await realSet(items);
+    };
+    await w.jobs.linkTitle(link());
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(w.writes()).toContain("markDone:2005:2026-11-05");
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "movie:5",
       outcome: "done",
     });
   });

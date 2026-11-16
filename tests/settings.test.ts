@@ -56,7 +56,7 @@ describe("lastAnswer", () => {
     error: "unavailable",
   };
 
-  it("the exact 4a settings parse with no lastAnswer", () => {
+  it("the settings of an older version parse with no lastAnswer", () => {
     expect("lastAnswer" in parseSettings(full())).toBe(false);
     expect("lastAnswer" in parseSettings({ mode: "live" })).toBe(false);
   });
@@ -78,8 +78,28 @@ describe("lastAnswer", () => {
 });
 
 describe("parseSettings accepts", () => {
-  it("an absent key as simulation", () => {
-    expect(parseSettings(undefined)).toEqual({ mode: "simulation" });
+  it("an absent key as live, the first run waiting for a click", () => {
+    expect(parseSettings(undefined)).toEqual({
+      mode: "live",
+      firstRunPending: true,
+    });
+  });
+
+  it("firstRunPending: true, kept", () => {
+    const value = { mode: "live", firstRunPending: true };
+    expect(parseSettings(value)).toEqual(value);
+  });
+
+  it("a stored simulation without firstRunPending, unchanged", () => {
+    expect(parseSettings({ mode: "simulation" })).toEqual({
+      mode: "simulation",
+    });
+  });
+
+  it("firstRunPending: false is rejected (only true is valid)", () => {
+    expect(() =>
+      parseSettings({ mode: "live", firstRunPending: false }),
+    ).toThrow(StoredStateError);
   });
 
   it("a full value, unchanged", () => {
@@ -148,7 +168,7 @@ describe("parseSettings accepts", () => {
     });
   });
 
-  it("a finish with its title parses, and one without (4a) still does", () => {
+  it("a finish with its title parses, and one without (an older version's) still does", () => {
     const withTitle = {
       at: 1,
       key: "movie:1",
@@ -211,7 +231,7 @@ describe("parseSettings accepts", () => {
     });
   });
 
-  it("a stored Plan 3 run record parses, without year, type or next", () => {
+  it("a run record stored by an older version parses, without year, type or next", () => {
     const lastRun = {
       at: 1,
       trigger: "button",
@@ -587,7 +607,7 @@ describe("thresholds and pauseFromPercent", () => {
     finishWindow: { from: 0, count: 1 },
   };
 
-  it("the exact Plan 3 shape parses and takes the defaults", () => {
+  it("the exact shape of an older version parses and takes the defaults", () => {
     const parsed = parseSettings(plan3);
     expect(parsed).toEqual(plan3);
     expect(thresholdsOf(parsed)).toEqual({ film: 0.9, episode: 0.8 });
@@ -631,4 +651,13 @@ describe("thresholds and pauseFromPercent", () => {
       );
     },
   );
+
+  it("accepts the shape a reset leaves in simulation", () => {
+    expect(
+      parseSettings({ mode: "simulation", firstRunPending: true }),
+    ).toEqual({
+      mode: "simulation",
+      firstRunPending: true,
+    });
+  });
 });

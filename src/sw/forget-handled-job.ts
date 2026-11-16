@@ -1,6 +1,7 @@
 // « Oublier » a handled title, whether the owner unticked « vu » on Naka or pressed the button on the page.
 // Storage only: nothing is sent to SensCritique or Naka, and what is already there stays (ratings, « vu »,
-// the settled pair). The state is saved first, then the cards; each only when it changes.
+// the settled pair). The state is saved first, then the cards; each only when it changes. Each job says whether
+// it forgot anything, so the title page's undo record goes only after a forget that changed something.
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor, type RatingCard } from "../core/rating-cards";
@@ -16,34 +17,38 @@ type ForgetStore = Pick<
   "loadState" | "saveState" | "loadRatings" | "saveRatings"
 >;
 
-// A finish waiting for a Naka tab (I2) is held too: once unticked, no retry may mark the title seen.
+// A finish waiting for a Naka tab (retry-job) is held too: once unticked, no retry may mark the title seen.
 function holds(state: SyncState, key: string): boolean {
   return holdsKey(state, key) || isWaiting(state, key);
 }
 
-async function forgetKey(store: ForgetStore, key: string): Promise<void> {
+async function forgetKey(store: ForgetStore, key: string): Promise<boolean> {
   const state = await store.loadState();
-  if (!holds(state, key)) return;
+  if (!holds(state, key)) return false;
   await store.saveState(dropRetry(forgetHandled(state, key), key));
+  return true;
 }
 
 // An unwatched title is not « à noter »: its card goes, other cards stay.
-async function dropCard(store: ForgetStore, key: string): Promise<void> {
+async function dropCard(store: ForgetStore, key: string): Promise<boolean> {
   const cards = await store.loadRatings();
-  if (cardFor(cards, key) === undefined) return;
+  if (cardFor(cards, key) === undefined) return false;
   await store.saveRatings(cards.filter((card: RatingCard) => card.key !== key));
+  return true;
 }
 
 export async function forgetHandledJob(
   store: ForgetStore,
   msg: ForgetHandledMessage,
-): Promise<void> {
+): Promise<boolean> {
   const key = contentKeyOf(msg);
-  await forgetKey(store, key);
-  await dropCard(store, key);
+  const forgot = await forgetKey(store, key);
+  const dropped = await dropCard(store, key);
+  return forgot || dropped;
 }
 
-// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds nothing.
+// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds
+// nothing.
 async function heldBy(store: ForgetStore, key: string): Promise<boolean> {
   if (holds(await store.loadState(), key)) return true;
   return cardFor(await store.loadRatings(), key) !== undefined;
@@ -64,11 +69,14 @@ export async function forgetFromTabJob(
   store: ForgetStore & Pick<Store, "loadSettings" | "saveSettings">,
   now: () => number,
   msg: ForgetHandledMessage,
-): Promise<void> {
-  if (!(await heldBy(store, contentKeyOf(msg)))) return;
+): Promise<boolean> {
+  if (!(await heldBy(store, contentKeyOf(msg)))) return false;
   const settings = await store.loadSettings();
   const window = windowAt(settings.forgetWindow, now());
-  if (isForgetFull(window)) return dropWaiting(store, contentKeyOf(msg));
+  if (isForgetFull(window)) {
+    await dropWaiting(store, contentKeyOf(msg));
+    return false;
+  }
   await store.saveSettings({ ...settings, forgetWindow: withOneMore(window) });
-  await forgetHandledJob(store, msg);
+  return forgetHandledJob(store, msg);
 }

@@ -1,14 +1,18 @@
 // Reads the owner's state on one product from a ProductCurrentUserInfos answer. Pure: no network.
 //
-// Only the two flags, the product's universe (public, non-personal: film, series, episode…), the
-// owner's own rating (currentUserInfos.rating, to be shown back to the owner), the product's public average and, now, the product's
-// public title and year (the label, read leniently by product-label.ts, for the preview) leave this module, with what
-// an undo restores: the date seen (kept to put « vu » back as it was), whether the owner reviewed or recommended the
-// title (an undo never drops those) and the product's page; the user id, the season count (Naka's is the one used, Ruling 11) and everything else in the answer
-// are dropped here. The product-level `rating` is the public average, read leniently by average-rating.ts (null when unreadable, it never fails the answer). An answer that
-// does not describe the requested product, whose isDone or isWished is not a boolean, whose universe is not a safe
-// integer or whose rating is neither null nor an integer 1 to 10 (the key must be present) fails closed
-// with one fixed message (never a piece of the answer).
+// What leaves this module:
+// - the two flags, isDone and isWished;
+// - the product's universe (public, non-personal: film, series, episode…);
+// - the owner's own rating (currentUserInfos.rating, to be shown back to the owner);
+// - the public average: the product-level `rating`, read leniently by average-rating.ts (null when
+//   unreadable, it never fails the answer);
+// - the public title and year (the label, read leniently by product-label.ts, for the preview);
+// - what an undo restores: the date seen (to put « vu » back as it was), whether the owner reviewed or
+//   recommended the title (an undo never drops those), and the product's page.
+// The user id, the season count (Naka's is the one used) and everything else in the answer are dropped.
+// An answer that does not describe the requested product, whose isDone or isWished is not a boolean,
+// whose universe is not a safe integer or whose rating is neither null nor an integer 1 to 10 (the key
+// must be present) fails closed with one fixed message (never a piece of the answer).
 // The requested product with a null currentUserInfos is how SensCritique answers a token it does not
 // recognize: that is ScUnauthenticatedError, so the owner is told to log in again.
 
@@ -86,7 +90,7 @@ function dateDoneOf(infos: Record<string, unknown>): string | null {
 }
 
 /** A critique or recommendation flag: only `false` says there is none; anything else counts as one, so
- * nothing that could drop it is offered (fails closed, owner decision D13). */
+ * nothing that could drop it is offered (fails closed). */
 function protectedFlagOf(flag: unknown): boolean {
   return flag !== false;
 }

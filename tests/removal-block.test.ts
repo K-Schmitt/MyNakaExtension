@@ -16,7 +16,12 @@ import type {
   RemovalOfferAnswer,
 } from "../src/sw/question-offers";
 import { fakeClock, flush } from "./end-block-fakes";
-import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
+import {
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  noObserverWatch,
+} from "./ui-fakes";
 
 const NB = " ";
 const OFFER: RemovalOffer = {
@@ -24,7 +29,7 @@ const OFFER: RemovalOffer = {
   key: "removal:sc:21391:112240873",
   removeFrom: "sc",
   pair: { nakaId: 21391, scId: 112240873 },
-  title: "Un Job Mortel",
+  title: "Twin Peaks",
 };
 const REMOVE = "Retirer aussi de tes envies SensCritique";
 
@@ -41,7 +46,7 @@ function lastFor(target: QuestionKey, seq: number): LastAnswer {
 function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   const clock = fakeClock();
   const doc = new FakeDoc();
-  const ui = createEndUi(doc);
+  const ui = createEndUi(doc, noObserverWatch());
   const sent: unknown[][] = [];
   const asked: number[] = [];
   const script = { answer: first as RemovalOfferAnswer | undefined };
@@ -98,7 +103,7 @@ describe("the removal block", () => {
     expect(t.asked).toEqual([21391]);
     expect(t.block.isShown()).toBe(true);
     expect(t.texts()).toContain(
-      `«${NB}Un Job Mortel${NB}» a quitté Ma liste Naka.`,
+      `«${NB}Twin Peaks${NB}» a quitté Ma liste Naka.`,
     );
     expect(t.texts()).toContain(`${REMOVE}${NB}?`);
   });

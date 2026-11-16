@@ -4,6 +4,7 @@
 // APOLLO, with `credentials: "omit"`. It is never put in a URL, a body, an error message or a log.
 // Error messages carry the operation name and the HTTP status only: a response body may hold personal data.
 
+import type { Fetch } from "../core/fetch-type";
 import {
   ScTimeoutError,
   ScUnauthenticatedError,
@@ -11,18 +12,7 @@ import {
 } from "./sc-errors";
 import { GQL } from "./sc-queries";
 
-export type Fetch = (
-  url: string,
-  init: {
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    credentials: "include" | "omit";
-    redirect?: "error" | "follow" | "manual";
-    /** Set by the worker's request timeout (Ruling 16), never by the clients. */
-    signal?: AbortSignal;
-  },
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+export type { Fetch };
 
 export type ScSession = { token?: string; username?: string };
 export type ScDeps = { fetch: Fetch; getSession: () => Promise<ScSession> };
@@ -37,7 +27,7 @@ const APOLLO = "https://apollo.senscritique.com/";
 const MAX_BODY = 2_000_000;
 const SC_429 = "HTTP 429";
 
-export const JSON_TYPE = "application/json";
+const JSON_TYPE = "application/json";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -60,7 +50,7 @@ export async function readSession(deps: ScDeps): Promise<ScSession> {
   }
 }
 
-// A rate limit or a timeout on the home page stays one, so that the breaker opens (M2, K4): only the
+// A rate limit or a timeout on the home page stays one, so that the breaker opens: only the
 // class and the status are read, and the error is rebuilt from fixed text. Anything else, even an error
 // that throws while it is looked at, is the one fixed "could not be read".
 function sessionError(error: unknown): ScUnavailableError {
@@ -124,7 +114,8 @@ function openEnvelope(json: unknown, label: string): Envelope {
   if (!isRecord(json)) {
     throw new ScUnavailableError(`SensCritique ${label}: unexpected response`);
   }
-  if (json.errors !== undefined) {
+  // `errors: null` is read as an absent key: only a present value is a GraphQL error.
+  if (json.errors !== undefined && json.errors !== null) {
     if (mentionsUnauthenticated(json.errors)) {
       throw new ScUnauthenticatedError();
     }

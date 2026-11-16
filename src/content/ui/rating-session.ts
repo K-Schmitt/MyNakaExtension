@@ -15,7 +15,6 @@ import type { RatingHandlers } from "./rating-render";
 import type { SessionPorts } from "./session-ports";
 import { labelOf, needsConfirm, type Session, viewFor } from "./session-views";
 
-export type { SessionPorts };
 export { GRACE_MS };
 
 // `absentIsDone`: for a list of cards, where the answer lists only cards with something pending, a card

@@ -5,7 +5,8 @@
 
 import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
-import type { PendingItem, SyncState } from "./state";
+import { openAmbiguity } from "./questions";
+import type { SyncState } from "./state";
 import { type Candidate, matchTitle, type Titled } from "./title-match";
 
 export type ScMatch =
@@ -16,8 +17,6 @@ export type ScMatch =
   | { kind: "asked"; candidateIds: number[] }
   | { kind: "not-found" };
 
-type Side = "naka" | "sc";
-
 type Search = { searchSc(q: string): Promise<Candidate[]> };
 
 // The resolver's swap guard: a product already mapped is never taken over. The title itself is not
@@ -26,23 +25,10 @@ function isHeld(state: SyncState, scId: number): boolean {
   return state.mapping.some((pair) => pair.scId === scId);
 }
 
-function openQuestion(
-  state: SyncState,
-  side: Side,
-  id: number,
-): Extract<PendingItem, { kind: "ambiguity" }> | undefined {
-  for (const item of state.pending) {
-    if (item.kind === "ambiguity" && item.side === side && item.id === id) {
-      return item;
-    }
-  }
-  return undefined;
-}
-
-// An SC-side question lists NAKA ids: the owner is asked about the product itself, and the stored
-// question stays as it is.
+// A SensCritique-side question is about the product itself, so the id returned is the product's; the
+// stored question stays as it is.
 function mappedMatch(state: SyncState, pair: Pair): ScMatch {
-  if (openQuestion(state, "sc", pair.scId)) {
+  if (openAmbiguity(state, "sc", pair.scId)) {
     return { kind: "asked", candidateIds: [pair.scId] };
   }
   return { kind: "pair", pair, isNew: false };
@@ -54,7 +40,7 @@ export async function matchOnSc(
   titled: Titled,
   ports: Search,
 ): Promise<ScMatch> {
-  const asked = openQuestion(state, "naka", nakaId);
+  const asked = openAmbiguity(state, "naka", nakaId);
   if (asked) return { kind: "asked", candidateIds: [...asked.candidateIds] };
   const mapped = state.mapping.find((pair) => pair.nakaId === nakaId);
   if (mapped) return mappedMatch(state, mapped);
@@ -64,7 +50,7 @@ export async function matchOnSc(
   if (result.kind === "ambiguous") {
     return { kind: "needs-choice", candidateIds: result.ids, candidates };
   }
-  if (isHeld(state, result.id) || openQuestion(state, "sc", result.id)) {
+  if (isHeld(state, result.id) || openAmbiguity(state, "sc", result.id)) {
     return { kind: "needs-choice", candidateIds: [result.id], candidates };
   }
   return { kind: "pair", pair: { nakaId, scId: result.id }, isNew: true };

@@ -1,5 +1,5 @@
-// The list-sync writes. Live: the Plan 2 contract (a product already done on SensCritique is never
-// wished). Simulation (spec §8quinquies): nothing is written; each write the run would make is recorded
+// The list-sync writes. Live: the sync's contract (a product already done on SensCritique is never
+// wished). Simulation: nothing is written; each write the run would make is recorded
 // for the preview, and the product state is still READ so that the report says what live would do.
 
 import { universeType } from "../core/adapt-titles";

@@ -225,8 +225,8 @@ describe("forgetting clears the finish waiting on that title", () => {
     expect(w.network()).toEqual([]);
   });
 
-  // I2: an answer sent with no Naka tab moved the question's finish into `retryFinishes`; an untick of
-  // « vu » on Naka must forget it there too, or the next successful sync marks the title seen (B8b).
+  // An answer sent with no Naka tab moved the question's finish into `retryFinishes`; an untick of
+  // « vu » on Naka must forget it there too, or the next successful sync marks the title seen.
   const entryOf = (id: number): RetryFinish => ({
     key: keyOf(id),
     pair: { nakaId: id, scId: 1000 + id },

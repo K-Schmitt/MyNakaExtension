@@ -21,8 +21,9 @@ export async function forgetJob(store: SettingsStore): Promise<void> {
 
 /** One decision per setting: a field added to Settings does not compile until it is kept or dropped. */
 export type ResetRules = Record<keyof Settings, "keep" | "drop">;
-export const RESET_RULES: ResetRules = {
-  mode: "drop", // always simulation
+const RESET_RULES: ResetRules = {
+  mode: "keep",
+  firstRunPending: "drop", // set back to true by keptOf
   binding: "keep",
   thresholds: "keep",
   pauseFromPercent: "keep",
@@ -40,14 +41,14 @@ function keptOf(settings: Settings): Settings {
   const kept = Object.entries(settings).filter(
     ([key]) => RESET_RULES[key as keyof Settings] === "keep",
   );
-  return { ...Object.fromEntries(kept), mode: "simulation" };
+  return { ...Object.fromEntries(kept), firstRunPending: true } as Settings;
 }
 
 async function keptSettings(store: SettingsStore): Promise<Settings> {
   try {
     return keptOf(await store.loadSettings());
   } catch {
-    return { mode: "simulation" };
+    return { mode: "live", firstRunPending: true };
   }
 }
 

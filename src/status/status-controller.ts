@@ -4,6 +4,7 @@
 import type { ToWorker } from "../ext/messages";
 import type { Mode } from "../ext/settings";
 import type { LocalAction } from "../sw/activity";
+import { type PageTimer, POLL_MS } from "./page-timer";
 import {
   SETTINGS_COPY,
   type SettingsDraft,
@@ -15,14 +16,6 @@ import { sendConfirmed } from "./status-actions";
 import type { StatusFormat } from "./status-format";
 import { confirmText } from "./status-mode-copy";
 import { LOADING_VIEW, type StatusView, toStatusView } from "./status-view";
-
-// While a job runs or a mode change waits, the page asks again this often (Ruling 20).
-export const POLL_MS = 5000;
-
-export type PageTimer = {
-  set(fn: () => void, ms: number): unknown;
-  clear(handle: unknown): void;
-};
 
 export type FocusTarget = "resync" | "switch" | "forget" | "reset" | "headline";
 
@@ -75,7 +68,7 @@ function focusTarget(pressed: Pressed, view: StatusView): FocusTarget {
   if (pressed === "resync") return pressed;
   if (view.kind !== "ready") return "headline";
   if (pressed === "switch") {
-    return view.switchLabel === undefined ? "headline" : pressed;
+    return view.mode === undefined ? "headline" : pressed;
   }
   return view.actionsDisabled ? "headline" : pressed;
 }
@@ -138,7 +131,7 @@ export function createController(ports: Ports): Controller {
 
   // One action at a time: a click during an answer is ignored, and the buttons are disabled meanwhile. A
   // poll due meanwhile asks nothing: the action's own answer arms the next one. Disabling the pressed
-  // button drops its focus, so it gets it back once the buttons are enabled again (Ruling 19).
+  // button drops its focus, so it gets it back once the buttons are enabled again.
   async function exclusive(
     action: () => Promise<void>,
     pressed?: Pressed,
@@ -163,7 +156,8 @@ export function createController(ports: Ports): Controller {
   async function toggle(): Promise<void> {
     if (current.kind !== "ready" || current.mode === undefined) return;
     if (current.mode === "live") return switchTo("simulation");
-    if (!ports.confirm(confirmText(current.previewCount))) return;
+    const pending = current.firstRunLine !== undefined;
+    if (!ports.confirm(confirmText(current.previewCount, pending))) return;
     return switchTo("live");
   }
 

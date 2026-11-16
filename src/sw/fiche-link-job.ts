@@ -2,7 +2,7 @@
 // for that content. A title the extension knows (unlinked on the Naka side, or with an open question) takes
 // the status page's link-title path: both sites read, then the mapping; any ending but `done` (refused,
 // mismatch, failed) rejects, so the tab shows its error line. Any other title gets a
-// display-only link (§7 choice 6), kept apart from the mapping and the sync, at most MAX_FICHE_LINKS of
+// display-only link, kept apart from the mapping and the sync, at most MAX_FICHE_LINKS of
 // them: the first key goes before a new one. Unreadable links are replaced (they only spare a search).
 
 import { openAmbiguity } from "../core/questions";
@@ -11,7 +11,7 @@ import type { LinkAnswer } from "../ext/fiche-answers";
 import { type FicheLinks, MAX_FICHE_LINKS } from "../ext/fiche-links-schema";
 import type { FicheLinkMessage } from "../ext/fiche-messages";
 import type { Store } from "../ext/store";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { assertIssued } from "./fiche-issued";
 import { LinkRefusedError } from "./fiche-link-pair";
 import type { JobDeps } from "./job-deps";
@@ -32,7 +32,7 @@ async function storedLinks(store: Store): Promise<FicheLinks> {
   }
 }
 
-export function withLink(
+function withLink(
   links: FicheLinks,
   contentId: number,
   productId: number,

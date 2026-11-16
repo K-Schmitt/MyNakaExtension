@@ -1,6 +1,7 @@
 import { MAX_CANDIDATES } from "../core/questions";
 import type { QuestionCandidate } from "../core/state";
 import type { MediaType } from "../core/title-match";
+import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 import {
   asId,
   asInt,
@@ -23,9 +24,6 @@ const CANDIDATE_KEYS = valuesOf<keyof QuestionCandidate>({
   type: true,
   image: true,
 });
-
-const MIN_YEAR = 1800;
-const MAX_YEAR = 2100;
 
 function asYear(raw: unknown, path: string): number {
   const year = asInt(raw, MIN_YEAR, path);

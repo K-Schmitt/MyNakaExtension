@@ -8,7 +8,7 @@ import { ACTIONS_SHEET } from "../src/content/ui/fiche-styles";
 import { ratingView } from "../src/content/ui/rating-view";
 import { themeCss } from "../src/ui/theme-tokens";
 import { filmCard } from "./rating-fixtures";
-import { FakeDoc } from "./ui-fakes";
+import { FakeDoc, noObserverWatch } from "./ui-fakes";
 
 const SELECTORS = [
   ".mn-card",
@@ -109,7 +109,7 @@ describe("BLOCK_SHEET", () => {
 describe("the overlays get the sheet", () => {
   it("the end block's shadow root carries BLOCK_SHEET in a style node", () => {
     const doc = new FakeDoc();
-    createEndUi(doc).show(ratingView(filmCard(), "film"), {
+    createEndUi(doc, noObserverWatch()).show(ratingView(filmCard(), "film"), {
       onChoose: () => {},
       onAction: () => {},
       onOther: () => {},

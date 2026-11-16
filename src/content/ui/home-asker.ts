@@ -4,10 +4,7 @@
 import type { CardAnswer, CardsAnswer } from "../../sw/rating-answers";
 import type { WorkerPort } from "./worker-port";
 
-export function cardAnswerFor(
-  key: string,
-  cards: CardsAnswer["cards"],
-): CardAnswer {
+function cardAnswerFor(key: string, cards: CardsAnswer["cards"]): CardAnswer {
   const hit = cards.find((entry) => entry.card.key === key);
   return {
     card: hit?.card ?? null,

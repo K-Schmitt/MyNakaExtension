@@ -1,11 +1,12 @@
-// The step 7 states the actions host shows instead of, or under, its buttons: loading, its failure with
-// « Réessayer », the candidates to link with their posters, « Pas trouvé » with its search (step 8b), a
-// series' confirmation, the write's and the season's error lines. Texts go through textContent; every
-// button acts on a trusted click only.
+// The states of a title with no product to rate, that the actions host shows instead of, or under, its
+// buttons: loading, its failure with « Réessayer », the candidates to link with their posters, « Pas trouvé »
+// with its search, a series' confirmation, the write's and the season's error lines. Texts go through
+// textContent; every button acts on a trusted click only.
 
 import type { QuestionCandidate } from "../../core/state";
 import type { FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import { candidateChoices } from "./fiche-candidate-choice";
 import {
   INFO_FAILED_LINE,
@@ -46,16 +47,17 @@ export function seasonLines(doc: Maker, view: FicheView): ElementLike[] {
   return [textLine(doc, seasonFailedLine(view.season), ERROR_CLASS)];
 }
 
+/** The series' warning, then « Envoyer » and « Annuler », acting only while `watch` says them visible. */
 export function seriesConfirm(
   doc: Maker,
   handlers: FicheHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
+  const onConfirm = (send: boolean) =>
+    send ? handlers.confirmSeries() : handlers.cancelSeries();
   return [
     textLine(doc, SERIES_CONFIRM, WARNING_CLASS),
-    confirmRow(doc, {
-      onConfirm: (send) =>
-        send ? handlers.confirmSeries() : handlers.cancelSeries(),
-    }),
+    confirmRow(doc, { onConfirm }, watch),
   ];
 }
 
@@ -64,11 +66,12 @@ function linkParts(
   view: FicheView,
   candidates: readonly QuestionCandidate[],
   handlers: FicheHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
   const choices =
     view.pending === "link"
       ? textLine(doc, LINKING_LINE)
-      : candidateChoices(doc, candidates, handlers);
+      : candidateChoices(doc, candidates, handlers, watch);
   return [
     textLine(doc, LINK_HEADING, TITLE_CLASS),
     choices,
@@ -97,28 +100,30 @@ function notFoundParts(
   view: FicheView,
   handlers: FicheHandlers,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   return [
     textLine(doc, NOT_FOUND_LINE),
-    ...searchParts(doc, view, handlers, slot),
+    ...searchParts(doc, view, handlers, slot, watch),
     ...outcomeLines(doc, view, LINK_FAILED_LINE),
   ];
 }
 
 /**
  * What shows while the title has no product to rate: loading, its failure, the candidates, « Pas trouvé ».
- * The search field it makes, if any, goes into `slot`.
+ * The search field it makes, if any, goes into `slot`; `watch` guards the candidates.
  */
 export function rareParts(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   const { info } = view;
   if (info === undefined) return infoParts(doc, view, handlers);
   if (info.state === "choose") {
-    return linkParts(doc, view, info.candidates ?? [], handlers);
+    return linkParts(doc, view, info.candidates ?? [], handlers, watch);
   }
-  return notFoundParts(doc, view, handlers, slot);
+  return notFoundParts(doc, view, handlers, slot, watch);
 }

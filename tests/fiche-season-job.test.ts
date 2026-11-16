@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { parseSeasonAnswer } from "../src/ext/fiche-answers";
 import { UNIVERSE } from "../src/sc/sc-queries";
 import type { ScEpisode } from "../src/sc/season-episodes";
-import { NotIssuedError } from "../src/sw/fiche-mine-job";
+import { NotIssuedError } from "../src/sw/fiche-asker";
 import { answerWorld } from "./answer-world";
 import {
   info,

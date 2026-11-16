@@ -79,7 +79,7 @@ const PAGE_MESSAGES: [string, unknown][] = [
   ["a handled-titles", { type: "handled-titles" }],
   ["a cancel-retry", { type: "cancel-retry", contentId: 3 }],
 ];
-// Ruling 14: every question message, the reads and the answers, is tried from each untrusted sender.
+// Every question message, the reads and the answers, is tried from each untrusted sender.
 const QUESTION_MESSAGES: [string, unknown][] = [
   ["an open-questions", { type: "open-questions" }],
   ["a removal-offer", { type: "removal-offer", contentId: 3 }],
@@ -340,7 +340,7 @@ describe("router: trusted messages become jobs", () => {
     expect(r.calls.filter((c) => c.startsWith("retry:"))).toHaveLength(1);
   });
 
-  // A2: one waiting step, after the last sync, with the earliest time: a sync stamps its run at its
+  // One waiting step, after the last sync, with the earliest time: a sync stamps its run at its
   // start, so the later time alone would miss the first sync's success.
   it("a sync queued while a retry step waits merges them: one step, last, with the earlier time", async () => {
     const r = router();
@@ -613,6 +613,14 @@ describe("router: trusted messages become jobs", () => {
     expect(r.send({ type: "status" }, STATUS_PAGE)).toBe(true);
     await settle();
     expect(r.calls).toEqual(["status"]);
+    expect(r.answers).toEqual([r.snapshot]);
+  });
+
+  it("a status page whose url has a fragment is answered", async () => {
+    const r = router();
+    const url = `${STATUS_URL}#reglages`;
+    r.send({ type: "status" }, { id: EXT, url, tab: { url } });
+    await settle();
     expect(r.answers).toEqual([r.snapshot]);
   });
 
@@ -1292,7 +1300,7 @@ describe("router: one queue", () => {
     expect(r.answers).toEqual([]);
   });
 
-  it("a status answer channel that throws becomes no unhandled rejection (M4)", async () => {
+  it("a status answer channel that throws becomes no unhandled rejection", async () => {
     const unhandled: unknown[] = [];
     const listener = (reason: unknown) => unhandled.push(reason);
     process.on("unhandledRejection", listener);
@@ -1317,7 +1325,7 @@ describe("router: one queue", () => {
   });
 });
 
-// Ruling 20: the status is answered at once, outside the queue, read-only. It says which job runs and which
+// The status is answered at once, outside the queue, read-only. It says which job runs and which
 // mode a queued set-mode will apply: both live in memory, lost with the queue on a worker restart.
 describe("router: the status answer waits for no job", () => {
   function gated() {
@@ -1827,6 +1835,7 @@ function nakaFetch(clock: Clock) {
 function worker(loggedIn = true, start = "2026-11-04T12:00:00Z") {
   const clock: Clock = { time: Date.parse(start) };
   const storage = memoryArea();
+  storage.data.set("settings", { mode: "simulation" });
   const sc = scFetch(loggedIn, clock);
   const naka = nakaFetch(clock);
   const client = createNakaClient({
@@ -1897,7 +1906,7 @@ describe("worker end to end: a SensCritique request that never answers", () => {
       });
       r.handle({ type: "resync" }, STATUS_PAGE, () => undefined);
       await settle();
-      // The status does not wait for the stuck run (Ruling 20): it says a sync runs.
+      // The status does not wait for the stuck run: it says a sync runs.
       r.handle({ type: "status" }, STATUS_PAGE, (a) => answers.push(a));
       await settle();
       expect(answers).toHaveLength(1);
@@ -2006,7 +2015,7 @@ function stallingWorker(stuck: string, hangs: (answered: Call[]) => boolean) {
   return { storage, requests, hung, send, runOut, lastRun };
 }
 
-describe("worker end to end: a SensCritique site that stops answering (K4)", () => {
+describe("worker end to end: a SensCritique site that stops answering", () => {
   it.each([WWW_HOME, APOLLO_HOST])(
     "%s hanging mid-run costs one 30 s timeout (the search port on Apollo, the write port on the home page, which searches never read), not one per title",
     async (stuck) => {
@@ -2124,7 +2133,7 @@ describe("worker end to end: the tokens stay where they belong", () => {
     const w = worker(false);
     w.send({ ...FINISHED, contentId: 3 }, NAKA_TAB);
     await settle();
-    // Ruling 18: the local pre-check reads the state once; handleFinish never runs.
+    // The local pre-check reads the state once; handleFinish never runs.
     expect(w.storage.ops.filter((op) => op === "get:state")).toHaveLength(1);
     expect(w.storage.ops).not.toContain("set:state");
     expect(w.naka.calls.map((c) => c.url)).toEqual([
@@ -2250,7 +2259,7 @@ describe("worker end to end: the shared limiters", () => {
   });
 });
 
-// Ruling 20 (spec §5, probe 3): SearchProductExplorer answers without a token; a search reads no session.
+// A probe showed SearchProductExplorer answers without a token; a search reads no session.
 describe("worker end to end: searches read no session", () => {
   const TWENTY = Array.from({ length: 20 }, (_, i) => i + 1);
   const operation = (call: Call): string =>
@@ -2265,10 +2274,12 @@ describe("worker end to end: searches read no session", () => {
       fetch: nakaPlaylist(TWENTY),
       token: () => NAKA_TOKEN,
     });
+    const storage = memoryArea();
+    storage.data.set("settings", { mode: "simulation" });
     const r = createWorker({
       extensionId: EXT,
       session: memoryArea(),
-      storage: memoryArea(),
+      storage,
       tabs: tabRunning(client, () => "77").tabs,
       fetch: sc.fetch,
       timer: { set: () => 0, clear: () => undefined },
@@ -2325,7 +2336,7 @@ describe("worker end to end: a finish is dated in the owner's time zone", () => 
   });
 });
 
-// M10 and M12: the first real use, end to end through createWorker with the real clients, and the real
+// The first real use, end to end through createWorker with the real clients, and the real
 // snapshot read by the page's own view model.
 describe("worker end to end: a first naka-ready in simulation", () => {
   const NB = "\u202F";
@@ -2374,9 +2385,9 @@ describe("worker end to end: a first naka-ready in simulation", () => {
     expect(w.answers).toHaveLength(1);
     expect(toStatusView(w.answers[0], localFormat("UTC"))).toEqual({
       kind: "ready",
-      headline: `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      headline: `Mode simulation actif${NB}: tes listes ne sont pas modifiées. Voir Réglages.`,
       mode: "simulation",
-      switchLabel: "Activer les écritures",
+      simulationOn: true,
       switchDisabled: false,
       actionsDisabled: false,
       inProgress: false,
@@ -2402,7 +2413,7 @@ describe("worker end to end: a first naka-ready in simulation", () => {
   });
 });
 
-describe("router: the manual link family (B6)", () => {
+describe("router: the manual link family", () => {
   it("search-titles from the status page is answered by the job, outside the queue", async () => {
     const blocker = latch();
     const r = router({
@@ -2460,7 +2471,7 @@ describe("router: the manual link family (B6)", () => {
     ]);
   });
 
-  it("a waiting link is reported as answering by its key, a waiting requeue by its row's key (R1)", async () => {
+  it("a waiting link is reported as answering by its key, a waiting requeue by its row's key", async () => {
     const blocker = latch();
     const r = router({
       syncJob: async () => {
@@ -2477,7 +2488,7 @@ describe("router: the manual link family (B6)", () => {
     blocker.open();
   });
 
-  it("a requeue is answering only while it waits: the row unlocks once it has run (R1)", async () => {
+  it("a requeue is answering only while it waits: the row unlocks once it has run", async () => {
     const r = router();
     r.send(REQUEUE, STATUS_PAGE);
     await settle();

@@ -1,4 +1,4 @@
-// One list-sync run: the binding first, then Plan 2's runSync, then the run record. Any failure is
+// One list-sync run: the binding first, then core's runSync, then the run record. Any failure is
 // recorded as a JobError code; the stored state is then the one the run saved, or the one before it.
 // A run that completed after a breaker opened or its tab was lost records "ok" with that first code.
 
@@ -24,6 +24,16 @@ type RunResult = {
 
 // Anything but the button is automatic, and waits out the gap.
 const isAutomatic = (trigger: Trigger): boolean => trigger !== "button";
+
+// Until the first click, no automatic run starts (a fresh install, a reset).
+function waitsForClick(settings: Settings, trigger: Trigger): boolean {
+  return isAutomatic(trigger) && settings.firstRunPending === true;
+}
+
+// The first click whose run succeeds (outcome ok) lifts the hold; a failed one leaves it.
+function clearsFirstRun(trigger: Trigger, record: RunRecord): boolean {
+  return !isAutomatic(trigger) && record.outcome === "ok";
+}
 
 async function runWithPreview(
   deps: JobDeps,
@@ -81,11 +91,13 @@ function nextSettings(
   const next: Settings = { ...settings, lastRun: done.record };
   if (done.accounts !== undefined) next.binding = done.accounts;
   if (isAutomatic(trigger)) next.lastAutoRunAt = done.record.at;
+  if (clearsFirstRun(trigger, done.record)) delete next.firstRunPending;
   return next;
 }
 
 export async function syncJob(deps: JobDeps, trigger: Trigger): Promise<void> {
   const settings = await deps.store.loadSettings();
+  if (waitsForClick(settings, trigger)) return;
   const at = deps.now();
   if (isAutomatic(trigger) && !shouldStartAutoRun(settings.lastAutoRunAt, at)) {
     return;

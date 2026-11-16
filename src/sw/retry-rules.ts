@@ -1,5 +1,5 @@
-// Which failures of a finish leave it waiting for a Naka tab (I2). A first failure starts the wait; a retry
-// that fails again for one of these keeps it.
+// Which failures of a finish leave it waiting for a Naka tab (retry-job). A first failure starts the wait; a
+// retry that fails again for one of these keeps it.
 
 import type { JobError } from "../ext/job-error";
 

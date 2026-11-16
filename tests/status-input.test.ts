@@ -57,6 +57,18 @@ describe("readSnapshot: the thresholds and the pause setting", () => {
     ).toBeUndefined();
   });
 
+  it("keeps firstRunPending when true and refuses any other value", () => {
+    expect(readSnapshot({ mode: "live", firstRunPending: true })).toEqual({
+      mode: "live",
+      firstRunPending: true,
+    });
+    for (const bad of [false, null, 1, "true"]) {
+      expect(
+        readSnapshot({ mode: "live", firstRunPending: bad }),
+      ).toBeUndefined();
+    }
+  });
+
   it.each([
     { thresholds: { film: 0.5, episode: 0.8 } },
     { thresholds: "0.9" },

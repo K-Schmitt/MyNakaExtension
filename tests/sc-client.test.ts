@@ -76,7 +76,7 @@ function userInfos(
   return {
     isDone: false,
     isWished: true,
-    // SensCritique answers both flags (the query asks for them); one missing reads as protected (D13).
+    // SensCritique answers both flags (the query asks for them); one missing reads as protected (fails closed).
     isReviewed: false,
     isRecommended: false,
     productId: id,
@@ -533,6 +533,12 @@ describe("error mapping", () => {
     },
   );
 
+  it("reads `errors: null` next to valid data as no GraphQL error", async () => {
+    const body = JSON.stringify({ errors: null, data: { done: true } });
+    const { client } = setup(LOGGED_IN, () => raw(200, body));
+    await expect(client.wish(5)).resolves.toBeUndefined();
+  });
+
   it("says when the body is not JSON", async () => {
     const { client } = setup(LOGGED_IN, () =>
       raw(200, "<html>challenge</html>"),
@@ -703,7 +709,7 @@ describe("a wishlist read that comes back short or malformed", () => {
     return error;
   }
 
-  it("rejects a short last page: 19 items read for a total of 20 (probe P5)", async () => {
+  it("rejects a short last page: 19 items read for a total of 20 (seen in an owner's probe)", async () => {
     const first = Array.from({ length: 18 }, (_v, i) => product(i + 1));
     const error = await rejection((call) =>
       Number(variablesOf(call).offset) === 0
@@ -724,7 +730,7 @@ describe("a wishlist read that comes back short or malformed", () => {
     expect(error.message).toBe(SHORT);
   });
 
-  it("rejects an entry the parser drops: a null url (probe P5)", async () => {
+  it("rejects an entry the parser drops: a null url (seen in an owner's probe)", async () => {
     const page = [product(1), { ...product(2), url: null }, product(3)];
     const error = await rejection(() => wishPage(page, 3));
     expect(error.message).toBe(DROPPED);
@@ -749,8 +755,8 @@ describe("a wishlist read that comes back short or malformed", () => {
   });
 
   it.each([
-    ["a fractional id (probe P5)", 1.5],
-    ["a negative id (probe P5)", -3],
+    ["a fractional id", 1.5],
+    ["a negative id", -3],
     ["a zero id", 0],
     ["an unsafe id", 2 ** 53],
     ["a string id", "7"],
@@ -924,7 +930,7 @@ describe("the token stays secret", () => {
         expect(call.url).toBe(APOLLO);
         expect(call.init.method).toBe("POST");
         expect(call.init.credentials).toBe("omit");
-        // The search sends no token at all (Ruling 20); every other Apollo call sends it.
+        // The search sends no token at all; every other Apollo call sends it.
         const search = operationOf(call) === "SearchProductExplorer";
         expect(authorization).toBe(search ? undefined : TOKEN);
       } else {
@@ -1723,7 +1729,7 @@ describe("search", () => {
     expect(variablesOf(calls[0] as Call).query).toBe("Amélie");
   });
 
-  // Ruling 20 (spec §5, probe 3): the search answers without a token, so it never reads the session.
+  // A probe showed the search answers without a token, so it never reads the session.
   it("sends no authorization header, even when the session has a token", async () => {
     const { client, calls } = setup(LOGGED_IN, found());
     await client.search("x", "movie");

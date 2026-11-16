@@ -1,11 +1,10 @@
-// The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once,
-// a series after its confirmation, an episode of the shown season, a link to a candidate the worker
-// offered (step 7's or a search's). One write at a time; an answer that comes once the visit is over
-// changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is
-// on screen (fiche-ma-liste).
-// A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer la note », the link).
-// A film's rating that did not go out after its explicit finish wrote brings them too (D9, ruling R2): the
-// flags apply, the stars keep the owner's rating, and its own line says « Annuler » puts the title back.
+// The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once, a
+// series after its confirmation, an episode of the shown season, a link to a candidate the worker offered
+// (« Relier à SensCritique » or a search's). One write at a time; an answer that comes once the visit is over
+// changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is on
+// screen (fiche-ma-liste). A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer
+// la note », the link). A film's rating that did not go out after its explicit finish wrote brings them too:
+// the flags apply, the stars keep the owner's rating, and its own line says « Annuler » puts the title back.
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
@@ -33,7 +32,11 @@ function endingOf(answer: RateAnswer | undefined): Ending {
   if ("sent" in answer) {
     return {
       sent: true,
-      outcome: { kind: "sent-with-error", error: answer.error },
+      outcome: {
+        kind: "sent-with-error",
+        step: answer.step,
+        error: answer.error,
+      },
     };
   }
   if (answer.panel !== undefined) {

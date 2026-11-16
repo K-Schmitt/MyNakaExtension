@@ -46,7 +46,7 @@ export type FinishRecord = {
   at: number;
   key: string;
   outcome: FinishOutcome["kind"] | "failed";
-  /** Present if and only if the outcome is "failed" (Ruling 13). */
+  /** Present if and only if the outcome is "failed". */
   error?: JobError;
   /** The Naka title of the film or the series, when the finish got as far as reading it. */
   title?: string;
@@ -61,7 +61,7 @@ export type Settings = {
   lastAutoRunAt?: number;
   lastRun?: RunRecord;
   lastFinish?: FinishRecord;
-  /** The hour's budget of finishes (Ruling 15). */
+  /** The hour's budget of finishes (finish-window). */
   finishWindow?: FinishWindow;
   /** The hour's budget of forgets asked by a Naka tab (a forged unticked « vu »). */
   forgetWindow?: FinishWindow;
@@ -69,8 +69,10 @@ export type Settings = {
   thresholds?: Thresholds;
   /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
   pauseFromPercent?: number;
-  /** The outcome of the last answer to a question (D8). */
+  /** The outcome of the last answer to a question. */
   lastAnswer?: LastAnswer;
+  /** Present (true) when the next pass waits for a click: a first run, or after a reset. Absent means no. */
+  firstRunPending?: true;
 };
 
 // A Record, so that a field added to Settings without being added here does not compile.
@@ -85,6 +87,7 @@ const KEYS = valuesOf<keyof Settings>({
   thresholds: true,
   pauseFromPercent: true,
   lastAnswer: true,
+  firstRunPending: true,
 });
 const FINISH_OUTCOMES = valuesOf<FinishRecord["outcome"]>({
   ignored: true,
@@ -152,9 +155,13 @@ function parseFinishWindow(raw: unknown): FinishWindow {
   return parseWindow(raw, "settings.finishWindow", MAX_FINISHES_PER_WINDOW);
 }
 
-// The settings read from storage. An absent key (undefined) is a first install: simulation, nothing else.
+function parseFirstRunPending(raw: unknown): true {
+  return raw === true ? true : fail("settings.firstRunPending");
+}
+
+// The settings read from storage. An absent key (undefined) is a first install: live, first run on a click.
 export function parseSettings(raw: unknown): Settings {
-  if (raw === undefined) return { mode: "simulation" };
+  if (raw === undefined) return { mode: "live", firstRunPending: true };
   const record = asRecord(raw, "settings");
   onlyKeys(record, KEYS, "settings");
   const binding = whenPresent(record.binding, parseBinding);
@@ -175,6 +182,10 @@ export function parseSettings(raw: unknown): Settings {
   const lastAnswer = whenPresent(record.lastAnswer, (v) =>
     parseLastAnswer(v, "settings.lastAnswer"),
   );
+  const firstRunPending = whenPresent(
+    record.firstRunPending,
+    parseFirstRunPending,
+  );
   return {
     mode: asOneOf(record.mode, MODES, "settings.mode"),
     ...(binding === undefined ? {} : { binding }),
@@ -186,6 +197,7 @@ export function parseSettings(raw: unknown): Settings {
     ...(thresholds === undefined ? {} : { thresholds }),
     ...(pauseFromPercent === undefined ? {} : { pauseFromPercent }),
     ...(lastAnswer === undefined ? {} : { lastAnswer }),
+    ...(firstRunPending === undefined ? {} : { firstRunPending }),
   };
 }
 

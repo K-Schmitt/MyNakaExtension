@@ -3,7 +3,7 @@
 // clicks. Everything outside goes through the ports.
 
 import type { QuestionKey } from "../core/questions";
-import { checkQuery } from "../naka/naka-input";
+import { checkQuery } from "../core/search-query";
 import type { PageListsAnswer } from "../sw/question-offers";
 import {
   accepted,
@@ -18,7 +18,7 @@ import {
   type RowAction,
   toListsView,
 } from "./lists-view";
-import { POLL_MS } from "./status-controller";
+import { POLL_MS } from "./page-timer";
 
 export type ListsController = {
   load(): Promise<void>;

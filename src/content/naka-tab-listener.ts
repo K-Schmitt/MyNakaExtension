@@ -1,4 +1,4 @@
-// The Naka tab's chrome.runtime listener (Ruling 9): only this extension may ask, and only a known call
+// The Naka tab's chrome.runtime listener: only this extension may ask, and only a known call
 // runs. The sender is checked before the message is even read; the answer comes later, so the listener
 // returns true to keep Chrome's channel open.
 

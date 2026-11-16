@@ -42,7 +42,7 @@ const universeOf = (id: number): number => {
   return id === SERIES_SC || id === 2007 ? UNIVERSE.serie : UNIVERSE.episode;
 };
 
-// Plan 3's answer (contract): ONE save that upserts the chosen pair and resolves every open
+// The answer contract: ONE save that upserts the chosen pair and resolves every open
 // ambiguity about the same Naka id or the same SensCritique id.
 function answer(state: SyncState, pair: Pair): SyncState {
   const about = (item: SyncState["pending"][number]): boolean =>
@@ -387,9 +387,9 @@ describe("episode finishes, then the sync", () => {
   });
 });
 
-// Plan 3's amended answer contract: "none of these" keeps the question OPEN with no candidate, and so
+// The amended answer contract: "none of these" keeps the question OPEN with no candidate, and so
 // does a question whose candidates another answer took (steps 5 and 6). The open question then stops
-// the finish (it asks again, with no write) and the other direction of the sync (G1).
+// the finish (it asks again, with no write) and the other direction of the sync.
 function noneOfThese(state: SyncState, side: "naka" | "sc", id: number) {
   const out = chooseNone(state, side, id);
   if (!out) throw new Error("expected an open question");
@@ -439,7 +439,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     ...(finish === undefined ? {} : { finish }),
   });
 
-  it("P1: a finish carrying the year writes nothing to the rejected product and asks again", async () => {
+  it("a finish carrying the year writes nothing to the rejected product and asks again", async () => {
     const { w, ports } = yearless();
     await runSync(ports);
     expect(w.state.pending).toEqual([asked("naka", FILM, [FILM_SC])]);
@@ -468,7 +468,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     ]);
   });
 
-  it("P2: once the owner wishes the rejected product, the SensCritique pass asks instead of mapping (G1)", async () => {
+  it("once the owner wishes the rejected product, the SensCritique pass asks instead of mapping", async () => {
     const { w, ports } = yearless();
     await runSync(ports);
     w.state = noneOfThese(w.state, "naka", FILM);
@@ -499,7 +499,7 @@ describe("the owner answers 'none of these' (amended contract)", () => {
     ]);
   });
 
-  it("step 5: a question whose only candidate another answer took stays open and stops the finish", async () => {
+  it("a question whose only candidate another answer took stays open and stops the finish", async () => {
     const { w, ports } = world({
       naka: [FILM, 43],
       sc: [],

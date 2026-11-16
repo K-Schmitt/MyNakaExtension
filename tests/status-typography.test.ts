@@ -13,14 +13,14 @@ import {
   toListsView,
 } from "../src/status/lists-view";
 import { SETTINGS_COPY, toSettingsView } from "../src/status/settings-view";
-import { ACTION_COPY, CONFIRM_TEXT } from "../src/status/status-actions";
+import { CONFIRM_TEXT } from "../src/status/status-actions";
 import { localFormat } from "../src/status/status-format";
 import { confirmText } from "../src/status/status-mode-copy";
 import { type StatusView, toStatusView } from "../src/status/status-view";
 import type { StatusSnapshot } from "../src/sw/status-snapshot";
 import { AMBIGUITY, LISTS, REMOVAL, UNLINKED_NAKA } from "./lists-fixtures";
 
-// French typography (Ruling 19): U+202F NARROW NO-BREAK SPACE before « : », « ; », « ? » and « ! », and
+// French typography: U+202F NARROW NO-BREAK SPACE before « : », « ; », « ? » and « ! », and
 // inside « ». A colon between digits (a time, 14:05) takes none.
 const NB = "\u202F";
 
@@ -78,7 +78,7 @@ const SNAPSHOTS: StatusSnapshot[] = [
       at: AT,
       key: "tv:21391:S1E3",
       outcome: "done",
-      title: "Un Job Mortel",
+      title: "Twin Peaks",
     },
     counts: { pendingRemovals: 1, openQuestions: 2, unlinked: 3 },
     running: { kind: "sync", since: AT },
@@ -94,13 +94,15 @@ const SNAPSHOTS: StatusSnapshot[] = [
   { mode: "live", pendingActions: ["forget", "reset"] },
   { mode: "live", pendingRatings: 0 },
   { mode: "live", pendingRatings: 3 },
+  { mode: "live", firstRunPending: true },
+  { mode: "simulation", firstRunPending: true },
 ];
 
 function texts(view: StatusView): string[] {
   if (view.kind !== "ready") return [view.message];
   return [
     view.headline,
-    view.switchLabel ?? "",
+    view.firstRunLine ?? "",
     ...view.lines,
     ...view.preview,
     ...view.next,
@@ -132,11 +134,10 @@ describe("French typography on the status page", () => {
   it("every error label, both confirmations and the silent-engine state follow it", () => {
     const all = [
       ...Object.values(JOB_ERROR_LABELS),
-      confirmText(0),
-      confirmText(1),
-      confirmText(3),
+      ...[false, true].flatMap((pending) =>
+        [0, 1, 3].map((count) => confirmText(count, pending)),
+      ),
       ...Object.values(CONFIRM_TEXT),
-      ...Object.values(ACTION_COPY),
       ...texts(toStatusView(undefined, localFormat("UTC"))),
     ];
     expect(all.flatMap(typographyFaults)).toEqual([]);
@@ -239,5 +240,15 @@ describe("French typography on the status page", () => {
       all.filter((text) => text.includes("\u202F")).length,
     ).toBeGreaterThan(20);
     expect(all.flatMap(typographyFaults)).toEqual([]);
+  });
+});
+
+describe("the reset confirmation", () => {
+  it("keeps the mode and promises a click, with no simulation fallback", () => {
+    const text = CONFIRM_TEXT.reset;
+    expect(text).not.toContain("repasse en simulation");
+    expect(text).not.toContain("réactiver les écritures");
+    expect(text).toContain(`«${NB}Resynchroniser${NB}»`);
+    expect(text).toContain("Le mode, les réglages");
   });
 });

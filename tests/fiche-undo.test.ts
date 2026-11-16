@@ -88,7 +88,7 @@ describe("undoSteps, title not seen before", () => {
     expect(undoSteps(r, at(OPEN))).toEqual([UNDONE, WISH, MA_LISTE, LOCAL]);
   });
 
-  it("puts an old rating back right after undone (spec §7, ruling R1)", () => {
+  it("puts an old rating back right after undone", () => {
     const r = record({ rating: 4, isWished: true, inMaListe: true });
     expect(undoSteps(r, at(OPEN))).toEqual([
       UNDONE,
@@ -187,7 +187,7 @@ describe("undoSteps, protected title", () => {
   });
 });
 
-describe("undoSteps, a retry after a partial failure (ruling R9)", () => {
+describe("undoSteps, a retry after a partial failure", () => {
   const seenDated = { isDone: true, dateDone: "2026-11-02" } as const;
 
   it("skips the rating steps once « vu », its date and the rating are back", () => {
@@ -215,7 +215,7 @@ describe("undoSteps, a retry after a partial failure (ruling R9)", () => {
     ]);
   });
 
-  it("puts an old rating back without undone once the product is bare (R1)", () => {
+  it("puts an old rating back without undone once the product is bare", () => {
     const r = record({ rating: 4 });
     const bare = { ...at(OPEN), rating: null, isDone: false, dateDone: null };
     expect(undoSteps(r, bare)).toEqual([{ kind: "rate", rating: 4 }, LOCAL]);

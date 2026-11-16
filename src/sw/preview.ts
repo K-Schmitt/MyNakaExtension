@@ -1,5 +1,5 @@
 // What a simulated run would have written, and what the next pass will write, as titles for the owner to
-// check (spec §8quinquies). A title comes from the side that already holds it: SensCritique's own
+// check before going live. A title comes from the side that already holds it: SensCritique's own
 // wishlist for an addition to Naka; for an addition to SensCritique, the product read the simulated write
 // already made (its label), else Naka's catalogue through the run's describe cache. A title that cannot be
 // read is empty, so the list still counts every write.

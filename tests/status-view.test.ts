@@ -9,7 +9,11 @@ import {
   COUNT_ORDER,
   WAITING_LABELS,
 } from "../src/status/status-owner-lines";
-import { toStatusView } from "../src/status/status-view";
+import {
+  LOADING_VIEW,
+  showsSimulation,
+  toStatusView,
+} from "../src/status/status-view";
 import type { Counts, StatusSnapshot } from "../src/sw/status-snapshot";
 
 // French typography: U+202F before « : ; ? ! » and inside « ». Every expected string below spells it
@@ -66,25 +70,61 @@ function ready(snapshot: StatusSnapshot, format = UTC) {
 }
 
 describe("toStatusView: mode", () => {
-  it("says what simulation leaves alone and what it still writes, and offers live", () => {
+  it("simulation: the headline says so and points to Réglages, the switch is on", () => {
     const view = ready({ mode: "simulation", counts: COUNTS });
     expect(view.headline).toBe(
-      `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      `Mode simulation actif${NB}: tes listes ne sont pas modifiées. Voir Réglages.`,
     );
     expect(view.mode).toBe("simulation");
-    expect(view.switchLabel).toBe("Activer les écritures");
+    expect(view.simulationOn).toBe(true);
   });
 
-  it("labels live and offers the way back", () => {
+  it("live: the headline no longer names the mode and the switch is off", () => {
     const view = ready({ mode: "live", counts: COUNTS });
-    expect(view.headline).toBe("Écritures actives");
-    expect(view.switchLabel).toBe("Revenir en simulation");
+    expect(view.headline).toBe("Synchronisation active");
+    expect(view.simulationOn).toBe(false);
+    expect(view.preview).toEqual([]);
+  });
+
+  it("live with next: next is empty in the Activité view", () => {
+    const view = ready({
+      mode: "live",
+      lastRun: run({
+        next: [{ side: "sc", title: "Film 3", year: 2003, type: "film" }],
+      }),
+    });
+    expect(view.next).toEqual([]);
+  });
+
+  it("simulation with next: next is listed", () => {
+    const view = ready({
+      mode: "simulation",
+      lastRun: run({
+        next: [{ side: "sc", title: "Film 3", year: 2003, type: "film" }],
+      }),
+    });
+    expect(view.next).toHaveLength(1);
+  });
+
+  it("firstRunPending in live: the first pass adds to the lists", () => {
+    const view = ready({ mode: "live", firstRunPending: true });
+    expect(view.firstRunLine).toBe(
+      `Premier passage${NB}: il ajoutera aux deux listes les titres qui manquent, au plus 10 écritures. Clique sur ${LAQ}${NB}Resynchroniser${NB}${RAQ} pour le lancer.`,
+    );
+    expect(ready({ mode: "live" }).firstRunLine).toBeUndefined();
+  });
+
+  it("firstRunPending in simulation: the first pass promises no write", () => {
+    const view = ready({ mode: "simulation", firstRunPending: true });
+    expect(view.firstRunLine).toBe(
+      `Premier passage${NB}: il montrera dans Réglages ce qu’une synchronisation écrirait. Clique sur ${LAQ}${NB}Resynchroniser${NB}${RAQ} pour le lancer.`,
+    );
   });
 
   it("offers no switch when the settings cannot be read", () => {
     const view = ready({ error: "stored-state" });
     expect(view.mode).toBeUndefined();
-    expect(view.switchLabel).toBeUndefined();
+    expect(view.simulationOn).toBe(false);
     expect(view.lines).toContain(
       `Lecture de l’état impossible${NB}: État enregistré illisible`,
     );
@@ -155,7 +195,7 @@ describe("toStatusView: the last run, by its own mode", () => {
     `Pas encore examinés${NB}: 4`,
   ];
 
-  // Ruling 21: failed writes, in either mode, right after Déjà vus, and only when there are some.
+  // Failed writes, in either mode, right after Déjà vus, and only when there are some.
   const FAILED = (n: number) =>
     `Échecs (nouvel essai au prochain passage)${NB}: ${n}`;
   const withFailures = (mode: RunRecord["mode"], n: number) =>
@@ -269,10 +309,10 @@ describe("toStatusView: the last run, by its own mode", () => {
       at: AT,
       key: "tv:21391:S1E3",
       outcome: "done",
-      title: "Un Job Mortel",
+      title: "Twin Peaks",
     };
     expect(ready({ mode: "live", lastFinish }).lines).toContain(
-      `Dernière fin de visionnage${NB}: «${NB}Un Job Mortel${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
+      `Dernière fin de visionnage${NB}: «${NB}Twin Peaks${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
     );
   });
 
@@ -463,11 +503,11 @@ describe("toStatusView: the next pass's writes", () => {
     `Ma liste Naka${NB}: (titre inconnu)`,
   ];
 
-  it("lists them in live mode", () => {
-    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual(lines);
+  it("hides them in live mode: the section only shows in Réglages under simulation", () => {
+    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual([]);
   });
 
-  it("lists them in simulation too", () => {
+  it("lists them in simulation", () => {
     const view = ready({ mode: "simulation", lastRun: run({ next }) });
     expect(view.next).toEqual(lines);
   });
@@ -480,35 +520,52 @@ describe("toStatusView: the next pass's writes", () => {
 
 describe("the confirmation before going live", () => {
   const ASK = `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures.`;
-  const NEXT = `La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka)`;
+  const NEXT = `La prochaine démarre au bouton «${NB}Resynchroniser${NB}» ou à la prochaine ouverture de Naka`;
+  const PENDING = `La prochaine démarre au clic sur «${NB}Resynchroniser${NB}»`;
 
-  it("with a preview: the cap, and that the page shows the writes before each pass", () => {
-    expect(confirmText(3)).toBe(
-      `${ASK} ${NEXT} reprendra les 3 titres de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+  it("with a preview: the cap, when the next pass starts and what it takes up", () => {
+    expect(confirmText(3, false)).toBe(
+      `${ASK} ${NEXT} et reprendra les 3 titres de l’aperçu, puis les suivants.`,
     );
   });
 
-  // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
+  // One title agrees in the singular; two and more keep « les N titres ».
   it("with one title in the preview: le titre de l’aperçu", () => {
-    expect(confirmText(1)).toBe(
-      `${ASK} ${NEXT} reprendra le titre de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+    expect(confirmText(1, false)).toBe(
+      `${ASK} ${NEXT} et reprendra le titre de l’aperçu, puis les suivants.`,
     );
   });
 
   it("with two titles: les 2 titres de l’aperçu", () => {
-    expect(confirmText(2)).toContain(
+    expect(confirmText(2, false)).toContain(
       "reprendra les 2 titres de l’aperçu, puis les suivants",
     );
   });
 
-  it("without a preview: the cap, and where the page shows the writes", () => {
-    expect(confirmText(0)).toBe(
-      `${ASK} La page de l’extension montre les écritures prévues au prochain passage.`,
+  it("without a preview: the cap and when the next pass starts", () => {
+    expect(confirmText(0, false)).toBe(`${ASK} ${NEXT}.`);
+  });
+
+  // While the first run waits for a click, opening Naka starts nothing.
+  it("first run pending: the next pass starts on « Resynchroniser » only", () => {
+    expect(confirmText(0, true)).toBe(`${ASK} ${PENDING}.`);
+    expect(confirmText(2, true)).toBe(
+      `${ASK} ${PENDING} et reprendra les 2 titres de l’aperçu, puis les suivants.`,
     );
   });
+
+  // Since lot 9a the page lists the writes in simulation only: no promise that it shows them.
+  it.each([0, 1, 3])(
+    "promises no page showing the writes (%i titles)",
+    (count) => {
+      for (const pending of [false, true]) {
+        expect(confirmText(count, pending)).not.toMatch(/page/);
+      }
+    },
+  );
 });
 
-// Ruling 20: the status is answered while a job runs; the page names it and asks again until it ends.
+// The status is answered while a job runs; the page names it and asks again until it ends.
 describe("toStatusView: what runs now", () => {
   it("names a running sync with the time it started, and asks to be polled", () => {
     const view = ready({ mode: "live", running: { kind: "sync", since: AT } });
@@ -691,5 +748,23 @@ describe("toStatusView: the ratings waiting", () => {
 
   it("shows no line when the ratings were not read", () => {
     expect(ready({ mode: "live" }).lines).toEqual([]);
+  });
+});
+
+// The « Simulation » section (switch, help, planned writes) shows only once the mode is known.
+describe("showsSimulation", () => {
+  it("hides it while loading, without an engine, and while the mode is unknown", () => {
+    expect(showsSimulation(LOADING_VIEW)).toBe(false);
+    expect(showsSimulation(toStatusView(undefined, UTC))).toBe(false);
+    expect(showsSimulation(toStatusView({ error: "stored-state" }, UTC))).toBe(
+      false,
+    );
+  });
+
+  it("shows it in simulation and in live", () => {
+    expect(showsSimulation(toStatusView({ mode: "simulation" }, UTC))).toBe(
+      true,
+    );
+    expect(showsSimulation(toStatusView({ mode: "live" }, UTC))).toBe(true);
   });
 });

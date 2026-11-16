@@ -1,6 +1,6 @@
-// Naka's own « Ma liste » button on a title page (spec §5): `.dcpl-split > button.dc-btn-soft`, `.is-active`
+// Naka's own « Ma liste » button on a title page: `.dcpl-split > button.dc-btn-soft`, `.is-active`
 // while the title is in the list. Clicking it lets Naka's page send its own request and update the class, so
-// the button stays right after our writes (spec §7). Read only, but for that one programmatic click.
+// the button stays right after our writes. Read only, but for that one programmatic click.
 
 import type { FichePorts } from "../fiche-ports";
 

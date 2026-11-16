@@ -1,9 +1,10 @@
 // The home row's ports in the page: the real document, the keeper's DOM ports over Naka's list, the page's
-// timers and a ResizeObserver on the carousel's track.
+// timers, a ResizeObserver on the carousel's track and the tiles' visibility watch.
 
 import type { SizeWatch } from "./carousel";
 import { createRowPorts } from "./home-row-dom";
 import type { HomeRowPorts } from "./home-row-ui";
+import { type ObserverWindow, pageSeenWatch } from "./star-visibility-dom";
 
 const pageTimer = {
   set: (fn: () => void, ms: number) => setTimeout(fn, ms),
@@ -31,5 +32,6 @@ export function homeRowPorts(doc: Document): HomeRowPorts {
     watchSize,
     reducedMotion: () =>
       doc.defaultView?.matchMedia(REDUCED_MOTION).matches ?? false,
+    seen: pageSeenWatch(window as unknown as ObserverWindow),
   };
 }

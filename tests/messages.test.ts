@@ -594,7 +594,7 @@ describe("parsePageEvent", () => {
   });
 });
 
-describe("finished: F5 rules", () => {
+describe("finished: the number and id rules", () => {
   const base = { type: "finished", source: "explicit", contentId: 3 };
 
   it("maps a progress of -0 to 0", () => {
@@ -730,6 +730,17 @@ describe("isTrustedSender", () => {
     ).toBe("status-page");
   });
 
+  it("accepts the status page whose url carries a fragment", () => {
+    const tabbed = `${STATUS}#reglages`;
+    expect(isTrustedSender({ id: ID, url: tabbed }, ID)).toBe("status-page");
+    expect(
+      isTrustedSender({ id: ID, url: tabbed, tab: { url: tabbed } }, ID),
+    ).toBe("status-page");
+    expect(
+      isTrustedSender({ id: ID, url: STATUS, tab: { url: tabbed } }, ID),
+    ).toBe("status-page");
+  });
+
   it("rejects the status url in a tab with another or no url", () => {
     expect(
       isTrustedSender({ id: ID, url: STATUS, tab: { url: NAKA } }, ID),
@@ -742,13 +753,18 @@ describe("isTrustedSender", () => {
     ).toBeUndefined();
   });
 
-  it("rejects a status url with a query or fragment, or lookalikes", () => {
+  it("rejects a status url with a query, an encoded fragment, or lookalikes", () => {
     for (const url of [
       `${STATUS}?x`,
-      `${STATUS}#x`,
+      `${STATUS}?x#reglages`,
+      `${STATUS}%23reglages`,
       `${STATUS}x`,
+      `chrome-extension://${ID}/#reglages`,
       `chrome-extension://${ID}/other.html`,
+      `chrome-extension://${ID}/other.html#reglages`,
       "chrome-extension://other/status.html",
+      `chrome-extension://other/status.html#reglages`,
+      `https://${ID}/status.html#reglages`,
     ]) {
       expect(isTrustedSender({ id: ID, url }, ID)).toBeUndefined();
       expect(
@@ -1011,7 +1027,7 @@ describe("allowedFor", () => {
   });
 });
 
-describe("the manual link messages (B6)", () => {
+describe("the manual link messages", () => {
   const SEARCH = { type: "search-titles", side: "sc", query: "cowboy bebop" };
   const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
   const REQUEUE = { type: "requeue-question", side: "sc", id: 7 };

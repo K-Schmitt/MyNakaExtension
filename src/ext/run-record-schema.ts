@@ -1,3 +1,4 @@
+import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 import {
   asInt,
   asList,
@@ -53,8 +54,6 @@ const PREVIEW_KEYS = valuesOf<keyof PreviewItem>({
   year: true,
   type: true,
 });
-const MIN_YEAR = 1800;
-const MAX_YEAR = 2100;
 
 function parseYear(raw: unknown, path: string): number {
   const year = asInt(raw, MIN_YEAR, path);

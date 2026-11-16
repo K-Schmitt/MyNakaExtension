@@ -16,7 +16,13 @@ import type { QuestionOffer } from "../src/sw/question-offers";
 import { flush } from "./end-block-fakes";
 import { answerOf, asksOf, entryOf, homeWorld, sendsOf } from "./home-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  FakeShadow,
+} from "./ui-fakes";
 
 const film = (id: number, at: number): RatingCard =>
   filmCard({ key: `movie:${id}`, contentId: id, title: `Film ${id}`, at });
@@ -157,7 +163,7 @@ describe("a choice in the row", () => {
     locked.onChoose(9);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
-    await w.ready(); // Ruling 27: the lock redrew the row, the neighbour has a fresh grace
+    await w.ready(); // the lock redrew the row, the neighbour has a fresh grace
     w.handlersOf("movie:1").onChoose(6);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);
@@ -269,7 +275,7 @@ describe("the série confirmation in an entry", () => {
     expect(w.viewOf(SERIE.key)?.confirm).toBe(true);
     expect(w.viewOf(SERIE.key)?.notice).toBe(chosenLine(7));
     expect(w.viewOf(SERIE.key)?.warning).toBe(SERIES_WARNING);
-    await w.ready(); // Ruling F2
+    await w.ready();
     w.handlersOf(SERIE.key).onConfirm(false);
     await flush();
     expect(sendsOf(w.calls)).toEqual([]);
@@ -280,7 +286,7 @@ describe("the série confirmation in an entry", () => {
     const w = await arrived(SERIE);
     await w.ready();
     w.handlersOf(SERIE.key).onChoose(7);
-    await w.ready(); // Ruling F2: the confirmation view has its own grace
+    await w.ready(); // the confirmation view has its own grace
     w.handlersOf(SERIE.key).onConfirm(true);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 5:1:1 série 7"]);
@@ -350,7 +356,7 @@ describe("a tile that slides under the cursor after a card leaves", () => {
   // The star of that value on the row's only tile, drawn from what the block showed last.
   function starOnRow(w: Awaited<ReturnType<typeof arrived>>, n: number) {
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const star = descendants(root).find(
       (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
     );
@@ -430,7 +436,7 @@ describe("the live card of the home block", () => {
     const { chosen, handlers } = liveHandlers();
     w.block.showLive(REMOVAL.key, liveView(), handlers);
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const keep = descendants(root).find((el: FakeElement) =>
       el.textContent?.startsWith("Non"),
     );
@@ -447,7 +453,7 @@ describe("the live card of the home block", () => {
     await w.ready();
     w.block.hideLive();
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const star = (n: number) =>
       descendants(root).find(
         (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,

@@ -3,7 +3,7 @@
 // tracker or the parsers: ids and marks only, never page text. The title page events go to the fiche
 // controller, which sends only the parsed (capped) title of the title its own address names.
 
-import { type ContentIds, contentKeyOf } from "../core/finish-event";
+import { type ContentIds, contentKeyOf, idsOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import type { FicheInput } from "./fiche-ports";
 import {
@@ -13,18 +13,15 @@ import {
 } from "./page-events";
 import {
   createPlaybackTracker,
+  type FinishedMessage,
   type PlaybackTracker,
 } from "./playback-tracker";
+import type { VideoSample } from "./video-sample";
 
-// Ruling 10: Naka is a single-page app, so the URL is polled every second; the video every 5 s.
-export const URL_POLL_MS = 1000;
-export const SAMPLE_MS = 5000;
+// Naka is a single-page app, so the URL is polled every second; the video every 5 s.
+const URL_POLL_MS = 1000;
+const SAMPLE_MS = 5000;
 
-export type VideoSample = {
-  currentTime: number;
-  duration: number;
-  src: string;
-};
 export type PageMessage = { source: unknown; origin: string; data: unknown };
 
 export type TabEnv = {
@@ -43,19 +40,11 @@ export type TabEnv = {
   pathChanged(pathname: string): void;
   /** Naka just answered a removal of this title from « Ma liste » (an id the page reported). */
   removed(contentId: number): void;
+  /** Uses up the owner's last real gesture on the page: true when it was recent enough. */
+  takeGesture(): boolean;
   /** The title page controller: the pathname at every URL poll, and the page's fiche and season events. */
   fiche: FicheInput;
 };
-
-type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
-
-function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
-  return {
-    contentId,
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
-}
 
 // Each finished the tab sends, threshold, credits or explicit, is also told to the end block.
 function sendFinished(env: TabEnv, msg: FinishedMessage): void {
@@ -84,18 +73,12 @@ function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
     tracker.credits(event);
     return;
   }
-  const finished = tracker.watched(event);
+  const finished = tracker.watched(event, env.takeGesture);
   if (finished) sendFinished(env, finished);
 }
 
 function idsOfContext(ctx: PlayerContext | undefined): ContentIds | undefined {
-  if (ctx === undefined) return undefined;
-  const { contentId, season, episode } = ctx;
-  return {
-    contentId,
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
+  return ctx === undefined ? undefined : idsOf(ctx);
 }
 
 function pathOf(href: string): string {

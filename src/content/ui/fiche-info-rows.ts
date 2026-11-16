@@ -1,4 +1,4 @@
-// The two SensCritique rows at the end of Naka's info panel (spec §2, decision 3): « SensCritique » and the
+// The two SensCritique rows at the end of Naka's info panel, in Naka's own style: « SensCritique » and the
 // average, « Ta note » and the ten stars. They copy Naka's rows (`div.dcf-info-row`: a label `span`, a value
 // `span`) so its styles apply; the stars sit in a closed host inside the value. The row keeper puts them back
 // at the end of the panel whenever Naka redraws the aside. Input stops at the rows. Texts go through

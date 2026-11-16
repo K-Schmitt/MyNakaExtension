@@ -2,7 +2,7 @@
 // played and the highest season. With no list, the catalogue's numberOfSeasons is the only fact left.
 // The list counts RELEASED episodes only, while the catalogue's numberOfEpisodes counts the announced ones:
 // when the list falls short of it, the season still airing is the last one, and the missing episodes are
-// its own (VisionQuest, 2026-11-06: 7 released of 8, the 7th looked like the end of the series).
+// its own (Severance, 2026-11-06: 7 released of 8, the 7th looked like the end of the series).
 
 import type { NakaSeasons } from "../naka/naka-seasons";
 import type { SeasonFacts } from "./season-end";

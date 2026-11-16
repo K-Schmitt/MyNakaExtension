@@ -3,8 +3,8 @@
 // before any sync asked), a stored mapped pair, not settled, that BOTH sides listed at the last completed
 // run, and whose Naka id the job now reads as gone from « Ma liste ». Anything else is refused, with no
 // network and no save. A removal reads both sites before its one write, and a title gone from the other
-// side or back on its own is `moot`: no write (D6). The binding is checked first: its account read is the
-// job's first Naka call, so no write ever is (Ruling 22). An EMPTY « Ma liste » is a failed read, never
+// side or back on its own is `moot`: no write. The binding is checked first: its account read is the
+// job's first Naka call, so no write ever is. An EMPTY « Ma liste » is a failed read, never
 // "gone": the Naka parser accepts `contentIds: []`, so it proves nothing. Answers work in both modes.
 
 import type { Pair } from "../core/list-diff";
@@ -35,7 +35,7 @@ export function removalTarget(msg: AnswerRemovalMessage): QuestionKey {
   return `removal:${msg.removeFrom}:${msg.nakaId}:${msg.scId}`;
 }
 
-// The block's case (D5): the owner just removed the title from Naka, and no sync asked yet.
+// The block's case: the owner just removed the title from Naka, and no sync asked yet.
 function blockAllowed(state: SyncState, { msg, pair }: Answer): boolean {
   return (
     msg.removeFrom === "sc" &&
@@ -77,7 +77,7 @@ async function removeFromSc(deps: JobDeps, answer: Answer): Promise<Ending> {
   return "done";
 }
 
-// An empty list fails here too (Ruling 15): it would otherwise read as "gone" and close the question.
+// An empty list fails here too: it would otherwise read as "gone" and close the question.
 async function removeFromNaka(deps: JobDeps, { msg }: Answer): Promise<Ending> {
   const naka = await boundNaka(deps);
   if ((await deps.sc.productState(msg.scId)).isWished) return "moot";
@@ -105,7 +105,7 @@ async function remove(
   return ending;
 }
 
-// « Non » settles the pair (D2), so that no sync writes the title back to the side it left.
+// « Non » settles the pair, so that no sync writes the title back to the side it left.
 async function keep(
   deps: JobDeps,
   state: SyncState,

@@ -1,6 +1,6 @@
 // What the status page shows: the mode, the last run and finish, the binding and the counts of what
-// waits for the owner. Codes and stored records only: no token, no error text. It only reads (Ruling 20:
-// it is answered outside the queue, while a job may run); the router adds what runs and what is pending.
+// waits for the owner. Codes and stored records only: no token, no error text. It only reads (it
+// is answered outside the queue, while a job may run); the router adds what runs and what is pending.
 
 import type { SyncState } from "../core/state";
 import type { Thresholds } from "../core/watch-trigger";
@@ -28,6 +28,8 @@ export type Counts = {
 export type StatusSnapshot = {
   /** Absent when the settings cannot be read. */
   mode?: Mode;
+  /** The first list sync still waits for a click: automatic runs are held. */
+  firstRunPending?: true;
   binding?: Binding;
   lastRun?: RunRecord;
   lastFinish?: FinishRecord;
@@ -74,6 +76,7 @@ function fromSettings(settings: Settings): StatusSnapshot {
     thresholds: thresholdsOf(settings),
     pauseFromPercent: pauseFromOf(settings),
   };
+  if (settings.firstRunPending) snapshot.firstRunPending = true;
   if (settings.binding) snapshot.binding = settings.binding;
   if (settings.lastRun) snapshot.lastRun = settings.lastRun;
   if (settings.lastFinish) snapshot.lastFinish = settings.lastFinish;

@@ -1,7 +1,15 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+
+const ICONS = {
+  "16": "icons/icon-16.png",
+  "32": "icons/icon-32.png",
+  "48": "icons/icon-48.png",
+  "128": "icons/icon-128.png",
+};
 
 describe("manifest", () => {
   it("is a Manifest V3 file with a semver version", () => {
@@ -52,5 +60,27 @@ describe("manifest", () => {
         run_at: "document_idle",
       },
     ]);
+  });
+
+  it("is version 1.0.0, the same as package.json", () => {
+    expect(manifest.version).toBe("1.0.0");
+    expect(pkg.version).toBe(manifest.version);
+  });
+
+  it("declares the four icon sizes for the extension and its button", () => {
+    expect(manifest.icons).toEqual(ICONS);
+    expect(manifest.action).toEqual({ default_icon: ICONS });
+  });
+
+  it("points every icon at a file under src/", () => {
+    for (const path of Object.values(ICONS)) {
+      expect(existsSync(`src/${path}`), path).toBe(true);
+    }
+  });
+
+  it("writes the description with a narrow no-break space before the colon", () => {
+    expect(manifest.description).toBe(
+      "Passerelle entre Naka et SensCritique\u202f: notes, listes et fin de visionnage.",
+    );
   });
 });

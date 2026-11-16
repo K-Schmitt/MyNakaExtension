@@ -1,6 +1,7 @@
 // The status page's entry: binds the controller to the DOM, `chrome.runtime`, `window.confirm` and the clock.
 // Everything shown goes through textContent: titles are remote catalogue text.
 
+import { downloadText, mountExport } from "./data-export-dom";
 import { createHandledController } from "./handled-controller";
 import { showHandled } from "./handled-dom";
 import { createListsController } from "./lists-controller";
@@ -15,7 +16,9 @@ import {
 } from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
-import type { StatusView } from "./status-view";
+import { focusIdFor, tabFromHash } from "./status-tabs";
+import { mountTabs } from "./status-tabs-dom";
+import { type StatusView, showsSimulation } from "./status-view";
 import { createSyncEnd } from "./sync-end";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -61,9 +64,13 @@ function render(view: StatusView): void {
   element("preview-section").hidden = !ready || view.preview.length === 0;
   fill(element("next"), ready ? view.next : []);
   element("next-section").hidden = !ready || view.next.length === 0;
+  element("simulation").hidden = !showsSimulation(view);
   const toggle = element<HTMLButtonElement>("switch");
-  toggle.hidden = !ready || view.switchLabel === undefined;
-  toggle.textContent = ready ? (view.switchLabel ?? "") : "";
+  toggle.hidden = !showsSimulation(view);
+  toggle.setAttribute("aria-checked", String(ready && view.simulationOn));
+  const firstRun = element("first-run");
+  firstRun.textContent = ready ? (view.firstRunLine ?? "") : "";
+  firstRun.hidden = firstRun.textContent === "";
   switchLocked = ready && view.switchDisabled;
   syncSwitch();
   // Also shown on an unreadable state: the reset is the repair.
@@ -72,9 +79,10 @@ function render(view: StatusView): void {
   syncActions();
 }
 
-// The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
+// The pressed button gets its focus back; the headline takes it when that button is hidden (tabindex -1 in
+// status.html), and the selected tab when the target sits in the other panel.
 function focus(target: FocusTarget): void {
-  element(target).focus();
+  element(focusIdFor(target, tabFromHash(window.location.hash))).focus();
 }
 
 function setBusy(busy: boolean): void {
@@ -143,7 +151,8 @@ const lists = createListsController({
   answered: () => void handled.load(),
 });
 
-// A sync that ended may have changed what is handled and asked: both lists are asked again after it.
+// Both lists are asked again once the click is answered; syncEnd asks them again when the poll sees the
+// sync end, the read that shows what the sync changed.
 element("resync").addEventListener(
   "click",
   () =>
@@ -176,6 +185,16 @@ element("save-settings").addEventListener("click", () => {
   markSaved();
   void controller.saveSettings(readDraft());
 });
+mountExport(
+  document,
+  chrome.storage.local,
+  downloadText,
+  chrome.runtime.getManifest().version,
+  (text) => {
+    element("export-note").textContent = text;
+  },
+);
+mountTabs(document, window);
 void controller.load();
 void handled.load();
 void lists.load();

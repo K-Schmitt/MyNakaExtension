@@ -1,5 +1,6 @@
-// What the worker is doing now, for the status answer (Ruling 20): the job running, the mode a queued
-// set-mode will apply, and whether a set-settings waits or runs. In memory only: a worker restart loses it with the queue it describes.
+// What the worker is doing now, for the status answer: the job running, the mode a queued set-mode will
+// apply, and whether a set-settings waits or runs. In memory only: a worker restart loses it with the queue
+// it describes.
 
 import type { Mode } from "../ext/settings";
 

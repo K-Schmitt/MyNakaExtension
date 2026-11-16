@@ -9,68 +9,85 @@
   <body>
     <main>
       <h1>MyNakaExtension</h1>
-      <div id="status" aria-live="polite">
-        <p id="headline" tabindex="-1">Chargement…</p>
-        <ul id="lines"></ul>
-        <section id="preview-section" hidden>
-          <h2>Écritures prévues</h2>
-          <ul id="preview"></ul>
+      <div role="tablist" aria-label="Sections">
+        <button type="button" role="tab" id="tab-activite" aria-controls="panel-activite" aria-selected="true">Activité</button>
+        <button type="button" role="tab" id="tab-reglages" aria-controls="panel-reglages" aria-selected="false" tabindex="-1">Réglages</button>
+      </div>
+      <div role="tabpanel" id="panel-activite" aria-labelledby="tab-activite">
+        <div id="status" aria-live="polite">
+          <p id="headline" tabindex="-1">Chargement…</p>
+          <ul id="lines"></ul>
+        </div>
+        <p id="first-run" hidden></p>
+        <p>
+          <button type="button" id="resync" disabled>Resynchroniser</button>
+        </p>
+        <p id="lists-note" role="status"></p>
+        <section id="questions" hidden>
+          <h2>Questions</h2>
+          <ul id="questions-list"></ul>
         </section>
-        <section id="next-section" hidden>
-          <h2>Écritures prévues au prochain passage</h2>
-          <ul id="next"></ul>
+        <section id="unlinked" hidden>
+          <h2>Titres non reliés</h2>
+          <ul id="unlinked-list"></ul>
+        </section>
+        <details id="handled" hidden>
+          <summary id="handled-heading">Titres traités</summary>
+          <ul id="handled-list"></ul>
+        </details>
+      </div>
+      <div role="tabpanel" id="panel-reglages" aria-labelledby="tab-reglages" hidden>
+        <section id="simulation" hidden>
+          <h2>Simulation</h2>
+          <p>
+            <button type="button" role="switch" id="switch" aria-checked="false" aria-describedby="simulation-help" disabled hidden>Mode simulation</button>
+          </p>
+          <p id="simulation-help">En simulation, l’extension ne modifie pas tes listes «&#8239;à voir&#8239;». Les fins de visionnage restent enregistrées sur SensCritique. Utile pour vérifier ce qu’une synchronisation ferait avant de l’activer.</p>
+          <section id="preview-section" hidden>
+            <h3>Écritures prévues</h3>
+            <ul id="preview"></ul>
+          </section>
+          <section id="next-section" hidden>
+            <h3>Écritures prévues au prochain passage</h3>
+            <ul id="next"></ul>
+          </section>
+        </section>
+        <section id="settings" hidden>
+          <h2>Réglages</h2>
+          <p>
+            <label for="film-threshold">Seuil pour les films</label>
+            <select id="film-threshold"></select>
+          </p>
+          <p>
+            <label for="episode-threshold">Seuil pour les épisodes</label>
+            <select id="episode-threshold"></select>
+          </p>
+          <fieldset>
+            <legend>Bloc sur la pause</legend>
+            <p>
+              <input type="radio" name="pause" id="pause-any" />
+              <label for="pause-any">À tout moment</label>
+            </p>
+            <p>
+              <input type="radio" name="pause" id="pause-from" />
+              <label for="pause-from" id="pause-from-before">À partir de</label>
+              <input type="text" inputmode="numeric" size="3" id="pause-text" aria-labelledby="pause-from-before" aria-describedby="pause-error" />&#8239;%
+            </p>
+            <p id="pause-error" role="alert"></p>
+          </fieldset>
+          <p><button type="button" id="save-settings" disabled>Enregistrer les réglages</button></p>
+          <p id="settings-note" role="status"></p>
+        </section>
+        <section id="data" hidden>
+          <h2>Données enregistrées</h2>
+          <p>
+            <button type="button" id="export">Exporter mes données</button>
+            <button type="button" id="forget" disabled>Oublier les comptes liés</button>
+            <button type="button" id="reset" disabled>Réinitialiser</button>
+          </p>
+          <p id="export-note" role="status"></p>
         </section>
       </div>
-      <p>
-        <button type="button" id="resync" disabled>Resynchroniser</button>
-        <button type="button" id="switch" disabled hidden></button>
-      </p>
-      <p id="lists-note" role="status"></p>
-      <section id="questions" hidden>
-        <h2>Questions</h2>
-        <ul id="questions-list"></ul>
-      </section>
-      <section id="unlinked" hidden>
-        <h2>Titres non reliés</h2>
-        <ul id="unlinked-list"></ul>
-      </section>
-      <section id="settings" hidden>
-        <h2>Réglages</h2>
-        <p>
-          <label for="film-threshold">Seuil pour les films</label>
-          <select id="film-threshold"></select>
-        </p>
-        <p>
-          <label for="episode-threshold">Seuil pour les épisodes</label>
-          <select id="episode-threshold"></select>
-        </p>
-        <fieldset>
-          <legend>Bloc sur la pause</legend>
-          <p>
-            <input type="radio" name="pause" id="pause-any" />
-            <label for="pause-any">À tout moment</label>
-          </p>
-          <p>
-            <input type="radio" name="pause" id="pause-from" />
-            <label for="pause-from" id="pause-from-before">À partir de</label>
-            <input type="text" inputmode="numeric" size="3" id="pause-text" aria-labelledby="pause-from-before" aria-describedby="pause-error" />&#8239;%
-          </p>
-          <p id="pause-error" role="alert"></p>
-        </fieldset>
-        <p><button type="button" id="save-settings" disabled>Enregistrer les réglages</button></p>
-        <p id="settings-note" role="status"></p>
-      </section>
-      <section id="data" hidden>
-        <h2>Données enregistrées</h2>
-        <p>
-          <button type="button" id="forget" disabled>Oublier les comptes liés</button>
-          <button type="button" id="reset" disabled>Réinitialiser</button>
-        </p>
-      </section>
-      <details id="handled" hidden>
-        <summary id="handled-heading">Titres traités</summary>
-        <ul id="handled-list"></ul>
-      </details>
     </main>
     <script src="status.js"></script>
   </body>

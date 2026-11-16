@@ -12,7 +12,7 @@ import { HANDLED_COPY } from "../src/status/handled-view";
 import * as jobErrorLabels from "../src/status/job-error-labels";
 import * as listsCopy from "../src/status/lists-copy";
 import { SETTINGS_COPY } from "../src/status/settings-view";
-import { ACTION_COPY, CONFIRM_TEXT } from "../src/status/status-actions";
+import { CONFIRM_TEXT } from "../src/status/status-actions";
 import { localFormat } from "../src/status/status-format";
 import * as statusModeCopy from "../src/status/status-mode-copy";
 import { WAITING_LABELS } from "../src/status/status-owner-lines";
@@ -135,7 +135,14 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
     ficheCopy.outcomeLine({ kind: "failed" }, ficheCopy.LINK_FAILED_LINE),
     ...CODES.flatMap((error) => [
       ficheCopy.outcomeLine({ kind: "not-sent", error }, ""),
-      ficheCopy.outcomeLine({ kind: "sent-with-error", error }, ""),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "ma-liste", error },
+        "",
+      ),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "local-save", error },
+        "",
+      ),
     ]),
     ficheCopy.outcomeLine({ kind: "finish-wrote" }, ""),
     ficheCopy.outcomeLine({ kind: "finish-wrote-expired" }, ""),
@@ -164,7 +171,10 @@ const LISTS_CALLS: CopyCalls<typeof listsCopy> = {
 };
 
 const MODE_CALLS: CopyCalls<typeof statusModeCopy> = {
-  confirmText: () => [0, 1, 3].map(statusModeCopy.confirmText),
+  confirmText: () =>
+    [false, true].flatMap((pending) =>
+      [0, 1, 3].map((count) => statusModeCopy.confirmText(count, pending)),
+    ),
 };
 
 const calls = (table: Record<string, () => readonly string[]>): string[] =>
@@ -206,6 +216,7 @@ const SNAPSHOTS: unknown[] = [
   undefined,
   { mode: "simulation", pendingRatings: 0 },
   { mode: "live", pendingRatings: 3, pendingActions: ["forget", "reset"] },
+  { mode: "live", firstRunPending: true },
   ...CODES.map((error) => ({ error })),
   ...CODES.map((error) => ({
     mode: "live",
@@ -228,7 +239,7 @@ const SNAPSHOTS: unknown[] = [
       ],
       next: [{ side: "naka", title: "Dune", year: 2021, type: "serie" }],
     }),
-    lastFinish: finish({ key: "tv:21391:S1E3", title: "Un Job Mortel" }),
+    lastFinish: finish({ key: "tv:21391:S1E3", title: "Twin Peaks" }),
   },
   {
     mode: "live",
@@ -247,7 +258,7 @@ function viewTexts(view: StatusView): string[] {
   if (view.kind !== "ready") return [view.message];
   return [
     view.headline,
-    view.switchLabel ?? "",
+    view.firstRunLine ?? "",
     ...view.lines,
     ...view.preview,
     ...view.next,
@@ -259,7 +270,7 @@ function statusPageTexts(): string[] {
   const html = readFileSync("src/status/status.html", "utf8");
   return [
     ...SNAPSHOTS.flatMap((s) => viewTexts(toStatusView(s, format))),
-    ...tableStrings([ACTION_COPY, CONFIRM_TEXT, SETTINGS_COPY]),
+    ...tableStrings([CONFIRM_TEXT, SETTINGS_COPY]),
     ...tableStrings([WAITING_LABELS, HANDLED_COPY]),
     HANDLED_COPY.heading(3),
     ...html
@@ -352,5 +363,28 @@ describe("every shown sentence speaks in « tu » with ’", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
     expect(all.flatMap(registerFaults)).toEqual([]);
+  });
+});
+
+describe("the line of a rating sent but not saved", () => {
+  it("uses ’, names no list, blames no site, and asks for no retry", () => {
+    const line = ficheCopy.outcomeLine(
+      { kind: "sent-with-error", step: "local-save", error: "unavailable" },
+      "",
+    );
+    expect(line).toBe(
+      "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.",
+    );
+    expect(registerFaults(line)).toEqual([]);
+    expect(line).not.toMatch(/ [:;?!]|Ma liste|réessaie|ne répond pas/);
+  });
+
+  it("keeps the « Ma liste » line for a failed removal", () => {
+    expect(
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "ma-liste", error: "naka-session" },
+        "",
+      ),
+    ).toBe(ficheCopy.sentWithErrorLine("naka-session"));
   });
 });

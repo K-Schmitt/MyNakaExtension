@@ -90,7 +90,7 @@ describe("applyRating", () => {
   it("records the rating and the current, drops pending, clears the failure", () => {
     const failed = { label: "épisode", error: "unavailable", at: 5 } as const;
     const card = episodeCard({ failed });
-    const [out] = applyRating([card], card.key, "épisode", 7, 2000);
+    const [out] = applyRating([card], card.key, "épisode", 7);
     expect(out?.given.épisode).toBe(7);
     expect(out?.targets.find((t) => t.label === "épisode")?.current).toBe(7);
     expect(out?.pending).toEqual(["saison"]);
@@ -99,24 +99,24 @@ describe("applyRating", () => {
   it("keeps the failure of another label", () => {
     const failed = { label: "saison", error: "unavailable", at: 5 } as const;
     const card = episodeCard({ failed });
-    const [out] = applyRating([card], card.key, "épisode", 7, 2000);
+    const [out] = applyRating([card], card.key, "épisode", 7);
     expect(out?.failed).toEqual(failed);
   });
   it("leaves the card where it is and the other cards alone", () => {
     const a = filmCard({ key: "movie:1", contentId: 1 });
     const b = filmCard({ key: "movie:2", contentId: 2 });
-    const out = applyRating([a, b], "movie:2", "film", 5, 9);
+    const out = applyRating([a, b], "movie:2", "film", 5);
     expect(out.map((c) => c.key)).toEqual(["movie:1", "movie:2"]);
     expect(out[0]).toEqual(a);
     expect(out[1]?.given.film).toBe(5);
   });
   it("returns the list unchanged for an unknown key", () => {
     const cards = [filmCard()];
-    expect(applyRating(cards, "movie:404", "film", 5, 9)).toEqual(cards);
+    expect(applyRating(cards, "movie:404", "film", 5)).toEqual(cards);
   });
   it("does not change its input", () => {
     const card = filmCard();
-    applyRating([card], card.key, "film", 5, 9);
+    applyRating([card], card.key, "film", 5);
     expect(card.given).toEqual({});
     expect(card.pending).toEqual(["film"]);
   });

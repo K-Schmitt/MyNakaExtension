@@ -50,7 +50,7 @@ describe("readProductState: what an undo restores", () => {
     expect(stateOf({ [key]: value })[key]).toBe(value);
   });
 
-  // Fails closed (owner decision D13, 2026-11-14): a flag SensCritique did not answer as a boolean
+  // Fails closed (owner's decision of 2026-11-14): a flag SensCritique did not answer as a boolean
   // counts as a critique or recommendation, so nothing that could drop one is offered.
   it.each([
     ["absent", undefined],

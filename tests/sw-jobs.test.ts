@@ -109,7 +109,7 @@ type Opts = {
 
 function world(o: Opts = {}) {
   const { area, store } = memoryStore();
-  if (o.settings) area.data.set("settings", o.settings);
+  area.data.set("settings", o.settings ?? { mode: "simulation" });
   if (o.state) area.data.set("state", o.state);
   const nk = fakeNaka(o.naka ?? catalogueNaka());
   const sk = fakeSc(o.sc ?? catalogueSc());
@@ -706,7 +706,45 @@ describe("sync job: automatic triggers", () => {
   });
 });
 
-describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
+describe("sync job: the first run waits for a click", () => {
+  it.each(["naka-ready", "playlist"] as const)(
+    "%s with firstRunPending does nothing and saves nothing",
+    async (trigger) => {
+      const w = world({ settings: { mode: "live", firstRunPending: true } });
+      await w.jobs.syncJob(trigger);
+      expect(w.area.ops.filter((op) => op.startsWith("set"))).toEqual([]);
+      expect(w.nk.calls).toEqual([]);
+      expect(w.traffic.sent).toEqual([]);
+    },
+  );
+
+  it("the button with firstRunPending runs and clears the marker", async () => {
+    const w = world({ settings: { mode: "live", firstRunPending: true } });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("ok");
+    expect(w.settings().firstRunPending).toBeUndefined();
+  });
+
+  it("a failed first click keeps firstRunPending", async () => {
+    const w = world({
+      settings: { mode: "live", firstRunPending: true },
+      account: () => undefined,
+    });
+    await w.jobs.syncJob("button");
+    expect(w.settings().lastRun?.outcome).toBe("failed");
+    expect(w.settings().firstRunPending).toBe(true);
+  });
+
+  it("stored settings without firstRunPending: the automatic run starts", async () => {
+    const at = NOW - AUTO_RUN_GAP_MS;
+    const w = world({ settings: { mode: "live", lastAutoRunAt: at } });
+    await w.jobs.syncJob("naka-ready");
+    expect(w.settings().lastRun?.trigger).toBe("naka-ready");
+    expect(w.settings().lastAutoRunAt).toBe(NOW);
+  });
+});
+
+describe("sync job: a Naka tab lost mid-run", () => {
   // One Naka tab: with several, a dead one is passed over (see "one Naka tab per job").
   function closingTab(closeAfter: string | undefined, tabStaysListed = false) {
     const nk = fakeNaka(catalogueNaka());
@@ -734,7 +772,7 @@ describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
     return { tabs, failed, afterLoss };
   }
 
-  it("no Naka call reaches the tab after the loss; the run saves Plan 2's counts and says no-naka-tab", async () => {
+  it("no Naka call reaches the tab after the loss; the run saves the sync's counts and says no-naka-tab", async () => {
     const t = closingTab("playlistIds");
     const w = world({ tabs: t.tabs });
     await w.jobs.syncJob("button");
@@ -774,7 +812,7 @@ describe("sync job: a Naka tab lost mid-run (Ruling 17)", () => {
   });
 });
 
-describe("sync job: a run that a breaker stopped says so (Ruling 17)", () => {
+describe("sync job: a run that a breaker stopped says so", () => {
   it("a SensCritique session that expires after the first write gives ok with sc-session", async () => {
     let reads = 0;
     const w = world({
@@ -1355,7 +1393,7 @@ describe("finish job", () => {
     async (_name, opts, error) => {
       const w = world(opts);
       await w.jobs.finishJob(finished());
-      // Ruling 18: the local pre-check reads the state once; nothing reaches handleFinish.
+      // The local pre-check reads the state once; nothing reaches handleFinish.
       expect(w.area.ops.filter((op) => op === "get:state")).toHaveLength(1);
       expect(w.area.ops).not.toContain("set:state");
       expect(writesOf(w.sk.calls)).toEqual([]);
@@ -1509,7 +1547,7 @@ describe("finish job: at most 30 finishes an hour", () => {
   });
 });
 
-describe("finish job: only finishes that need the network count (Ruling 18)", () => {
+describe("finish job: only finishes that need the network count", () => {
   const TEN = 10;
 
   function countingTabs() {
@@ -1635,7 +1673,7 @@ describe("finish job: only finishes that need the network count (Ruling 18)", ()
     expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
   });
 
-  it("a clock behind the window's start opens a new window (K2)", async () => {
+  it("a clock behind the window's start opens a new window", async () => {
     const w = world({
       settings: {
         mode: "live",
@@ -1650,7 +1688,7 @@ describe("finish job: only finishes that need the network count (Ruling 18)", ()
     expect(w.settings().finishWindow).toEqual({ from: NOW, count: 1 });
   });
 
-  it("over the limit, 100 refusals write the settings once (K3)", async () => {
+  it("over the limit, 100 refusals write the settings once", async () => {
     const w = world({
       settings: {
         mode: "live",

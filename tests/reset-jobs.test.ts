@@ -65,11 +65,12 @@ describe("reset", () => {
     expect(w.state()).toEqual(emptyState());
   });
 
-  it("switches to simulation and keeps only the binding, thresholds, pause, auto-run date, finish window and answer counter", async () => {
+  it("keeps the mode, the binding, thresholds, pause, auto-run date, finish window and answer counter, and waits for a click", async () => {
     const w = answerWorld({ settings: FULL });
     await w.jobs.reset();
     expect(w.area.data.get("settings")).toEqual({
-      mode: "simulation",
+      mode: "live",
+      firstRunPending: true,
       binding: BOUND,
       thresholds: THRESHOLDS,
       pauseFromPercent: 50,
@@ -125,11 +126,23 @@ describe("reset", () => {
     expect(w.area.ops).not.toContain("get:ficheUndo");
   });
 
-  it("writes the default settings in simulation when the settings are unreadable", async () => {
+  it("keeps the simulation mode and waits for a click", async () => {
+    const w = answerWorld({ settings: { mode: "simulation" } });
+    await w.jobs.reset();
+    expect(w.area.data.get("settings")).toEqual({
+      mode: "simulation",
+      firstRunPending: true,
+    });
+  });
+
+  it("writes the default settings, live, waiting for a click, when the settings are unreadable", async () => {
     const w = answerWorld({ settings: FULL });
     w.area.data.set("settings", { mode: "nonsense" });
     await w.jobs.reset();
-    expect(w.area.data.get("settings")).toEqual({ mode: "simulation" });
+    expect(w.area.data.get("settings")).toEqual({
+      mode: "live",
+      firstRunPending: true,
+    });
   });
 });
 
@@ -153,11 +166,11 @@ describe("reset: the settings are saved first", () => {
     expect(w.area.data.get("settings")).toEqual(FULL);
   });
 
-  it("a failed state save comes after the switch to simulation", async () => {
+  it("a failed state save comes after the settings, which already wait for a click", async () => {
     const w = answerWorld({ settings: FULL });
     failingWrites(w, "state");
     await w.jobs.reset();
-    expect(w.settings().mode).toBe("simulation");
+    expect(w.settings().firstRunPending).toBe(true);
   });
 });
 

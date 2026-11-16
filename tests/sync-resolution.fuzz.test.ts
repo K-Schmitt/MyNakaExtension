@@ -15,7 +15,7 @@ import type { Candidate, Titled } from "../src/core/title-match";
 // Model-based fuzz of the REAL runSync WITH resolution. Every title starts unmapped, so the 20-id
 // resolution cap binds; searches and describes fail now and then (429-like), so mappings arrive late;
 // some titles have no year on one side and some have homonyms, so questions stay open. The owner edits
-// both lists between runs and answers questions as Plan 3's amended contract says (removals: keep,
+// both lists between runs and answers questions as the amended answer contract says (removals: keep,
 // remove, remove without effect, asked; ambiguities: a candidate or "none of these").
 // The owner tells the truth: an ambiguity answer is the title's own product when it is listed, else
 // "none of these", and the owner never wishes a homonym product. Every pairing the runner acts on is
@@ -37,7 +37,7 @@ const NEAR = new Set([5, 12, 29]);
 const SAME = new Set([6, 19, 28]);
 const STEPS = 50;
 const SEEDS = 300;
-// With no owner answer at all, only the cap and the failed searches delay a mapping (probe P3b); the
+// With no owner answer at all, only the cap and the failed searches delay a mapping; the
 // searches then fail more often, so the delay spans the owner's edits.
 const UNANSWERED_SEEDS = 200;
 
@@ -196,7 +196,7 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
     }
   };
   // The owner often comes back to the title they last edited, and now and then changes both sides of
-  // one title between two runs (probe P7: Naka's copy back and SensCritique's removed in the same gap).
+  // one title between two runs (seen in an owner's probe: Naka's copy back and SensCritique's removed in the same gap).
   let lastEdited = 1;
   const ownerEdit = (): void => {
     const n = r() < 0.5 ? lastEdited : 1 + Math.floor(r() * TITLES);
@@ -227,7 +227,7 @@ async function simulate(seed: number, answers: boolean): Promise<string[]> {
     }
   };
 
-  // Plan 3's amended contract, in ONE save. "None of these" keeps the question open with no candidate.
+  // The amended answer contract, in ONE save. "None of these" keeps the question open with no candidate.
   // A chosen pair: (2) nothing changes when it would evict a settled pair (the owner is shown the
   // conflict and does not confirm); (3) upsert; a pair sharing an id with a pending removal is settled;
   // (4) every question about the same Naka or SensCritique id is resolved; (5) the chosen ids leave the

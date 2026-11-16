@@ -5,7 +5,12 @@ import { createHomeRowUi } from "../src/content/ui/home-row-ui";
 import { homeView } from "../src/content/ui/home-view";
 import type { ListSnapshot } from "../src/content/ui/row-place";
 import { filmCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
+import {
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  fakeVisibility,
+} from "./ui-fakes";
 
 const HANDLERS: HomeHandlers = {
   entry: () => ({
@@ -26,8 +31,10 @@ function world() {
   const hosts: FakeElement[] = [];
   const watched: { target: TrackLike; fn: () => void; stopped: boolean }[] = [];
   let snap: ListSnapshot = { reprendre: 0, host: -1, age: 0 };
+  const vis = fakeVisibility();
   const ui = createHomeRowUi({
     doc,
+    seen: vis.seen,
     keeper: (host) => {
       hosts.push(host as FakeElement);
       return {
@@ -61,6 +68,7 @@ function world() {
   return {
     ui,
     doc,
+    vis,
     log,
     hosts,
     watched,
@@ -100,6 +108,21 @@ describe("createHomeRowUi", () => {
     ]);
   });
 
+  it("watches the stars it drew, only the last draw's, and none once hidden", () => {
+    const w = world();
+    w.ui.show(VIEW, HANDLERS);
+    const groups = () =>
+      w.hosts.flatMap((h) =>
+        descendants(h.shadow).filter((el) => el.className === "mn-stars"),
+      );
+    expect([...w.vis.observed]).toEqual(groups());
+    w.ui.show(VIEW, HANDLERS);
+    expect([...w.vis.observed]).toEqual(groups());
+    expect(w.vis.observed.size).toBe(1);
+    w.ui.hide();
+    expect(w.vis.observed.size).toBe(0);
+  });
+
   it("a show after a hide draws again in the same host and starts afresh", () => {
     const w = world();
     w.ui.show(VIEW, HANDLERS);
@@ -129,6 +152,13 @@ describe("createHomeRowUi", () => {
       undefined,
       undefined,
     ]);
+  });
+
+  it("hide stops watching the track's size", () => {
+    const w = world();
+    w.ui.show(VIEW, HANDLERS);
+    w.ui.hide();
+    expect(w.watched.map((x) => x.stopped)).toEqual([true]);
   });
 
   it("a redraw stops watching the old track and watches the new one", () => {

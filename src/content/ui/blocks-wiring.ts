@@ -1,16 +1,17 @@
 // The three rating blocks of a Naka tab, and the rules between them. Pure: the entry hands in the worker
-// port, the timer, both overlays, the clock and the title lookup, and binds what this returns to the
-// page's events. The end and pause blocks draw in one overlay, a card or a question, owned by one block at
-// a time: the end block closes the pause block before it opens, and the pause block neither draws nor
-// clears while the end block is shown (a question of the end block included). Every URL change closes the pause block; leaving the player closes the end block
-// too, while an episode change (autoplay) keeps its card. The home row has its own host among Naka's rows. The removal
-// block (after a removal on Naka, on any naka.cx path) draws in the player overlay but yields to both: it
-// shows only when neither is shown, and either one opening closes it. On the home page it is instead the
-// home row's first card, whatever the other blocks do, and it closes when the tab leaves the home path; a
-// block opened off the home page closes when the tab arrives there.
+// port, the timer, both overlays, the clock and the title lookup, and binds what this returns to the page's
+// events. The end and pause blocks draw in one overlay, a card or a question, owned by one block at a time:
+// the end block closes the pause block before it opens, and the pause block neither draws nor clears while
+// the end block is shown (a question of the end block included). Every URL change closes the pause block;
+// leaving the player closes the end block too, while an episode change (autoplay) keeps its card. The home
+// row has its own host among Naka's rows. The removal block (after a removal on Naka, on any naka.cx path)
+// draws in the player overlay but yields to both: it shows only when neither is shown, and either one opening
+// closes it. On the home page it is instead the home row's first card, whatever the other blocks do, and it
+// closes when the tab leaves the home path; a block opened off the home page closes when the tab arrives
+// there.
 
 import type { ContentIds } from "../../core/finish-event";
-import type { VideoSample } from "../naka-tab";
+import type { VideoSample } from "../video-sample";
 import { createEndBlock } from "./end-block";
 import type { EndTimer } from "./end-poll";
 import { createHomeBlock, type HomeHandlers } from "./home-block";
@@ -112,7 +113,8 @@ export function wireBlocks(ports: WiringPorts) {
     },
     pathChanged: (pathname: string) => {
       homeBlock.route(pathname);
-      // Leaving home closes the row's card; arriving home closes a floating block (P13: none there).
+      // Leaving home closes the row's card; arriving home closes a floating block (none floats over the home
+      // page).
       const here = homeBlock.isHome() ? "home" : "player";
       if (removalOn !== undefined && removalOn !== here) removalBlock.close();
     },

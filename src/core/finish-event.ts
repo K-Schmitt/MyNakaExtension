@@ -1,9 +1,10 @@
 // The end-of-viewing event the Naka page reports, checked once before the handler touches anything.
-// It crosses a message boundary in Plan 3, so the types are not trusted at runtime: a bad event
+// It crosses a message boundary, so the types are not trusted at runtime: a bad event
 // rejects with a fixed message (never one built from its values) before any port is called.
 
 import { valuesOf } from "../ext/field-checks";
 import type { Titled } from "./title-match";
+import { isYearInRange, MAX_YEAR, MIN_YEAR } from "./year-range";
 
 /** Where the end of viewing came from: a progress mark, Naka's « vu », or the start of the credits. */
 export type FinishSource = "threshold" | "explicit" | "credits";
@@ -56,14 +57,6 @@ function isProgress(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= 1;
 }
 
-function isYear(value: unknown): boolean {
-  return (
-    Number.isSafeInteger(value) &&
-    (value as number) >= 1800 &&
-    (value as number) <= 3000
-  );
-}
-
 function checkTitled(titled: Titled): void {
   if (typeof titled.title !== "string" || titled.title.trim() === "") {
     reject("title must not be empty");
@@ -72,8 +65,8 @@ function checkTitled(titled: Titled): void {
   if (originalTitle !== undefined && typeof originalTitle !== "string") {
     reject("originalTitle must be a string");
   }
-  if (year !== undefined && !isYear(year)) {
-    reject("year must be a whole number from 1800 to 3000");
+  if (year !== undefined && !isYearInRange(year)) {
+    reject(`year must be a whole number from ${MIN_YEAR} to ${MAX_YEAR}`);
   }
 }
 
@@ -142,6 +135,15 @@ export function contentKeyOf({ contentId, season, episode }: ContentIds) {
       ? { kind: "episode", contentId, season, episode }
       : { kind: "film", contentId },
   );
+}
+
+// The ids alone, without a key that holds undefined: what a message or a stored record carries.
+export function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
+  return {
+    contentId,
+    ...(season === undefined ? {} : { season }),
+    ...(episode === undefined ? {} : { episode }),
+  };
 }
 
 const KEY_PARTS = /^(?:movie:(\d+)|tv:(\d+):S(\d+)E(\d+))$/;

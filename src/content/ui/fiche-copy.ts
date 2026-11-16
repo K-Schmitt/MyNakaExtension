@@ -59,7 +59,7 @@ const NOT_PUT_BACK: Record<RunStep["kind"], string> = {
   localRestore: "l’extension n’a pas repris son état d’avant",
 };
 
-/** « Annuler » stopped at `failed`: that step and the ones after it were not done (spec §4). */
+/** « Annuler » stopped at `failed`: that step and the ones after it were not done. */
 export function partialUndoLine(failed: RunStep["kind"]): string {
   return `L’annulation s’est arrêtée${NB}: ${NOT_PUT_BACK[failed]}, et la suite n’a pas été faite.`;
 }
@@ -78,7 +78,11 @@ export function sentWithErrorLine(error: JobError): string {
   return `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: ${RATING_ERROR_LABELS[error]}.`;
 }
 
-/** A film's rating that did not go out after its explicit finish wrote (D9, ruling R2). */
+/** The rating went out; the extension could not save it on its side. No site is at fault, nothing to send again. */
+export const SENT_NOT_SAVED_LINE =
+  "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.";
+
+/** A film's rating that did not go out after its explicit finish wrote: « Annuler » puts the title back. */
 export const FINISH_WROTE_LINE = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}${UNDO_LABEL}${NB}» le remet comme avant.`;
 
 /** The same line once « Annuler » timed out on the page. */
@@ -98,7 +102,9 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
     case "not-sent":
       return errorLine(outcome.error);
     case "sent-with-error":
-      return sentWithErrorLine(outcome.error);
+      return outcome.step === "local-save"
+        ? SENT_NOT_SAVED_LINE
+        : sentWithErrorLine(outcome.error);
     case "finish-wrote":
       return FINISH_WROTE_LINE;
     case "finish-wrote-expired":

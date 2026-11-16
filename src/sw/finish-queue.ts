@@ -1,4 +1,4 @@
-// The router's bound on finishes (Ruling 15). A page script can send a `finished` for every content id:
+// The router's bound on finishes. A page script can send a `finished` for every content id:
 // at most one finish waits per content key, and at most MAX_QUEUED_FINISHES are queued or running. The
 // rest is dropped, unrecorded. A newer message for a waiting key replaces it when its progress is at
 // least as high (the 0.9 mark arriving while the 0.85 one waits must not be lost). A running job no

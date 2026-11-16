@@ -1,16 +1,15 @@
-// What a title page rating is about to change (spec §7 « État d'avant »): the product's state is read
-// through the SC limiter just before a film's or a series' rating, and kept as the one undo record,
-// replacing any older one. A failed read never stops the rating: the record is then cleared (an older
-// one would undo more than the last rating), and the panel offers no undo. Episode ratings keep nothing.
-// The record also keeps the extension's own state of the title (ruling R8), read in the same job before
-// any write: the handled key, the settled pair, the title's cards as stored. A local read that fails
-// clears the record the same way. A film the worker's client took out of « Ma liste » while the tab could
-// not read the button is noted as listed (ruling R10), so « Annuler » adds it back. A rating answered
-// `{ error }` puts the record it replaced back only when nothing of it was written (D9): a refusal before
-// any write (the binding, the hour's budget, the pre-check, a state read before the first write) or a
-// ProductRate that threw with nothing sent before it (a film with its card, a series). A film whose
-// explicit finish wrote (« vu », out of the wishes, the settled pair, the handled key) keeps this
-// rating's record, so « Annuler » restores it from its before-state.
+// What a title page rating is about to change (its « État d'avant »): the product's state is read through the
+// SC limiter just before a film's or a series' rating, and kept as the one undo record, replacing any older
+// one. A failed read never stops the rating: the record is then cleared (an older one would undo more than
+// the last rating), and the panel offers no undo. Episode ratings keep nothing. The record also keeps the
+// extension's own state of the title, read in the same job before any write: the handled key, the settled
+// pair, the title's cards as stored. A local read that fails clears the record the same way. A film the
+// worker's client took out of « Ma liste » while the tab could not read the button is noted as listed, so
+// « Annuler » adds it back. A rating answered `{ error }` puts the record it replaced back only when nothing of
+// it was written (write-watch): a refusal before any write (the binding, the hour's budget, the pre-check, a
+// state read before the first write) or a ProductRate that threw with nothing sent before it (a film with its
+// card, a series). A film whose explicit finish wrote (« vu », out of the wishes, the settled pair, the
+// handled key) keeps this rating's record, so « Annuler » restores it from its before-state.
 
 import type { FicheUndo, UndoLocal, UndoRole } from "../core/fiche-undo";
 import type { FicheRateMessage } from "../ext/fiche-messages";
@@ -151,7 +150,7 @@ export async function putBackReplaced(
   }
 }
 
-/** The film was listed: kept only on a record that still names this content and this product (R10). */
+/** The film was listed: kept only on a record that still names this content and this product. */
 export async function noteListed(
   deps: JobDeps,
   { contentId, productId }: FicheRateMessage,

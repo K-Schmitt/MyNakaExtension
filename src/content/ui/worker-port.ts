@@ -2,7 +2,7 @@
 // nothing here touches chrome.*. A send that fails gives `undefined`, never a throw; an answer is
 // validated field by field (worker-answers) before the block uses it.
 
-import type { ContentIds } from "../../core/finish-event";
+import { type ContentIds, idsOf } from "../../core/finish-event";
 import type { QuestionKey } from "../../core/questions";
 import type { RatingLabel } from "../../core/rating-cards";
 import type { Side } from "../../core/state";
@@ -17,14 +17,6 @@ import { parseCardAnswer, parseCardsAnswer } from "./worker-answers";
 type PortMessage = RatingMessage | QuestionMessage;
 
 export type SendRating = (msg: PortMessage) => Promise<unknown>;
-
-function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
-  return {
-    contentId,
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
-}
 
 export type WorkerPort = ReturnType<typeof createWorkerPort>;
 

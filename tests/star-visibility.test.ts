@@ -36,7 +36,7 @@ function world() {
 const target = (name: string): Target => ({ isConnected: true, name });
 const slot = () => ({});
 
-describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
+describe("createSeenWatch: whether a click on a star row counts", () => {
   it("observes the row it is given", () => {
     const w = world();
     const row = target("row");
@@ -44,7 +44,7 @@ describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
     expect(w.observed).toEqual([row]);
   });
 
-  it("counts a click before any entry has come (owner's decision D11)", () => {
+  it("counts a click before any entry has come (a real click is never lost to a missing signal)", () => {
     const w = world();
     expect(w.watch(target("row") as never, slot())()).toBe(true);
   });
@@ -152,5 +152,28 @@ describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
     expect(w.unobserved).toEqual([old]);
     w.watch(target("elsewhere") as never, slot());
     expect(w.unobserved).toEqual([old]);
+  });
+
+  it("release stops watching the row a slot drew last, and only that slot's", () => {
+    const w = world();
+    const place = slot();
+    const row = target("row");
+    const other = target("other");
+    w.watch(row as never, place);
+    w.watch(other as never, slot());
+    w.watch.release(place);
+    expect(w.unobserved).toEqual([row]);
+    w.watch.release(place);
+    expect(w.unobserved).toEqual([row]);
+  });
+
+  it("release does nothing without an observer", () => {
+    const watch = createSeenWatch(
+      () => undefined,
+      () => 0,
+    );
+    const place = slot();
+    watch(target("row") as never, place);
+    expect(() => watch.release(place)).not.toThrow();
   });
 });

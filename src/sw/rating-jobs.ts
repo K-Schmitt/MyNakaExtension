@@ -1,10 +1,10 @@
 // The rating jobs. A rating goes out only for a target of a STORED card: the worker never takes a product id
 // from a message. The card is the one the finish made, the one the explicit finish of the pause case makes
 // here, or, for a title already handled, the one rebuilt read-only (handled-card.ts). A film or an épisode
-// only: a saison or a série is never rated without its card. The binding is checked before the write, as
-// the finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended: no
-// error once the rating went out, else the error (the card's failure, or why no card could be made), and
-// whether the card step wrote before it (D9: the explicit finish's SensCritique writes or its sync state).
+// only: a saison or a série is never rated without its card. The binding is checked before the write, as the
+// finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended: no error
+// once the rating went out, else the error (the card's failure, or why no card could be made), and whether
+// the card step wrote before it (write-watch: the explicit finish's SensCritique writes or its sync state).
 
 import { cardlessLabel } from "../core/cardless-label";
 import { contentKeyOf } from "../core/finish-event";
@@ -21,6 +21,7 @@ import { isHandled } from "../core/state";
 import type { JobError } from "../ext/job-error";
 import type { DismissRatingMessage, RateMessage } from "../ext/rating-messages";
 import type { Store } from "../ext/store";
+import { savedAfterSent } from "./after-sent";
 import { checkBinding } from "./binding";
 import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
@@ -35,8 +36,11 @@ type Wrote = { wroteBefore: boolean };
 /** The card's target, or why there is none (a label never rated without its card has no error). */
 type Lookup = Wrote & { found?: Found; error?: JobError };
 type Rated = { cards: RatingCard[]; error?: JobError };
-/** How a rating ended: no error once it went out. */
-export type RateEnd = Wrote & { error?: JobError };
+/**
+ * How a rating ended: no error once it went out. `unsaved`: it went out, and its card's save failed
+ * (after-sent: never a failure of the rating).
+ */
+export type RateEnd = Wrote & { error?: JobError; unsaved?: JobError };
 
 function foundIn(
   cards: RatingCard[],
@@ -47,10 +51,10 @@ function foundIn(
   return target === undefined ? undefined : { cards, target };
 }
 
-// With no card, a film or an épisode runs its explicit finish first (the design's §2.4 pause case), through
+// With no card, a film or an épisode runs its explicit finish first (the pause case), through
 // the same job as any finish: its pre-check, its budget, its binding. A title already handled (finished
-// under Plan 3, or before its card existed) has a free finish that makes no card: its card is built
-// read-only instead (Ruling L2), with no write and no finish record. The finish's error, if any.
+// by an older version, or before its card existed) has a free finish that makes no card: its card is built
+// read-only instead, with no write and no finish record. The finish's error, if any.
 async function cardStep(
   deps: JobDeps,
   msg: RateMessage,
@@ -110,7 +114,7 @@ async function rated(
   const at = deps.now();
   try {
     await sendRating(deps, target.productId, msg.rating);
-    return { cards: applyRating(cards, key, msg.label, msg.rating, at) };
+    return { cards: applyRating(cards, key, msg.label, msg.rating) };
   } catch (caught) {
     const error = toJobError(caught);
     return { cards: applyFailure(cards, key, msg.label, error, at), error };
@@ -118,7 +122,7 @@ async function rated(
 }
 
 // A ProductRate that throws counts as not sent: SensCritique answered no rating, and the card keeps the
-// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique (D9).
+// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique.
 export async function rateJob(
   deps: JobDeps,
   msg: RateMessage,
@@ -127,8 +131,14 @@ export async function rateJob(
   if (found === undefined)
     return { error: error ?? "unavailable", wroteBefore };
   const result = await rated(deps, found, msg);
-  await deps.store.saveRatings(result.cards);
-  return { error: result.error, wroteBefore };
+  if (result.error !== undefined) {
+    await deps.store.saveRatings(result.cards);
+    return { error: result.error, wroteBefore };
+  }
+  const unsaved = await savedAfterSent(() =>
+    deps.store.saveRatings(result.cards),
+  );
+  return unsaved === undefined ? { wroteBefore } : { wroteBefore, unsaved };
 }
 
 export async function dismissJob(

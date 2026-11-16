@@ -6,7 +6,7 @@ import { answerWorld, BOUND } from "./answer-world";
 import { filmTitle, linkedTo, TAB } from "./fiche-fixtures";
 import { filmCard, target } from "./rating-fixtures";
 
-// The title page's undo record is the last rating of the title (spec 8 §2): a later write of the same
+// The title page's undo record is the last rating of the title only: a later write of the same
 // content from another surface clears it, so « Annuler » cannot erase that newer rating on SensCritique.
 
 const LIVE: Settings = { mode: "live", binding: BOUND };
@@ -94,6 +94,40 @@ describe("the title page's undo after a later write of the same title", () => {
 
     // Assert
     expect(w.area.data.get("ficheUndo")).toBeNull();
+  });
+
+  it.each([
+    ["« Oublier » on the status page", "forgetHandled"],
+    ["« Oublier » asked by a Naka tab", "forgetHandledFromTab"],
+  ] as const)(
+    "%s of an episode nothing holds: the record stays",
+    async (_n, job) => {
+      // Arrange
+      const w = await ratedOnItsPage();
+      const record = w.area.data.get("ficheUndo");
+
+      // Act
+      const episode = { contentId: 5, season: 1, episode: 3 };
+      await w.jobs[job]({ type: "forget-handled", ...episode });
+
+      // Assert
+      expect(w.area.data.get("ficheUndo")).toEqual(record);
+    },
+  );
+
+  it("a Naka tab's « Oublier » over the hour's budget: nothing forgotten, the record stays", async () => {
+    // Arrange
+    const w = await ratedOnItsPage();
+    const record = w.area.data.get("ficheUndo");
+    const full = { from: Date.parse("2026-11-05T12:00:00Z"), count: 10 };
+    w.area.data.set("settings", { ...LIVE, forgetWindow: full });
+
+    // Act
+    await w.jobs.forgetHandledFromTab({ type: "forget-handled", contentId: 5 });
+
+    // Assert
+    expect(w.state().handled).toContain("movie:5");
+    expect(w.area.data.get("ficheUndo")).toEqual(record);
   });
 
   it("a finish that writes clears this content's undo record", async () => {

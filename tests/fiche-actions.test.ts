@@ -31,7 +31,7 @@ import {
   starsOf,
   texts,
 } from "./fiche-ui-world";
-import { FakeDoc, type FakeElement } from "./ui-fakes";
+import { FakeDoc, type FakeElement, noObserverWatch } from "./ui-fakes";
 
 const NB = "\u202F";
 const URL = "https://www.senscritique.com/film/solaris/1234";
@@ -334,7 +334,7 @@ describe("the undo and refusal copy", () => {
   });
 });
 
-describe("every step 7 rare state, in the actions host", () => {
+describe("every rare state of a title with no product, in the actions host", () => {
   it("shows a loading line until the worker answers", () => {
     const t = fakeUi(FILM_PATH);
     t.controller.event(ficheEvent());
@@ -473,12 +473,41 @@ describe("every step 7 rare state, in the actions host", () => {
   it("says « Note envoyée, mais … » when a later step failed", async () => {
     const t = await film();
     star(t.parts(), 9)?.click(true);
-    t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
+    t.ofType("fiche-rate")[0]?.answer({
+      sent: true,
+      step: "ma-liste",
+      error: "naka-session",
+    });
     await settle();
     expect(texts(t.parts())).toContain(
       `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnecte-toi sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
+  });
+
+  const NOT_SAVED =
+    "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.";
+  const notSaved = { sent: true, step: "local-save", error: "unavailable" };
+
+  it("a film whose rating went out but was not saved: says so, blames no site, asks for nothing", async () => {
+    const t = await film();
+    star(t.parts(), 9)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer(notSaved);
+    await settle();
+    expect(texts(t.parts())).toContain(NOT_SAVED);
+    expect(texts(t.parts()).join(" ")).not.toContain("Ma liste");
+    expect(texts(t.parts()).join(" ")).not.toContain("réessaie");
+    expect(checked(t.parts())).toEqual(["9 sur 10"]);
+  });
+
+  it("a series whose rating went out but was not saved: the same line", async () => {
+    const t = await series();
+    star(t.parts(), 6)?.click(true);
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    t.ofType("fiche-rate")[0]?.answer(notSaved);
+    await settle();
+    expect(texts(t.parts())).toContain(NOT_SAVED);
+    expect(texts(t.parts()).join(" ")).not.toContain("Ma liste");
   });
 
   it("shows the error lines of a rating that did not go out", async () => {
@@ -497,7 +526,7 @@ describe("every step 7 rare state, in the actions host", () => {
     );
   });
 
-  it("a rating not sent after its finish wrote: its line, « Annuler » at once, the stars as they were (D9, R2)", async () => {
+  it("a rating not sent after its finish wrote: its line, « Annuler » at once, the stars as they were", async () => {
     const t = await film();
     star(t.parts(), 9)?.click(true);
     t.ofType("fiche-rate")[0]?.answer({
@@ -523,7 +552,7 @@ describe("every step 7 rare state, in the actions host", () => {
     ]);
   });
 
-  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause (D9)", async () => {
+  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause", async () => {
     // Arrange
     const t = await film();
     star(t.parts(), 9)?.click(true);
@@ -597,6 +626,7 @@ describe("the actions between two views", () => {
     const shown = createFicheActions({
       doc,
       panel: aside.panel,
+      seen: noObserverWatch(),
       watch: () => () => {},
       timer: idleTimer,
     });
@@ -651,7 +681,7 @@ describe("the actions between two views", () => {
   });
 });
 
-describe("Naka's « Ma liste » the tab could not update (D14)", () => {
+describe("Naka's « Ma liste » the tab could not update", () => {
   it("says so under the stars once the button left the screen before the click", async () => {
     const t = await film(productOf());
     t.page.maListe = true;
@@ -665,7 +695,7 @@ describe("Naka's « Ma liste » the tab could not update (D14)", () => {
   });
 });
 
-describe("a title star click and the star's visibility (D7)", () => {
+describe("a title star click and the star's visibility", () => {
   it("watches the info row's group of stars, the one holding the clicked star", async () => {
     const t = await film();
     const watched = t.stars.rows.at(-1);
@@ -683,5 +713,72 @@ describe("a title star click and the star's visibility (D7)", () => {
     expect(t.ofType("fiche-rate").map((c) => c.msg)).toMatchObject([
       { type: "fiche-rate", rating: 8 },
     ]);
+  });
+});
+
+describe("the write buttons and the actions' visibility", () => {
+  const slotOf = (t: Awaited<ReturnType<typeof film>>, label: string) => {
+    const el = buttonNamed(actionParts(t), label);
+    // The watched element is the button itself (or, for the confirmation, its row).
+    const i = t.stars.rows.indexOf(el as FakeElement);
+    return t.stars.slots[i];
+  };
+
+  it.each([
+    ["Annuler", { canUndo: true }, "fiche-undo"],
+    ["Retirer la note", { canRemove: true }, "fiche-remove"],
+  ] as const)(
+    "« %s » sends nothing while reported hidden, and sends once visible",
+    async (label, flags, type) => {
+      const t = await film(productOf(flags));
+      expect(slotOf(t, label)).toBeDefined();
+      t.stars.hidden = true;
+      buttonNamed(actionParts(t), label)?.click(true);
+      expect(t.ofType(type)).toEqual([]);
+      t.stars.hidden = false;
+      buttonNamed(actionParts(t), label)?.click(true);
+      expect(t.ofType(type)).toHaveLength(1);
+    },
+  );
+
+  it("a series' « Envoyer » sends nothing while reported hidden, and sends once visible", async () => {
+    const t = await series();
+    star(t.parts(), 6)?.click(true);
+    t.stars.hidden = true;
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    t.stars.hidden = false;
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    expect(t.ofType("fiche-rate")).toHaveLength(1);
+  });
+
+  it("stops watching the write buttons' row on a redraw and when the tab leaves the title page", async () => {
+    const t = await film(productOf({ canRemove: true }));
+    const first = slotOf(t, "Retirer la note");
+    buttonNamed(actionParts(t), "Retirer la note")?.click(true);
+    expect(t.stars.released).toContain(first);
+    const second = slotOf(t, "Retirer la note");
+    expect(second).not.toBe(first);
+    t.controller.path("/");
+    expect(t.stars.released).toContain(second);
+  });
+
+  it("a candidate to link sends nothing while reported hidden, and links once visible; a redraw stops watching it", async () => {
+    const t = await film({
+      state: "choose",
+      candidates: [{ id: 71, title: "Solaris", year: 2002, type: "film" }],
+    });
+    const choice = () =>
+      actionParts(t).find((p) => p.className.split(" ").includes("mn-choice"));
+    const watched = choice();
+    const i = t.stars.rows.indexOf(watched as FakeElement);
+    expect(i).toBeGreaterThanOrEqual(0);
+    t.stars.hidden = true;
+    choice()?.click(true);
+    expect(t.ofType("fiche-link")).toEqual([]);
+    t.stars.hidden = false;
+    choice()?.click(true);
+    expect(t.ofType("fiche-link")).toHaveLength(1);
+    expect(t.stars.released).toContain(t.stars.slots[i]);
   });
 });

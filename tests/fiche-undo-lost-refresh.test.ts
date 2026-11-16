@@ -41,7 +41,7 @@ async function undoneThenLost(answer: unknown) {
   return { ...t, parts, retry: () => buttonNamed(parts(), RETRY_LABEL) };
 }
 
-describe("an undo's line through a lost read of the panel (spec §4)", () => {
+describe("an undo's line through a lost read of the panel", () => {
   it.each([
     ["a partial undo", PARTIAL, partialUndoLine("wish")],
     ["a refused undo", { refused: "expired" }, REFUSED_LINES.expired],

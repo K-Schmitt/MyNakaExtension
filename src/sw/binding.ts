@@ -28,7 +28,7 @@ async function readAccounts(readers: AccountReaders): Promise<Accounts> {
 }
 
 // A binding made before the Naka account was known binds the SensCritique side only.
-export function isBoundElsewhere(
+function isBoundElsewhere(
   binding: Binding | undefined,
   accounts: Accounts,
 ): boolean {

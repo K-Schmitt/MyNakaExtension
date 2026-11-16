@@ -27,7 +27,7 @@ export type FichePage = {
   /** The token of the info's read on its way, if one is: an older read's end leaves a newer one's. */
   infoReading?: object;
   outcome?: FicheOutcome;
-  /** Naka's « Ma liste » the tab had to click left the screen first (D14): its line, until the next write. */
+  /** Naka's « Ma liste » the tab had to click left the screen first: its line, until the next write. */
   maListeMissed?: true;
   pending?: FichePending;
   /** The episode of the rating on its way, or of the last write's outcome; absent for another write. */

@@ -24,8 +24,6 @@ import type {
 import { LISTS_COPY, reasonLine, unlinkedHeading } from "./lists-copy";
 import { searchView } from "./lists-search-view";
 
-export { LISTS_COPY };
-
 export type RowAction =
   | { kind: "answer-question"; side: Side; id: number; choice: number | null }
   | {

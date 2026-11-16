@@ -6,10 +6,9 @@ import { UNIVERSE } from "../sc/sc-queries";
 import type { ScWishItem } from "../sc/wishlist-page";
 import type { TitleImage } from "./title-image";
 import type { Candidate, MediaType, Titled } from "./title-match";
+import { isYearInRange } from "./year-range";
 
 const YEAR_PREFIX = /^\d{4}/;
-const MIN_YEAR = 1800;
-const MAX_YEAR = 2100;
 
 function nakaType(mediaType: NakaItem["mediaType"]): MediaType {
   switch (mediaType) {
@@ -25,7 +24,7 @@ function yearOf(releaseDate: string | undefined): number | undefined {
     return undefined;
   }
   const year = Number(releaseDate.slice(0, 4));
-  return year >= MIN_YEAR && year <= MAX_YEAR ? year : undefined;
+  return isYearInRange(year) ? year : undefined;
 }
 
 function urlType(url: string): MediaType | undefined {

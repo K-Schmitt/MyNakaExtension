@@ -193,6 +193,15 @@ describe("toggleMode", () => {
     ]);
   });
 
+  it("names « Resynchroniser » alone while the first run waits for a click", async () => {
+    const t = setup([{ mode: "simulation", firstRunPending: true }, LIVE]);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.confirms).toHaveLength(1);
+    expect(t.confirms[0]).toContain("La prochaine démarre au clic sur");
+    expect(t.confirms[0]).not.toContain("ouverture de Naka");
+  });
+
   it("does nothing when the owner declines", async () => {
     const t = setup([SIM], false);
     await t.controller.load();
@@ -235,7 +244,7 @@ describe("toggleMode", () => {
   });
 });
 
-// Ruling 20: while a job runs or a mode change waits, the page asks again every 5 s, and only then.
+// While a job runs or a mode change waits, the page asks again every 5 s, and only then.
 describe("polling", () => {
   const statuses = (sent: ToWorker[]) =>
     sent.filter((m) => m.type === "status").length;
@@ -312,7 +321,7 @@ describe("polling", () => {
 });
 
 // Disabling the pressed button drops its focus: once the answer is shown and the buttons are enabled
-// again, the focus goes back to it, or to the headline when that button is now hidden (Ruling 19).
+// again, the focus goes back to it, or to the headline when that button is now hidden.
 describe("focus after an action", () => {
   it("returns to Resynchroniser once the buttons are enabled again", async () => {
     const t = setup([SIM, SIM]);
@@ -541,7 +550,7 @@ const cps = (text: string) => [...text].map((c) => c.codePointAt(0));
 const FORGET_TEXT =
   "Oublier les comptes liés efface seulement le lien enregistré entre ton compte SensCritique et ton compte Naka. Aucun jeton n’est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?";
 const RESET_TEXT =
-  "Réinitialiser efface l’état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le mode repasse en simulation. Le prochain passage sera un premier passage, qui ne fait qu’ajouter, sans la mémoire des retraits\u202F: un titre retiré d’un côté et encore présent de l’autre y reviendrait. Vérifie l’aperçu avant de réactiver les écritures. Les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?";
+  "Réinitialiser efface l’état de synchronisation\u202F: paires, présences, questions, notes en attente et fins déjà traitées. Le prochain passage sera un premier passage, qui ne fait qu’ajouter, sans la mémoire des retraits\u202F: un titre retiré d’un côté et encore présent de l’autre y reviendrait. Il attendra un clic sur «\u202FResynchroniser\u202F». Le mode, les réglages (seuils, pause) et les comptes liés sont gardés. Réinitialiser\u202F?";
 
 describe("the local actions", () => {
   it.each([

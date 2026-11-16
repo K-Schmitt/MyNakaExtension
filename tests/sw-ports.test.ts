@@ -313,7 +313,7 @@ describe("circuit breaker: what opens it", () => {
       "a SensCritique 429",
       new ScUnavailableError("SensCritique SearchProductExplorer: HTTP 429"),
     ],
-    ["a SensCritique timeout (K4)", new ScTimeoutError("UserCollection")],
+    ["a SensCritique timeout", new ScTimeoutError("UserCollection")],
   ];
   const closed: [string, unknown][] = [
     ["no Naka tab", new JobRejected("no-naka-tab")],

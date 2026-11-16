@@ -31,7 +31,7 @@ import {
 import { optionalImage } from "./image-schema";
 import { parsePair } from "./pair-schema";
 
-export type { LastAnswer, QuestionKey };
+export type { LastAnswer };
 export { parseLastAnswer, parseQuestionKey };
 
 const SIDES = valuesOf<Side>({ naka: true, sc: true });

@@ -4,7 +4,7 @@ import { runSync, type SyncPorts } from "../src/core/sync-runner";
 import type { Candidate, Titled } from "../src/core/title-match";
 
 // The REAL runner over two catalogues: the owner's open question on a title is never decided by the
-// other direction of the same run, nor of a later one (G1).
+// other direction of the same run, nor of a later one.
 
 const N = 42;
 const M = 43;

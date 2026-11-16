@@ -1,4 +1,4 @@
-// The sentences about what the worker does now (Ruling 20): the job running, and a mode change waiting.
+// The sentences about what the worker does now: the job running, and a mode change waiting.
 
 import type { Mode } from "../ext/settings";
 import type { Running } from "../sw/activity";

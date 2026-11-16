@@ -1,6 +1,6 @@
-// The record of the owner's last answer (D8): one `lastAnswer` in the settings, numbered so that the tab and
+// The record of the owner's last answer: one `lastAnswer` in the settings, numbered so that the tab and
 // the page tell a new outcome from the one they already showed. The settings are loaded first: unreadable
-// settings reject here and record nothing (Plan 3: never overwrite unreadable settings, the binding is in
+// settings reject here and record nothing (unreadable settings are never overwritten: the binding is in
 // them). A failure always carries its code, and only a failure does: the settings parser refuses any other
 // shape, so a bad record would make every later load fail.
 

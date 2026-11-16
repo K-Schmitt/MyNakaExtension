@@ -64,7 +64,8 @@ h1 {
   line-height: 28px;
 }
 
-h2 {
+h2,
+h3 {
   margin: 0 0 var(--mn-space-3);
   font: 600 var(--mn-text-title) var(--mn-font);
 }
@@ -87,7 +88,7 @@ details#handled,
   border-radius: var(--mn-radius-lg);
 }
 
-#status section {
+#simulation section {
   margin: var(--mn-space-3) 0 0;
   background: var(--mn-color-surface-raised);
 }
@@ -175,7 +176,7 @@ input[type="text"] {
   padding: var(--mn-space-1) var(--mn-space-2);
   background: var(--mn-color-bg);
   color: var(--mn-color-text);
-  border: 1px solid var(--mn-color-border);
+  border: 1px solid var(--mn-color-text-tertiary);
   border-radius: var(--mn-radius-sm);
   font: var(--mn-text-body) var(--mn-font);
 }
@@ -219,7 +220,74 @@ summary:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button {
+  button,
+  [role="switch"]::after {
     transition: none;
   }
+}
+
+/* The switch: a track and a thumb drawn by one pseudo-element, driven by aria-checked alone. */
+[role="switch"] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mn-space-3);
+}
+
+[role="switch"]::after {
+  content: "";
+  width: 40px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 1px solid var(--mn-color-text-tertiary);
+  border-radius: var(--mn-radius-pill);
+  background-color: var(--mn-color-bg);
+  background-image: radial-gradient(
+    circle,
+    var(--mn-color-text-secondary) 0 7px,
+    transparent 7.5px
+  );
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: left center;
+  transition:
+    background-position var(--mn-motion),
+    background-color var(--mn-motion);
+}
+
+[role="switch"][aria-checked="true"]::after {
+  background-color: var(--mn-color-accent);
+  border-color: var(--mn-color-accent);
+  background-image: radial-gradient(
+    circle,
+    var(--mn-color-on-accent) 0 7px,
+    transparent 7.5px
+  );
+  background-position: right center;
+}
+
+[role="switch"]:focus-visible {
+  outline: 2px solid var(--mn-color-accent-text);
+  outline-offset: 2px;
+}
+
+[role="tablist"] {
+  display: flex;
+  gap: var(--mn-space-2);
+  margin-bottom: var(--mn-space-4);
+  border-bottom: 1px solid var(--mn-color-border);
+}
+
+[role="tab"] {
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+[role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--mn-color-accent-text);
+  color: var(--mn-color-text);
+}
+
+[role="tabpanel"][hidden] {
+  display: none;
 }

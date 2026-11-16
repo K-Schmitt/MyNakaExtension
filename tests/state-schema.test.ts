@@ -394,14 +394,14 @@ describe("parseState and the titles of a question", () => {
   const messageOf = (state: unknown): string =>
     (rejection(state) as Error).message;
 
-  it("the exact 4a question parses and has no candidates", () => {
+  it("a question of an older version parses and has no candidates", () => {
     const state = withPending(q());
     const out = parseState(state);
     expect(out).toEqual(state);
     expect(out.pending[0]).not.toHaveProperty("candidates");
   });
 
-  it("the exact 4a removal parses", () => {
+  it("a removal of an older version parses", () => {
     const state = withPending({
       kind: "removal",
       removeFrom: "sc",

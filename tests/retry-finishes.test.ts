@@ -105,7 +105,7 @@ describe("cancelRetry", () => {
     expect(retriesOf(after as SyncState)).toEqual([]);
   });
 
-  // A3: a « garder » given on the pair while the finish waited is undone with the link.
+  // A « garder » given on the pair while the finish waited is undone with the link.
   it("forgets the pair's settled mark, and only that one", () => {
     const state = withEntry(linked({ settled: [p(5, 50), p(9, 90)] }), entry());
     const after = cancelRetry(state, "movie:5");

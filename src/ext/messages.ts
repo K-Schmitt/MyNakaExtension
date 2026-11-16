@@ -3,8 +3,8 @@
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
 import type { ContentIds, FinishSource } from "../core/finish-event";
+import { checkQuery } from "../core/search-query";
 import type { Thresholds } from "../core/watch-trigger";
-import { checkQuery } from "../naka/naka-input";
 import {
   FICHE_SENDERS,
   FICHE_TYPE_FLAGS,
@@ -93,7 +93,7 @@ export type NakaReplyError =
   | "unavailable"
   | "not-found";
 
-// `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
+// `value` is untrusted, whatever the parser did: the worker re-validates it with the Naka client's parsers.
 // It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReply =
   | { ok: true; value?: unknown }
@@ -329,11 +329,22 @@ function isNakaTop(sender: Sender): boolean {
   );
 }
 
-// The status page, with no tab or opened in a tab that shows the same page.
+// A url without its fragment (the status page puts its tab there). Nothing else is dropped.
+function withoutFragment(url: string): string {
+  const at = url.indexOf("#");
+  return at === -1 ? url : url.slice(0, at);
+}
+
+// The status page, with no tab or opened in a tab that shows the same page, fragment aside.
 function isStatusPage(sender: Sender, extensionId: string): boolean {
   const status = `chrome-extension://${extensionId}/status.html`;
-  if (sender.url !== status) return false;
-  return sender.tab === undefined || sender.tab.url === status;
+  if (sender.url === undefined || withoutFragment(sender.url) !== status) {
+    return false;
+  }
+  return (
+    sender.tab === undefined ||
+    (sender.tab.url !== undefined && withoutFragment(sender.tab.url) === status)
+  );
 }
 
 // Who sent a runtime message. The worker acts only for these two roles.

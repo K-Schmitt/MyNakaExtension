@@ -1,11 +1,10 @@
-// Every chrome.runtime message is untrusted. Ruling 8: the router parses it, then checks who sent it,
-// then whether that sender may send that type, and ignores (never answers) anything that fails a step.
-// Every job of the worker then runs on ONE queue, one at a time. `status` is no job (Ruling 20): it is
-// answered at once, outside the queue, from a read-only snapshot and the
-// activity kept here. `set-mode` and `set-settings` stay queued: a sync saves the settings it loaded. `rating-card` and
-// `rating-cards` are answered the same way (read-only). `rate` and `dismiss-rating` are queued jobs, answered
-// `{ ok: true }` at once: the tab reads a resolved send as "sent", and a listener that neither answers nor
-// keeps the channel may make Chrome reject the send.
+// Every chrome.runtime message is untrusted. The router parses it, then checks who sent it, then whether that
+// sender may send that type, and ignores (never answers) anything that fails a step. Every job of the worker
+// then runs on ONE queue, one at a time. `status` is no job: it is answered at once, outside the queue, from
+// a read-only snapshot and the activity kept here. `set-mode` and `set-settings` stay queued: a sync saves
+// the settings it loaded. `rating-card` and `rating-cards` are answered the same way (read-only). `rate` and
+// `dismiss-rating` are queued jobs, answered `{ ok: true }` at once: the tab reads a resolved send as "sent",
+// and a listener that neither answers nor keeps the channel may make Chrome reject the send.
 
 import { contentKeyOf } from "../core/finish-event";
 import {
@@ -32,8 +31,6 @@ import type { CardAnswer, CardsAnswer } from "./rating-answers";
 import { cardlessSendingOf, sendingOf } from "./rating-answers";
 import { createRetrySteps } from "./retry-steps";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
-
-export type { Respond };
 
 export type Router = {
   /** true when `respond` will be called later (Chrome keeps the channel open). */
@@ -82,7 +79,8 @@ export function createRouter(deps: RouterDeps): Router {
   const tabForgets = createForgetQueue(enqueue, (msg) =>
     jobs.forgetHandledFromTab(msg),
   );
-  // P3: the keys whose cancel is queued, with how many; the handled-titles answer omits them until the last job ends.
+  // The keys whose cancel is queued, with how many; the handled-titles answer omits them until the last job
+  // ends.
   const cancelling = new Map<string, number>();
   const cancelEnded = (key: string): void => {
     const left = (cancelling.get(key) ?? 1) - 1;

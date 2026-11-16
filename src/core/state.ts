@@ -1,4 +1,4 @@
-import type { Pair } from "./list-diff";
+import { type Pair, pairKey } from "./list-diff";
 import type { Presence } from "./presence";
 import type { RetryFinish } from "./retry-finishes";
 import type { TitleImage } from "./title-image";
@@ -31,11 +31,11 @@ export type PendingItem =
       side: Side;
       id: number;
       candidateIds: number[];
-      /** Dismissed from the home row (design §7). */
+      /** Dismissed from the home row: shown on the status page only. */
       asked?: true;
       /** The asked title, on its own side. */
       title?: string;
-      /** Absent: a question saved before 4b ("legacy"). When present, its ids are `candidateIds`. */
+      /** Absent: a question saved by an older version ("legacy"). When present, its ids are `candidateIds`. */
       candidates?: QuestionCandidate[];
       /** Content key of the latest finish waiting on this question (a naka-side question only). */
       finish?: string;
@@ -55,7 +55,7 @@ export type SyncState = {
   settled: Pair[];
   pending: PendingItem[];
   handled: string[];
-  /** The title of each handled key, written at finish time; absent for keys handled before B8b. */
+  /** The title of each handled key, written at finish time; absent for keys handled by an older version. */
   handledTitles?: Record<string, string>;
   /** Answers whose finish waits for a Naka tab, at most 20. */
   retryFinishes?: RetryFinish[];
@@ -68,8 +68,6 @@ export type SyncState = {
   /** Legacy: kept so stored states still parse; nothing reads it for a decision (see Settings.thresholds). */
   threshold: number;
 };
-
-const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
 export function samePair(a: Pair, b: Pair): boolean {
   return pairKey(a) === pairKey(b);

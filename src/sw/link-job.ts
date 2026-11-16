@@ -1,8 +1,8 @@
-// The owner links a title by hand from the status page (B6), and asks a legacy question again. A link takes
-// `otherId` from the message, the one place a message gives an id (Global Constraint): so the worker
+// The owner links a title by hand from the status page, and asks a legacy question again. A link takes
+// `otherId` from the message, the one place a message gives an id: so the worker
 // verifies before it saves. The title must be an unlinked entry or an open question (core/questions); BOTH
 // kinds are then read on both sites (the Naka item, the SensCritique product) and must be the same, a film
-// with a film or a série with a série. The write is local (D10), so no account is checked here: the
+// with a film or a série with a série. The write is local, so no account is checked here: the
 // follow-up finish of a waiting question checks its own binding, budget and pre-check. Both modes allow it.
 
 import type { FinishedMessage } from "../content/playback-tracker";
@@ -77,8 +77,12 @@ export async function linkTitleJob(
     );
     return "failed";
   }
-  await recordAnswer(deps.store, target, result.ending, deps.now());
-  if (result.finish !== undefined) await finishJob(deps, result.finish);
+  try {
+    await recordAnswer(deps.store, target, result.ending, deps.now());
+  } finally {
+    // The saved link resolved the question that held the finish: it is run even when the log threw.
+    if (result.finish !== undefined) await finishJob(deps, result.finish);
+  }
   return result.ending;
 }
 
@@ -92,7 +96,7 @@ async function dropped(
   return "done";
 }
 
-// « Reposer la question »: drops a question stored before 4b, so that the next sync asks it again (D1).
+// « Reposer la question »: drops a question stored by an older version, so that the next sync asks it again.
 export async function requeueJob(
   deps: Pick<JobDeps, "store" | "now">,
   msg: RequeueQuestionMessage,

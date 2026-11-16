@@ -10,6 +10,11 @@
 // start offers one "credits" finish per key, with its real progress, provided the start is at or past
 // CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither,
 // so a start is bound to the content playing when it arrives (none playing: it is ignored).
+//
+// An explicit « vu » counts for the content playing (same id, season and episode) once a sample of it has
+// counted in this context: a page script can post one for any id and pushState to any player URL. For any
+// other content (none playing, not yet sampled, another title, another episode, the whole series) it counts
+// only right after a real gesture on the page, and each « vu » uses up one gesture.
 
 import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
@@ -21,6 +26,7 @@ import {
   pastCredits,
 } from "./credits-starts";
 import type { PlayerContext } from "./page-events";
+import type { VideoSample } from "./video-sample";
 
 export type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
 
@@ -37,14 +43,16 @@ type Playing = { contentId: number; season?: number; episode?: number };
 
 type KeyState = { marks: Set<number>; watched: boolean; credits: boolean };
 
-type VideoSample = { currentTime: number; duration: number; src: string };
-
 type Reference = { src: string; duration: number };
 
 export type PlaybackTracker = {
   context(ctx: PlayerContext | undefined): void;
   sample(s: VideoSample): FinishedMessage | undefined;
-  watched(ev: PageEvent): FinishedMessage | undefined;
+  /** `takeGesture` uses up the last real gesture, for a title not playing only: true when it was recent enough (none given: false). */
+  watched(
+    ev: PageEvent,
+    takeGesture?: () => boolean,
+  ): FinishedMessage | undefined;
   /** Where the credits start, for the episode (or the film) the event names. */
   credits(ev: PageEvent): void;
   /** An unticked « vu »: that key can send its explicit finish again. */
@@ -99,6 +107,8 @@ export function createPlaybackTracker(): PlaybackTracker {
   let previousSrc: string | undefined;
   let lastSrc: string | undefined;
   let reference: Reference | undefined;
+  // A sample of the current context has counted: its content really plays.
+  let sampled = false;
 
   function stateOf(p: Playing): KeyState {
     const key = keyOf(p);
@@ -127,6 +137,7 @@ export function createPlaybackTracker(): PlaybackTracker {
     if (lastSrc !== undefined) previousSrc = lastSrc;
     lastSrc = undefined;
     reference = undefined;
+    sampled = false;
   }
 
   function isCurrentSrc(src: string): boolean {
@@ -155,6 +166,7 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (current === undefined || !isCurrentSrc(s.src)) return undefined;
       lastSrc = s.src;
       if (!isConsistent(s)) return undefined;
+      sampled = true;
       const state = stateOf(current);
       const progress = s.currentTime / s.duration;
       const reached = newMarks(state, progress);
@@ -177,12 +189,16 @@ export function createPlaybackTracker(): PlaybackTracker {
       const state = states.get(keyOf(idsOf(ev)));
       if (state !== undefined) state.watched = false;
     },
-    watched(ev) {
+    watched(ev, takeGesture = () => false) {
       if (ev.kind !== "watched") return undefined;
       const playing = idsOf(ev);
-      const state = stateOf(playing);
-      if (state.watched) return undefined;
-      state.watched = true;
+      if (states.get(keyOf(playing))?.watched === true) return undefined;
+      // A page script can name any id: the content playing, or one real gesture per other content.
+      const isPlaying =
+        sampled && current !== undefined && sameKey(current, playing);
+      // The playing title's « vu » leaves the gesture to an off-player « vu » that follows the same click.
+      if (!isPlaying && !takeGesture()) return undefined;
+      stateOf(playing).watched = true;
       return {
         type: "finished",
         source: "explicit",

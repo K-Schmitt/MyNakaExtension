@@ -29,7 +29,7 @@ const REMOVAL: RemovalOffer = {
   key: "removal:naka:21391:112240873",
   removeFrom: "naka",
   pair: { nakaId: 21391, scId: 112240873 },
-  title: "Un Job Mortel",
+  title: "Twin Peaks",
 };
 const AMBIG = (
   id: number,
@@ -94,7 +94,7 @@ describe("the questions of the home row", () => {
     const w = await arrived([], questionsOf(REMOVAL));
     const view = w.questionViewOf(REMOVAL.key);
     expect(view?.heading).toBe(
-      `«${NB}Un Job Mortel${NB}» a quitté tes envies SensCritique.`,
+      `«${NB}Twin Peaks${NB}» a quitté tes envies SensCritique.`,
     );
     expect(view?.question).toBe(`Retirer aussi de Ma liste Naka${NB}?`);
     expect(view?.choices.map((c) => c.label)).toEqual([
@@ -191,13 +191,13 @@ describe("answers from the row", () => {
 describe("the title of an offer", () => {
   it("an untitled removal gets its title from titleOf(21391)", async () => {
     const w = homeWorld();
-    w.state.titles.set(21391, "Un Job Mortel");
+    w.state.titles.set(21391, "Twin Peaks");
     w.state.questions = questionsOf({ ...REMOVAL, title: "" });
     createHomeBlock(w.ports).route("/");
     await flush();
     expect(w.calls).toContain("titleOf 21391");
     expect(w.questionViewOf(REMOVAL.key)?.heading).toContain(
-      `«${NB}Un Job Mortel${NB}»`,
+      `«${NB}Twin Peaks${NB}»`,
     );
   });
 
@@ -271,7 +271,7 @@ describe("leaving the home path", () => {
   });
 });
 
-describe("Ruling U1: a fresh grace for the entries that remain", () => {
+describe("a fresh grace for the entries that remain", () => {
   async function ratingsMoved() {
     const w = await arrived([A, B], questionsOf());
     await w.ready();
@@ -353,7 +353,7 @@ describe("Ruling U1: a fresh grace for the entries that remain", () => {
   });
 });
 
-describe("Ruling 27: an entry that redraws gives every other entry a fresh grace", () => {
+describe("an entry that redraws gives every other entry a fresh grace", () => {
   it("a rating entry locking: a click on its neighbour at 100 ms sends nothing, 400 ms after is taken", async () => {
     const w = await arrived([A, B], questionsOf());
     await w.ready();
@@ -423,7 +423,7 @@ describe("Ruling 27: an entry that redraws gives every other entry a fresh grace
   });
 });
 
-describe("Ruling 28 and 29: a question the worker is answering", () => {
+describe("a question the worker is answering", () => {
   it("a re-arrival opens it locked, with no button; a click sends nothing; it leaves once answered", async () => {
     const w = await arrived([], { questions: [Q1], answering: [Q1.key] });
     await w.ready();
@@ -471,7 +471,7 @@ describe("Ruling 28 and 29: a question the worker is answering", () => {
   });
 });
 
-describe("Ruling 30: a title lookup that never answers", () => {
+describe("a title lookup that never answers", () => {
   it("is given up after 2 s: the cards are shown, the question says « (titre inconnu) »", async () => {
     const w = homeWorld();
     w.ports.titleOf = () => new Promise<string | undefined>(() => {});
@@ -488,11 +488,11 @@ describe("Ruling 30: a title lookup that never answers", () => {
 
   it("a lookup that answers in time is kept, and its timer is cleared", async () => {
     const w = homeWorld();
-    w.state.titles.set(21391, "Un Job Mortel");
+    w.state.titles.set(21391, "Twin Peaks");
     w.state.questions = questionsOf({ ...REMOVAL, title: "" });
     createHomeBlock(w.ports).route("/");
     await flush();
-    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Un Job Mortel");
+    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Twin Peaks");
     expect(w.clock.count()).toBe(0);
   });
 });

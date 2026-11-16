@@ -1,7 +1,5 @@
-import type { Pair } from "./list-diff";
+import { type Pair, pairKey } from "./list-diff";
 import { type SyncState, setSnapshot } from "./state";
-
-export const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
 export function pendingRemovalPairs(state: SyncState): Pair[] {
   return state.pending.flatMap((item) =>

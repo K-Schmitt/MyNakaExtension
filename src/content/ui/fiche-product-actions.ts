@@ -1,12 +1,14 @@
-// The product's actions under Naka's info panel (spec §2, §6): « Voir sur SensCritique », an
+// The product's actions under Naka's info panel: « Voir sur SensCritique », an
 // `<a target="_blank">` to the validated product page, and « Annuler » or « Retirer la note » (the
 // protected-title line instead of the latter), then the write on its way and its ending. A series'
 // confirmation replaces them while it is shown, so its « Annuler » never sits by the undo one. Each button
-// acts on a trusted click only.
+// acts on a trusted click only; « Annuler », « Retirer la note » and the confirmation only while `watch` says
+// them visible.
 
 import type { FicheProduct } from "../../ext/fiche-answers";
 import type { FichePending, FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import {
   MA_LISTE_MISSED_LINE,
   PROTECTED_LINE,
@@ -21,10 +23,10 @@ import { outcomeLines, seriesConfirm } from "./fiche-rare-states";
 import { NOT_RATED_LINE, SENDING_LINE } from "./rating-copy";
 import {
   BUTTON_CLASS,
-  button,
   type Maker,
   row,
   textLine,
+  watchedButton,
 } from "./rating-render";
 
 const LINK_CLASS = `${BUTTON_CLASS} mn-link`;
@@ -57,14 +59,18 @@ function writeButton(
   doc: Maker,
   product: FicheProduct,
   handlers: FicheHandlers,
+  watch: RowWatch,
 ) {
   if (product.canUndo)
-    return [button(doc, UNDO_LABEL, BUTTON_CLASS, handlers.undo)];
+    return [watchedButton(doc, UNDO_LABEL, BUTTON_CLASS, watch, handlers.undo)];
   if (!product.canRemove) return [];
-  return [button(doc, REMOVE_LABEL, BUTTON_CLASS, handlers.remove)];
+  return [
+    watchedButton(doc, REMOVE_LABEL, BUTTON_CLASS, watch, handlers.remove),
+  ];
 }
 
-/** The worker's word (decision 6); « Annuler » stays offered over it, since it never loses a critique. */
+/** The worker's word on a critique or a recommendation; « Annuler » stays offered over it, since it never
+ * loses a critique. */
 function showsProtected(product: FicheProduct): boolean {
   return product.protected && !product.canUndo;
 }
@@ -89,11 +95,15 @@ export function productActions(
   view: FicheView,
   product: FicheProduct,
   handlers: FicheHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
-  if (view.pending === "confirm-series") return seriesConfirm(doc, handlers);
+  if (view.pending === "confirm-series") {
+    return seriesConfirm(doc, handlers, watch);
+  }
+  const writes = writeButton(doc, product, handlers, watch);
   const buttons = [
     ...(product.url === undefined ? [] : [scLink(doc, product.url)]),
-    ...writeButton(doc, product, handlers).map((el) => disabledWhile(view, el)),
+    ...writes.map((el) => disabledWhile(view, el)),
   ];
   return [
     ...(buttons.length > 0 ? [row(doc, buttons)] : []),

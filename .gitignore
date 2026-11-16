@@ -36,3 +36,6 @@ AGENTS.md
 .cursor/
 .aider*
 .mcp.json
+
+# Decision log, kept local
+NOTES.md

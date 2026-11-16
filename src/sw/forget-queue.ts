@@ -5,7 +5,7 @@
 import { contentKeyOf } from "../core/finish-event";
 import type { ForgetHandledMessage } from "../ext/page-messages";
 
-export const MAX_QUEUED_FORGETS = 20;
+const MAX_QUEUED_FORGETS = 20;
 
 export type ForgetQueue = (msg: ForgetHandledMessage) => void;
 

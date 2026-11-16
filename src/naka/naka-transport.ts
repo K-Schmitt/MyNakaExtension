@@ -4,7 +4,7 @@
 // to BASE, with the browser's default credentials. It is never put in a URL, a body, an error message or a
 // log. Error messages carry the operation label and the HTTP status only: a response body may hold data.
 
-import type { Fetch } from "../sc/sc-client";
+import type { Fetch } from "../core/fetch-type";
 import { NakaUnavailableError } from "./naka-errors";
 
 export type NakaDeps = { fetch: Fetch; token: () => string | undefined };

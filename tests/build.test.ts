@@ -11,6 +11,13 @@ const FILES = [
   "status.js",
 ];
 
+const ICONS = [
+  "icons/icon-16.png",
+  "icons/icon-32.png",
+  "icons/icon-48.png",
+  "icons/icon-128.png",
+];
+
 function out(name: string): string {
   return readFileSync(`dist/${name}`, "utf8");
 }
@@ -35,6 +42,12 @@ describe("build", () => {
   it("keeps console.log out of every output file", () => {
     for (const name of FILES) {
       expect(out(name), name).not.toContain("console.log");
+    }
+  });
+
+  it("copies the four icon PNGs into dist/icons/", () => {
+    for (const name of ICONS) {
+      expect(existsSync(`dist/${name}`), name).toBe(true);
     }
   });
 });

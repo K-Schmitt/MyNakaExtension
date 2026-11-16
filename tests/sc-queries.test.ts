@@ -13,7 +13,6 @@ const QUERIES = [
   "UserCollection",
   "ProductCurrentUserInfos",
   "SearchProductExplorer",
-  "SearchAutocomplete",
 ] as const;
 
 function balanced(text: string, open: string, close: string): boolean {

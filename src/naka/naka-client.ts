@@ -4,8 +4,9 @@
 // cached. The token lives in a local variable of that call and goes only to naka-transport's `send`, in the
 // `authorization` header. See naka-transport.ts for the rules on the wire and in error messages.
 
+import { checkQuery } from "../core/search-query";
 import { NakaUnavailableError } from "./naka-errors";
-import { checkContentId, checkQuery } from "./naka-input";
+import { checkContentId } from "./naka-input";
 import { type NakaItem, toItem, toItems, toPlaylistIds } from "./naka-items";
 import { type NakaSeasons, toSeasons } from "./naka-seasons";
 import {
@@ -17,11 +18,10 @@ import {
   send,
 } from "./naka-transport";
 
-export type { Fetch } from "../sc/sc-client";
+export type { Fetch } from "../core/fetch-type";
 export { NakaUnavailableError } from "./naka-errors";
 export type { NakaItem } from "./naka-items";
 export type { NakaSeasons } from "./naka-seasons";
-export type { NakaDeps } from "./naka-transport";
 
 export type NakaClient = {
   playlistIds(): Promise<number[]>;
@@ -93,7 +93,12 @@ async function contentById(
     }
     throw error;
   }
-  const item = toItem(unwrap(parseJson(text, "content")));
+  // A 200 that holds no entry is unreadable, not « not in the catalogue » (that is the 404 above).
+  const entry = unwrap(parseJson(text, "content"));
+  if (!isRecord(entry)) {
+    throw new NakaUnavailableError("Naka content: unexpected response");
+  }
+  const item = toItem(entry);
   if (item !== undefined && item.contentId !== contentId) {
     throw new NakaUnavailableError("Naka content: unexpected item");
   }

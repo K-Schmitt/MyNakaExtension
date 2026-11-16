@@ -96,6 +96,15 @@ describe("matching on SensCritique", () => {
     expect(w.saved).toEqual([]);
   });
 
+  it("searches once when the original title is the title", async () => {
+    const same = film({ titled: { ...FILM_TITLE, originalTitle: "Le Film" } });
+    const w = world({ search: { "Le Film": [] } });
+    expect(await handleFinish(same, w.ports, DEFAULT_THRESHOLDS)).toEqual({
+      kind: "not-found",
+    });
+    expect(searches(w.calls)).toEqual(["searchSc:Le Film"]);
+  });
+
   it("a candidate listed twice is one candidate", async () => {
     const c = cand(FILM_SC, FILM_TITLE);
     const w = world({ search: { "Le Film": [c, c] } });
