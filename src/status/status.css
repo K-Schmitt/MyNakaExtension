@@ -64,7 +64,8 @@ h1 {
   line-height: 28px;
 }
 
-h2 {
+h2,
+h3 {
   margin: 0 0 var(--mn-space-3);
   font: 600 var(--mn-text-title) var(--mn-font);
 }
