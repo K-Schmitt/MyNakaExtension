@@ -10,6 +10,9 @@
 // start offers one "credits" finish per key, with its real progress, provided the start is at or past
 // CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither,
 // so a start is bound to the content playing when it arrives (none playing: it is ignored).
+//
+// An explicit « vu » counts only for the content playing (same id, season and episode): a page script can
+// post one for any id. None playing, another title, another episode or the whole series: it is ignored.
 
 import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
@@ -180,6 +183,8 @@ export function createPlaybackTracker(): PlaybackTracker {
     watched(ev) {
       if (ev.kind !== "watched") return undefined;
       const playing = idsOf(ev);
+      // A page script can name any id: only the content the player plays may finish (F1).
+      if (current === undefined || !sameKey(current, playing)) return undefined;
       const state = stateOf(playing);
       if (state.watched) return undefined;
       state.watched = true;

@@ -331,12 +331,16 @@ describe("keys", () => {
       kind: "watched",
       contentId,
     });
-    for (let id = 1; id <= 200; id += 1) t.watched(ev(id));
-    expect(t.watched(ev(2))).toBeUndefined();
-    expect(t.watched(ev(1))).toBeUndefined();
-    t.watched(ev(201));
-    expect(t.watched(ev(1))).toBeDefined();
-    expect(t.watched(ev(3))).toBeUndefined();
+    const watchedPlaying = (id: number) => {
+      t.context({ contentId: id, mediaType: "movie" });
+      return t.watched(ev(id));
+    };
+    for (let id = 1; id <= 200; id += 1) watchedPlaying(id);
+    expect(watchedPlaying(2)).toBeUndefined();
+    expect(watchedPlaying(1)).toBeUndefined();
+    watchedPlaying(201);
+    expect(watchedPlaying(1)).toBeDefined();
+    expect(watchedPlaying(3)).toBeUndefined();
   });
 });
 
@@ -353,7 +357,8 @@ describe("unwatched", () => {
   });
 
   it("leaves the other keys alone", () => {
-    const t = film();
+    const t = createPlaybackTracker();
+    t.context({ contentId: 6, mediaType: "movie" });
     t.watched({ ...ev, contentId: 6 });
     t.unwatched(off);
     expect(t.watched({ ...ev, contentId: 6 })).toBeUndefined();
@@ -385,8 +390,9 @@ describe("watched", () => {
     expect(t.watched(ev)).toBeUndefined();
   });
 
-  it("carries season and episode", () => {
+  it("carries season and episode of the episode playing", () => {
     const t = createPlaybackTracker();
+    t.context(EP);
     expect(t.watched({ ...ev, contentId: 9, season: 1, episode: 2 })).toEqual({
       type: "finished",
       source: "explicit",
@@ -397,19 +403,72 @@ describe("watched", () => {
     });
   });
 
-  it("a different episode is a new key", () => {
+  it("a different episode, once playing, is a new key", () => {
     const t = createPlaybackTracker();
-    expect(t.watched({ ...ev, season: 1, episode: 1 })).toBeDefined();
-    expect(t.watched({ ...ev, season: 1, episode: 2 })).toBeDefined();
-    expect(t.watched({ ...ev, season: 2, episode: 1 })).toBeDefined();
-    expect(
-      t.watched({ ...ev, contentId: 6, season: 1, episode: 1 }),
-    ).toBeDefined();
-    expect(t.watched({ ...ev, season: 1, episode: 1 })).toBeUndefined();
+    const playing = (contentId: number, season: number, episode: number) => {
+      t.context({ contentId, mediaType: "tv", season, episode });
+      return t.watched({ ...ev, contentId, season, episode });
+    };
+    expect(playing(5, 1, 1)).toBeDefined();
+    expect(playing(5, 1, 2)).toBeDefined();
+    expect(playing(5, 2, 1)).toBeDefined();
+    expect(playing(6, 1, 1)).toBeDefined();
+    expect(playing(5, 1, 1)).toBeUndefined();
   });
 
-  it("does not depend on a playback context", () => {
-    expect(createPlaybackTracker().watched(ev)).toBeDefined();
+  it("ignores a vu for a title that is not the one playing (forged id)", () => {
+    const t = film();
+    expect(t.watched({ ...ev, contentId: 4242 })).toBeUndefined();
+  });
+
+  it("a forged vu for another title does not use up the playing title's vu", () => {
+    const t = film();
+    t.watched({ ...ev, contentId: 4242 });
+    expect(t.watched(ev)?.source).toBe("explicit");
+  });
+
+  it("ignores a vu when nothing plays", () => {
+    expect(createPlaybackTracker().watched(ev)).toBeUndefined();
+  });
+
+  it("ignores a vu of the title just left when the player is closed", () => {
+    const t = film();
+    t.context(undefined);
+    expect(t.watched(ev)).toBeUndefined();
+  });
+
+  it("ignores the previous episode's vu once the player moved to the next one", () => {
+    const t = createPlaybackTracker();
+    t.context(EP);
+    t.context({ ...EP, episode: 3 });
+    expect(t.watched({ ...ev, contentId: 9, season: 1, episode: 2 })).toBe(
+      undefined,
+    );
+    expect(t.watched({ ...ev, contentId: 9, season: 1, episode: 3 })).toEqual({
+      type: "finished",
+      source: "explicit",
+      progress: 1,
+      contentId: 9,
+      season: 1,
+      episode: 3,
+    });
+  });
+
+  it("ignores a vu of the whole series or of another episode while an episode plays", () => {
+    const t = createPlaybackTracker();
+    t.context(EP);
+    expect(t.watched({ ...ev, contentId: 9 })).toBeUndefined();
+    expect(
+      t.watched({ ...ev, contentId: 9, season: 1, episode: 5 }),
+    ).toBeUndefined();
+    expect(
+      t.watched({ ...ev, contentId: 9, season: 2, episode: 2 }),
+    ).toBeUndefined();
+  });
+
+  it("ignores an episode's vu while a film with the same id plays", () => {
+    const t = film();
+    expect(t.watched({ ...ev, season: 1, episode: 1 })).toBeUndefined();
   });
 
   it("ignores a playlist event", () => {
