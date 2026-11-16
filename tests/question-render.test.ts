@@ -5,7 +5,13 @@ import {
   questionView,
 } from "../src/content/ui/question-view";
 import type { AmbiguityOffer, RemovalOffer } from "../src/sw/question-offers";
-import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  FakeShadow,
+} from "./ui-fakes";
 
 const NB = "\u202F";
 const OFFER: AmbiguityOffer = {
@@ -28,7 +34,7 @@ function setup(view: QuestionView) {
   const doc = new FakeDoc();
   const root = new FakeShadow();
   const handlers = { onChoose: vi.fn(), onAction: vi.fn() };
-  renderQuestion(doc, root, view, handlers);
+  renderQuestion(doc, root, view, handlers, COUNTS);
   const all = descendants(root);
   const buttons = all.filter((el) => el.tag === "button");
   return { root, handlers, all, buttons };

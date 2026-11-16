@@ -112,7 +112,7 @@ describe("the player block's stars and confirmation (D7)", () => {
     expect(h.onChoose).toHaveBeenCalledWith(3);
   });
 
-  it("a redraw watches only the rows it drew, a question drawn instead none, and hide none", () => {
+  it("a redraw watches only the rows it drew (a question instead: its candidates only), and hide none", () => {
     const p = player();
     p.ui.show(FILM(), handlers());
     p.ui.show(CONFIRM(), handlers());
@@ -122,7 +122,9 @@ describe("the player block's stars and confirmation (D7)", () => {
       onChoose: vi.fn(),
       onAction: vi.fn(),
     });
-    expect(p.v.observed.size).toBe(0);
+    expect([...p.v.observed]).toEqual(
+      buttonsOf(p.root()).filter((b) => b.textContent?.startsWith("Une série")),
+    );
     p.ui.show(FILM(), handlers());
     expect(p.v.observed.size).toBe(1);
     p.ui.hide();

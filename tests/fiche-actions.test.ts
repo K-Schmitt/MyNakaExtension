@@ -691,7 +691,7 @@ describe("the write buttons and the actions' visibility (D7, owner's decision 20
   const slotOf = (t: Awaited<ReturnType<typeof film>>, label: string) => {
     const el = buttonNamed(actionParts(t), label);
     // The watched element is the button itself (or, for the confirmation, its row).
-    const i = t.stars.rows.findIndex((row) => row === el);
+    const i = t.stars.rows.indexOf(el as FakeElement);
     return t.stars.slots[i];
   };
 
@@ -732,5 +732,24 @@ describe("the write buttons and the actions' visibility (D7, owner's decision 20
     expect(second).not.toBe(first);
     t.controller.path("/");
     expect(t.stars.released).toContain(second);
+  });
+
+  it("a candidate to link sends nothing while reported hidden, and links once visible; a redraw stops watching it", async () => {
+    const t = await film({
+      state: "choose",
+      candidates: [{ id: 71, title: "Solaris", year: 2002, type: "film" }],
+    });
+    const choice = () =>
+      actionParts(t).find((p) => p.className.split(" ").includes("mn-choice"));
+    const watched = choice();
+    const i = t.stars.rows.indexOf(watched as FakeElement);
+    expect(i).toBeGreaterThanOrEqual(0);
+    t.stars.hidden = true;
+    choice()?.click(true);
+    expect(t.ofType("fiche-link")).toEqual([]);
+    t.stars.hidden = false;
+    choice()?.click(true);
+    expect(t.ofType("fiche-link")).toHaveLength(1);
+    expect(t.stars.released).toContain(t.stars.slots[i]);
   });
 });
