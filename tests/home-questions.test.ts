@@ -271,7 +271,7 @@ describe("leaving the home path", () => {
   });
 });
 
-describe("Ruling U1: a fresh grace for the entries that remain", () => {
+describe("a fresh grace for the entries that remain", () => {
   async function ratingsMoved() {
     const w = await arrived([A, B], questionsOf());
     await w.ready();
@@ -353,7 +353,7 @@ describe("Ruling U1: a fresh grace for the entries that remain", () => {
   });
 });
 
-describe("Ruling 27: an entry that redraws gives every other entry a fresh grace", () => {
+describe("an entry that redraws gives every other entry a fresh grace", () => {
   it("a rating entry locking: a click on its neighbour at 100 ms sends nothing, 400 ms after is taken", async () => {
     const w = await arrived([A, B], questionsOf());
     await w.ready();
@@ -423,7 +423,7 @@ describe("Ruling 27: an entry that redraws gives every other entry a fresh grace
   });
 });
 
-describe("Ruling 28 and 29: a question the worker is answering", () => {
+describe("a question the worker is answering", () => {
   it("a re-arrival opens it locked, with no button; a click sends nothing; it leaves once answered", async () => {
     const w = await arrived([], { questions: [Q1], answering: [Q1.key] });
     await w.ready();
@@ -471,7 +471,7 @@ describe("Ruling 28 and 29: a question the worker is answering", () => {
   });
 });
 
-describe("Ruling 30: a title lookup that never answers", () => {
+describe("a title lookup that never answers", () => {
   it("is given up after 2 s: the cards are shown, the question says « (titre inconnu) »", async () => {
     const w = homeWorld();
     w.ports.titleOf = () => new Promise<string | undefined>(() => {});

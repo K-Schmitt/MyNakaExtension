@@ -21,7 +21,7 @@ import { UNIVERSE } from "../src/sc/sc-queries";
 // Model-based fuzz of the finish handler and the REAL runSync on one world. The
 // owner edits both lists, writes, reads and saves fail on both handlers, and the
 // Plan-3 answers arrive between steps: removals (keep, remove, no effect,
-// asked) and the owner's choice on any open question, made as Plan 3's contract
+// asked) and the owner's choice on any open question, made as the answer contract
 // says (one save: the chosen pair upserted, every open question about the same
 // Naka id or the same SensCritique id resolved), followed by the explicit
 // replay of the stored finish.
@@ -42,7 +42,7 @@ import { UNIVERSE } from "../src/sc/sc-queries";
 // product) with an open SensCritique-side question.
 // State invariant: after every run and every finish, no mapped pair has an open
 // question on its Naka id or on its SensCritique id.
-// Answers follow Plan 3's amended contract: "none of these" keeps the question
+// Answers follow the amended answer contract: "none of these" keeps the question
 // open with no candidate, and the chosen ids leave the other questions'
 // candidates, a question left with none staying open.
 
@@ -153,7 +153,7 @@ async function simulate(seed: number): Promise<string[]> {
       }
       log.push(`run addToSc ${id}`);
       flaky(0.2, "addToSc");
-      // Plan 3 reads the product state first and never wishes a product already done.
+      // The live writer reads the product state first and never wishes a product already done.
       if (done.has(id)) return "already-done";
       lists.sc.add(id);
       return "added";
@@ -334,7 +334,7 @@ async function simulate(seed: number): Promise<string[]> {
     }
   };
 
-  // Plan 3's contract: ONE save that upserts the chosen pair and resolves every
+  // The answer contract: ONE save that upserts the chosen pair and resolves every
   // open ambiguity about the same Naka id or the same SensCritique id.
   const answerAmbiguity = async (
     item: PendingItem & { kind: "ambiguity" },

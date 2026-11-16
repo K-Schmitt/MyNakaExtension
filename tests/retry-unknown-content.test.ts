@@ -1,6 +1,6 @@
 // A waiting finish played again whose content Naka no longer knows (404 on /browse/{id}), or knows as
 // another kind: it is recorded as the last finish, failed with naka-content-unknown, under its question's
-// title, and its entry leaves retryFinishes (owner decision D1, option b).
+// title, and its entry leaves retryFinishes (the owner's decision).
 
 import { describe, expect, it } from "vitest";
 import { handledTitles, waitingTitles } from "../src/core/handled-titles";
@@ -26,7 +26,7 @@ const entry = (id: number, title?: string): RetryFinish => ({
   },
   at: NOW - 5000,
 });
-// A question saved before 4b: no title and no candidates.
+// A question saved by an older version: no title and no candidates.
 const legacy = (id: number): RetryFinish => {
   const { candidates: _gone, ...question } = entry(id).question;
   return { ...entry(id), question };

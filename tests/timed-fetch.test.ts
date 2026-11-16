@@ -118,7 +118,7 @@ async function expectTimeout(promise: Promise<unknown>): Promise<void> {
   expect(strings(error).join(" ")).not.toContain("T0K3N");
 }
 
-describe("a request its timer aborted (K4)", () => {
+describe("a request its timer aborted", () => {
   const TOKEN_INIT: Init = { ...INIT, headers: { authorization: "T0K3N" } };
 
   it("the scan sees the token in what the fetch threw (control)", () => {

@@ -352,7 +352,7 @@ describe("the Naka tab", () => {
   });
 
   // The poll sees the page leave and come back between two samples: the source played before the
-  // change is then stale (B8, Ruling 10), so it completes nothing; a sampler alone would not notice.
+  // change is then stale, so it completes nothing; a sampler alone would not notice.
   it("the URL poll follows the page between samples", () => {
     const t = tab(PLAYER(3));
     t.page.video = { currentTime: 10, duration: 6000, src: "blob:a" };

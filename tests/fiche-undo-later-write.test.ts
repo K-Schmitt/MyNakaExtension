@@ -6,7 +6,7 @@ import { answerWorld, BOUND } from "./answer-world";
 import { filmTitle, linkedTo, TAB } from "./fiche-fixtures";
 import { filmCard, target } from "./rating-fixtures";
 
-// The title page's undo record is the last rating of the title (spec 8 §2): a later write of the same
+// The title page's undo record is the last rating of the title only: a later write of the same
 // content from another surface clears it, so « Annuler » cannot erase that newer rating on SensCritique.
 
 const LIVE: Settings = { mode: "live", binding: BOUND };

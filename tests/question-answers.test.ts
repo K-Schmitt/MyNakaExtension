@@ -284,7 +284,7 @@ describe("answerRemovalOffer", () => {
     expect((await offerOf(state)).offer).toBeNull();
   });
 
-  it("is not offered for a stale snapshot pair: Naka's presence ended at run 6 of 8 (fuzz seed 4312)", async () => {
+  it("is not offered for a stale snapshot pair: Naka's presence ended at run 6 of 8 (a case a fuzz test found)", async () => {
     const state = mappedAt5({
       run: 8,
       presence: {

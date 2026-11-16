@@ -199,7 +199,7 @@ describe("tab selection", () => {
     expect(strings(error).join("|")).not.toContain(MARKER);
   });
 
-  // Ruling 17: a closed tab, or a content script gone after an extension reload.
+  // A closed tab, or a content script gone after an extension reload.
   it("maps a failing send to JobRejected(no-naka-tab), without its text", async () => {
     const port: TabsPort = {
       query: async () => [{ id: 1 }],
@@ -216,7 +216,7 @@ describe("tab selection", () => {
   });
 });
 
-// Ruling 20: a tab with no content script (opened before the install, or after an extension reload)
+// A tab with no content script (opened before the install, or after an extension reload)
 // rejects its send. A proxy is one job's: it pins the first tab that answers, for every later call.
 describe("pinning the first tab that answers", () => {
   const DEAD = new Error(`Receiving end does not exist. ${MARKER}`);

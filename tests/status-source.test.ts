@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Every way to turn a string into markup (Ruling 19). The page writes remote text (titles, the
+// Every way to turn a string into markup. The page writes remote text (titles, the
 // SensCritique username) with textContent only; no source of the extension may use any of these.
 const HTML_SINKS =
   /innerHTML|outerHTML|insertAdjacentHTML|document\.write|DOMParser|createContextualFragment|setHTMLUnsafe|srcdoc/g;

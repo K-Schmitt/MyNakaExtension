@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-// The service worker entry against a fake `chrome`: what it binds, and how (Ruling 9).
+// The service worker entry against a fake `chrome`: what it binds, and how.
 const EXT = "abcdefghijklmnopabcdefghijklmnop";
 const PLAYER = "https://naka.cx/player?id=3&type=movie";
 const NAKA_TAB = { id: EXT, url: PLAYER, frameId: 0, tab: { url: PLAYER } };
@@ -165,7 +165,7 @@ describe("service worker entry", () => {
   });
 });
 
-// M8: the toolbar button opens the status page, which is the extension's options page.
+// The toolbar button opens the status page, which is the extension's options page.
 describe("the toolbar button", () => {
   it("one click opens the status page once", async () => {
     expect(clicks).toHaveLength(1);

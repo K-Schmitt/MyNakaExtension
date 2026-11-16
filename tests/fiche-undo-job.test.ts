@@ -318,7 +318,7 @@ describe("fiche-undo, end to end after a series rating", () => {
     expect(w.cards()).toEqual([episode]);
   });
 
-  it("not seen but rated before (R1): undone, then the old rating", async () => {
+  it("not seen but rated before: undone, then the old rating", async () => {
     const sc: Sc = { now: { rating: 4 } };
     const w = seriesWorld(sc, []);
     await w.registry.open(TAB, 5, seriesTitle(13), []);
@@ -512,7 +512,7 @@ describe("fiche-undo: « Ma liste »", () => {
   });
 });
 
-describe("fiche-undo: « Ma liste » when the button was not on screen at the rating (R10)", () => {
+describe("fiche-undo: « Ma liste » when the button was not on screen at the rating", () => {
   /** « Ma liste » as the client changes it: the film listed, then removed by the rating. */
   function listedWorld(sc: Sc, o: WorldOpts = {}) {
     let list = [5];

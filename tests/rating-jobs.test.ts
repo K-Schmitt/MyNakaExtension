@@ -665,7 +665,7 @@ describe("rate", () => {
     expect(w.nk.calls).toEqual([]);
   });
 
-  it("a content already handled whose card is gone is rated from a card rebuilt read-only (Ruling L2)", async () => {
+  it("a content already handled whose card is gone is rated from a card rebuilt read-only", async () => {
     const w = world();
     await w.jobs.finishJob(finished());
     w.area.data.delete("ratings");
@@ -739,7 +739,7 @@ describe("rate", () => {
   });
 });
 
-describe("rate: the binding is checked before the write (Plan 3)", () => {
+describe("rate: the binding is checked before the write", () => {
   it("another SensCritique account: no ProductRate, the failure is stored", async () => {
     const w = world({ settings: { mode: "live", binding: BOUND } });
     await w.jobs.finishJob(finished());
@@ -794,7 +794,7 @@ describe("rate: the binding is checked before the write (Plan 3)", () => {
   });
 });
 
-describe("rate a handled title that has no card (Ruling L2)", () => {
+describe("rate a handled title that has no card", () => {
   const FILM_PAIR = { nakaId: FILM, scId: 1003 };
   const SERIES_PAIR = { nakaId: SERIES, scId: 1007 };
   const LAST: Settings["lastFinish"] = {
@@ -802,7 +802,7 @@ describe("rate a handled title that has no card (Ruling L2)", () => {
     key: "movie:3",
     outcome: "done",
   };
-  // Finished under Plan 3, or before its card existed: handled, mapped, no card.
+  // Finished by an older version, or before its card existed: handled, mapped, no card.
   function handled(
     o: Opts,
     keys: string[],
@@ -905,7 +905,7 @@ describe("rate a handled title that has no card (Ruling L2)", () => {
     });
   });
 
-  it("a forged rate for a key that is NOT handled takes 4a's path: the explicit finish, its budget, then the rate", async () => {
+  it("a forged rate for a key that is NOT handled takes the cardless path: the explicit finish, its budget, then the rate", async () => {
     const w = handled({}, []);
     await w.jobs.rate(rate("film", 8));
     expect(writesOf(w.sk.calls)).toEqual([

@@ -38,7 +38,7 @@ export function violation(w: World, what: string): void {
   w.violations.push(`seed ${w.seed}: ${what} | ${w.log.slice(-12).join("; ")}`);
 }
 
-// Plan 2's re-wish oracle: from now on, no run may wish this film again.
+// The re-wish oracle: from now on, no run may wish this film again.
 export function guard(w: World, id: number, why: string): void {
   w.guarded.set(id, why);
   w.stats.guards += 1;
@@ -73,7 +73,7 @@ export function checkBinding(w: World, what: string): void {
   if (otherSc || otherNaka) violation(w, `${what} after a binding mismatch`);
 }
 
-// Oracles of a list write (a wish, a playlist add): live mode only, the binding, Plan 2's re-add and re-wish.
+// Oracles of a list write (a wish, a playlist add): live mode only, the binding, the sync's re-add and re-wish rules.
 export function checkListWrite(w: World, side: Side, id: number): void {
   w.stats.liveWrites += 1;
   if ((settingsOf(w)?.mode ?? "simulation") !== "live") {
@@ -93,7 +93,7 @@ export function checkListWrite(w: World, side: Side, id: number): void {
 }
 
 // The status answers in flight. AsyncLocalStorage follows an answer's own promise chain and no other, so
-// a storage write made inside it is the answer's, whatever job runs meanwhile (Ruling 20).
+// a storage write made inside it is the answer's, whatever job runs meanwhile.
 export const answering = new AsyncLocalStorage<true>();
 
 // Oracle O12: a status answer never writes storage.
@@ -102,7 +102,7 @@ export function checkStatusWrite(w: World, keys: string[]): void {
     violation(w, `a status answer wrote ${keys.join(",")}`);
 }
 
-// Oracle O10 (Ruling 17): once the job's pinned tab refused a send, or every tab it found did, its tab is
+// Oracle O10: once the job's pinned tab refused a send, or every tab it found did, its tab is
 // lost, and the job calls the tabs no more, but for the one query that classifies a pinned tab's loss.
 export function checkTabCall(w: World): void {
   if (w.current?.tabLost)
@@ -121,7 +121,7 @@ export function checkQueryCall(w: World): void {
   checkQuery(w);
 }
 
-// Oracle O11 (Rulings 9 and 20): a job finds its tabs, tries them in their query order until one
+// Oracle O11: a job finds its tabs, tries them in their query order until one
 // answers, and then sends to that pinned tab only, with no new lookup. A lost tab is O10's.
 export function checkQuery(w: World): void {
   const ctx = w.current;

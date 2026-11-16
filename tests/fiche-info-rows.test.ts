@@ -247,7 +247,7 @@ describe("the SensCritique rows in Naka's info panel", () => {
     expect(t.watching()).toBe(false);
   });
 
-  it("leave no separate block: the step 7 panel modules are gone", () => {
+  it("leave no separate block: the old panel modules are gone", () => {
     expect(existsSync("src/content/ui/fiche-panel.ts")).toBe(false);
     expect(existsSync("src/content/ui/fiche-panel-block.ts")).toBe(false);
   });

@@ -107,7 +107,7 @@ const removal = (removeFrom: "naka" | "sc", pair: Pair): PendingItem => ({
   title: `Film ${removeFrom === "naka" ? pair.nakaId : pair.scId - 1000}`,
 });
 
-// Plan 3's answer (contract): ONE save that upserts the chosen pair and resolves every open ambiguity
+// The answer contract: ONE save that upserts the chosen pair and resolves every open ambiguity
 // about the same Naka id or the same SensCritique id.
 function answer(state: SyncState, pair: Pair): SyncState {
   const about = (item: PendingItem): boolean =>
@@ -161,9 +161,9 @@ describe("a pair seen together before it was mapped", () => {
 
   it.each([
     ["a run happens before the answer", true],
-    ["the answer comes before any run (probe P3)", false],
+    ["the answer comes before any run", false],
   ])(
-    "P3: an open question delays the mapping, the owner removes 1005, %s: a question, no write",
+    "an open question delays the mapping, the owner removes 1005, %s: a question, no write",
     async (_name, runBetween) => {
       const { w, ports } = world({
         naka: [5],
@@ -332,7 +332,7 @@ describe("the owner's latest action wins: additions", () => {
 });
 
 describe("each id is judged by its current period (amendment 1)", () => {
-  it("C1: an absent id keeps its interval: a truthful re-pairing with a homonym it was seen with is a question", async () => {
+  it("an absent id keeps its interval: a truthful re-pairing with a homonym it was seen with is a question", async () => {
     // Naka 1 and Naka 2 are homonyms; SensCritique 1001 is really Naka 2's product, but the resolver
     // maps it to Naka 1 first and asks about Naka 2.
     const pair2 = { nakaId: 2, scId: 1001 };
@@ -348,7 +348,7 @@ describe("each id is judged by its current period (amendment 1)", () => {
     expect(await runSync(ports)).toEqual(report({ pendingRemovals: 1 }));
     const removed = w.state.pending.find((i) => i.kind === "removal");
     if (!removed) throw new Error("expected the removal question");
-    // The owner answers "remove" (Plan 3 removes Naka 1), then "Naka 2 is 1001".
+    // The owner answers "remove" (the answer removes Naka 1), then "Naka 2 is 1001".
     w.naka.delete(1);
     w.state = answer(resolvePending(w.state, removed), pair2);
     const r = await runSync(ports);
@@ -359,7 +359,7 @@ describe("each id is judged by its current period (amendment 1)", () => {
     expect(r).toEqual(report({ pendingRemovals: 1 }));
   });
 
-  it("C2: a pair seen together, removed from both lists, then re-added on Naka and mapped in that run is an addition", async () => {
+  it("a pair seen together, removed from both lists, then re-added on Naka and mapped in that run is an addition", async () => {
     const { w, ports } = world({
       naka: [5],
       sc: [1005],
@@ -384,8 +384,8 @@ describe("each id is judged by its current period (amendment 1)", () => {
 describe("a late-mapped pair is snapshotted as if mapped all along", () => {
   // Runs 1-2: both titles listed. Run 3: film 5 gone from Naka, 1005 still wished. Before run 4 the
   // owner re-adds 5 AND removes 1005; run 4 maps the pair (or it was mapped from the start).
-  // `extraRuns`: runs after the gap that still cannot map it (delayed P7).
-  async function p7(mappedFromStart: boolean, extraRuns = 0) {
+  // `extraRuns`: runs after the gap that still cannot map it (a delayed swap).
+  async function lateMappedSwap(mappedFromStart: boolean, extraRuns = 0) {
     const { w, ports } = world({
       naka: [5],
       sc: [1005],
@@ -409,8 +409,8 @@ describe("a late-mapped pair is snapshotted as if mapped all along", () => {
     return { w, reports };
   }
 
-  it("delayed P7, mapped from the start: still only the run-3 question", async () => {
-    const { w, reports } = await p7(true, 1);
+  it("a delayed swap, mapped from the start: still only the run-3 question", async () => {
+    const { w, reports } = await lateMappedSwap(true, 1);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([removal("sc", PAIR5)]);
     expect(reports).toEqual([
@@ -422,8 +422,8 @@ describe("a late-mapped pair is snapshotted as if mapped all along", () => {
     ]);
   });
 
-  it("delayed P7, mapped late one run after the gap: a question, never a re-wish", async () => {
-    const { w, reports } = await p7(false, 1);
+  it("a delayed swap, mapped late one run after the gap: a question, never a re-wish", async () => {
+    const { w, reports } = await lateMappedSwap(false, 1);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([removal("naka", PAIR5)]);
     expect(reports).toEqual([
@@ -511,8 +511,8 @@ describe("a late-mapped pair is snapshotted as if mapped all along", () => {
     ]);
   });
 
-  it("P7, mapped from the start: the run-3 removal question blocks every write", async () => {
-    const { w, reports } = await p7(true);
+  it("a swap in one gap, mapped from the start: the run-3 removal question blocks every write", async () => {
+    const { w, reports } = await lateMappedSwap(true);
     expect(w.writes).toEqual([]);
     expect(w.state.pending).toEqual([removal("sc", PAIR5)]);
     expect(reports).toEqual([
@@ -523,8 +523,8 @@ describe("a late-mapped pair is snapshotted as if mapped all along", () => {
     ]);
   });
 
-  it("P7, mapped late: the run that maps it asks, and 1005 is never wished back", async () => {
-    const { w, reports } = await p7(false);
+  it("a swap in one gap, mapped late: the run that maps it asks, and 1005 is never wished back", async () => {
+    const { w, reports } = await lateMappedSwap(false);
     expect(w.writes).toEqual([]);
     expect(w.state.presence).toEqual({
       naka: [

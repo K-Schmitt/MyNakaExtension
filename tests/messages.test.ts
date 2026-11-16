@@ -594,7 +594,7 @@ describe("parsePageEvent", () => {
   });
 });
 
-describe("finished: F5 rules", () => {
+describe("finished: the number and id rules", () => {
   const base = { type: "finished", source: "explicit", contentId: 3 };
 
   it("maps a progress of -0 to 0", () => {
@@ -1027,7 +1027,7 @@ describe("allowedFor", () => {
   });
 });
 
-describe("the manual link messages (B6)", () => {
+describe("the manual link messages", () => {
   const SEARCH = { type: "search-titles", side: "sc", query: "cowboy bebop" };
   const LINK = { type: "link-title", side: "naka", id: 5, otherId: 2005 };
   const REQUEUE = { type: "requeue-question", side: "sc", id: 7 };

@@ -35,7 +35,7 @@ function fakeWindow(withV2: boolean) {
   };
 }
 
-describe("intersectionObserverV2: the real observer behind the stars' visibility (D7)", () => {
+describe("intersectionObserverV2: the real observer behind the stars' visibility", () => {
   it("tracks visibility with the smallest delay v2 allows, and forwards observe and unobserve", () => {
     const { win, made } = fakeWindow(true);
     const observer = intersectionObserverV2(win)(() => {});

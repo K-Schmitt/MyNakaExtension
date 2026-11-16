@@ -13,7 +13,7 @@ import { strings } from "./naka-bridge-fakes";
 import { countingLimiter, fakeNaka, memoryStore } from "./sw-fakes";
 
 // A rate limit on the home page (the session read) must stay a rate limit, so that the breaker opens
-// (M2): every other failure of the read keeps its one fixed text.
+// every other failure of the read keeps its one fixed text.
 const TOKEN = "T0K3NFAKE0123456789abcdef";
 const HOME = "https://www.senscritique.com/";
 
@@ -126,7 +126,7 @@ describe("a home page that SensCritique rate-limits", () => {
     expect(strings(error).join(" ")).not.toContain(TOKEN);
   });
 
-  // The search reads no session (Ruling 20): its own 429 from Apollo opens its breaker.
+  // The search reads no session: its own 429 from Apollo opens its breaker.
   it("opens the port's breaker: its later calls in the job make no request", async () => {
     const { client, calls } = homeAnswering(429);
     const { store } = memoryStore();

@@ -18,9 +18,9 @@ import { runSync } from "../src/core/sync-runner";
 // owner removed it there, once a completed run had seen the pair in both lists.
 
 // 14 titles so the write cap of 10 binds. Remap answers (upsertMapping, as
-// Plan 3 will do) move a title to another SensCritique id while its removal is
+// the answers do) move a title to another SensCritique id while its removal is
 // still pending; answering that removal afterwards lifts the protection only
-// when it was set on an id of the evicted pair (probe E, a Plan 3 contract:
+// when it was set on an id of the evicted pair (the answer contract:
 // the ambiguity answer settles the new pair).
 const TITLES = 14;
 const STEPS = 60;

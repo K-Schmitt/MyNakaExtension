@@ -265,7 +265,7 @@ describe("answer-question", () => {
     });
   });
 
-  it("in simulation mode, choice 2005 gives the same mapping and done (design §2.8)", async () => {
+  it("in simulation mode, choice 2005 gives the same mapping and done (answers work in both modes)", async () => {
     const w = answerWorld({
       state: asked(),
       settings: { mode: "simulation" },
@@ -293,7 +293,7 @@ describe("answer-question", () => {
     expect(w.settings().lastAnswer?.target).toBe("ambiguity:sc:1021");
   });
 
-  it("a product a settled pair holds is refused (D18), with no save", async () => {
+  it("a product a settled pair holds is refused, with no save", async () => {
     const before = stateWith({
       pending: [question()],
       mapping: [{ nakaId: 8, scId: 2005 }],

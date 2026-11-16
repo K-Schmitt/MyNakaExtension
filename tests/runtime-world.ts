@@ -127,7 +127,7 @@ type Context = (
 ) &
   TabTrace;
 
-// The thresholds the owner may store per kind, and the spec's defaults when none is stored.
+// The thresholds the owner may store per kind, and the defaults when none is stored.
 export const THRESHOLDS = [0.8, 0.85, 0.9, 0.95, 0.99];
 export type KindThresholds = { film: number; episode: number };
 const SPEC_DEFAULT_THRESHOLDS: KindThresholds = { film: 0.9, episode: 0.8 };
@@ -265,7 +265,7 @@ function flaky(w: World, what: string): void {
   }
 }
 
-// A finish that parked behind an open question of its title (D4) is not handled yet: its film may still
+// A finish that parked behind an open question of its title is not handled yet: its film may still
 // be wished once the owner answers.
 function waitsOnQuestion(state: unknown, contentId: number): boolean {
   const pending = (state as { pending?: { side?: string; id?: number }[] })
@@ -595,7 +595,7 @@ export function scFor(w: World, gen: number): ScClient {
 }
 
 // The finish job reads the clock once, right after its settings: the oracle judges the hour's budget
-// there, from the stored window, as the spec words it.
+// there, from the stored window, as finish-window states the rule.
 export function clockFor(w: World): () => number {
   return () => {
     const ctx = w.current;
@@ -690,7 +690,7 @@ export function checkInvoked(w: World, key: JobKey): void {
 }
 
 // The jobs as the router sees them, counted, with the oracle O1 "never two jobs at once" per worker. The
-// status answer is no job (Ruling 20): O1 does not count it, O7 and O12 judge it.
+// status answer is no job: O1 does not count it, O7 and O12 judge it.
 type Run = <T>(key: JobKey, ctx: Context, job: () => Promise<T>) => Promise<T>;
 
 // An answer job: O14 to O16 judge it from the state it started from (tests/runtime-answer-oracles.ts).
@@ -744,10 +744,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     answerRemoval: (msg) =>
       answerRun(w, msg, run, () => jobs.answerRemoval(msg)),
     hideQuestion: (msg) => answerRun(w, msg, run, () => jobs.hideQuestion(msg)),
-    // The fuzz sends no manual link (B6 has its own tests): these pass through unobserved.
+    // The fuzz sends no manual link (the manual link has its own tests): these pass through unobserved.
     linkTitle: (msg) => jobs.linkTitle(msg),
     requeueQuestion: (msg) => jobs.requeueQuestion(msg),
-    // I2: the router queues one retry step per sync, then one per step that answered true (O7 counts both;
+    // The router queues one retry step per sync, then one per step that answered true (O7 counts both;
     // O17 judges the writes).
     retryPending: (since) => jobs.retryPending(since),
     retryNext: async (since) => {
@@ -759,10 +759,10 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     },
     forget: () => jobs.forget(),
     reset: () => jobs.reset(),
-    // The fuzz sends no unticked « vu » (B8b has its own tests): these pass through unobserved.
+    // The fuzz sends no unticked « vu » (the forget has its own tests): these pass through unobserved.
     forgetHandled: (msg) => jobs.forgetHandled(msg),
     forgetHandledFromTab: (msg) => jobs.forgetHandledFromTab(msg),
-    // The fuzz sends no cancel-retry (I2 has its own tests): it passes through unobserved.
+    // The fuzz sends no cancel-retry (the retry has its own tests): it passes through unobserved.
     cancelRetry: (msg) => jobs.cancelRetry(msg),
     handledTitles: (cancelling) => jobs.handledTitles(cancelling),
     searchTitles: (msg) => jobs.searchTitles(msg),
@@ -772,7 +772,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
     removalOffer: (contentId, answering) =>
       jobs.removalOffer(contentId, answering),
     pageLists: (answering) => jobs.pageLists(answering),
-    // The fuzz sends no title page message (step 7 has its own tests): these pass through unobserved.
+    // The fuzz sends no title page message (the title page has its own tests): these pass through unobserved.
     ficheInfo: (tabId, msg) => jobs.ficheInfo(tabId, msg),
     ficheSeason: (tabId, msg) => jobs.ficheSeason(tabId, msg),
     ficheMine: (tabId, msg) => jobs.ficheMine(tabId, msg),
@@ -790,7 +790,7 @@ export function observed(w: World, gen: number, jobs: Jobs): Jobs {
   };
 }
 
-// The owner's own list edits (Plan 2's re-add oracle): removing a title from a side while a completed
+// The owner's own list edits (the re-add oracle): removing a title from a side while a completed
 // run had seen it in both lists protects that side; adding it back lifts the protection.
 export function ownerEdit(w: World, n: number, side: Side): void {
   const id = side === "naka" ? n : scOf(n);

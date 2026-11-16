@@ -132,7 +132,7 @@ describe("scToTitled", () => {
     },
   );
 
-  it("P4: an episode product is never a series candidate", () => {
+  it("an episode product is never a series candidate", () => {
     const episode = sc({
       productId: 133353723,
       title: "Widow's Bay",
@@ -143,7 +143,7 @@ describe("scToTitled", () => {
     expect(scToCandidate(episode)).toBeUndefined();
   });
 
-  it("P4: a Naka series is never mapped to an episode product", async () => {
+  it("a Naka series is never mapped to an episode product", async () => {
     const products = [
       sc({
         productId: 133353723,

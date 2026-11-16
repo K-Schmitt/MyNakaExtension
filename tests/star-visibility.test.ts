@@ -36,7 +36,7 @@ function world() {
 const target = (name: string): Target => ({ isConnected: true, name });
 const slot = () => ({});
 
-describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
+describe("createSeenWatch: whether a click on a star row counts", () => {
   it("observes the row it is given", () => {
     const w = world();
     const row = target("row");
@@ -44,7 +44,7 @@ describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
     expect(w.observed).toEqual([row]);
   });
 
-  it("counts a click before any entry has come (owner's decision D11)", () => {
+  it("counts a click before any entry has come (a real click is never lost to a missing signal)", () => {
     const w = world();
     expect(w.watch(target("row") as never, slot())()).toBe(true);
   });

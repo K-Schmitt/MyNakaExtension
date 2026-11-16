@@ -334,7 +334,7 @@ describe("the undo and refusal copy", () => {
   });
 });
 
-describe("every step 7 rare state, in the actions host", () => {
+describe("every rare state of a title with no product, in the actions host", () => {
   it("shows a loading line until the worker answers", () => {
     const t = fakeUi(FILM_PATH);
     t.controller.event(ficheEvent());
@@ -526,7 +526,7 @@ describe("every step 7 rare state, in the actions host", () => {
     );
   });
 
-  it("a rating not sent after its finish wrote: its line, « Annuler » at once, the stars as they were (D9, R2)", async () => {
+  it("a rating not sent after its finish wrote: its line, « Annuler » at once, the stars as they were", async () => {
     const t = await film();
     star(t.parts(), 9)?.click(true);
     t.ofType("fiche-rate")[0]?.answer({
@@ -552,7 +552,7 @@ describe("every step 7 rare state, in the actions host", () => {
     ]);
   });
 
-  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause (D9)", async () => {
+  it("once « Annuler » times out after a finish that wrote, its line drops the « Annuler » clause", async () => {
     // Arrange
     const t = await film();
     star(t.parts(), 9)?.click(true);
@@ -681,7 +681,7 @@ describe("the actions between two views", () => {
   });
 });
 
-describe("Naka's « Ma liste » the tab could not update (D14)", () => {
+describe("Naka's « Ma liste » the tab could not update", () => {
   it("says so under the stars once the button left the screen before the click", async () => {
     const t = await film(productOf());
     t.page.maListe = true;
@@ -695,7 +695,7 @@ describe("Naka's « Ma liste » the tab could not update (D14)", () => {
   });
 });
 
-describe("a title star click and the star's visibility (D7)", () => {
+describe("a title star click and the star's visibility", () => {
   it("watches the info row's group of stars, the one holding the clicked star", async () => {
     const t = await film();
     const watched = t.stars.rows.at(-1);
@@ -716,7 +716,7 @@ describe("a title star click and the star's visibility (D7)", () => {
   });
 });
 
-describe("the write buttons and the actions' visibility (D7, owner's decision 2026-11-16)", () => {
+describe("the write buttons and the actions' visibility", () => {
   const slotOf = (t: Awaited<ReturnType<typeof film>>, label: string) => {
     const el = buttonNamed(actionParts(t), label);
     // The watched element is the button itself (or, for the confirmation, its row).

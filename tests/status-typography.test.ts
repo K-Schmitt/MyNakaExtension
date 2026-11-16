@@ -20,7 +20,7 @@ import { type StatusView, toStatusView } from "../src/status/status-view";
 import type { StatusSnapshot } from "../src/sw/status-snapshot";
 import { AMBIGUITY, LISTS, REMOVAL, UNLINKED_NAKA } from "./lists-fixtures";
 
-// French typography (Ruling 19): U+202F NARROW NO-BREAK SPACE before « : », « ; », « ? » and « ! », and
+// French typography: U+202F NARROW NO-BREAK SPACE before « : », « ; », « ? » and « ! », and
 // inside « ». A colon between digits (a time, 14:05) takes none.
 const NB = "\u202F";
 

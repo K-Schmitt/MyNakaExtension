@@ -235,7 +235,7 @@ describe("toggleMode", () => {
   });
 });
 
-// Ruling 20: while a job runs or a mode change waits, the page asks again every 5 s, and only then.
+// While a job runs or a mode change waits, the page asks again every 5 s, and only then.
 describe("polling", () => {
   const statuses = (sent: ToWorker[]) =>
     sent.filter((m) => m.type === "status").length;
@@ -312,7 +312,7 @@ describe("polling", () => {
 });
 
 // Disabling the pressed button drops its focus: once the answer is shown and the buttons are enabled
-// again, the focus goes back to it, or to the headline when that button is now hidden (Ruling 19).
+// again, the focus goes back to it, or to the headline when that button is now hidden.
 describe("focus after an action", () => {
   it("returns to Resynchroniser once the buttons are enabled again", async () => {
     const t = setup([SIM, SIM]);
