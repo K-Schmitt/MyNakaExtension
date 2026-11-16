@@ -215,13 +215,15 @@ export function createJobs(
     reset: () => quietly(() => resetJob(deps.store)),
     forgetHandled: (msg) =>
       quietly(async () => {
-        await forgetHandledJob(deps.store, msg);
-        await forgetUndoOf(deps.store, msg.contentId);
+        if (await forgetHandledJob(deps.store, msg)) {
+          await forgetUndoOf(deps.store, msg.contentId);
+        }
       }),
     forgetHandledFromTab: (msg) =>
       quietly(async () => {
-        await forgetFromTabJob(deps.store, deps.now, msg);
-        await forgetUndoOf(deps.store, msg.contentId);
+        if (await forgetFromTabJob(deps.store, deps.now, msg)) {
+          await forgetUndoOf(deps.store, msg.contentId);
+        }
       }),
     cancelRetry: (msg) => quietly(() => cancelRetryJob(deps.store, msg)),
     handledTitles: (cancelling) => answerHandledTitles(deps.store, cancelling),
