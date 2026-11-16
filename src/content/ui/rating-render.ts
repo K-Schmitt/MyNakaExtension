@@ -27,7 +27,7 @@ export type Maker = Pick<DocLike, "createElement">;
 
 export const BLOCK_CLASS = "mn-card";
 export const BUTTON_CLASS = "mn-btn";
-export const PRIMARY_CLASS = "mn-btn mn-btn--primary";
+const PRIMARY_CLASS = "mn-btn mn-btn--primary";
 export const ERROR_CLASS = "mn-line mn-error";
 export const WARNING_CLASS = "mn-line mn-warning";
 export const TITLE_CLASS = "mn-line mn-title";

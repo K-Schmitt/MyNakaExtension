@@ -1,7 +1,7 @@
 import type { Pair, SyncPlan } from "./list-diff";
 
 export const MAX_WRITES_PER_RUN = 10;
-export const MAX_CONSECUTIVE_FAILURES = 2;
+const MAX_CONSECUTIVE_FAILURES = 2;
 
 export type Side = "naka" | "sc";
 

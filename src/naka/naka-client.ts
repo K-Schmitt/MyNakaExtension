@@ -21,7 +21,6 @@ export type { Fetch } from "../sc/sc-client";
 export { NakaUnavailableError } from "./naka-errors";
 export type { NakaItem } from "./naka-items";
 export type { NakaSeasons } from "./naka-seasons";
-export type { NakaDeps } from "./naka-transport";
 
 export type NakaClient = {
   playlistIds(): Promise<number[]>;

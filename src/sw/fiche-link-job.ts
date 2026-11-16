@@ -32,7 +32,7 @@ async function storedLinks(store: Store): Promise<FicheLinks> {
   }
 }
 
-export function withLink(
+function withLink(
   links: FicheLinks,
   contentId: number,
   productId: number,

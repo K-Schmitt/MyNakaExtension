@@ -61,7 +61,7 @@ function buildActions(
  * What the actions show, as one string: two views with equal inputs draw the same actions. Every field
  * counts but the episodes (the boxes draw them), so a field added to the view is compared by default.
  */
-export function actionsInputs(view: FicheView): string {
+function actionsInputs(view: FicheView): string {
   const { episodes: _drawnByTheBoxes, ...shown } = view;
   return JSON.stringify(shown);
 }

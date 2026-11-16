@@ -31,9 +31,7 @@ export const THEME = {
   motion: "150ms",
 } as const;
 
-export const NAKA_VARS: Readonly<
-  Partial<Record<keyof typeof THEME.color, string>>
-> = {
+const NAKA_VARS: Readonly<Partial<Record<keyof typeof THEME.color, string>>> = {
   bg: "--color-bg-primary",
   surface: "--color-bg-card",
   surfaceRaised: "--color-bg-elevated",

@@ -114,7 +114,7 @@ async function rated(
   const at = deps.now();
   try {
     await sendRating(deps, target.productId, msg.rating);
-    return { cards: applyRating(cards, key, msg.label, msg.rating, at) };
+    return { cards: applyRating(cards, key, msg.label, msg.rating) };
   } catch (caught) {
     const error = toJobError(caught);
     return { cards: applyFailure(cards, key, msg.label, error, at), error };

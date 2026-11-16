@@ -33,8 +33,6 @@ import { cardlessSendingOf, sendingOf } from "./rating-answers";
 import { createRetrySteps } from "./retry-steps";
 import { PLAYLIST_DEBOUNCE_MS } from "./run-throttle";
 
-export type { Respond };
-
 export type Router = {
   /** true when `respond` will be called later (Chrome keeps the channel open). */
   handle(raw: unknown, sender: Sender, respond: Respond): boolean;

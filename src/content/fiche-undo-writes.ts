@@ -26,7 +26,7 @@ function shownTitle(scope: FicheScope): TitleIds | undefined {
 }
 
 /** The line an answer leaves: none once it all went through. */
-export function undoOutcome(
+function undoOutcome(
   answer: UndoAnswer | RemoveAnswer | undefined,
   action: UndoAction,
 ): FicheOutcome | undefined {

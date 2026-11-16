@@ -10,10 +10,9 @@ import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
 import { askOrNothing, questionOf, startEndPoll } from "./end-poll";
 import { createQuestionHost, type HostPorts } from "./question-host";
-import { createRatingSession, type SessionPorts } from "./rating-session";
+import { createRatingSession } from "./rating-session";
+import type { SessionPorts } from "./session-ports";
 import { labelOf } from "./session-views";
-
-export type { EndTimer } from "./end-poll";
 
 export type EndPorts = SessionPorts &
   HostPorts & {

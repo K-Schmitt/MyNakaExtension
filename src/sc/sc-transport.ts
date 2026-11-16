@@ -37,7 +37,7 @@ const APOLLO = "https://apollo.senscritique.com/";
 const MAX_BODY = 2_000_000;
 const SC_429 = "HTTP 429";
 
-export const JSON_TYPE = "application/json";
+const JSON_TYPE = "application/json";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

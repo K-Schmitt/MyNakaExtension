@@ -34,7 +34,7 @@ import type { ScWishItem } from "./wishlist-page";
 
 export { ScUnauthenticatedError, ScUnavailableError } from "./sc-errors";
 export type { ProductState } from "./sc-product-state";
-export type { Fetch, ScDeps, ScSession } from "./sc-transport";
+export type { Fetch, ScSession } from "./sc-transport";
 
 export type ScClient = {
   wish(productId: number): Promise<void>;

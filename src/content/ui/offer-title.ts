@@ -6,7 +6,7 @@
 import type { QuestionOffer } from "../../sw/question-offers";
 import type { EndTimer } from "./end-poll";
 
-export const TITLE_WAIT_MS = 2000;
+const TITLE_WAIT_MS = 2000;
 
 type TitleOf = (contentId: number) => Promise<string | undefined>;
 

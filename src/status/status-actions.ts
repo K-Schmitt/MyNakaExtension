@@ -4,12 +4,6 @@
 import type { ToWorker } from "../ext/messages";
 import type { LocalAction } from "../sw/activity";
 
-export const ACTION_COPY = {
-  section: "Données enregistrées",
-  forget: "Oublier les comptes liés",
-  reset: "Réinitialiser",
-};
-
 export const CONFIRM_TEXT: Record<LocalAction, string> = {
   forget:
     "Oublier les comptes liés efface seulement le lien enregistré entre ton compte SensCritique et ton compte Naka. Aucun jeton n’est jamais stocké. Le prochain passage liera les comptes connectés à ce moment-là. Oublier les comptes liés\u202F?",

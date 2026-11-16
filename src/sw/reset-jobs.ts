@@ -21,7 +21,7 @@ export async function forgetJob(store: SettingsStore): Promise<void> {
 
 /** One decision per setting: a field added to Settings does not compile until it is kept or dropped. */
 export type ResetRules = Record<keyof Settings, "keep" | "drop">;
-export const RESET_RULES: ResetRules = {
+const RESET_RULES: ResetRules = {
   mode: "keep",
   firstRunPending: "drop", // set back to true by keptOf
   binding: "keep",
