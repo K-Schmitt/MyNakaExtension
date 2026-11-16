@@ -5,7 +5,7 @@ import type { ToWorker } from "../ext/messages";
 import type { PageListsAnswer, UnlinkedOffer } from "../sw/question-offers";
 import { readLists, readSearch } from "./lists-input";
 import type { ListsView, RowAction, SearchPhase } from "./lists-view";
-import type { PageTimer } from "./status-controller";
+import type { PageTimer } from "./page-timer";
 
 export type ListsPorts = {
   send(message: ToWorker): Promise<unknown>;

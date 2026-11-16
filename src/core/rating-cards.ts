@@ -111,7 +111,7 @@ export function applyFailure(
 }
 
 export function cardFor(
-  cards: RatingCard[],
+  cards: readonly RatingCard[],
   key: string,
 ): RatingCard | undefined {
   return cards.find((card) => card.key === key);

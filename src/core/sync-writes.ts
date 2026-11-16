@@ -1,9 +1,8 @@
 import type { Pair, SyncPlan } from "./list-diff";
+import { type Side, samePair } from "./state";
 
 export const MAX_WRITES_PER_RUN = 10;
 const MAX_CONSECUTIVE_FAILURES = 2;
-
-export type Side = "naka" | "sc";
 
 export type Write = { side: Side; pair: Pair };
 
@@ -25,9 +24,6 @@ export type WriteOutcome = {
 };
 
 type Result = "added" | "already-done" | "failed";
-
-const samePair = (a: Pair, b: Pair): boolean =>
-  a.nakaId === b.nakaId && a.scId === b.scId;
 
 function failedLast(
   pairs: readonly Pair[],

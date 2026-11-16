@@ -18,7 +18,7 @@ import type {
 } from "../ext/fiche-undo-answers";
 import type { Mode } from "../ext/settings";
 import { checkBinding } from "./binding";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { issuedTitle } from "./fiche-issued";
 import { undoLive } from "./fiche-panel-flags";
 import { runStep, type StepRun } from "./fiche-undo-steps";

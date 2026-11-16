@@ -10,7 +10,7 @@
 // block opened off the home page closes when the tab arrives there.
 
 import type { ContentIds } from "../../core/finish-event";
-import type { VideoSample } from "../naka-tab";
+import type { VideoSample } from "../video-sample";
 import { createEndBlock } from "./end-block";
 import type { EndTimer } from "./end-poll";
 import { createHomeBlock, type HomeHandlers } from "./home-block";

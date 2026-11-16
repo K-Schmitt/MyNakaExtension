@@ -4,8 +4,9 @@
 // cached. The token lives in a local variable of that call and goes only to naka-transport's `send`, in the
 // `authorization` header. See naka-transport.ts for the rules on the wire and in error messages.
 
+import { checkQuery } from "../core/search-query";
 import { NakaUnavailableError } from "./naka-errors";
-import { checkContentId, checkQuery } from "./naka-input";
+import { checkContentId } from "./naka-input";
 import { type NakaItem, toItem, toItems, toPlaylistIds } from "./naka-items";
 import { type NakaSeasons, toSeasons } from "./naka-seasons";
 import {
@@ -17,7 +18,7 @@ import {
   send,
 } from "./naka-transport";
 
-export type { Fetch } from "../sc/sc-client";
+export type { Fetch } from "../core/fetch-type";
 export { NakaUnavailableError } from "./naka-errors";
 export type { NakaItem } from "./naka-items";
 export type { NakaSeasons } from "./naka-seasons";

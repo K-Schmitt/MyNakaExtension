@@ -11,7 +11,7 @@ import type { LinkAnswer } from "../ext/fiche-answers";
 import { type FicheLinks, MAX_FICHE_LINKS } from "../ext/fiche-links-schema";
 import type { FicheLinkMessage } from "../ext/fiche-messages";
 import type { Store } from "../ext/store";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { assertIssued } from "./fiche-issued";
 import { LinkRefusedError } from "./fiche-link-pair";
 import type { JobDeps } from "./job-deps";

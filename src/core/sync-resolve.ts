@@ -1,20 +1,16 @@
 import type { SyncPlan } from "./list-diff";
+import { openAmbiguity } from "./questions";
 import { type ResolverPorts, resolveNakaIds, resolveScIds } from "./resolver";
-import type { SyncState } from "./state";
+import type { Side, SyncState } from "./state";
 
 export const MAX_RESOLVE_PER_RUN = 20;
-
-type Side = "naka" | "sc";
 
 function skippedByResolver(state: SyncState, side: Side, id: number): boolean {
   const own = (pair: { nakaId: number; scId: number }): number =>
     side === "naka" ? pair.nakaId : pair.scId;
   return (
     state.mapping.some((pair) => own(pair) === id) ||
-    state.pending.some(
-      (item) =>
-        item.kind === "ambiguity" && item.side === side && item.id === id,
-    ) ||
+    openAmbiguity(state, side, id) !== undefined ||
     state.unlinked.some((item) => item.side === side && item.id === id)
   );
 }

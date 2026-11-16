@@ -4,6 +4,7 @@
 // APOLLO, with `credentials: "omit"`. It is never put in a URL, a body, an error message or a log.
 // Error messages carry the operation name and the HTTP status only: a response body may hold personal data.
 
+import type { Fetch } from "../core/fetch-type";
 import {
   ScTimeoutError,
   ScUnauthenticatedError,
@@ -11,18 +12,7 @@ import {
 } from "./sc-errors";
 import { GQL } from "./sc-queries";
 
-export type Fetch = (
-  url: string,
-  init: {
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    credentials: "include" | "omit";
-    redirect?: "error" | "follow" | "manual";
-    /** Set by the worker's request timeout (Ruling 16), never by the clients. */
-    signal?: AbortSignal;
-  },
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+export type { Fetch };
 
 export type ScSession = { token?: string; username?: string };
 export type ScDeps = { fetch: Fetch; getSession: () => Promise<ScSession> };

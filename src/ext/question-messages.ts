@@ -4,8 +4,8 @@
 // against the stored state before anything is written.
 
 import type { QuestionKey } from "../core/questions";
+import { checkQuery } from "../core/search-query";
 import type { Side } from "../core/state";
-import { checkQuery } from "../naka/naka-input";
 import { parseQuestionKey } from "./answer-record";
 import { asBoolean, asId, asOneOf, asString, valuesOf } from "./field-checks";
 import type { SenderRole } from "./messages";

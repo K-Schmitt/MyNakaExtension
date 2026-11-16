@@ -1,8 +1,9 @@
 import { findCandidates } from "./candidate-search";
 import type { Pair } from "./list-diff";
-import { type AmbiguityItem, toCandidates } from "./questions";
+import { type AmbiguityItem, openAmbiguity, toCandidates } from "./questions";
 import {
   addPending,
+  type Side,
   type SyncState,
   setUnlinked,
   type UnlinkedItem,
@@ -16,8 +17,6 @@ export type ResolverPorts = {
   describeSc(id: number): Promise<Titled | undefined>;
   searchSc(q: string): Promise<Candidate[]>;
 };
-
-type Side = "naka" | "sc";
 
 type Direction = {
   side: Side;
@@ -56,15 +55,9 @@ function scDirection(ports: ResolverPorts): Direction {
 
 const otherSide = (side: Side): Side => (side === "naka" ? "sc" : "naka");
 
-function isAsked(state: SyncState, side: Side, id: number): boolean {
-  return state.pending.some(
-    (item) => item.kind === "ambiguity" && item.side === side && item.id === id,
-  );
-}
-
 function isSettled(state: SyncState, dir: Direction, id: number): boolean {
   const mapped = state.mapping.some((pair) => dir.own(pair) === id);
-  const asked = isAsked(state, dir.side, id);
+  const asked = openAmbiguity(state, dir.side, id) !== undefined;
   const unlinked = state.unlinked.some(
     (item) => item.side === dir.side && item.id === id,
   );
@@ -104,7 +97,8 @@ function mapOrAsk(
   const heldByAnother = state.mapping.some(
     (pair) => dir.other(pair) === otherId,
   );
-  const askedAboutOther = isAsked(state, otherSide(dir.side), otherId);
+  const askedAboutOther =
+    openAmbiguity(state, otherSide(dir.side), otherId) !== undefined;
   if (heldByAnother || askedAboutOther) {
     return addPending(state, questionOf(dir, id, titled, found, [otherId]));
   }

@@ -4,6 +4,7 @@
 import type { ToWorker } from "../ext/messages";
 import type { Mode } from "../ext/settings";
 import type { LocalAction } from "../sw/activity";
+import { type PageTimer, POLL_MS } from "./page-timer";
 import {
   SETTINGS_COPY,
   type SettingsDraft,
@@ -15,14 +16,6 @@ import { sendConfirmed } from "./status-actions";
 import type { StatusFormat } from "./status-format";
 import { confirmText } from "./status-mode-copy";
 import { LOADING_VIEW, type StatusView, toStatusView } from "./status-view";
-
-// While a job runs or a mode change waits, the page asks again this often (Ruling 20).
-export const POLL_MS = 5000;
-
-export type PageTimer = {
-  set(fn: () => void, ms: number): unknown;
-  clear(handle: unknown): void;
-};
 
 export type FocusTarget = "resync" | "switch" | "forget" | "reset" | "headline";
 

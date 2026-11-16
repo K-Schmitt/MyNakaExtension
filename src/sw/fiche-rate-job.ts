@@ -6,8 +6,8 @@
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
+import type { FicheAsker } from "./fiche-asker";
 import { rateFilm } from "./fiche-film-rate";
-import type { FicheAsker } from "./fiche-info-job";
 import { assertIssued, issuedSeries } from "./fiche-issued";
 import { rateEpisode, rateSeries } from "./fiche-series-rate";
 import type { JobDeps } from "./job-deps";

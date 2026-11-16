@@ -5,12 +5,10 @@
 // stays while at least one is, and leaves when neither is. A later one-sided state is then the owner
 // removing one side: a question, never an addition. Pure: no port, no clock.
 
-import type { Pair } from "./list-diff";
+import { type Pair, pairKey } from "./list-diff";
 
 export type PresenceEntry = { id: number; from: number; to: number };
 export type Presence = { naka: PresenceEntry[]; sc: PresenceEntry[] };
-
-const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
 // An id present at the end of `run` extends its interval that reached the previous run; otherwise it
 // starts a new one. Every other interval is kept as it is.

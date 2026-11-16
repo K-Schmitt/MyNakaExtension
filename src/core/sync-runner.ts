@@ -1,15 +1,15 @@
-import { type Pair, planListSync } from "./list-diff";
+import { type Pair, pairKey, planListSync } from "./list-diff";
 import { closeMootRemovals } from "./moot-removals";
 import { nextPresence, withPairsSeenTogether } from "./presence";
 import { type TitledRemoval, titleNewRemovals } from "./removal-titles";
 import type { ResolverPorts } from "./resolver";
-import { addPending, type SyncState, settlePair } from "./state";
+import { addPending, type SyncState, samePair, settlePair } from "./state";
 import {
   countWaiting,
   MAX_RESOLVE_PER_RUN,
   resolveUnlinked,
 } from "./sync-resolve";
-import { nextSnapshot, pairKey, pendingRemovalPairs } from "./sync-snapshot";
+import { nextSnapshot, pendingRemovalPairs } from "./sync-snapshot";
 import {
   executeWrites,
   MAX_WRITES_PER_RUN,
@@ -109,17 +109,16 @@ function settleAlreadyDone(state: SyncState, outcome: WriteOutcome): SyncState {
 }
 
 function nextRetryLast(state: SyncState, outcome: WriteOutcome): SyncState {
-  const same = (a: Pair, b: Pair): boolean => pairKey(a) === pairKey(b);
   const settledNow = [
     ...outcome.added,
     ...outcome.failed,
     ...outcome.alreadyDone,
   ];
   const waiting = state.retryLast.filter(
-    (pair) => !settledNow.some((done) => same(done, pair)),
+    (pair) => !settledNow.some((done) => samePair(done, pair)),
   );
   const candidates = [...waiting, ...outcome.failed].filter((pair) =>
-    state.mapping.some((mapped) => same(mapped, pair)),
+    state.mapping.some((mapped) => samePair(mapped, pair)),
   );
   const unique = new Map(candidates.map((pair) => [pairKey(pair), pair]));
   return { ...state, retryLast: [...unique.values()] };

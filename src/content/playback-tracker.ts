@@ -26,6 +26,7 @@ import {
   pastCredits,
 } from "./credits-starts";
 import type { PlayerContext } from "./page-events";
+import type { VideoSample } from "./video-sample";
 
 export type FinishedMessage = Extract<ToWorker, { type: "finished" }>;
 
@@ -41,8 +42,6 @@ const MAX_KEYS = 200;
 type Playing = { contentId: number; season?: number; episode?: number };
 
 type KeyState = { marks: Set<number>; watched: boolean; credits: boolean };
-
-type VideoSample = { currentTime: number; duration: number; src: string };
 
 type Reference = { src: string; duration: number };
 

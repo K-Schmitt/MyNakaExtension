@@ -1,4 +1,4 @@
-import type { Pair } from "./list-diff";
+import { type Pair, pairKey } from "./list-diff";
 import type { Presence } from "./presence";
 import type { RetryFinish } from "./retry-finishes";
 import type { TitleImage } from "./title-image";
@@ -68,8 +68,6 @@ export type SyncState = {
   /** Legacy: kept so stored states still parse; nothing reads it for a decision (see Settings.thresholds). */
   threshold: number;
 };
-
-const pairKey = (pair: Pair): string => `${pair.nakaId}:${pair.scId}`;
 
 export function samePair(a: Pair, b: Pair): boolean {
   return pairKey(a) === pairKey(b);
