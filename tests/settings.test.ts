@@ -651,4 +651,13 @@ describe("thresholds and pauseFromPercent", () => {
       );
     },
   );
+
+  it("accepts the shape a reset leaves in simulation", () => {
+    expect(
+      parseSettings({ mode: "simulation", firstRunPending: true }),
+    ).toEqual({
+      mode: "simulation",
+      firstRunPending: true,
+    });
+  });
 });
