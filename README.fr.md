@@ -45,12 +45,14 @@ L’extension n’est distribuée que sur GitHub (pas de boutique de navigateur)
 
 À l’installation, les écritures sont actives, mais la première synchronisation t’attend : clique sur
 « Resynchroniser » dans la page de l’extension (elle ne fait qu’ajouter, 10 écritures au plus). Active
-d’abord la simulation dans Réglages si tu veux voir ce qu’elle écrirait.
+d’abord la simulation dans Réglages si tu veux voir ce qu’elle écrirait : la simulation ne retient que
+les écritures de listes, les fins de visionnage restent écrites.
 
 ## Confidentialité
 
-Tout reste dans le stockage d’extension de ton navigateur. Les données ne vont qu’à naka.cx et à
-senscritique.com, pour ton compte ; rien ne va au développeur, ni statistiques, ni tiers. Les jetons de
+Tout reste dans le stockage d’extension de ton navigateur. Les requêtes vont à naka.cx et à
+senscritique.com pour ton compte, plus les affiches chargées depuis image.tmdb.org et
+media.senscritique.com ; rien n’arrive au développeur, ni statistiques, ni code tiers. Les jetons de
 session ne sont jamais enregistrés. Tu peux exporter ou effacer tes données depuis l’onglet Réglages.
 Détails : [PRIVACY.fr.md](PRIVACY.fr.md).
 
@@ -92,16 +94,20 @@ où il naît :
 - **Des parsers stricts partout.** Chaque message entre contextes et chaque valeur stockée passe par un
   parser qui reconstruit un objet neuf à partir des clés connues et refuse tout le reste. Une liste lue
   en partie arrête la synchronisation au lieu d’être prise pour vide.
-- **Des gardes sur les écritures.** Une écriture sur un site exige un vrai clic (`isTrusted`) sur un
-  bouton de l’extension, dans une racine fantôme fermée, au moins 0,4 s après l’apparition du bouton ;
-  chaque contrôle qui écrit est en plus ignoré s’il n’a pas été visible à l’écran pendant 300 ms
-  (IntersectionObserver v2), contre les clics cachés. Une fin ne compte que pour le titre en cours de
-  lecture, après une vraie lecture. Des budgets bornent ce qui passerait quand même : 10 écritures de
-  liste par synchronisation, 30 fins par heure, une fin en attente par titre. Le mode simulation liste
-  les écritures qu’une synchronisation ferait sans les faire.
+- **Des gardes sur les écritures.** Les notes, les réponses aux questions, les liaisons, les retraits
+  et l’annulation exigent un vrai clic (`isTrusted`) sur un contrôle de l’extension, dans une racine
+  fantôme fermée, au moins 0,4 s après son apparition, et visible à l’écran depuis 300 ms
+  (IntersectionObserver v2), contre les clics cachés. Les écritures automatiques sont bornées par des
+  budgets : une synchronisation des listes fait 10 écritures au plus, et la toute première attend un
+  clic ; une fin de visionnage ne compte que pour le titre en cours de lecture, après une vraie lecture,
+  30 par heure au plus et une en attente par titre. Le mode simulation liste les écritures de listes
+  qu’une synchronisation ferait sans les faire (les fins restent écrites).
 - **Échec fermé.** Un autre compte connecté sur l’un des deux sites arrête tout travail avant la moindre
-  écriture ; un refus pour trop de requêtes, une session expirée ou un délai dépassé coupent le même
-  type d’appel pour le reste du travail.
+  écriture. Un coupe-circuit cesse d’appeler un site pour le reste du travail après un refus pour trop de
+  requêtes (HTTP 429) ou une erreur de session sur l’un des deux sites, ou une requête SensCritique
+  qui dépasse son délai.
+- **Permissions minimales.** `storage`, et l’accès aux seuls hôtes `naka.cx`, `www.senscritique.com` et
+  `apollo.senscritique.com`. Aucun code distant, aucun `eval`.
 
 La logique pure (seuils, rapprochement des titres, synchronisation, fins de visionnage) vit dans
 `src/core/`, à part de tout ce qui touche `chrome.*` ou une page, et se teste sans navigateur.
