@@ -3,9 +3,9 @@
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
 // product, every rare state of step 7 (fiche-rare-states) with step 8b's search field and « Réessayer ».
 // Built again only when what it shows changed; a search field that had the focus gets it back
-// (field-focus). The search field's keys and input stay in the host. « Annuler », « Retirer la note » and the
-// series confirmation act only while `seen` says their row visible (D7); a redraw and a hide stop watching
-// the rows of the last draw.
+// (field-focus). The search field's keys and input stay in the host. « Annuler », « Retirer la note », the
+// series confirmation and the candidates act only while `seen` says them visible (D7); a redraw and a hide
+// stop watching the rows of the last draw.
 
 import type { FicheView } from "../fiche-view";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
@@ -46,7 +46,7 @@ function buildActions(
   const product = view.info?.product;
   const parts = [
     ...(product === undefined
-      ? rareParts(doc, view, handlers, slot)
+      ? rareParts(doc, view, handlers, slot, watch)
       : productActions(doc, view, product, handlers, watch)),
     ...seasonLines(doc, view),
   ];

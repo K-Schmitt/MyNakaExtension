@@ -7,7 +7,7 @@ import {
   questionView,
 } from "../src/content/ui/question-view";
 import type { AmbiguityOffer, RemovalOffer } from "../src/sw/question-offers";
-import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
+import { COUNTS, descendants, FakeDoc, type FakeElement } from "./ui-fakes";
 
 const AMBIG: AmbiguityOffer = {
   kind: "ambiguity",
@@ -37,7 +37,7 @@ const REMOVAL: RemovalOffer = {
 
 function tile(view: QuestionView) {
   const h = { onChoose: vi.fn(), onAction: vi.fn() };
-  const el = buildQuestionTile(new FakeDoc(), view, h) as FakeElement;
+  const el = buildQuestionTile(new FakeDoc(), view, h, COUNTS) as FakeElement;
   const buttons = descendants(el).filter((d) => d.tag === "button");
   return { el, h, buttons };
 }

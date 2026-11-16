@@ -59,8 +59,9 @@ function questionCard(
   doc: Maker,
   { key, view }: HomeQuestion,
   handlers: HomeHandlers,
+  watch: RowWatch,
 ): ElementLike {
-  return buildQuestionTile(doc, view, handlers.question(key));
+  return buildQuestionTile(doc, view, handlers.question(key), watch);
 }
 
 function track(
@@ -72,14 +73,14 @@ function track(
   const cards = doc.createElement("div");
   cards.className = TRACK_CLASS;
   if (view.live !== undefined) {
-    cards.appendChild(questionCard(doc, view.live, handlers));
+    cards.appendChild(questionCard(doc, view.live, handlers, watch));
   }
   for (const { key, view: entry, image } of view.entries) {
     const tileHandlers = handlers.entry(key);
     cards.appendChild(buildRatingTile(doc, entry, image, tileHandlers, watch));
   }
   for (const question of view.questions) {
-    cards.appendChild(questionCard(doc, question, handlers));
+    cards.appendChild(questionCard(doc, question, handlers, watch));
   }
   return cards;
 }
@@ -96,7 +97,7 @@ const shownTracks = new WeakMap<
 >();
 
 /**
- * Replaces whatever the root holds with the row; `watch` guards the tiles' stars and confirmations (D7);
+ * Replaces whatever the root holds with the row; `watch` guards the tiles' writing controls (D7);
  * `arrows` re-measures them on a resize and sets their motion.
  */
 export function renderRow(

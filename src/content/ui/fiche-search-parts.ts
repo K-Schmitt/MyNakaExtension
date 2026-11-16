@@ -5,6 +5,7 @@
 import { MAX_SEARCH_QUERY } from "../../ext/fiche-messages";
 import type { FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import { candidateChoices } from "./fiche-candidate-choice";
 import {
   INFO_FAILED_LINE,
@@ -78,6 +79,7 @@ function searchEnding(
   doc: Maker,
   view: FicheView,
   handlers: Pick<FicheHandlers, "link">,
+  watch: RowWatch,
 ): ElementLike[] {
   const { search } = view;
   if (search === undefined) return [];
@@ -90,7 +92,7 @@ function searchEnding(
     case "done":
       return search.candidates.length === 0
         ? [textLine(doc, nothingFoundLine(search.query))]
-        : [candidateChoices(doc, search.candidates, handlers)];
+        : [candidateChoices(doc, search.candidates, handlers, watch)];
   }
 }
 
@@ -99,9 +101,10 @@ export function searchParts(
   view: FicheView,
   handlers: Pick<FicheHandlers, "search" | "link">,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   return [
     searchForm(doc, view, handlers, slot),
-    ...searchEnding(doc, view, handlers),
+    ...searchEnding(doc, view, handlers, watch),
   ];
 }

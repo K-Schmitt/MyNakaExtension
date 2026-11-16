@@ -66,11 +66,12 @@ function linkParts(
   view: FicheView,
   candidates: readonly QuestionCandidate[],
   handlers: FicheHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
   const choices =
     view.pending === "link"
       ? textLine(doc, LINKING_LINE)
-      : candidateChoices(doc, candidates, handlers);
+      : candidateChoices(doc, candidates, handlers, watch);
   return [
     textLine(doc, LINK_HEADING, TITLE_CLASS),
     choices,
@@ -99,28 +100,30 @@ function notFoundParts(
   view: FicheView,
   handlers: FicheHandlers,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   return [
     textLine(doc, NOT_FOUND_LINE),
-    ...searchParts(doc, view, handlers, slot),
+    ...searchParts(doc, view, handlers, slot, watch),
     ...outcomeLines(doc, view, LINK_FAILED_LINE),
   ];
 }
 
 /**
  * What shows while the title has no product to rate: loading, its failure, the candidates, « Pas trouvé ».
- * The search field it makes, if any, goes into `slot`.
+ * The search field it makes, if any, goes into `slot`; `watch` guards the candidates (D7).
  */
 export function rareParts(
   doc: Maker,
   view: FicheView,
   handlers: FicheHandlers,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   const { info } = view;
   if (info === undefined) return infoParts(doc, view, handlers);
   if (info.state === "choose") {
-    return linkParts(doc, view, info.candidates ?? [], handlers);
+    return linkParts(doc, view, info.candidates ?? [], handlers, watch);
   }
-  return notFoundParts(doc, view, handlers, slot);
+  return notFoundParts(doc, view, handlers, slot, watch);
 }
