@@ -39,9 +39,9 @@ function parseCounts(raw: unknown): Counts {
   };
 }
 
-// The marker is `true` or absent: `false`, null or anything else refuses the answer.
+// A marker is `true` or absent: `false`, null or anything else refuses the answer.
 function parsePending(raw: unknown): true {
-  return raw === true ? true : fail("pendingSettings");
+  return raw === true ? true : fail("marker");
 }
 
 // A non-empty list of known actions, each once: an empty or repeating list is refused.
@@ -56,6 +56,7 @@ function parseActions(raw: unknown): LocalAction[] {
 function parseSnapshot(raw: unknown): StatusSnapshot {
   const record = asRecord(raw, "status");
   const mode = whenPresent(record.mode, (v) => asOneOf<Mode>(v, MODES, "mode"));
+  const firstRunPending = whenPresent(record.firstRunPending, parsePending);
   const binding = whenPresent(record.binding, parseBinding);
   const lastRun = whenPresent(record.lastRun, (v) =>
     parseRunRecord(v, "lastRun"),
@@ -83,6 +84,7 @@ function parseSnapshot(raw: unknown): StatusSnapshot {
     ...(pendingActions === undefined ? {} : { pendingActions }),
     ...(pendingSettings === undefined ? {} : { pendingSettings }),
     ...(mode === undefined ? {} : { mode }),
+    ...(firstRunPending === undefined ? {} : { firstRunPending }),
     ...(binding === undefined ? {} : { binding }),
     ...(lastRun === undefined ? {} : { lastRun }),
     ...(lastFinish === undefined ? {} : { lastFinish }),

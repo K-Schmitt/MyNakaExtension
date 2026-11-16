@@ -25,6 +25,16 @@ type RunResult = {
 // Anything but the button is automatic, and waits out the gap.
 const isAutomatic = (trigger: Trigger): boolean => trigger !== "button";
 
+// Until the first click, no automatic run starts (a fresh install, a reset).
+function waitsForClick(settings: Settings, trigger: Trigger): boolean {
+  return isAutomatic(trigger) && settings.firstRunPending === true;
+}
+
+// The first click that completes lifts the hold; a failed one leaves it.
+function clearsFirstRun(trigger: Trigger, record: RunRecord): boolean {
+  return !isAutomatic(trigger) && record.outcome === "ok";
+}
+
 async function runWithPreview(
   deps: JobDeps,
   settings: Settings,
@@ -81,11 +91,13 @@ function nextSettings(
   const next: Settings = { ...settings, lastRun: done.record };
   if (done.accounts !== undefined) next.binding = done.accounts;
   if (isAutomatic(trigger)) next.lastAutoRunAt = done.record.at;
+  if (clearsFirstRun(trigger, done.record)) delete next.firstRunPending;
   return next;
 }
 
 export async function syncJob(deps: JobDeps, trigger: Trigger): Promise<void> {
   const settings = await deps.store.loadSettings();
+  if (waitsForClick(settings, trigger)) return;
   const at = deps.now();
   if (isAutomatic(trigger) && !shouldStartAutoRun(settings.lastAutoRunAt, at)) {
     return;

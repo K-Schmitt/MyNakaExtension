@@ -28,6 +28,8 @@ export type Counts = {
 export type StatusSnapshot = {
   /** Absent when the settings cannot be read. */
   mode?: Mode;
+  /** The first list sync still waits for a click: automatic runs are held. */
+  firstRunPending?: true;
   binding?: Binding;
   lastRun?: RunRecord;
   lastFinish?: FinishRecord;
@@ -74,6 +76,7 @@ function fromSettings(settings: Settings): StatusSnapshot {
     thresholds: thresholdsOf(settings),
     pauseFromPercent: pauseFromOf(settings),
   };
+  if (settings.firstRunPending) snapshot.firstRunPending = true;
   if (settings.binding) snapshot.binding = settings.binding;
   if (settings.lastRun) snapshot.lastRun = settings.lastRun;
   if (settings.lastFinish) snapshot.lastFinish = settings.lastFinish;
