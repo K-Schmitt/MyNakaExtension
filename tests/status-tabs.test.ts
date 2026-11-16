@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { tabAfterKey, tabFromHash } from "../src/status/status-tabs";
+import {
+  focusIdFor,
+  tabAfterKey,
+  tabFromHash,
+} from "../src/status/status-tabs";
 import { mountTabs, type TabDoc } from "../src/status/status-tabs-dom";
 import { FakeElement } from "./ui-fakes";
 
@@ -87,5 +91,17 @@ describe("mountTabs", () => {
     const { el } = world();
     expect(el("tab-activite").press("a")).toBe(false);
     expect(el("panel-reglages").attributes.hidden).toBe("");
+  });
+});
+
+describe("focusIdFor", () => {
+  it("keeps a target that sits in the selected panel", () => {
+    expect(focusIdFor("headline", "activite")).toBe("headline");
+    expect(focusIdFor("reset", "reglages")).toBe("reset");
+  });
+
+  it("falls back to the selected tab when the target is in a hidden panel", () => {
+    expect(focusIdFor("headline", "reglages")).toBe("tab-reglages");
+    expect(focusIdFor("forget", "activite")).toBe("tab-activite");
   });
 });

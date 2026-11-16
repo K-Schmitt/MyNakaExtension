@@ -15,6 +15,7 @@ import {
 } from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
+import { focusIdFor, tabFromHash } from "./status-tabs";
 import { mountTabs } from "./status-tabs-dom";
 import type { StatusView } from "./status-view";
 import { createSyncEnd } from "./sync-end";
@@ -75,7 +76,7 @@ function render(view: StatusView): void {
 
 // The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
 function focus(target: FocusTarget): void {
-  element(target).focus();
+  element(focusIdFor(target, tabFromHash(window.location.hash))).focus();
 }
 
 function setBusy(busy: boolean): void {
