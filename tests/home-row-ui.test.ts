@@ -154,6 +154,13 @@ describe("createHomeRowUi", () => {
     ]);
   });
 
+  it("hide stops watching the track's size", () => {
+    const w = world();
+    w.ui.show(VIEW, HANDLERS);
+    w.ui.hide();
+    expect(w.watched.map((x) => x.stopped)).toEqual([true]);
+  });
+
   it("a redraw stops watching the old track and watches the new one", () => {
     const w = world();
     w.ui.show(VIEW, HANDLERS);

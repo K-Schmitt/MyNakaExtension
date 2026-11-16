@@ -408,6 +408,42 @@ describe("an episode rating on its box", () => {
     expect(t.ofType("fiche-rate")).toHaveLength(1);
   });
 
+  const starsSlotOf = (
+    t: Awaited<ReturnType<typeof twoBoxes>>["t"],
+    b: FakeBox,
+  ) =>
+    t.stars.slots.find((_, i) =>
+      t.stars.rows[i]?.children.includes(starOf(b, 6) as FakeElement),
+    );
+
+  it("stops watching a box's stars when the tab leaves the title page (D7)", async () => {
+    const { t, three, four } = await twoBoxes();
+    const slots = [starsSlotOf(t, three), starsSlotOf(t, four)];
+    t.controller.path("/");
+    expect(t.stars.released).toEqual(expect.arrayContaining(slots));
+  });
+
+  it("stops watching a box's stars once Naka drops the box (D7)", async () => {
+    const three = fakeBox("S1 E3");
+    const four = fakeBox("S1 E4");
+    const boxes = [three, four];
+    const t = await seasonOne(boxes, episodes([3, 7.4], [4, 6.8]));
+    const slot = t.stars.slots.find((_, i) =>
+      t.stars.rows[i]?.children.includes(starOf(three, 6) as FakeElement),
+    );
+    boxes.splice(0, 1);
+    t.pageChanged();
+    expect(t.stars.released).toEqual([slot]);
+  });
+
+  it("stops watching a box's stars when Naka rewrites its code for another season (D7)", async () => {
+    const { t, three } = await twoBoxes();
+    const slot = starsSlotOf(t, three);
+    three.codeSpan.textContent = "S2 E3";
+    t.pageChanged();
+    expect(t.stars.released).toEqual([slot]);
+  });
+
   it("draws each box's stars in a slot of its own, kept when the box is drawn again (D7)", async () => {
     const { t, three, four } = await twoBoxes();
     const slotOf = (b: FakeBox) =>

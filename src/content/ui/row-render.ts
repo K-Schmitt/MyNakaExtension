@@ -120,3 +120,10 @@ export function renderRow(
   const unwatch = wireArrows(asTrack(cards), prev, next, arrows);
   shownTracks.set(root, { track: asTrack(cards), unwatch });
 }
+
+/** Empties the root and stops the size watch of the track it showed. */
+export function clearRow(root: ShadowRootLike): void {
+  shownTracks.get(root)?.unwatch();
+  shownTracks.delete(root);
+  root.replaceChildren();
+}
