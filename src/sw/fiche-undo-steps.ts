@@ -1,4 +1,4 @@
-// One step of « Annuler » (undoSteps' plan, spec §7): the SensCritique writes, each a slot of the SC
+// One step of « Annuler » (undoSteps' plan): the SensCritique writes, each a slot of the SC
 // limiter; « Ma liste » given back on Naka; then the extension's own state (fiche-local-restore). The
 // « Ma liste » step is a list write: the job drops it in simulation. With Naka's button on screen
 // (listByTab) the tab clicks it itself and the worker writes nothing; else the client adds the film,

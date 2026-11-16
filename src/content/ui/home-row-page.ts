@@ -1,5 +1,5 @@
 // The home row's ports in the page: the real document, the keeper's DOM ports over Naka's list, the page's
-// timers, a ResizeObserver on the carousel's track and the tiles' visibility watch (D7).
+// timers, a ResizeObserver on the carousel's track and the tiles' visibility watch.
 
 import type { SizeWatch } from "./carousel";
 import { createRowPorts } from "./home-row-dom";

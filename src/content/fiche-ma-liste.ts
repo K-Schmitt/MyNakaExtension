@@ -1,4 +1,4 @@
-// Naka's « Ma liste » button kept right after our writes (spec §7): when it is on screen, the tab tells the
+// Naka's « Ma liste » button kept right after our writes: when it is on screen, the tab tells the
 // worker so (`listByTab`), and once the worker answers `maListe: "tab"` the tab clicks it itself; Naka's page
 // then sends its own request and its class follows. One click at most per answer, the button read again
 // right before it, and only when the tab itself sent `listByTab`: a button already in the wanted state, gone
@@ -39,7 +39,7 @@ export function givenBackByTab(answer: UndoAnswer | undefined): boolean {
 }
 
 /** One click when the visit goes on and the button is on screen but not `wanted` (true: in the list); the
- * button gone from the screen meanwhile, the panel says « Ma liste » was not updated (D14). */
+ * button gone from the screen meanwhile, the panel says « Ma liste » was not updated. */
 export function setMaListe(scope: FicheScope, wanted: boolean): void {
   if (!scope.live() || !stillOnTitle(scope)) return;
   const now = scope.ports.maListe();

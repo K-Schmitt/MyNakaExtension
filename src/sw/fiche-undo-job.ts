@@ -1,11 +1,11 @@
-// « Annuler » on a title page (fiche-undo, spec §6 decisions 1, 6, 7 and §7), queued like every write.
+// « Annuler » on a title page (fiche-undo), queued like every write.
 // Refused before any request unless the product is issued to the asking tab as that content's title and
 // a live undo record names that title, that product and that role. The product's state is read again:
 // undoSteps refuses a title whose critique or recommendation ProductUndone could erase (answered
 // `refused: "protected"`, no write). The binding is checked before the first write; then the steps run in
 // order, the first failure stopping them: the answer names the steps done and the one that failed (and
 // who gave « Ma liste » back so far), and the record is kept so the owner can try again; the retry plans
-// from the state read then, skipping what is already back (undoSteps, ruling R9). Once every step ran the
+// from the state read then, skipping what is already back (undoSteps). Once every step ran the
 // record is cleared: a clear that fails still answers ok, the steps being done (it then simply expires).
 // In simulation the « Ma liste » step is dropped: everything else is sent.
 
@@ -45,7 +45,8 @@ async function liveRecord(
   return live && record?.role === role ? record : undefined;
 }
 
-/** undoSteps on the product's state read now (R9); undefined when the title is protected. */
+/** undoSteps on the product's state read now, so a retry skips what is back; undefined when the title is
+ * protected. */
 async function plan(
   deps: JobDeps,
   record: FicheUndo,

@@ -1,4 +1,4 @@
-// The rating card of a title already handled that has none (Ruling L2): finished under Plan 3, or before
+// The rating card of a title already handled that has none: finished by an older version, or before
 // its card existed. Its explicit finish is free (the pre-check sees it handled), so the pause case makes no
 // card and its rate would be refused forever. The card is built READ-ONLY: the stored pair, one Naka
 // content read (the job's first Naka call), the SensCritique product of the film or of the episode, and

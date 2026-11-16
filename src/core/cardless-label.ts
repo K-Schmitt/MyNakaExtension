@@ -1,4 +1,4 @@
-// A title with no rating card is rated as ONE content (the design's §2.4 pause case): a film has no season,
+// A title with no rating card is rated as ONE content (the pause case): a film has no season,
 // an épisode has both. A saison or a série is never rated without its card.
 
 import type { ContentIds } from "./finish-event";

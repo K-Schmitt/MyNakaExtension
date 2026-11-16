@@ -2,7 +2,7 @@
 // for that content. A title the extension knows (unlinked on the Naka side, or with an open question) takes
 // the status page's link-title path: both sites read, then the mapping; any ending but `done` (refused,
 // mismatch, failed) rejects, so the tab shows its error line. Any other title gets a
-// display-only link (§7 choice 6), kept apart from the mapping and the sync, at most MAX_FICHE_LINKS of
+// display-only link, kept apart from the mapping and the sync, at most MAX_FICHE_LINKS of
 // them: the first key goes before a new one. Unreadable links are replaced (they only spare a search).
 
 import { openAmbiguity } from "../core/questions";

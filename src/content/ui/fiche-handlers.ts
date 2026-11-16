@@ -21,7 +21,7 @@ export type FicheHandlers = Pick<
 const VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 /** Ten stars (hover preview on), the owner's rating marked once known; `name` names them (« Note » without).
- * A click counts only while `seen` says the group is visible (D7); `slot` is the place the row is drawn in. */
+ * A click counts only while `seen` says the group is visible; `slot` is the place the row is drawn in. */
 export function ficheStars(
   doc: Pick<DocLike, "createElement">,
   mine: number | null | undefined,

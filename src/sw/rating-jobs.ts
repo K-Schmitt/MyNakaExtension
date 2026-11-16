@@ -1,10 +1,10 @@
 // The rating jobs. A rating goes out only for a target of a STORED card: the worker never takes a product id
 // from a message. The card is the one the finish made, the one the explicit finish of the pause case makes
 // here, or, for a title already handled, the one rebuilt read-only (handled-card.ts). A film or an épisode
-// only: a saison or a série is never rated without its card. The binding is checked before the write, as
-// the finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended: no
-// error once the rating went out, else the error (the card's failure, or why no card could be made), and
-// whether the card step wrote before it (D9: the explicit finish's SensCritique writes or its sync state).
+// only: a saison or a série is never rated without its card. The binding is checked before the write, as the
+// finish does. A failure is stored on the card as a code, never as text. rateJob says how it ended: no error
+// once the rating went out, else the error (the card's failure, or why no card could be made), and whether
+// the card step wrote before it (write-watch: the explicit finish's SensCritique writes or its sync state).
 
 import { cardlessLabel } from "../core/cardless-label";
 import { contentKeyOf } from "../core/finish-event";
@@ -51,10 +51,10 @@ function foundIn(
   return target === undefined ? undefined : { cards, target };
 }
 
-// With no card, a film or an épisode runs its explicit finish first (the design's §2.4 pause case), through
+// With no card, a film or an épisode runs its explicit finish first (the pause case), through
 // the same job as any finish: its pre-check, its budget, its binding. A title already handled (finished
-// under Plan 3, or before its card existed) has a free finish that makes no card: its card is built
-// read-only instead (Ruling L2), with no write and no finish record. The finish's error, if any.
+// by an older version, or before its card existed) has a free finish that makes no card: its card is built
+// read-only instead, with no write and no finish record. The finish's error, if any.
 async function cardStep(
   deps: JobDeps,
   msg: RateMessage,
@@ -122,7 +122,7 @@ async function rated(
 }
 
 // A ProductRate that throws counts as not sent: SensCritique answered no rating, and the card keeps the
-// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique (D9).
+// failure. `wroteBefore` covers only the card step before it, whose writes do stand on SensCritique.
 export async function rateJob(
   deps: JobDeps,
   msg: RateMessage,

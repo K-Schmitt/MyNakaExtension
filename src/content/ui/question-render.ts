@@ -1,7 +1,7 @@
 // Draws a QuestionView in the overlay's shadow root, through the rating block's pieces: every text goes
 // through textContent, every button acts on a trusted click only. A view that is sending shows its line
 // and no button. A choice that can lead to a site write (a candidate, « Retirer ») acts only while `watch`
-// says it visible (D7); « Garder », « Aucun » and the actions write on no site and are not watched.
+// says it visible; « Garder », « Aucun » and the actions write on no site and are not watched.
 
 import type { ElementLike, ShadowRootLike } from "./dom-like";
 import type { RowWatch } from "./draw-watch";
@@ -33,7 +33,7 @@ export function writesOnSite(choice: QuestionChoice): boolean {
   return choice.kind === "candidate" || choice.kind === "remove";
 }
 
-/** A choice's button, watched (D7) when the choice can lead to a site write. */
+/** A choice's button, watched for visibility when the choice can lead to a site write. */
 export function choiceButton(
   doc: Maker,
   { choice, label }: { choice: QuestionChoice; label: string },

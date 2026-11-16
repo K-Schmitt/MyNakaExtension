@@ -67,7 +67,7 @@ type Found = { state: SyncState; key: string; pair: Pair; title: string };
 
 // An explicit "seen" completes whatever the progress, and so does the start of the credits from
 // CREDITS_FLOOR up (below it the threshold decides); a bad threshold throws for every source.
-// The threshold is the one of the event's kind. Exported for the worker's local pre-check (Ruling 18):
+// The threshold is the one of the event's kind. Exported for the worker's local pre-check:
 // one rule decides, before and in the handler.
 export function isComplete(
   event: Pick<CheckedEvent, "source" | "progress" | "kind">,

@@ -9,8 +9,8 @@ export class ScUnavailableError extends Error {
   }
 }
 
-// A request the worker's 30 s timer aborted (Ruling 16). Its text names the operation and the timeout
-// only. Like a 429, it opens the port's breaker (K4): a site that stopped answering costs one timeout
+// A request the worker's 30 s timer aborted. Its text names the operation and the timeout
+// only. Like a 429, it opens the port's breaker: a site that stopped answering costs one timeout
 // per port, not one per call.
 export class ScTimeoutError extends ScUnavailableError {
   constructor(label: string) {

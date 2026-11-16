@@ -4,7 +4,7 @@
 // liste », so a removal of it is not one. Pure: it reads the presence as stored. Every completed run
 // records every id of both final lists, so a pair listed on both has both intervals ending at `run`. The
 // snapshot is no evidence: it also carries pairs kept for a pending removal or a settled pair, which may be
-// stale (fuzz seed 4312).
+// stale (a fuzz test found the case).
 
 import type { Pair } from "./list-diff";
 import type { PresenceEntry } from "./presence";

@@ -1,5 +1,5 @@
 // One shown question and its answer, for the Naka blocks and (through the same rules) the page's rows.
-// The 4a rating session applied to a question: the lock after a choice, the sending line, the re-asks on
+// The rating session's rules applied to a question: the lock after a choice, the sending line, the re-asks on
 // END_POLL_MS counted from the click, the move-on rule and the unreachable rule. An answer goes out only
 // from a trusted click (the render guarantees it). A click within GRACE_MS of the buttons appearing is
 // taken for one meant for the page: ignored.

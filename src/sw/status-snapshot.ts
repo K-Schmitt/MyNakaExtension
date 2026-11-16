@@ -1,6 +1,6 @@
 // What the status page shows: the mode, the last run and finish, the binding and the counts of what
-// waits for the owner. Codes and stored records only: no token, no error text. It only reads (Ruling 20:
-// it is answered outside the queue, while a job may run); the router adds what runs and what is pending.
+// waits for the owner. Codes and stored records only: no token, no error text. It only reads (it
+// is answered outside the queue, while a job may run); the router adds what runs and what is pending.
 
 import type { SyncState } from "../core/state";
 import type { Thresholds } from "../core/watch-trigger";

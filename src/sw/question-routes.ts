@@ -39,7 +39,7 @@ function queueKeyOf(msg: AnswerMessage): QuestionKey {
   }
 }
 
-/** The key of the row a queued answer locks: a requeue locks its legacy question's row (R1). */
+/** The key of the row a queued answer locks: a requeue locks its legacy question's row. */
 function rowKeyOf(key: QuestionKey): QuestionKey {
   return key.startsWith("requeue:")
     ? `ambiguity:${key.slice("requeue:".length)}`

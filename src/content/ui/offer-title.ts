@@ -1,7 +1,7 @@
-// The title of an offer the worker stored without one (a question asked before 4b, a removal whose title
-// the sync did not read). A Naka id is read with the tab's own client; a SensCritique-side offer has a
-// stored title or none, and a miss stays "" (the view then says « (titre inconnu) »). A read that fails
-// or does not answer within TITLE_WAIT_MS is a miss: the row never waits longer on a title.
+// The title of an offer the worker stored without one (a question stored by an older version, a removal whose
+// title the sync did not read). A Naka id is read with the tab's own client; a SensCritique-side offer has a
+// stored title or none, and a miss stays "" (the view then says « (titre inconnu) »). A read that fails or
+// does not answer within TITLE_WAIT_MS is a miss: the row never waits longer on a title.
 
 import type { QuestionOffer } from "../../sw/question-offers";
 import type { EndTimer } from "./end-poll";

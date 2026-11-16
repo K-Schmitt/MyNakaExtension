@@ -1,9 +1,9 @@
-// The product's actions under Naka's info panel (spec §2, §6): « Voir sur SensCritique », an
+// The product's actions under Naka's info panel: « Voir sur SensCritique », an
 // `<a target="_blank">` to the validated product page, and « Annuler » or « Retirer la note » (the
 // protected-title line instead of the latter), then the write on its way and its ending. A series'
 // confirmation replaces them while it is shown, so its « Annuler » never sits by the undo one. Each button
 // acts on a trusted click only; « Annuler », « Retirer la note » and the confirmation only while `watch` says
-// them visible (D7).
+// them visible.
 
 import type { FicheProduct } from "../../ext/fiche-answers";
 import type { FichePending, FicheView } from "../fiche-view";
@@ -69,7 +69,8 @@ function writeButton(
   ];
 }
 
-/** The worker's word (decision 6); « Annuler » stays offered over it, since it never loses a critique. */
+/** The worker's word on a critique or a recommendation; « Annuler » stays offered over it, since it never
+ * loses a critique. */
 function showsProtected(product: FicheProduct): boolean {
   return product.protected && !product.canUndo;
 }

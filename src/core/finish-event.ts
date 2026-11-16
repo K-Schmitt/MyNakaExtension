@@ -1,5 +1,5 @@
 // The end-of-viewing event the Naka page reports, checked once before the handler touches anything.
-// It crosses a message boundary in Plan 3, so the types are not trusted at runtime: a bad event
+// It crosses a message boundary, so the types are not trusted at runtime: a bad event
 // rejects with a fixed message (never one built from its values) before any port is called.
 
 import { valuesOf } from "../ext/field-checks";

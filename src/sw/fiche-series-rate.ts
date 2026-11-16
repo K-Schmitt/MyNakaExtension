@@ -1,18 +1,18 @@
-// A series or an episode rated from its title page (Q10): no finish, no slot of the hour's budget. Both
-// first make the series' link (Q11, D6: an episode's star links its series like the panel's star): the
-// title's pair {content, series product} goes through linkForRating's checks in this same queued job (no
-// conflicting mapping, no settled pair holding either side), so a refusal writes nothing and sends nothing.
-// The binding is checked before the one ProductRate (sendRating); a failure is answered with its code. Then
-// the stored cards that name this very product are updated: a series' rating goes to the série target of
-// every card of the content, an episode's to the épisode target of that episode's card. Only a series'
-// rating settles the pair, so settlePair never makes a pair the sync would skip. A finish that waited on
-// the series' resolved question (an episode's) then runs once, after the rating, as after the status
-// page's link, whether the rating went out or not: the link is made either way. A series' state is read and
-// kept as the undo record after the link, before its ProductRate (put back as it was when the rating does not
-// go out: the ProductRate is the series' only write, so nothing was written before it, D9); its answer
-// carries the panel. An episode's
-// rating keeps nothing and answers no panel. Once the rating went out, the local saves after it (the settled
-// pair, the cards) are best-effort: a failure is answered `{ sent: true, step: "local-save", error }`, never as not sent.
+// A series or an episode rated from its title page: no finish, no slot of the hour's budget. Both first make
+// the series' link (an episode's star links its series like the panel's star): the title's pair {content,
+// series product} goes through linkForRating's checks in this same queued job (no conflicting mapping, no
+// settled pair holding either side), so a refusal writes nothing and sends nothing. The binding is checked
+// before the one ProductRate (sendRating); a failure is answered with its code. Then the stored cards that
+// name this very product are updated: a series' rating goes to the série target of every card of the content,
+// an episode's to the épisode target of that episode's card. Only a series' rating settles the pair, so
+// settlePair never makes a pair the sync would skip. A finish that waited on the series' resolved question
+// (an episode's) then runs once, after the rating, as after the status page's link, whether the rating went
+// out or not: the link is made either way. A series' state is read and kept as the undo record after the
+// link, before its ProductRate (put back as it was when the rating does not go out: the ProductRate is the
+// series' only write, so nothing was written before it); its answer carries the panel. An episode's rating
+// keeps nothing and answers no panel. Once the rating went out, the local saves after it (the settled pair,
+// the cards) are best-effort: a failure is answered `{ sent: true, step: "local-save", error }`, never as not
+// sent.
 
 import { contentKeyOf } from "../core/finish-event";
 import type { Pair } from "../core/list-diff";

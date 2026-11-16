@@ -1,9 +1,9 @@
-// Where the home cards draw: a row of their own among Naka's rows, under « Reprendre la lecture ». The
-// host is made on the first show, so that a page that never has cards gets no element from the
-// extension; the keeper puts it back in place whenever Naka rebuilds its list. The page's parts come in
-// through ports (home-row-page.ts binds them), so that the show/hide chain runs on test fakes. The tiles'
-// stars and confirmations are guarded by D7 (`seen`): each draw stops watching the rows of the last one,
-// and so does a hide.
+// Where the home cards draw: a row of their own among Naka's rows, under « Reprendre la lecture ». The host
+// is made on the first show, so that a page that never has cards gets no element from the extension; the
+// keeper puts it back in place whenever Naka rebuilds its list. The page's parts come in through ports
+// (home-row-page.ts binds them), so that the show/hide chain runs on test fakes. The tiles' stars and
+// confirmations are guarded by the visibility watch (`seen`): each draw stops watching the rows of the last
+// one, and so does a hide.
 
 import type { SizeWatch } from "./carousel";
 import type { DocLike, ElementLike } from "./dom-like";
@@ -23,7 +23,7 @@ export type HomeRowPorts = {
   watchSize: SizeWatch;
   /** Whether the system asks for reduced motion, now. */
   reducedMotion(): boolean;
-  /** The D7 watch of the tiles' stars and confirmations. */
+  /** The visibility watch of the tiles' stars and confirmations. */
   seen: ReleasableWatch;
 };
 

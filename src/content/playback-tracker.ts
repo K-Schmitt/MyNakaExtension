@@ -193,7 +193,7 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (ev.kind !== "watched") return undefined;
       const playing = idsOf(ev);
       if (states.get(keyOf(playing))?.watched === true) return undefined;
-      // A page script can name any id (F1): the content playing, or one real gesture per other content.
+      // A page script can name any id: the content playing, or one real gesture per other content.
       const isPlaying =
         sampled && current !== undefined && sameKey(current, playing);
       const hadGesture = takeGesture();

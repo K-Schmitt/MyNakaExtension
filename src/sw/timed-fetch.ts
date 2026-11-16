@@ -1,9 +1,9 @@
-// Every worker request to SensCritique ends within 30 s (Ruling 16): Apollo, the home-page session read
+// Every worker request to SensCritique ends within 30 s: Apollo, the home-page session read
 // and the www pages. One job holds the queue, so a request that never answered would hold every later job.
 // The timer covers the whole exchange, body read included, and is never cleared: aborting a request
 // whose body was already read changes nothing. The request itself is kept field for field.
 // Once the timer fired, the request or its body read fails with the fixed ScTimeoutError, whatever the
-// fetch threw (K4): sc-transport's `send` names the operation, and the port's breaker opens on it.
+// fetch threw: sc-transport's `send` names the operation, and the port's breaker opens on it.
 
 import type { Fetch } from "../sc/sc-client";
 import { ScTimeoutError } from "../sc/sc-errors";

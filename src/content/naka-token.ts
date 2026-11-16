@@ -1,6 +1,7 @@
 // The Naka token, read from the page's own auth record for the client's token function, in the isolated
-// script only (Ruling 9). It is `state.token` of localStorage["nakastream-auth"]: undefined when logged
-// out or unreadable, and it never throws, so no error can carry the record's text.
+// script only: the token never leaves the Naka tab's isolated world. It is `state.token` of
+// localStorage["nakastream-auth"]: undefined when logged out or unreadable, and it never throws, so no error
+// can carry the record's text.
 
 import { isRecord } from "../naka/naka-transport";
 import { AUTH_KEY } from "./naka-bridge";

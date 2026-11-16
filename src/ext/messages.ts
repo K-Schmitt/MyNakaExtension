@@ -93,7 +93,7 @@ export type NakaReplyError =
   | "unavailable"
   | "not-found";
 
-// `value` is untrusted, whatever the parser did: the worker re-validates it with Plan 2's Naka parsers.
+// `value` is untrusted, whatever the parser did: the worker re-validates it with the Naka client's parsers.
 // It is absent for void calls (add, remove): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReply =
   | { ok: true; value?: unknown }

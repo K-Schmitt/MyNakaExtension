@@ -1,10 +1,10 @@
-// One end of viewing (Rulings 13, 15 and 18). In order: the settings; the local pre-check, which stops for
-// free a message our own state already decides; the hour's budget; the slot reserved at once, before any
-// network call, so that no kill loses the count; the event built from Naka's catalogue (a read); the
-// binding, before any network call after that read and before any write; Plan 2's handleFinish; the
-// record, saved with the reserved slot. A finish writes in both modes (spec §8quinquies). A content Naka
-// does not know, or of the wrong kind, keeps its slot spent: a page's message records nothing, a replayed
-// waiting finish records naka-content-unknown (unknown-content.ts).
+// One end of viewing. In order: the settings; the local pre-check, which stops for free a message our own
+// state already decides; the hour's budget; the slot reserved at once, before any network call, so that no
+// kill loses the count; the event built from Naka's catalogue (a read); the binding, before any network call
+// after that read and before any write; core's handleFinish; the record, saved with the reserved slot. A
+// finish writes in both modes (the simulation covers the lists only). A content Naka does not know, or of the
+// wrong kind, keeps its slot spent: a page's message records nothing, a replayed waiting finish records
+// naka-content-unknown (unknown-content.ts).
 
 import type { FinishedMessage } from "../content/playback-tracker";
 import { contentKeyOf } from "../core/finish-event";
@@ -80,7 +80,7 @@ async function attempt(
   }
 }
 
-// One refusal per window is enough to show the limit (K3): the later ones write nothing.
+// One refusal per window is enough to show the limit: the later ones write nothing.
 function alreadyRefused(settings: Settings, window: FinishWindow): boolean {
   const last = settings.lastFinish;
   return last?.error === "finish-limit" && last.at >= window.from;

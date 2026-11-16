@@ -1,5 +1,5 @@
-// One sample of the page's first <video>: its position, its duration and the source it plays (B8's
-// stale-source rule needs `currentSrc`). A missing or unreadable element is no sample.
+// One sample of the page's first <video>: its position, its duration and the source it plays (the tracker
+// drops a sample of a stale source, so it needs `currentSrc`). A missing or unreadable element is no sample.
 
 export type VideoSample = {
   currentTime: number;
