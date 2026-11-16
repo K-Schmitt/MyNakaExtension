@@ -48,7 +48,7 @@ type Reference = { src: string; duration: number };
 export type PlaybackTracker = {
   context(ctx: PlayerContext | undefined): void;
   sample(s: VideoSample): FinishedMessage | undefined;
-  /** `takeGesture` uses up the last real gesture: true when it was recent enough (none given: false). */
+  /** `takeGesture` uses up the last real gesture, for a title not playing only: true when it was recent enough (none given: false). */
   watched(
     ev: PageEvent,
     takeGesture?: () => boolean,
@@ -196,8 +196,8 @@ export function createPlaybackTracker(): PlaybackTracker {
       // A page script can name any id: the content playing, or one real gesture per other content.
       const isPlaying =
         sampled && current !== undefined && sameKey(current, playing);
-      const hadGesture = takeGesture();
-      if (!isPlaying && !hadGesture) return undefined;
+      // The playing title's « vu » leaves the gesture to an off-player « vu » that follows the same click.
+      if (!isPlaying && !takeGesture()) return undefined;
       stateOf(playing).watched = true;
       return {
         type: "finished",

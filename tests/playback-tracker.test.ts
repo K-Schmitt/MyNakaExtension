@@ -5,6 +5,7 @@ import {
   type PlaybackTracker,
   PROGRESS_MARKS,
 } from "../src/content/playback-tracker";
+import { createGestureGate } from "../src/content/user-gesture";
 import { THRESHOLD_CHOICES } from "../src/core/watch-trigger";
 import { PAGE_CHANNEL, type PageEvent } from "../src/ext/messages";
 
@@ -515,15 +516,27 @@ describe("watched", () => {
     expect(t.watched({ ...ev, contentId: 6 }, () => false)).toBeUndefined();
   });
 
-  it("the playing title's vu needs no gesture, and uses up any recent one", () => {
+  it("the playing title's vu needs no gesture and leaves any recent one unused", () => {
     const t = playingFilm();
     let takes = 0;
     const take = () => {
       takes += 1;
-      return false;
+      return true;
     };
     expect(t.watched(ev, take)?.source).toBe("explicit");
-    expect(takes).toBe(1);
+    expect(takes).toBe(0);
+  });
+
+  // One click, then the playing « vu » and an off-player « vu » within 3 s: the click is the second one's.
+  it("after one click, the playing vu then an off-player vu both count", () => {
+    const t = playingFilm();
+    let clock = 1000;
+    const gate = createGestureGate(() => clock);
+    gate.note({ type: "click", isTrusted: true });
+    clock += 500;
+    expect(t.watched(ev, gate.take)?.contentId).toBe(5);
+    clock += 500;
+    expect(t.watched({ ...ev, contentId: 6 }, gate.take)?.contentId).toBe(6);
   });
 
   it("a repeated off-player vu of a title already sent leaves the gesture unused", () => {

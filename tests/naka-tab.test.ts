@@ -567,14 +567,17 @@ describe("the Naka tab", () => {
     ).toEqual([1, 2]);
   });
 
-  it("the playing title's vu uses up the click that made it", () => {
+  // The playing title's « vu » needs no click, so it leaves the click to an off-player « vu ».
+  it("the playing title's vu leaves the click to the off-player vu after it", () => {
     const t = tab(PLAYER(3));
     t.played();
     t.gestures.note({ type: "click", isTrusted: true });
     t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
     t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 4242 });
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 4243 });
     expect(t.sent.slice(1)).toEqual([
       { type: "finished", source: "explicit", progress: 1, contentId: 3 },
+      { type: "finished", source: "explicit", progress: 1, contentId: 4242 },
     ]);
   });
 
