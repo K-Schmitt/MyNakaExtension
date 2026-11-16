@@ -4,6 +4,7 @@
 // the reader (sc-wishlist.ts) rejects a page with a dropped item, so a dropped item never shortens a list.
 
 import { imageOf, type TitleImage } from "../core/title-image";
+import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 
 export type ScWishItem = {
   productId: number;
@@ -21,8 +22,6 @@ type WishlistPage = { items: ScWishItem[]; total: number };
 type Fields = Record<string, unknown>;
 
 const YEAR_PREFIX = /^\d{4}/;
-const MIN_YEAR = 1800;
-const MAX_YEAR = 2100;
 
 function isRecord(value: unknown): value is Fields {
   return typeof value === "object" && value !== null;

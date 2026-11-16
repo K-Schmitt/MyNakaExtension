@@ -4,7 +4,7 @@
 // already-parsed JSON value, and touches no `fetch`, no `chrome.*` and no DOM. Anything it cannot read is
 // "no event"; the bounds are the parser's.
 
-import { MAX_YEAR, MIN_YEAR } from "../ext/fiche-page-events";
+import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 import { PAGE_CHANNEL, type PageEvent, parsePageEvent } from "../ext/messages";
 
 const NAKA_ORIGIN = "https://naka.cx";
