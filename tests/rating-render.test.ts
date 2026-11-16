@@ -15,7 +15,13 @@ import {
 import { type RatingView, ratingView } from "../src/content/ui/rating-view";
 import { starRater } from "../src/content/ui/star-rater";
 import { episodeCard } from "./rating-fixtures";
-import { descendants, FakeDoc, FakeElement, FakeShadow } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  FakeElement,
+  FakeShadow,
+} from "./ui-fakes";
 
 function setup() {
   FakeElement.focused = null;
@@ -28,7 +34,7 @@ function setup() {
     onConfirm: vi.fn(),
   };
   const block = {
-    show: (view: RatingView) => renderRating(doc, root, view, handlers),
+    show: (view: RatingView) => renderRating(doc, root, view, handlers, COUNTS),
   };
   const buttons = () => descendants(root).filter((el) => el.tag === "button");
   const button = (text: string) => {

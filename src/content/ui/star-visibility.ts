@@ -5,7 +5,10 @@
 // (Naka lifts a hovered episode box by 3 px) and an overlay at opacity 0 are not seen by v2: known gaps.
 // No entry yet, an entry without `isVisible`, or a browser without the observer: the click counts, so a real
 // click is never lost to a missing signal. A row taken off the page stays watched, so it is read afresh once
-// put back; the row a slot (an episode box, the info row) drew last is unwatched when a new one replaces it.
+// put back; the row a slot (an episode box, the info row) drew last is unwatched when a new one replaces it,
+// or when the slot is released (a block taken off or drawn again whole: draw-watch). Since 2026-11-16 (owner)
+// the same rule guards every write button: the player and home-row stars, « Annuler », « Retirer la note »
+// and the series confirmation.
 
 import type { ElementLike } from "./dom-like";
 
@@ -21,6 +24,8 @@ export type ObserverMaker = (
 ) => VisibilityObserver | undefined;
 /** Starts watching a slot's star row; the answer says whether a click on it counts now. */
 export type SeenWatch = (row: ElementLike, slot: object) => () => boolean;
+/** The same, and `release` stops watching the row a slot drew last. */
+export type ReleasableWatch = SeenWatch & { release(slot: object): void };
 
 type Last = { visible: false } | { visible: true; since: number };
 
@@ -36,7 +41,7 @@ function nextLast(
 export function createSeenWatch(
   make: ObserverMaker,
   now: () => number,
-): SeenWatch {
+): ReleasableWatch {
   const last = new WeakMap<object, Last>();
   const drawn = new WeakMap<object, object>();
   const observer = make((entries) => {
@@ -51,7 +56,7 @@ export function createSeenWatch(
     if (seen === undefined) return true;
     return seen.visible && now() - seen.since >= MIN_VISIBLE_MS;
   };
-  return (row, slot) => {
+  const watch: SeenWatch = (row, slot) => {
     const previous = drawn.get(slot);
     if (previous !== undefined && previous !== row) {
       observer?.unobserve(previous);
@@ -60,4 +65,11 @@ export function createSeenWatch(
     observer?.observe(row);
     return () => counts(row);
   };
+  const release = (slot: object): void => {
+    const row = drawn.get(slot);
+    if (row === undefined) return;
+    drawn.delete(slot);
+    observer?.unobserve(row);
+  };
+  return Object.assign(watch, { release });
 }

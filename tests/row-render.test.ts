@@ -7,7 +7,13 @@ import { ROW_SHEET } from "../src/content/ui/row-styles";
 import type { AmbiguityOffer, RemovalOffer } from "../src/sw/question-offers";
 import { themeCss } from "../src/ui/theme-tokens";
 import { filmCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  FakeShadow,
+} from "./ui-fakes";
 
 const codePoints = (text: string | null): number[] =>
   [...(text ?? "")].map((c) => c.codePointAt(0) ?? 0);
@@ -49,7 +55,7 @@ function drawn() {
     [{ key: AMBIG.key, view: questionView(AMBIG, ["ecarter"]) }],
     { key: LIVE.key, view: questionView(LIVE, ["fermer"]) },
   );
-  renderRow(doc, root, view, HANDLERS);
+  renderRow(doc, root, view, HANDLERS, COUNTS);
   return root;
 }
 
@@ -108,7 +114,7 @@ describe("renderRow", () => {
       [{ key: AMBIG.key, view: questionView(AMBIG, ["ecarter"]) }],
       { key: LIVE.key, view: questionView(LIVE, ["fermer"]) },
     );
-    renderRow(doc, root, view, HANDLERS);
+    renderRow(doc, root, view, HANDLERS, COUNTS);
     const [, track] = root.children as FakeElement[];
     const cards = (track as FakeElement).children as FakeElement[];
     expect(cards.map((c) => c.className)).toEqual([
@@ -141,10 +147,10 @@ describe("renderRow", () => {
     const doc = new FakeDoc();
     const root = new FakeShadow();
     const view = homeView([{ card: filmCard({ key: "movie:1" }) }]);
-    renderRow(doc, root, view, HANDLERS);
+    renderRow(doc, root, view, HANDLERS, COUNTS);
     const [, first] = root.children as FakeElement[];
     (first as unknown as { scrollLeft: number }).scrollLeft = 624;
-    renderRow(doc, root, view, HANDLERS);
+    renderRow(doc, root, view, HANDLERS, COUNTS);
     const [, second] = root.children as FakeElement[];
     expect(second).not.toBe(first);
     expect((second as unknown as { scrollLeft: number }).scrollLeft).toBe(624);
@@ -159,8 +165,8 @@ describe("renderRow", () => {
   it("replaces what the root held", () => {
     const doc = new FakeDoc();
     const root = new FakeShadow();
-    renderRow(doc, root, homeView([]), HANDLERS);
-    renderRow(doc, root, homeView([]), HANDLERS);
+    renderRow(doc, root, homeView([]), HANDLERS, COUNTS);
+    renderRow(doc, root, homeView([]), HANDLERS, COUNTS);
     expect(root.children).toHaveLength(2);
   });
 });
@@ -190,7 +196,7 @@ function drawnWith(handlers: HomeHandlers) {
     [{ key: AMBIG.key, view: questionView(AMBIG, ["ecarter"]) }],
     { key: LIVE.key, view: questionView(LIVE, ["fermer"]) },
   );
-  renderRow(new FakeDoc(), root, view, handlers);
+  renderRow(new FakeDoc(), root, view, handlers, COUNTS);
   const [, track] = root.children as FakeElement[];
   return { root, cards: (track as FakeElement).children as FakeElement[] };
 }

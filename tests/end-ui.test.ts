@@ -4,7 +4,7 @@ import { questionView } from "../src/content/ui/question-view";
 import { ratingView } from "../src/content/ui/rating-view";
 import { QUESTION } from "./end-block-fakes";
 import { filmCard } from "./rating-fixtures";
-import { descendants, FakeDoc, FakeNode } from "./ui-fakes";
+import { descendants, FakeDoc, FakeNode, noObserverWatch } from "./ui-fakes";
 
 const handlers = () => ({
   onChoose: vi.fn(),
@@ -21,7 +21,7 @@ const buttonsIn = (doc: FakeDoc) =>
 describe("the end block's surface", () => {
   it("adds nothing to the page until a block is shown", () => {
     const doc = new FakeDoc();
-    createEndUi(doc);
+    createEndUi(doc, noObserverWatch());
     expect(doc.created).toEqual([]);
     expect(doc.body.children).toEqual([]);
   });
@@ -29,7 +29,7 @@ describe("the end block's surface", () => {
   it("draws the view in the closed shadow root of the host under body", () => {
     const doc = new FakeDoc();
     const h = handlers();
-    createEndUi(doc).show(view(), h);
+    createEndUi(doc, noObserverWatch()).show(view(), h);
     const host = doc.created[0];
     expect(host?.parent).toBe(doc.body);
     expect(host?.shadowInit).toEqual([{ mode: "closed" }]);
@@ -39,7 +39,7 @@ describe("the end block's surface", () => {
 
   it("puts the host back first when the page removed it", () => {
     const doc = new FakeDoc();
-    const ui = createEndUi(doc);
+    const ui = createEndUi(doc, noObserverWatch());
     ui.show(view(), handlers());
     doc.created[0]?.remove();
     ui.show(view(), handlers());
@@ -50,13 +50,13 @@ describe("the end block's surface", () => {
     const doc = new FakeDoc();
     const full = new FakeNode();
     doc.fullscreenElement = full;
-    createEndUi(doc).show(view(), handlers());
+    createEndUi(doc, noObserverWatch()).show(view(), handlers());
     expect(doc.created[0]?.parent).toBe(full);
   });
 
   it("hide empties the root, and hiding before any show does nothing", () => {
     const doc = new FakeDoc();
-    const ui = createEndUi(doc);
+    const ui = createEndUi(doc, noObserverWatch());
     ui.hide();
     expect(doc.created).toEqual([]);
     ui.show(view(), handlers());
@@ -67,7 +67,7 @@ describe("the end block's surface", () => {
   it("draws a question in the same host and root, and its click reaches the handler", () => {
     const doc = new FakeDoc();
     const h = { onChoose: vi.fn(), onAction: vi.fn() };
-    const ui = createEndUi(doc);
+    const ui = createEndUi(doc, noObserverWatch());
     ui.show(view(), handlers());
     ui.showQuestion(questionView(QUESTION, ["plus-tard"]), h);
     expect(doc.body.children).toHaveLength(1);

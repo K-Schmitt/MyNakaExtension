@@ -153,4 +153,27 @@ describe("createSeenWatch: whether a click on a star row counts (D7)", () => {
     w.watch(target("elsewhere") as never, slot());
     expect(w.unobserved).toEqual([old]);
   });
+
+  it("release stops watching the row a slot drew last, and only that slot's", () => {
+    const w = world();
+    const place = slot();
+    const row = target("row");
+    const other = target("other");
+    w.watch(row as never, place);
+    w.watch(other as never, slot());
+    w.watch.release(place);
+    expect(w.unobserved).toEqual([row]);
+    w.watch.release(place);
+    expect(w.unobserved).toEqual([row]);
+  });
+
+  it("release does nothing without an observer", () => {
+    const watch = createSeenWatch(
+      () => undefined,
+      () => 0,
+    );
+    const place = slot();
+    watch(target("row") as never, place);
+    expect(() => watch.release(place)).not.toThrow();
+  });
 });

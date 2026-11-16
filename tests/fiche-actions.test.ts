@@ -31,7 +31,7 @@ import {
   starsOf,
   texts,
 } from "./fiche-ui-world";
-import { FakeDoc, type FakeElement } from "./ui-fakes";
+import { FakeDoc, type FakeElement, noObserverWatch } from "./ui-fakes";
 
 const NB = "\u202F";
 const URL = "https://www.senscritique.com/film/solaris/1234";
@@ -597,6 +597,7 @@ describe("the actions between two views", () => {
     const shown = createFicheActions({
       doc,
       panel: aside.panel,
+      seen: noObserverWatch(),
       watch: () => () => {},
       timer: idleTimer,
     });
@@ -683,5 +684,53 @@ describe("a title star click and the star's visibility (D7)", () => {
     expect(t.ofType("fiche-rate").map((c) => c.msg)).toMatchObject([
       { type: "fiche-rate", rating: 8 },
     ]);
+  });
+});
+
+describe("the write buttons and the actions' visibility (D7, owner's decision 2026-11-16)", () => {
+  const slotOf = (t: Awaited<ReturnType<typeof film>>, label: string) => {
+    const el = buttonNamed(actionParts(t), label);
+    // The watched element is the button itself (or, for the confirmation, its row).
+    const i = t.stars.rows.findIndex((row) => row === el);
+    return t.stars.slots[i];
+  };
+
+  it.each([
+    ["Annuler", { canUndo: true }, "fiche-undo"],
+    ["Retirer la note", { canRemove: true }, "fiche-remove"],
+  ] as const)(
+    "« %s » sends nothing while reported hidden, and sends once visible",
+    async (label, flags, type) => {
+      const t = await film(productOf(flags));
+      expect(slotOf(t, label)).toBeDefined();
+      t.stars.hidden = true;
+      buttonNamed(actionParts(t), label)?.click(true);
+      expect(t.ofType(type)).toEqual([]);
+      t.stars.hidden = false;
+      buttonNamed(actionParts(t), label)?.click(true);
+      expect(t.ofType(type)).toHaveLength(1);
+    },
+  );
+
+  it("a series' « Envoyer » sends nothing while reported hidden, and sends once visible", async () => {
+    const t = await series();
+    star(t.parts(), 6)?.click(true);
+    t.stars.hidden = true;
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+    t.stars.hidden = false;
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    expect(t.ofType("fiche-rate")).toHaveLength(1);
+  });
+
+  it("stops watching the write buttons' row on a redraw and when the tab leaves the title page", async () => {
+    const t = await film(productOf({ canRemove: true }));
+    const first = slotOf(t, "Retirer la note");
+    buttonNamed(actionParts(t), "Retirer la note")?.click(true);
+    expect(t.stars.released).toContain(first);
+    const second = slotOf(t, "Retirer la note");
+    expect(second).not.toBe(first);
+    t.controller.path("/");
+    expect(t.stars.released).toContain(second);
   });
 });

@@ -6,6 +6,7 @@
 import type { QuestionCandidate } from "../../core/state";
 import type { FicheView } from "../fiche-view";
 import type { ElementLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import { candidateChoices } from "./fiche-candidate-choice";
 import {
   INFO_FAILED_LINE,
@@ -46,16 +47,17 @@ export function seasonLines(doc: Maker, view: FicheView): ElementLike[] {
   return [textLine(doc, seasonFailedLine(view.season), ERROR_CLASS)];
 }
 
+/** The series' warning, then « Envoyer » and « Annuler », acting only while `watch` says them visible (D7). */
 export function seriesConfirm(
   doc: Maker,
   handlers: FicheHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
+  const onConfirm = (send: boolean) =>
+    send ? handlers.confirmSeries() : handlers.cancelSeries();
   return [
     textLine(doc, SERIES_CONFIRM, WARNING_CLASS),
-    confirmRow(doc, {
-      onConfirm: (send) =>
-        send ? handlers.confirmSeries() : handlers.cancelSeries(),
-    }),
+    confirmRow(doc, { onConfirm }, watch),
   ];
 }
 

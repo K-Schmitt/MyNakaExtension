@@ -9,7 +9,7 @@ import { buildBlock } from "../src/content/ui/rating-render";
 import { buildRatingTile } from "../src/content/ui/rating-tile";
 import { type RatingView, ratingView } from "../src/content/ui/rating-view";
 import { episodeCard, target } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
+import { COUNTS, descendants, FakeDoc, type FakeElement } from "./ui-fakes";
 
 const POSTER = "https://image.tmdb.org/t/p/w780/back.jpg";
 
@@ -24,7 +24,13 @@ function handlers() {
 
 function tile(view: RatingView, image: string | undefined) {
   const h = handlers();
-  const el = buildRatingTile(new FakeDoc(), view, image, h) as FakeElement;
+  const el = buildRatingTile(
+    new FakeDoc(),
+    view,
+    image,
+    h,
+    COUNTS,
+  ) as FakeElement;
   const buttons = descendants(el).filter((d) => d.tag === "button");
   return { el, h, buttons };
 }
@@ -67,7 +73,12 @@ describe("buildRatingTile", () => {
   });
 
   it("shows the same lines as the player block, in the same order", () => {
-    const block = buildBlock(new FakeDoc(), FULL, handlers()) as FakeElement;
+    const block = buildBlock(
+      new FakeDoc(),
+      FULL,
+      handlers(),
+      COUNTS,
+    ) as FakeElement;
     const lines = lineTexts(tile(FULL, POSTER).el);
     expect(lines).toEqual(lineTexts(block));
     expect(lines).toHaveLength(6);

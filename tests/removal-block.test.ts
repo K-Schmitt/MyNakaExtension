@@ -16,7 +16,12 @@ import type {
   RemovalOfferAnswer,
 } from "../src/sw/question-offers";
 import { fakeClock, flush } from "./end-block-fakes";
-import { descendants, FakeDoc, type FakeElement } from "./ui-fakes";
+import {
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  noObserverWatch,
+} from "./ui-fakes";
 
 const NB = " ";
 const OFFER: RemovalOffer = {
@@ -41,7 +46,7 @@ function lastFor(target: QuestionKey, seq: number): LastAnswer {
 function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   const clock = fakeClock();
   const doc = new FakeDoc();
-  const ui = createEndUi(doc);
+  const ui = createEndUi(doc, noObserverWatch());
   const sent: unknown[][] = [];
   const asked: number[] = [];
   const script = { answer: first as RemovalOfferAnswer | undefined };
