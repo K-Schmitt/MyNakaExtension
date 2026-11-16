@@ -194,6 +194,30 @@ describe("isolated-world entry", () => {
     expect(toWorker.slice(before)).toEqual([{ type: "playlist-changed" }]);
   });
 
+  it("lets a vu of a title not playing through only after a trusted click on the window", async () => {
+    const before = toWorker.length;
+    const onClick = pageListeners.find((l) => l.type === "click")?.fn as (
+      event: unknown,
+    ) => void;
+    const onMessage = pageListeners.find((l) => l.type === "message")
+      ?.fn as PageListener;
+    const vu = (contentId: number) =>
+      onMessage({
+        source: page,
+        origin: "https://naka.cx",
+        data: { channel: "mynaka/1", kind: "watched", contentId },
+      });
+    vu(50);
+    onClick({ type: "click", isTrusted: true });
+    vu(51);
+    onClick({ type: "click", isTrusted: false });
+    vu(52);
+    await settle();
+    expect(toWorker.slice(before)).toEqual([
+      { type: "finished", source: "explicit", progress: 1, contentId: 51 },
+    ]);
+  });
+
   it("asks the worker for the cards to rate when the URL poll finds the home page", async () => {
     const before = toWorker.length;
     vi.stubGlobal("location", { href: "https://naka.cx/" });

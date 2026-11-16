@@ -1,16 +1,21 @@
 // The owner's last real gesture on the Naka page. A « vu » for a title the player is not playing (the fiche's
 // episode list, the player's « Épisodes » panel) counts only right after one: a page script can post a « vu »
-// for any id, but it cannot make an event with isTrusted true. One gesture lets one such « vu » through.
+// for any id, but it cannot make an event with isTrusted true. One gesture lets one such « vu » through, and
+// each « vu » uses up the oldest gesture still recent: ticking three episodes in a row gives three.
 
-// Naka's PUT /history/watched follows the click within one request round-trip.
+// Assumption, no probe behind it (to confirm at acceptance): Naka's PUT /history/watched, and so the page
+// event, follows the click within one request round-trip.
 export const GESTURE_WINDOW_MS = 3000;
+// One click fires pointerup then click, and Enter on a button fires a click too: one gesture.
+export const GESTURE_MERGE_MS = 300;
+export const MAX_GESTURES = 5;
 
 export type GestureEvent = { type: string; isTrusted?: boolean; key?: string };
 
 export type GestureGate = {
   /** Records a trusted click, pointerup, or Enter/Space keydown; anything else is ignored. */
   note(event: GestureEvent): void;
-  /** True once per gesture, within the window: the gesture is used up. */
+  /** Uses up the oldest gesture still within the window (older ones are dropped): true when there was one. */
   take(): boolean;
 };
 
@@ -40,21 +45,34 @@ function isGesture(event: GestureEvent): boolean {
   return GESTURE_TYPES.includes(event.type);
 }
 
+// A gesture within GESTURE_MERGE_MS of the last one is the same gesture: its time moves forward.
+function remember(gestures: number[], at: number): number[] {
+  const last = gestures[gestures.length - 1];
+  if (last !== undefined && at >= last && at - last <= GESTURE_MERGE_MS) {
+    return [...gestures.slice(0, -1), at];
+  }
+  return [...gestures, at].slice(-MAX_GESTURES);
+}
+
 export function createGestureGate(now: () => number): GestureGate {
-  let lastGestureAt: number | undefined;
+  let gestures: number[] = [];
   return {
     note(event) {
-      if (isGesture(event)) lastGestureAt = now();
+      if (isGesture(event)) gestures = remember(gestures, now());
     },
     take() {
-      const recent = isRecentGesture(lastGestureAt, now(), GESTURE_WINDOW_MS);
-      lastGestureAt = undefined;
-      return recent;
+      const at = now();
+      const recent = gestures.filter((g) =>
+        isRecentGesture(g, at, GESTURE_WINDOW_MS),
+      );
+      gestures = recent.slice(1);
+      return recent.length > 0;
     },
   };
 }
 
-// Capture phase on the window: the page cannot stop the event before the extension sees it.
+// Capture phase on the window. A page listener added earlier on the window can still stop the event
+// (stopImmediatePropagation): the « vu » off the player is then refused, never let through.
 export function listenToGestures(
   target: GestureTarget,
   gate: GestureGate,

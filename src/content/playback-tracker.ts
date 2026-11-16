@@ -11,9 +11,10 @@
 // CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither,
 // so a start is bound to the content playing when it arrives (none playing: it is ignored).
 //
-// An explicit « vu » counts for the content playing (same id, season and episode): a page script can post
-// one for any id. For any other content (none playing, another title, another episode, the whole series)
-// it counts only right after a real gesture on the page, and each gesture is used up by one « vu ».
+// An explicit « vu » counts for the content playing (same id, season and episode) once a sample of it has
+// counted in this context: a page script can post one for any id and pushState to any player URL. For any
+// other content (none playing, not yet sampled, another title, another episode, the whole series) it counts
+// only right after a real gesture on the page, and each « vu » uses up one gesture.
 
 import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
@@ -107,6 +108,8 @@ export function createPlaybackTracker(): PlaybackTracker {
   let previousSrc: string | undefined;
   let lastSrc: string | undefined;
   let reference: Reference | undefined;
+  // A sample of the current context has counted: its content really plays.
+  let sampled = false;
 
   function stateOf(p: Playing): KeyState {
     const key = keyOf(p);
@@ -135,6 +138,7 @@ export function createPlaybackTracker(): PlaybackTracker {
     if (lastSrc !== undefined) previousSrc = lastSrc;
     lastSrc = undefined;
     reference = undefined;
+    sampled = false;
   }
 
   function isCurrentSrc(src: string): boolean {
@@ -163,6 +167,7 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (current === undefined || !isCurrentSrc(s.src)) return undefined;
       lastSrc = s.src;
       if (!isConsistent(s)) return undefined;
+      sampled = true;
       const state = stateOf(current);
       const progress = s.currentTime / s.duration;
       const reached = newMarks(state, progress);
@@ -190,7 +195,8 @@ export function createPlaybackTracker(): PlaybackTracker {
       const playing = idsOf(ev);
       if (states.get(keyOf(playing))?.watched === true) return undefined;
       // A page script can name any id (F1): the content playing, or one real gesture per other content.
-      const isPlaying = current !== undefined && sameKey(current, playing);
+      const isPlaying =
+        sampled && current !== undefined && sameKey(current, playing);
       const hadGesture = takeGesture();
       if (!isPlaying && !hadGesture) return undefined;
       stateOf(playing).watched = true;

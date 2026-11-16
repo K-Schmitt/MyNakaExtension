@@ -21,6 +21,26 @@ function film() {
   return t;
 }
 
+let playedSources = 0;
+// The context, then one counted sample of a new source: the tracker knows the content really plays.
+function play(
+  t: PlaybackTracker,
+  ctx: Parameters<PlaybackTracker["context"]>[0],
+) {
+  t.context(ctx);
+  playedSources += 1;
+  t.sample({
+    currentTime: 0.1 * DUR,
+    duration: DUR,
+    src: `play-${playedSources}`,
+  });
+  return t;
+}
+
+function playingFilm() {
+  return play(createPlaybackTracker(), FILM);
+}
+
 // A sample at a fraction of the duration, from a video source.
 function at(t: PlaybackTracker, fraction: number, src = "A", duration = DUR) {
   return t.sample({ currentTime: fraction * duration, duration, src });
@@ -332,7 +352,7 @@ describe("keys", () => {
       contentId,
     });
     const watchedPlaying = (id: number) => {
-      t.context({ contentId: id, mediaType: "movie" });
+      play(t, { contentId: id, mediaType: "movie" });
       return t.watched(ev(id));
     };
     for (let id = 1; id <= 200; id += 1) watchedPlaying(id);
@@ -349,7 +369,7 @@ describe("unwatched", () => {
   const off: PageEvent = { channel: CH, kind: "unwatched", contentId: 5 };
 
   it("lets the next explicit vu of that key through again", () => {
-    const t = film();
+    const t = playingFilm();
     t.watched(ev);
     expect(t.watched(ev)).toBeUndefined();
     t.unwatched(off);
@@ -358,21 +378,21 @@ describe("unwatched", () => {
 
   it("leaves the other keys alone", () => {
     const t = createPlaybackTracker();
-    t.context({ contentId: 6, mediaType: "movie" });
+    play(t, { contentId: 6, mediaType: "movie" });
     t.watched({ ...ev, contentId: 6 });
     t.unwatched(off);
     expect(t.watched({ ...ev, contentId: 6 })).toBeUndefined();
   });
 
   it("is ignored for any other event kind", () => {
-    const t = film();
+    const t = playingFilm();
     t.watched(ev);
     t.unwatched(ev);
     expect(t.watched(ev)).toBeUndefined();
   });
 
   it("never sends anything by itself", () => {
-    expect(film().unwatched(off)).toBeUndefined();
+    expect(playingFilm().unwatched(off)).toBeUndefined();
   });
 });
 
@@ -380,7 +400,7 @@ describe("watched", () => {
   const ev: Watched = { channel: CH, kind: "watched", contentId: 5 };
 
   it("sends an explicit finished once per key", () => {
-    const t = film();
+    const t = playingFilm();
     expect(t.watched(ev)).toEqual({
       type: "finished",
       source: "explicit",
@@ -392,7 +412,7 @@ describe("watched", () => {
 
   it("carries season and episode of the episode playing", () => {
     const t = createPlaybackTracker();
-    t.context(EP);
+    play(t, EP);
     expect(t.watched({ ...ev, contentId: 9, season: 1, episode: 2 })).toEqual({
       type: "finished",
       source: "explicit",
@@ -406,7 +426,7 @@ describe("watched", () => {
   it("a different episode, once playing, is a new key", () => {
     const t = createPlaybackTracker();
     const playing = (contentId: number, season: number, episode: number) => {
-      t.context({ contentId, mediaType: "tv", season, episode });
+      play(t, { contentId, mediaType: "tv", season, episode });
       return t.watched({ ...ev, contentId, season, episode });
     };
     expect(playing(5, 1, 1)).toBeDefined();
@@ -417,12 +437,12 @@ describe("watched", () => {
   });
 
   it("ignores a vu for a title that is not the one playing (forged id)", () => {
-    const t = film();
+    const t = playingFilm();
     expect(t.watched({ ...ev, contentId: 4242 })).toBeUndefined();
   });
 
   it("a forged vu for another title does not use up the playing title's vu", () => {
-    const t = film();
+    const t = playingFilm();
     t.watched({ ...ev, contentId: 4242 });
     expect(t.watched(ev)?.source).toBe("explicit");
   });
@@ -432,15 +452,15 @@ describe("watched", () => {
   });
 
   it("ignores a vu of the title just left when the player is closed", () => {
-    const t = film();
+    const t = playingFilm();
     t.context(undefined);
     expect(t.watched(ev)).toBeUndefined();
   });
 
   it("ignores the previous episode's vu once the player moved to the next one", () => {
     const t = createPlaybackTracker();
-    t.context(EP);
-    t.context({ ...EP, episode: 3 });
+    play(t, EP);
+    play(t, { ...EP, episode: 3 });
     expect(t.watched({ ...ev, contentId: 9, season: 1, episode: 2 })).toBe(
       undefined,
     );
@@ -456,7 +476,7 @@ describe("watched", () => {
 
   it("ignores a vu of the whole series or of another episode while an episode plays", () => {
     const t = createPlaybackTracker();
-    t.context(EP);
+    play(t, EP);
     expect(t.watched({ ...ev, contentId: 9 })).toBeUndefined();
     expect(
       t.watched({ ...ev, contentId: 9, season: 1, episode: 5 }),
@@ -467,7 +487,7 @@ describe("watched", () => {
   });
 
   it("a vu for a title not playing counts right after a real gesture", () => {
-    const t = film();
+    const t = playingFilm();
     expect(t.watched({ ...ev, contentId: 6 }, () => true)).toEqual({
       type: "finished",
       source: "explicit",
@@ -491,12 +511,12 @@ describe("watched", () => {
   });
 
   it("a vu for a title not playing, without a gesture, sends nothing", () => {
-    const t = film();
+    const t = playingFilm();
     expect(t.watched({ ...ev, contentId: 6 }, () => false)).toBeUndefined();
   });
 
   it("the playing title's vu needs no gesture, and uses up any recent one", () => {
-    const t = film();
+    const t = playingFilm();
     let takes = 0;
     const take = () => {
       takes += 1;
@@ -507,7 +527,7 @@ describe("watched", () => {
   });
 
   it("a repeated off-player vu of a title already sent leaves the gesture unused", () => {
-    const t = film();
+    const t = playingFilm();
     t.watched({ ...ev, contentId: 6 }, () => true);
     let takes = 0;
     const take = () => {
@@ -518,8 +538,47 @@ describe("watched", () => {
     expect(takes).toBe(0);
   });
 
-  it("ignores an episode's vu while a film with the same id plays", () => {
+  it("the playing title's vu needs a gesture until a sample of it counted (a page can pushState)", () => {
     const t = film();
+    expect(t.watched(ev)).toBeUndefined();
+    expect(t.watched(ev, () => true)?.source).toBe("explicit");
+  });
+
+  it("the playing title's vu counts without a gesture after one counted sample", () => {
+    const t = film();
+    at(t, 0.1);
+    expect(t.watched(ev)?.source).toBe("explicit");
+  });
+
+  it("a sample of the previous content does not count for the one the URL moved to", () => {
+    const t = playingFilm();
+    t.context({ contentId: 6, mediaType: "movie" });
+    expect(t.watched({ ...ev, contentId: 6 })).toBeUndefined();
+  });
+
+  it("a sample of the previous source after the URL moved does not count", () => {
+    const t = film();
+    at(t, 0.1, "old");
+    t.context({ contentId: 6, mediaType: "movie" });
+    at(t, 0.2, "old");
+    expect(t.watched({ ...ev, contentId: 6 })).toBeUndefined();
+  });
+
+  it("an implausible sample (a short clip) does not count", () => {
+    const t = film();
+    sampleOf(t, 10, 60, "clip");
+    expect(t.watched(ev)).toBeUndefined();
+  });
+
+  it("coming back to a content needs a new counted sample", () => {
+    const t = playingFilm();
+    t.context(EP);
+    t.context(FILM);
+    expect(t.watched(ev)).toBeUndefined();
+  });
+
+  it("ignores an episode's vu while a film with the same id plays", () => {
+    const t = playingFilm();
     expect(t.watched({ ...ev, season: 1, episode: 1 })).toBeUndefined();
   });
 
@@ -533,7 +592,7 @@ describe("watched", () => {
   });
 
   it("is independent of the threshold marks of the same key", () => {
-    const t = film();
+    const t = playingFilm();
     at(t, 0.99);
     expect(t.watched(ev)?.source).toBe("explicit");
   });

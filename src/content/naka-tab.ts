@@ -65,12 +65,7 @@ function sendFinished(env: TabEnv, msg: FinishedMessage): void {
   env.finished(idsOf(msg));
 }
 
-function relay(
-  env: TabEnv,
-  tracker: PlaybackTracker,
-  follow: () => void,
-  event: PageEvent,
-) {
+function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   if (event.kind === "fiche" || event.kind === "season") {
     // Naka sends them right after a navigation: the controller follows the address before the next poll.
     env.fiche.path(pathOf(env.href()));
@@ -91,8 +86,6 @@ function relay(
     tracker.credits(event);
     return;
   }
-  // A « vu » is judged against the player URL of this moment, not the last poll's.
-  follow();
   const finished = tracker.watched(event, env.takeGesture);
   if (finished) sendFinished(env, finished);
 }
@@ -147,6 +140,6 @@ export function startNakaTab(env: TabEnv): void {
   env.every(SAMPLE_MS, sample);
   env.onPageMessage((ev) => {
     const event = acceptPageEvent(ev, env.self);
-    if (event) relay(env, tracker, follow, event);
+    if (event) relay(env, tracker, event);
   });
 }
