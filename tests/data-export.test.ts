@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STORED_KEYS } from "../src/ext/store";
 import { exportFileName, exportText } from "../src/status/data-export";
 import { EXPORT_FAILED, mountExport } from "../src/status/data-export-dom";
 import { FakeElement } from "./ui-fakes";
@@ -32,6 +33,13 @@ describe("exportText", () => {
     expect(parsed.extension).toBe("MyNakaExtension");
     expect(parsed.version).toBe("1.2.3");
     expect(parsed.exportedAt).toBe(NOW.toISOString());
+  });
+
+  // The export reads the store's own list: a sixth stored key reaches the file without a second list.
+  it("exports every key the store keeps", () => {
+    const stored = Object.fromEntries(STORED_KEYS.map((key) => [key, key]));
+    const parsed = JSON.parse(exportText(stored, "1", NOW));
+    expect(parsed.data).toEqual(stored);
   });
 
   it("leaves an absent key absent, not null", () => {
