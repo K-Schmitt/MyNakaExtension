@@ -76,9 +76,12 @@ async function afterLink(
   rated: () => Promise<RateAnswer>,
 ): Promise<RateAnswer> {
   const waiting = await linkForRating(deps.store, pair);
-  const answer = await rated();
-  if (waiting !== undefined) await finishJob(deps, waiting);
-  return answer;
+  try {
+    return await rated();
+  } finally {
+    // The link resolved the question that held the finish: it is run even when the rating step threw.
+    if (waiting !== undefined) await finishJob(deps, waiting);
+  }
 }
 
 export function rateSeries(
