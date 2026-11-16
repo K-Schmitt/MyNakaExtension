@@ -111,6 +111,7 @@ export function createEndBlock(ports: EndPorts) {
     /** Off the player: the queue and the waits go (a later finished polls again), the shown card closes. */
     leave(): void {
       epoch += 1;
+      for (const ids of queue) seen.delete(contentKeyOf(ids));
       queue.length = 0;
       for (const [key, stop] of waits) {
         stop();

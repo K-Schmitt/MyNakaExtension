@@ -558,6 +558,22 @@ describe("the end block and the overlay's other users", () => {
     expect(w.calls.filter((c) => !c.startsWith("ask"))).toEqual([]);
   });
 
+  it("after leave, a later finished for a key that was queued behind a card opens its card", async () => {
+    const w = world();
+    w.script(EP_IDS, answer(episodeCard()));
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7, title: "Suivant" })));
+    w.block.finished(EP_IDS);
+    await w.clock.advance(2000);
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    w.block.leave();
+    w.script(OTHER_IDS, answer(filmCard({ contentId: 7, title: "Suivant" })));
+    w.block.finished(OTHER_IDS);
+    await w.clock.advance(2000);
+    expect(w.block.isShown()).toBe(true);
+    expect(w.last().view.heading).toContain("Suivant");
+  });
+
   it("after leave, a later finished for a key that was still waiting polls again", async () => {
     const w = world();
     w.script(FILM_IDS, NOTHING);
