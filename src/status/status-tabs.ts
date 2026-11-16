@@ -17,3 +17,16 @@ export function tabAfterKey(current: TabId, key: string): TabId | undefined {
   if (key === "End") return TAB_IDS[last];
   return undefined;
 }
+
+const PANEL_OF: Record<string, TabId> = {
+  resync: "activite",
+  switch: "activite",
+  headline: "activite",
+  forget: "reglages",
+  reset: "reglages",
+};
+
+// The id to focus: the target itself, or the selected tab button when the target sits in a hidden panel.
+export function focusIdFor(target: string, selected: TabId): string {
+  return PANEL_OF[target] === selected ? target : `tab-${selected}`;
+}
