@@ -194,7 +194,7 @@ de visionnage, page d'état minimale. L'interface complète vient au Plan 4.
 ## 2026-11-04 — Recette du Plan 3
 
 La recette dans Brave a validé le moteur :
-- 265 films et séries lus dans les envies, soit les 268 envies moins 1 livre et 2 jeux ;
+- toutes les envies lues, films et séries (les livres et les jeux sont écartés) ;
 - les fins d'épisode par seuil et par le bouton « vu » de Naka ;
 - le passage automatique à l'épisode suivant ;
 - la synchronisation après un changement de « Ma liste » ;
@@ -205,7 +205,7 @@ Le 2026-11-04 à 20:11, le propriétaire a passé les listes en écritures activ
 
 Faits appris pendant la recette :
 - marquer un épisode vu laisse la série dans les envies ;
-- le propriétaire quitte au début du générique, vers 84 % pour un épisode d'« Un Job Mortel ».
+- le propriétaire quitte au début du générique, vers 84 % d'un épisode.
 
 ## 2026-11-05 — Plan 4a : noter depuis Naka
 
@@ -334,7 +334,7 @@ Décisions à connaître :
 
 Écarté :
 - Retirer aussi « vu » sur SensCritique quand on le décoche sur Naka : ce serait une écriture que le
-  propriétaire n'a pas cliquée dans un bloc de l'extension (idée gardée dans BACKLOG.md).
+  propriétaire n'a pas cliquée dans un bloc de l'extension (idée gardée pour plus tard).
 
 Limites connues :
 - Les données enregistrées ne vont que vers l'avant : après le 4b, une version 4a lit l'état ET les
@@ -350,11 +350,11 @@ Limites connues :
 - Une écriture née d'une réponse ou d'une liaison peut attendre plusieurs passages quand d'autres
   écritures sont reportées (10 par passage au plus).
 
-## 2026-11-06 — Saison en cours de diffusion (VisionQuest)
+## 2026-11-06 — Saison en cours de diffusion
 
-Défaut vu pendant la recette du 4b : l'épisode 7 de VisionQuest passait pour la fin de la saison et de la
-série. `available-seasons` ne compte que les épisodes sortis (`{1: 7}`), alors que la fiche du catalogue
-annonce `numberOfEpisodes: 8`.
+Défaut vu pendant la recette du 4b : l'épisode 7 d'une série en cours de diffusion passait pour la fin de
+la saison et de la série. `available-seasons` ne compte que les épisodes sortis (`{1: 7}`), alors que la
+fiche du catalogue annonce `numberOfEpisodes: 8`.
 
 ### Décisions
 
@@ -659,6 +659,36 @@ et D6 réglées, le champ de recherche durci, D7 laissée en attente.
   worker (double écriture possible si le clic de la page part quand même). Limite : une visite déjà finie, ou une
   lecture de la fiche perdue après « Annuler », n’affiche rien.
 
+## 2026-11-16 — Étape 9 : audit, finition et publication
+
+L’extension devient publique : un audit (sécurité et code), une page en deux onglets, l’export des données,
+la licence MIT, les READMEs et la politique de confidentialité.
+
+**Décisions du propriétaire**
+- Distribution par GitHub seulement : un zip en Release, chargé en mode développeur. Les boutiques de
+  navigateur sont écartées.
+- La simulation reste, sous un interrupteur décrit dans l’onglet Réglages ; ses écritures prévues ne
+  s’affichent que là.
+- Écritures actives par défaut à l’installation, mais le premier passage attend un clic sur
+  « Resynchroniser » (ajouts seulement, 10 écritures au plus). Un clic en simulation lève aussi
+  l’attente : le passage en écritures garde sa confirmation.
+- « Réinitialiser » garde le mode, et le passage suivant attend lui aussi un clic.
+- L’historique git est réécrit pour retirer l’adresse e-mail personnelle des commits. Limite acceptée :
+  les pages des anciennes pull requests de GitHub gardent les anciens commits.
+
+**Corrections de sécurité et risques restants**
+- F1 (moyen) : une page hostile pouvait envoyer une fin explicite inventée pour n’importe quel titre. Une
+  fin ne compte plus que pour le titre en cours de lecture, après un vrai échantillon de lecture ; un
+  « vu » coché hors du lecteur ne compte que dans les 3 s d’un geste de confiance, un geste chacun.
+  Restent : un « vu » inventé par vrai clic ; une page qui joue une vraie vidéo de 5 minutes ou plus ;
+  le « vu » de l’épisode précédent avant l’échantillon suivant, qui compte sans geste ; deux clics à
+  moins de 300 ms comptent pour un geste.
+- F2 (faible) : la garde de visibilité (300 ms visible sans interruption) couvre désormais chaque
+  contrôle qui écrit : étoiles du lecteur et de l’accueil, « Retirer la note », « Annuler », « Envoyer »
+  des séries, offre de retrait et choix d’un titre ambigu.
+- F3 (faible) : le workflow de release, qui construit le zip publié, épingle ses actions par SHA.
+- L’audit du code a corrigé dix défauts mineurs (F4 à F13) et retiré le code mort.
+
 ## Leçons apprises
 
 - Pour une logique qui rapproche deux listes au fil des passages, la relecture cas par cas ne suffit
@@ -675,3 +705,7 @@ et D6 réglées, le champ de recherche durci, D7 laissée en attente.
   (ses propres listes, les actions du propriétaire), et non à partir des définitions du code, a trouvé
   deux défauts réels du Plan 4b que les relectures avaient laissés passer : la fermeture d'un retrait
   qui faisait oublier un retrait voulu, et un instantané ancien qui laissait passer un faux retrait.
+- Un contrôle de l’expéditeur qui compare une adresse entière casse dès que l’adresse change sans
+  changer de page : l’onglet Réglages (`#reglages`) a fait refuser la page de l’extension par le
+  service worker. On compare l’adresse sans son fragment, et seulement elle ; un fragment encodé ou mal
+  placé reste refusé.
