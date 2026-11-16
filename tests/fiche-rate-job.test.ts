@@ -476,6 +476,59 @@ describe("fiche-rate: a linked title's waiting finish", () => {
   });
 });
 
+// Once the rating went out, the store refuses every save of `key`: a local step after it fails.
+function refuseSaves(w: ReturnType<typeof filmWorld>, key: string): void {
+  const realSet = w.area.set;
+  w.area.set = async (items) => {
+    if (key in items && rates(w.sk.calls).length > 0) throw new Error("quota");
+    await realSet(items);
+  };
+}
+
+describe("fiche-rate: a rating that went out, then a local save that fails", () => {
+  const SENT = { sent: true, error: "unavailable", panel: RATED.panel };
+
+  it("a film: answered as sent with the save's code, and still out of « Ma liste »", async () => {
+    const w = filmWorld();
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(SENT);
+    expect(rates(w.sk.calls)).toEqual(["rate:2005:8"]);
+    expect(w.nk.calls).toContain("removeFromPlaylist:5");
+  });
+
+  it("a series whose cards cannot be saved: answered as sent with the save's code, its pair settled", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    w.area.data.set("ratings", [episodeCard()]);
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(SENT);
+    expect(w.writes()).toEqual(["rate:13:8"]);
+    expect(w.state().settled).toEqual([{ nakaId: 5, scId: 13 }]);
+  });
+
+  it("a series whose pair cannot be settled: answered as sent with the save's code", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    refuseSaves(w, "state");
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    expect(await w.jobs.ficheRate(TAB, seriesRate())).toEqual(SENT);
+    expect(w.writes()).toEqual(["rate:13:8"]);
+  });
+
+  it("an episode whose card cannot be saved: answered as sent with the save's code", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    w.area.data.set("ratings", [episodeCard()]);
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({
+      sent: true,
+      error: "unavailable",
+    });
+    expect(w.writes()).toEqual(["rate:11:8"]);
+  });
+});
+
 describe("fiche-rate: an episode", () => {
   it("of a linked series: rated only, its card's épisode rated; no finish, no slot, no link", async () => {
     const w = filmWorld({ state: linkedTo(13) });
