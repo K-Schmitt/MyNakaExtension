@@ -15,14 +15,14 @@ L’extension garde cinq entrées dans le stockage d’extension du navigateur (
 | --- | --- |
 | `state` | Les titres que l’extension a traités : les liens entre un titre Naka et sa fiche SensCritique, les titres terminés, les questions ouvertes (« quel titre est-ce ? », « retirer aussi ? »), les titres qu’elle n’a pas pu relier, et le contenu des deux listes « à voir » au dernier passage. |
 | `settings` | Tes réglages (mode simulation, seuils de fin, bloc sur la pause), les comptes liés (ton nom d’utilisateur SensCritique et l’identifiant de ton compte Naka, pour s’arrêter si un autre compte se connecte), le résultat de la dernière synchronisation et de la dernière fin de visionnage, et des compteurs d’écritures par heure. |
-| `ratings` | Les notes en attente (la liste « À noter »). |
+| `ratings` | Une fiche par titre terminé (100 au plus) : son titre, sa saison et son épisode, l’adresse de son affiche, les notes encore à donner (la liste « À noter »), les notes déjà données par l’extension, et le dernier échec. |
 | `ficheLinks` | Les liens faits à la main entre une fiche Naka et un titre SensCritique, pour l’affichage. |
 | `ficheUndo` | La dernière note donnée depuis une fiche Naka et ce qu’elle a remplacé, pour que « Annuler » le remette (10 minutes). |
 
 **Les jetons ne sont jamais enregistrés.** Le jeton de session SensCritique est lu dans ta session
-ouverte au moment de chaque requête et ne reste qu’en mémoire ; le jeton Naka reste dans le script de l’extension de l’onglet Naka.
-Aucun des deux n’est écrit dans le stockage, un journal, un message d’erreur ou un export. L’extension
-ne dépose aucun cookie qui lui soit propre.
+ouverte au moment de chaque requête et ne reste qu’en mémoire ; le jeton Naka reste dans le script de
+l’extension de l’onglet Naka. Aucun des deux n’est écrit dans le stockage, un journal, un message
+d’erreur ou un export. L’extension ne dépose aucun cookie qui lui soit propre.
 
 ## Où c’est enregistré
 
@@ -31,10 +31,16 @@ synchronisé vers d’autres appareils, et les sites web ne peuvent pas le lire.
 
 ## Où les données sont envoyées
 
-Seulement à `naka.cx` et `senscritique.com` (`www` et `apollo`), pour ton compte et pour faire ce que
-tu as demandé : lire tes listes, marquer un titre vu, donner une note, ajouter ou retirer un titre d’une
-liste. Ces requêtes utilisent ta session déjà ouverte sur chaque site, comme si tu les faisais toi-même.
-Rien n’est envoyé ailleurs, et rien n’est envoyé au développeur.
+À `naka.cx` et `senscritique.com`, pour ton compte et pour ce à quoi sert l’extension : lire tes
+listes, marquer un titre vu, donner une note, ajouter ou retirer un titre d’une liste. Ces requêtes
+utilisent ta session déjà ouverte sur chaque site, comme si tu les faisais toi-même.
+
+Les blocs dessinés dans l’onglet Naka affichent aussi des affiches, chargées depuis `image.tmdb.org` et
+`media.senscritique.com`. Ce sont de simples requêtes d’image : comme toute image d’une page web, elles
+montrent ton adresse IP et ton navigateur à ce site, et l’adresse de l’image désigne le titre. Elles ne
+portent aucune de tes données enregistrées.
+
+Rien n’est envoyé ailleurs, et rien n’arrive jamais au développeur.
 
 ## Combien de temps
 
@@ -47,11 +53,12 @@ Tout se fait sur la page de l’extension, onglet Réglages, partie « Donnée
 
 - **Accès et portabilité** : « Exporter mes données » télécharge un fichier JSON des cinq entrées
   ci-dessus.
-- **Effacement** : « Oublier les comptes liés » oublie les comptes liés ; « Réinitialiser » efface
-  l’état de synchronisation, les notes en attente, les liens d’affichage et l’enregistrement
-  d’annulation (tes réglages, le mode et les comptes liés sont gardés). Désinstaller l’extension efface
-  tout.
+- **Effacement** : « Oublier les comptes liés » oublie les comptes liés (la synchronisation réussie
+  suivante relie les comptes alors connectés) ; « Réinitialiser » efface l’état de synchronisation,
+  les fiches de note, les liens d’affichage et l’enregistrement d’annulation (tes réglages, le mode et
+  les comptes liés sont gardés). Désinstaller l’extension efface tout.
 
 ## Contact
 
-Pour une question sur cette politique : ouvre une issue sur le dépôt GitHub du projet.
+Pour une question sur cette politique : ouvre une issue sur le dépôt GitHub du projet. Les issues
+GitHub sont publiques : n’y colle ni un export, ni tes noms de compte, ni rien de personnel.

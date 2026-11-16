@@ -15,7 +15,7 @@ The extension keeps five entries in the browser's extension storage (`chrome.sto
 | --- | --- |
 | `state` | The titles the extension handled: the links between a Naka title and its SensCritique page, the titles you finished, the open questions ("which title is this?", "remove it too?"), the titles it could not link, and what both watchlists held at the last sync. |
 | `settings` | Your settings (simulation mode, finish thresholds, pause block), the linked accounts (your SensCritique username and your Naka account identifier, used to stop if another account signs in), the result of the last sync and of the last finish, and hourly write counters. |
-| `ratings` | The ratings waiting to be given (the « À noter » list). |
+| `ratings` | One card per finished title (100 at most): its title, season and episode, poster address, the ratings still to give (the « À noter » list), the ratings already given through the extension, and the last failure. |
 | `ficheLinks` | Links between a Naka title page and a SensCritique title that you made by hand, for display. |
 | `ficheUndo` | The last rating given from a Naka title page and what it replaced, so « Annuler » can put it back (10 minutes). |
 
@@ -30,10 +30,16 @@ devices and is not readable by websites.
 
 ## Where data is sent
 
-Only to `naka.cx` and `senscritique.com` (`www` and `apollo`), on your behalf and to do what you asked:
-read your watchlists, mark a title as seen, give a rating, add or remove a title from a list. These
-requests use your existing session on each site, exactly as if you made them yourself. Nothing is sent
-anywhere else, and nothing is sent to the developer.
+To `naka.cx` and `senscritique.com`, on your behalf and to do what the extension is for: read your
+watchlists, mark a title as seen, give a rating, add or remove a title from a list. These requests use
+your existing session on each site, exactly as if you made them yourself.
+
+The blocks drawn in the Naka tab also show posters, loaded from `image.tmdb.org` and
+`media.senscritique.com`. These are plain image requests: like any image on a web page, they reveal
+your IP address and browser to that host, and the image's address identifies the title. They carry
+none of your stored data.
+
+Nothing is sent anywhere else, and nothing ever reaches the developer.
 
 ## How long it is kept
 
@@ -45,10 +51,12 @@ below), or until you remove the extension, which deletes its storage.
 All on the extension's page, Réglages tab, « Données enregistrées » section:
 
 - **Access and portability**: « Exporter mes données » downloads a JSON file with the five entries above.
-- **Erasure**: « Oublier les comptes liés » forgets the linked accounts; « Réinitialiser » erases the
-  sync state, the ratings waiting, the display links and the undo record (your settings, the mode and
-  the linked accounts are kept). Removing the extension erases everything.
+- **Erasure**: « Oublier les comptes liés » forgets the linked accounts (the next successful sync links
+  the accounts then signed in again); « Réinitialiser » erases the sync state, the rating cards, the
+  display links and the undo record (your settings, the mode and the linked accounts are kept).
+  Removing the extension erases everything.
 
 ## Contact
 
-Questions about this policy: open an issue on the project's GitHub repository.
+Questions about this policy: open an issue on the project's GitHub repository. GitHub issues are
+public: do not paste an export, your account names or anything else personal into one.

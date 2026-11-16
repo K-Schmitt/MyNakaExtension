@@ -45,13 +45,14 @@ The extension is distributed on GitHub only (no browser store).
 
 On a fresh install, writes are on, but the first sync waits for you: click « Resynchroniser » on the
 extension's page (it adds only, at most 10 writes). Turn on simulation in Réglages first if you want to
-see what it would write.
+see what it would write: simulation holds back list writes only, finishes are still written.
 
 ## Privacy
 
-Everything stays in your browser's extension storage. Data goes only to naka.cx and senscritique.com,
-on your behalf; nothing goes to the developer, no analytics, no third party. Session tokens are never
-stored. You can export or erase your data from the Réglages tab. Details: [PRIVACY.md](PRIVACY.md).
+Everything stays in your browser's extension storage. Requests go to naka.cx and senscritique.com on
+your behalf, plus poster images from image.tmdb.org and media.senscritique.com; nothing reaches the
+developer, no analytics, no third-party code. Session tokens are never stored. You can export or erase
+your data from the Réglages tab. Details: [PRIVACY.md](PRIVACY.md).
 
 ## How it works
 
@@ -88,14 +89,18 @@ you already have, and splits the work across three contexts so that each secret 
 - **Strict parsers everywhere.** Every message between contexts and every stored value goes through a
   parser that rebuilds a fresh object from known keys and refuses anything else. A list read
   incompletely stops the sync instead of being taken as empty.
-- **Write guards.** A write to a site needs a real (`isTrusted`) click on one of the extension's own
-  buttons, in a closed shadow root, at least 0.4 s after the button appeared; every write control is
-  also ignored unless it has been visibly on screen for 300 ms (IntersectionObserver v2), against hidden
-  clicks. A finish counts only for the title playing, after real playback. Budgets cap the damage of
-  anything that slips through: 10 list writes per sync, 30 finishes per hour, one pending finish per
-  title. Simulation mode lists the writes a sync would make without making them.
-- **Fail closed.** Another account signed in on either site stops every job before it writes; a rate-limit
-  refusal, an expired session or a timeout trips a circuit breaker for the rest of the job.
+- **Write guards.** Ratings, answers to questions, links, removals and undo need a real (`isTrusted`)
+  click on one of the extension's own controls, in a closed shadow root, at least 0.4 s after it
+  appeared, and visibly on screen for 300 ms (IntersectionObserver v2), against hidden clicks. The
+  automatic writes are capped by budgets: a list sync makes at most 10 writes, and the very first sync
+  waits for a click; an end of viewing counts only for the title playing, after real playback, at most
+  30 per hour and one pending per title. Simulation mode lists the list writes a sync would make
+  without making them (finishes are still written).
+- **Fail closed.** Another account signed in on either site stops every job before it writes. A circuit
+  breaker stops calling a site for the rest of the job after a rate limit (HTTP 429) or a session error
+  on either site, or a timed-out SensCritique request.
+- **Minimal permissions.** `storage`, and host access to `naka.cx`, `www.senscritique.com` and
+  `apollo.senscritique.com` only. No remote code, no `eval`.
 
 Pure logic (thresholds, title matching, list sync, finish handling) lives in `src/core/`, apart from
 anything that touches `chrome.*` or a page, and is tested without a browser.
