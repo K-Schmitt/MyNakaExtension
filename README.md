@@ -94,9 +94,9 @@ you already have, and splits the work across three contexts so that each secret 
   appeared, and visibly on screen for 300 ms (IntersectionObserver v2), against hidden clicks. The
   automatic writes are capped by budgets: a list sync makes at most 10 writes, and the very first sync
   waits for a click; a finish counts for the title playing once it passes its threshold or the credits,
-  or for a « vu » you tick yourself (a real click, one per click); at most 30 per hour and one pending
-  per title. Simulation mode lists the list writes a sync would make without making them (finishes are
-  still written).
+  or for a « vu » you tick: the playing title's counts after real playback, without a click, another
+  title's needs a real click, one per click; at most 30 per hour and one pending per title. Simulation
+  mode lists the list writes a sync would make without making them (finishes are still written).
 - **Fail closed.** Another account signed in on either site stops every job before it writes. A circuit
   breaker stops calling a site for the rest of the job after a rate limit (HTTP 429) or a session error
   on either site, or a timed-out SensCritique request.
