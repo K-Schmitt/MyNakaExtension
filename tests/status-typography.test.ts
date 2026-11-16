@@ -241,3 +241,13 @@ describe("French typography on the status page", () => {
     expect(all.flatMap(typographyFaults)).toEqual([]);
   });
 });
+
+describe("the reset confirmation", () => {
+  it("keeps the mode and promises a click, with no simulation fallback", () => {
+    const text = CONFIRM_TEXT.reset;
+    expect(text).not.toContain("repasse en simulation");
+    expect(text).not.toContain("réactiver les écritures");
+    expect(text).toContain(`«${NB}Resynchroniser${NB}»`);
+    expect(text).toContain("Le mode, les réglages");
+  });
+});
