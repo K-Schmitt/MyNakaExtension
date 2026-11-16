@@ -15,6 +15,7 @@ import {
 } from "./settings-dom";
 import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
+import { mountTabs } from "./status-tabs-dom";
 import type { StatusView } from "./status-view";
 import { createSyncEnd } from "./sync-end";
 
@@ -176,6 +177,7 @@ element("save-settings").addEventListener("click", () => {
   markSaved();
   void controller.saveSettings(readDraft());
 });
+mountTabs(document, window);
 void controller.load();
 void handled.load();
 void lists.load();

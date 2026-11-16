@@ -223,3 +223,25 @@ summary:focus-visible,
     transition: none;
   }
 }
+
+[role="tablist"] {
+  display: flex;
+  gap: var(--mn-space-2);
+  margin-bottom: var(--mn-space-4);
+  border-bottom: 1px solid var(--mn-color-border);
+}
+
+[role="tab"] {
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+[role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--mn-color-accent-text);
+  color: var(--mn-color-text);
+}
+
+[role="tabpanel"][hidden] {
+  display: none;
+}
