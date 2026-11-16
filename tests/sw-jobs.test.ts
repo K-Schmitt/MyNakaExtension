@@ -109,7 +109,7 @@ type Opts = {
 
 function world(o: Opts = {}) {
   const { area, store } = memoryStore();
-  if (o.settings) area.data.set("settings", o.settings);
+  area.data.set("settings", o.settings ?? { mode: "simulation" });
   if (o.state) area.data.set("state", o.state);
   const nk = fakeNaka(o.naka ?? catalogueNaka());
   const sk = fakeSc(o.sc ?? catalogueSc());

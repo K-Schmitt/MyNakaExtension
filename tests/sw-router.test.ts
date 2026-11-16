@@ -1827,6 +1827,7 @@ function nakaFetch(clock: Clock) {
 function worker(loggedIn = true, start = "2026-11-04T12:00:00Z") {
   const clock: Clock = { time: Date.parse(start) };
   const storage = memoryArea();
+  storage.data.set("settings", { mode: "simulation" });
   const sc = scFetch(loggedIn, clock);
   const naka = nakaFetch(clock);
   const client = createNakaClient({
@@ -2265,10 +2266,12 @@ describe("worker end to end: searches read no session", () => {
       fetch: nakaPlaylist(TWENTY),
       token: () => NAKA_TOKEN,
     });
+    const storage = memoryArea();
+    storage.data.set("settings", { mode: "simulation" });
     const r = createWorker({
       extensionId: EXT,
       session: memoryArea(),
-      storage: memoryArea(),
+      storage,
       tabs: tabRunning(client, () => "77").tabs,
       fetch: sc.fetch,
       timer: { set: () => 0, clear: () => undefined },

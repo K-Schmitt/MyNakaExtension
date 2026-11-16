@@ -23,6 +23,7 @@ export async function forgetJob(store: SettingsStore): Promise<void> {
 export type ResetRules = Record<keyof Settings, "keep" | "drop">;
 export const RESET_RULES: ResetRules = {
   mode: "drop", // always simulation
+  firstRunPending: "drop", // provisional: reworked with the reset logic
   binding: "keep",
   thresholds: "keep",
   pauseFromPercent: "keep",

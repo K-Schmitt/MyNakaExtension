@@ -19,7 +19,7 @@ const removedListeners: ((tabId: number) => void)[] = [];
 const opened = { count: 0, fail: false };
 const queries: unknown[] = [];
 const sends: unknown[][] = [];
-const stored = new Map<string, unknown>();
+const stored = new Map<string, unknown>([["settings", { mode: "simulation" }]]);
 const sessionReads: string[] = [];
 const fetched: string[] = [];
 

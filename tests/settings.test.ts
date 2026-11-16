@@ -78,8 +78,28 @@ describe("lastAnswer", () => {
 });
 
 describe("parseSettings accepts", () => {
-  it("an absent key as simulation", () => {
-    expect(parseSettings(undefined)).toEqual({ mode: "simulation" });
+  it("an absent key as live, the first run waiting for a click", () => {
+    expect(parseSettings(undefined)).toEqual({
+      mode: "live",
+      firstRunPending: true,
+    });
+  });
+
+  it("firstRunPending: true, kept", () => {
+    const value = { mode: "live", firstRunPending: true };
+    expect(parseSettings(value)).toEqual(value);
+  });
+
+  it("a stored simulation without firstRunPending, unchanged", () => {
+    expect(parseSettings({ mode: "simulation" })).toEqual({
+      mode: "simulation",
+    });
+  });
+
+  it("firstRunPending: false is rejected (only true is valid)", () => {
+    expect(() =>
+      parseSettings({ mode: "live", firstRunPending: false }),
+    ).toThrow(StoredStateError);
   });
 
   it("a full value, unchanged", () => {
