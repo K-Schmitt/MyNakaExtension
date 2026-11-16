@@ -9,7 +9,7 @@ import type { SeasonAnswer, SeasonEpisode } from "../ext/fiche-answers";
 import type { FicheSeasonMessage } from "../ext/fiche-messages";
 import { MAX_TEXT } from "../ext/fiche-page-events";
 import type { ScEpisode } from "../sc/season-episodes";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import type { JobDeps } from "./job-deps";
 

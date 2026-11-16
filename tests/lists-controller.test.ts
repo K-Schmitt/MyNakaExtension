@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ToWorker } from "../src/ext/messages";
 import { createListsController } from "../src/status/lists-controller";
 import type { ListRow, ListsView } from "../src/status/lists-view";
-import { POLL_MS } from "../src/status/status-controller";
+import { POLL_MS } from "../src/status/page-timer";
 import {
   AMBIGUITY,
   LEGACY,

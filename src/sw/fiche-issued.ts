@@ -3,8 +3,7 @@
 // a film's or a series'. A registry that cannot be read counts as not issued. Throws before any request.
 
 import type { UndoRole } from "../core/fiche-undo";
-import type { FicheAsker } from "./fiche-info-job";
-import { NotIssuedError } from "./fiche-mine-job";
+import { type FicheAsker, NotIssuedError } from "./fiche-asker";
 import type { FicheTitle } from "./fiche-registry-schema";
 import type { FicheRole } from "./fiche-roles";
 

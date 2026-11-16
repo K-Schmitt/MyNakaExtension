@@ -4,14 +4,8 @@
 
 import type { MineAnswer } from "../ext/fiche-answers";
 import type { FicheMineMessage } from "../ext/fiche-messages";
-import type { FicheAsker } from "./fiche-info-job";
+import { type FicheAsker, NotIssuedError } from "./fiche-asker";
 import type { JobDeps } from "./job-deps";
-
-export class NotIssuedError extends Error {
-  constructor() {
-    super("fiche: product not issued to this tab");
-  }
-}
 
 export async function ficheMineJob(
   deps: JobDeps,

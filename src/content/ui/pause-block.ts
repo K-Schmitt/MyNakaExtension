@@ -6,7 +6,7 @@ import type { ContentIds } from "../../core/finish-event";
 import type { RatingCard, RatingLabel } from "../../core/rating-cards";
 import type { AmbiguityOffer } from "../../sw/question-offers";
 import type { CardAnswer } from "../../sw/rating-answers";
-import type { VideoSample } from "../naka-tab";
+import type { VideoSample } from "../video-sample";
 import { askOrNothing, questionOf } from "./end-poll";
 import { createQuestionHost, type HostPorts } from "./question-host";
 import { createRatingSession } from "./rating-session";

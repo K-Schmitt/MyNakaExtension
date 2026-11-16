@@ -137,6 +137,15 @@ export function contentKeyOf({ contentId, season, episode }: ContentIds) {
   );
 }
 
+// The ids alone, without a key that holds undefined: what a message or a stored record carries.
+export function idsOf({ contentId, season, episode }: ContentIds): ContentIds {
+  return {
+    contentId,
+    ...(season === undefined ? {} : { season }),
+    ...(episode === undefined ? {} : { episode }),
+  };
+}
+
 const KEY_PARTS = /^(?:movie:(\d+)|tv:(\d+):S(\d+)E(\d+))$/;
 
 // The inverse of contentKeyOf; undefined for anything contentKey does not write.

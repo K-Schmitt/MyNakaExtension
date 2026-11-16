@@ -19,9 +19,9 @@ import type { PanelFlags, RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
 import type { JobError } from "../ext/job-error";
 import type { Store } from "../ext/store";
+import { NotIssuedError } from "./fiche-asker";
 import { linkForRating } from "./fiche-link-pair";
 import { type ListLeaving, leaveNakaList } from "./fiche-list-removal";
-import { NotIssuedError } from "./fiche-mine-job";
 import { afterRating, storedFlags } from "./fiche-panel-flags";
 import {
   type KeptBefore,

@@ -2,7 +2,7 @@
 // counted from the click, confirmation of a série, the unreachable line), so a locked entry never stops
 // the others. A card missing from the worker's list has nothing left to ask (`absentIsDone`).
 
-import type { ContentIds } from "../../core/finish-event";
+import { idsOf } from "../../core/finish-event";
 import type { RatingCard } from "../../core/rating-cards";
 import type { CardsAnswer } from "../../sw/rating-answers";
 import type { EndTimer } from "./end-poll";
@@ -27,14 +27,6 @@ type Slot = {
 
 /** `redraw(key)`: the entry of that card drew itself. `left`: an entry closed and is gone from the list. */
 export type RatingSlotHooks = { redraw(key: string): void; left(): void };
-
-function idsOf({ contentId, season, episode }: RatingCard): ContentIds {
-  return {
-    contentId,
-    ...(season === undefined ? {} : { season }),
-    ...(episode === undefined ? {} : { episode }),
-  };
-}
 
 export function createRatingSlots(
   ports: RatingSlotPorts,

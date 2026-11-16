@@ -2,11 +2,12 @@
 // Naka token; it sends a request, waits for the reply and re-validates it (see naka-values.ts). Every failure
 // is a fixed-text error: nothing the tab said is copied into one.
 
+import { checkQuery } from "../core/search-query";
 import { JobRejected } from "../ext/job-error";
 import { parseNakaReply, type ToNakaTab } from "../ext/messages";
 import type { NakaClient } from "../naka/naka-client";
 import { NakaUnavailableError } from "../naka/naka-errors";
-import { checkContentId, checkQuery } from "../naka/naka-input";
+import { checkContentId } from "../naka/naka-input";
 import {
   asAccount,
   asIdList,

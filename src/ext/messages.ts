@@ -3,8 +3,8 @@
 // fresh object holding only the known keys (anything else, a token included, is dropped), or undefined.
 
 import type { ContentIds, FinishSource } from "../core/finish-event";
+import { checkQuery } from "../core/search-query";
 import type { Thresholds } from "../core/watch-trigger";
-import { checkQuery } from "../naka/naka-input";
 import {
   FICHE_SENDERS,
   FICHE_TYPE_FLAGS,

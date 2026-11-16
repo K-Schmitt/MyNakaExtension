@@ -18,7 +18,8 @@ export type SyncPlan = {
   resolveSc: number[];
 };
 
-function pairKey(pair: Pair): string {
+/** The one key of a pair, for sets and maps: its two ids. */
+export function pairKey(pair: Pair): string {
   return `${pair.nakaId}:${pair.scId}`;
 }
 

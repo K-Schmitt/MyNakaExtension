@@ -4,11 +4,11 @@
 // and answered outside the queue (D9): it never saves. A failure is a fixed code, never the error's text.
 
 import { toCandidates } from "../core/questions";
+import { checkQuery } from "../core/search-query";
 import type { QuestionCandidate } from "../core/state";
 import type { Candidate } from "../core/title-match";
 import type { JobError } from "../ext/job-error";
 import type { SearchTitlesMessage } from "../ext/question-messages";
-import { checkQuery } from "../naka/naka-input";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { searchNakaCandidates, searchScBoth } from "./read-ports";
 import { toJobError } from "./to-job-error";

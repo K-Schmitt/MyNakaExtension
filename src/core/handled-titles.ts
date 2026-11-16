@@ -26,7 +26,7 @@ function labelOf(
 ): string {
   const title =
     state.handledTitles?.[key] ??
-    cardFor([...cards], key)?.title ??
+    cardFor(cards, key)?.title ??
     unknownTitle(ids.contentId);
   return withPlace(ids, title);
 }
@@ -45,7 +45,7 @@ export function waitingTitleOf(
   return (
     entry.question.title ??
     chosenTitle(entry) ??
-    cardFor([...cards], entry.key)?.title
+    cardFor(cards, entry.key)?.title
   );
 }
 

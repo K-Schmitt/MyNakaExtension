@@ -12,7 +12,7 @@ import type { FicheRemoveMessage } from "../ext/fiche-messages";
 import type { RemoveAnswer } from "../ext/fiche-undo-answers";
 import type { ProductState } from "../sc/sc-client";
 import { checkBinding } from "./binding";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { issuedTitle } from "./fiche-issued";
 import { type CardTitle, unrateCards } from "./fiche-local-restore";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";

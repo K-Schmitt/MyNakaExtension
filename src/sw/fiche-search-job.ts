@@ -17,7 +17,7 @@ import {
 } from "../ext/fiche-answers";
 import type { FicheSearchMessage } from "../ext/fiche-messages";
 import { WISH_UNIVERSE } from "../sc/sc-queries";
-import type { FicheAsker } from "./fiche-info-job";
+import type { FicheAsker } from "./fiche-asker";
 import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { readNakaItem } from "./read-ports";

@@ -2,7 +2,7 @@
 // pause reaches a capture listener on the document, so the listener sits there and acts only when the
 // target is the element readVideo samples. It only listens: the extension never pauses, plays or seeks.
 
-import type { VideoSample } from "./naka-tab";
+import type { VideoSample } from "./video-sample";
 import { readVideo } from "./video-sample";
 
 export type PauseDoc = {

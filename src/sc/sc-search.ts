@@ -3,7 +3,7 @@
 // many titles makes no home-page read for its searches. Only the first page (16 results, by relevance) is
 // read.
 
-import { checkQuery } from "../naka/naka-input";
+import { checkQuery } from "../core/search-query";
 import { ScUnavailableError } from "./sc-errors";
 import { UNIVERSE } from "./sc-queries";
 import {

@@ -12,7 +12,7 @@ import {
   toHandledView,
   viewOf,
 } from "./handled-view";
-import { type PageTimer, POLL_MS } from "./status-controller";
+import { type PageTimer, POLL_MS } from "./page-timer";
 
 export type HandledPorts = {
   send(message: ToWorker): Promise<unknown>;
