@@ -22,7 +22,7 @@ import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import { type JobDeps, jobNaka } from "./job-deps";
 import { readNakaItem } from "./read-ports";
 
-export class NotShownError extends Error {
+class NotShownError extends Error {
   constructor() {
     super("fiche: the tab does not show this content");
   }

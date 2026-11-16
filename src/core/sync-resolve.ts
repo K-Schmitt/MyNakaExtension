@@ -19,7 +19,7 @@ function skippedByResolver(state: SyncState, side: Side, id: number): boolean {
   );
 }
 
-export function waitingIds(
+function waitingIds(
   state: SyncState,
   side: Side,
   ids: readonly number[],

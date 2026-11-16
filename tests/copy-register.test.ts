@@ -12,7 +12,7 @@ import { HANDLED_COPY } from "../src/status/handled-view";
 import * as jobErrorLabels from "../src/status/job-error-labels";
 import * as listsCopy from "../src/status/lists-copy";
 import { SETTINGS_COPY } from "../src/status/settings-view";
-import { ACTION_COPY, CONFIRM_TEXT } from "../src/status/status-actions";
+import { CONFIRM_TEXT } from "../src/status/status-actions";
 import { localFormat } from "../src/status/status-format";
 import * as statusModeCopy from "../src/status/status-mode-copy";
 import { WAITING_LABELS } from "../src/status/status-owner-lines";
@@ -267,7 +267,7 @@ function statusPageTexts(): string[] {
   const html = readFileSync("src/status/status.html", "utf8");
   return [
     ...SNAPSHOTS.flatMap((s) => viewTexts(toStatusView(s, format))),
-    ...tableStrings([ACTION_COPY, CONFIRM_TEXT, SETTINGS_COPY]),
+    ...tableStrings([CONFIRM_TEXT, SETTINGS_COPY]),
     ...tableStrings([WAITING_LABELS, HANDLED_COPY]),
     HANDLED_COPY.heading(3),
     ...html

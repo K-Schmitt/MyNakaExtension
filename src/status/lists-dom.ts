@@ -2,13 +2,8 @@
 // typed search text. No logic of its own. Titles are remote text: textContent and setAttribute only.
 
 import type { QuestionKey } from "../core/questions";
-import {
-  LISTS_COPY,
-  type ListRow,
-  type ListsView,
-  type RowAction,
-  type RowButton,
-} from "./lists-view";
+import { LISTS_COPY } from "./lists-copy";
+import type { ListRow, ListsView, RowAction, RowButton } from "./lists-view";
 
 export type ListsHandlers = {
   onAction(key: QuestionKey, action: RowAction): void;

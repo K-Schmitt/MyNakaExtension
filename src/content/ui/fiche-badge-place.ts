@@ -4,7 +4,7 @@
 
 export type Rect = { top: number; left: number; right: number };
 
-export const BADGE_INSET_PX = 8;
+const BADGE_INSET_PX = 8;
 /** A child whose top-right corner is this close to the thumb's holds that corner. */
 const CORNER_PX = 40;
 

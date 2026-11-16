@@ -18,13 +18,13 @@ export function createEndUi(doc: DocLike, seen: ReleasableWatch) {
   const drawn = createDrawWatch(seen);
   return {
     show(view: RatingView, handlers: RatingHandlers): void {
-      overlay ??= createOverlayRoot(doc, "top-right", BLOCK_SHEET);
+      overlay ??= createOverlayRoot(doc, BLOCK_SHEET);
       overlay.attach();
       drawn.clear();
       renderRating(doc, overlay.root, view, handlers, drawn.watch);
     },
     showQuestion(view: QuestionView, handlers: QuestionHandlers): void {
-      overlay ??= createOverlayRoot(doc, "top-right", BLOCK_SHEET);
+      overlay ??= createOverlayRoot(doc, BLOCK_SHEET);
       overlay.attach();
       drawn.clear();
       renderQuestion(doc, overlay.root, view, handlers, drawn.watch);

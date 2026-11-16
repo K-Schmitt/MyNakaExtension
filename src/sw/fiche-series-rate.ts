@@ -57,9 +57,8 @@ async function rateCards(
     (card) => keys(card) && names(card, label, productId),
   );
   if (touched.length === 0) return;
-  const at = deps.now();
   const next = touched.reduce(
-    (all, card) => applyRating(all, card.key, label, rating, at),
+    (all, card) => applyRating(all, card.key, label, rating),
     cards,
   );
   await deps.store.saveRatings(next);

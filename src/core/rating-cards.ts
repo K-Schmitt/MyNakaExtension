@@ -70,7 +70,6 @@ export function applyRating(
   key: string,
   label: RatingLabel,
   rating: number,
-  _at: number,
 ): RatingCard[] {
   return mapCard(cards, key, (card) =>
     withoutFailureOf(

@@ -13,7 +13,7 @@ import type { FicheAsker } from "./fiche-info-job";
 import { type TabTurn, turnLimiters } from "./fiche-tab-turns";
 import type { JobDeps } from "./job-deps";
 
-export const MAX_SEASON_EPISODES = 500;
+const MAX_SEASON_EPISODES = 500;
 
 const isId = (n: number): boolean => Number.isSafeInteger(n) && n >= 1;
 

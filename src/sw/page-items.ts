@@ -13,8 +13,8 @@ import {
   type UnlinkedOffer,
 } from "./question-offers";
 
-export const MAX_PAGE_QUESTIONS = 50;
-export const MAX_PAGE_UNLINKED = 200;
+const MAX_PAGE_QUESTIONS = 50;
+const MAX_PAGE_UNLINKED = 200;
 
 export type PageItems = {
   questions: PageQuestion[];

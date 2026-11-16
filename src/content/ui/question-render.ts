@@ -78,7 +78,7 @@ function buttonRows(
     .map((buttons) => row(doc, buttons));
 }
 
-export function buildQuestionBlock(
+function buildQuestionBlock(
   doc: Maker,
   view: QuestionView,
   handlers: QuestionHandlers,

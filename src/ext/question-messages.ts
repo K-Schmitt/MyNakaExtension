@@ -31,10 +31,6 @@ export type QuestionMessage =
   | { type: "requeue-question"; side: Side; id: number };
 
 export type QuestionType = QuestionMessage["type"];
-export type RemovalOfferMessage = Extract<
-  QuestionMessage,
-  { type: "removal-offer" }
->;
 export type AnswerQuestionMessage = Extract<
   QuestionMessage,
   { type: "answer-question" }

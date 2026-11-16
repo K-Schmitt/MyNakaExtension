@@ -140,11 +140,7 @@ describe("createOverlayRoot", () => {
   it("keeps the sheet when the host moves", () => {
     const doc = new FakeDoc();
     const player = new FakeNode();
-    const { root } = createOverlayRoot(
-      doc,
-      "top-right",
-      ".mn-card { color: red; }",
-    );
+    const { root } = createOverlayRoot(doc, ".mn-card { color: red; }");
     root.replaceChildren(new FakeNode());
     doc.enterFullscreen(player);
     root.replaceChildren(new FakeNode());

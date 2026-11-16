@@ -20,14 +20,14 @@ export type PanelState = Pick<
   "rating" | "isReviewed" | "isRecommended" | "url"
 >;
 
-export const NO_PANEL: PanelFlags = {
+const NO_PANEL: PanelFlags = {
   canUndo: false,
   canRemove: false,
   protected: false,
 };
 
 /** `undoLeftMs`: how long the undo record stays live, 0 without one. */
-export function panelFlags(state: PanelState, undoLeftMs: number): PanelFlags {
+function panelFlags(state: PanelState, undoLeftMs: number): PanelFlags {
   const flags: PanelFlags = {
     canUndo: undoLeftMs > 0,
     canRemove: canRemove(state),
@@ -50,7 +50,7 @@ export function undoLive(
 }
 
 /** How long the stored record still undoes this product of this title: 0 when it does not. */
-export function undoLeft(
+function undoLeft(
   record: FicheUndo | null,
   title: TitleIds,
   now: number,
