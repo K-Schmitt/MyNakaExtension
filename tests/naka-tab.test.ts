@@ -120,6 +120,8 @@ describe("the tab listener", () => {
 });
 
 const PLAYER = (id: number) => `https://naka.cx/player?id=${id}&type=movie`;
+const EPISODE = (id: number, season: number, episode: number) =>
+  `https://naka.cx/player?id=${id}&type=tv&season=${season}&episode=${episode}`;
 const SELF = { name: "the tab's window" };
 
 function tab(start = PLAYER(3)) {
@@ -283,7 +285,7 @@ describe("the Naka tab", () => {
   });
 
   it("the explicit finished send calls the end block with the same ids", () => {
-    const t = tab();
+    const t = tab(EPISODE(7, 1, 2));
     t.post({
       channel: PAGE_CHANNEL,
       kind: "watched",
@@ -359,8 +361,8 @@ describe("the Naka tab", () => {
     expect(t.sent.slice(1)).toEqual([{ type: "playlist-changed" }]);
   });
 
-  it("an explicit vu gives one finished candidate", () => {
-    const t = tab();
+  it("an explicit vu of the episode playing gives one finished candidate", () => {
+    const t = tab(EPISODE(7, 1, 2));
     const watched = {
       channel: PAGE_CHANNEL,
       kind: "watched",
@@ -403,8 +405,49 @@ describe("the Naka tab", () => {
     expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
   });
 
+  it("a forged vu for a title that is not playing sends nothing", () => {
+    const t = tab(PLAYER(3));
+    t.tick(1000);
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 4242 });
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "watched",
+      contentId: 4243,
+      season: 1,
+      episode: 1,
+    });
+    expect(t.sent.slice(1)).toEqual([]);
+    expect(t.ended).toEqual([]);
+  });
+
+  it("a vu off the player page sends nothing", () => {
+    const t = tab("https://naka.cx/content/movie/3");
+    t.tick(1000);
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
+    expect(t.sent.slice(1)).toEqual([]);
+  });
+
+  it("a vu reads the player URL first: the episode just opened counts before the next poll", () => {
+    const t = tab(EPISODE(7, 1, 2));
+    t.tick(1000);
+    t.page.href = EPISODE(7, 1, 3);
+    const watched = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
+    t.post({ ...watched, season: 1, episode: 2 });
+    t.post({ ...watched, season: 1, episode: 3 });
+    expect(t.sent.slice(1)).toEqual([
+      {
+        type: "finished",
+        source: "explicit",
+        progress: 1,
+        contentId: 7,
+        season: 1,
+        episode: 3,
+      },
+    ]);
+  });
+
   it("after an unticked vu, the next tick of that title gives a finished again", () => {
-    const t = tab();
+    const t = tab(PLAYER(7));
     const on = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
     t.post(on);
     t.post({ ...on, kind: "unwatched" });
