@@ -76,7 +76,19 @@ function recordOf(
   };
 }
 
-/** Stores the record of this rating, or clears any when a state was not read; the record stored, if any. */
+/** Clears the stored record; a store that refuses leaves the older one, which then names another rating. */
+async function clearRecord(deps: JobDeps): Promise<void> {
+  try {
+    await deps.store.saveFicheUndo(null);
+  } catch {
+    // The rating goes out either way, with no « Annuler ».
+  }
+}
+
+/**
+ * Stores the record of this rating, or clears any when a state was not read; the record stored, if any.
+ * A save that fails never stops the rating: the record is cleared and the panel offers no undo.
+ */
 async function keepUndo(
   deps: JobDeps,
   msg: FicheRateMessage,
@@ -87,8 +99,13 @@ async function keepUndo(
   const local = before && (await readLocal(deps, title));
   const record =
     before && local ? recordOf(deps, msg, role, before, local) : undefined;
-  await deps.store.saveFicheUndo(record ?? null);
-  return record;
+  try {
+    await deps.store.saveFicheUndo(record ?? null);
+    return record;
+  } catch {
+    await clearRecord(deps);
+    return undefined;
+  }
 }
 
 /** The record stored now: null when there is none, undefined when the store could not give it. */
