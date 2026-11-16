@@ -167,7 +167,7 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     expect(field?.value).toBe("Solyaris");
   });
 
-  it("sends no second search while one is pending (R1)", async () => {
+  it("sends no second search while one is pending", async () => {
     const t = await notFound();
     const field = t.field();
     const chercher = t.chercher();

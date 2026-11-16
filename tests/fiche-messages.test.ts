@@ -438,7 +438,7 @@ describe("the panel's flags in the answers", () => {
     expect(parseRateAnswer(sent)).toEqual(sent);
   });
 
-  it("reads the flags on a rating that did not go out after its finish wrote (D9, R2)", () => {
+  it("reads the flags on a rating that did not go out after its finish wrote", () => {
     const wrote = { error: "unavailable", panel };
     expect(parseRateAnswer(wrote)).toEqual(wrote);
     expect(parseRateAnswer({ error: "unavailable" })).toEqual({

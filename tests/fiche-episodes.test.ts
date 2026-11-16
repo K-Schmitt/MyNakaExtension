@@ -398,7 +398,7 @@ describe("an episode rating on its box", () => {
     return { t, three, four };
   };
 
-  it("sends nothing for a trusted click on an episode's stars reported hidden (D7)", async () => {
+  it("sends nothing for a trusted click on an episode's stars reported hidden", async () => {
     const { t, three } = await twoBoxes();
     t.stars.hidden = true;
     starOf(three, 6)?.click(true);
@@ -416,14 +416,14 @@ describe("an episode rating on its box", () => {
       t.stars.rows[i]?.children.includes(starOf(b, 6) as FakeElement),
     );
 
-  it("stops watching a box's stars when the tab leaves the title page (D7)", async () => {
+  it("stops watching a box's stars when the tab leaves the title page", async () => {
     const { t, three, four } = await twoBoxes();
     const slots = [starsSlotOf(t, three), starsSlotOf(t, four)];
     t.controller.path("/");
     expect(t.stars.released).toEqual(expect.arrayContaining(slots));
   });
 
-  it("stops watching a box's stars once Naka drops the box (D7)", async () => {
+  it("stops watching a box's stars once Naka drops the box", async () => {
     const three = fakeBox("S1 E3");
     const four = fakeBox("S1 E4");
     const boxes = [three, four];
@@ -436,7 +436,7 @@ describe("an episode rating on its box", () => {
     expect(t.stars.released).toEqual([slot]);
   });
 
-  it("stops watching a box's stars when Naka rewrites its code for another season (D7)", async () => {
+  it("stops watching a box's stars when Naka rewrites its code for another season", async () => {
     const { t, three } = await twoBoxes();
     const slot = starsSlotOf(t, three);
     three.codeSpan.textContent = "S2 E3";
@@ -444,7 +444,7 @@ describe("an episode rating on its box", () => {
     expect(t.stars.released).toEqual([slot]);
   });
 
-  it("draws each box's stars in a slot of its own, kept when the box is drawn again (D7)", async () => {
+  it("draws each box's stars in a slot of its own, kept when the box is drawn again", async () => {
     const { t, three, four } = await twoBoxes();
     const slotOf = (b: FakeBox) =>
       t.stars.slots.filter((_, i) =>
@@ -460,7 +460,7 @@ describe("an episode rating on its box", () => {
     expect(slotOf(three)).toBe(first);
   });
 
-  it("refuses only the hidden box's stars: another box's click still rates (D7)", async () => {
+  it("refuses only the hidden box's stars: another box's click still rates", async () => {
     const { t, three, four } = await twoBoxes();
     const groupOfThree = t.stars.rows.find((row) =>
       row.children.includes(starOf(three, 6) as FakeElement),

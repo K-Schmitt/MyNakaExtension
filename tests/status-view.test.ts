@@ -191,7 +191,7 @@ describe("toStatusView: the last run, by its own mode", () => {
     `Pas encore examinés${NB}: 4`,
   ];
 
-  // Ruling 21: failed writes, in either mode, right after Déjà vus, and only when there are some.
+  // Failed writes, in either mode, right after Déjà vus, and only when there are some.
   const FAILED = (n: number) =>
     `Échecs (nouvel essai au prochain passage)${NB}: ${n}`;
   const withFailures = (mode: RunRecord["mode"], n: number) =>
@@ -524,7 +524,7 @@ describe("the confirmation before going live", () => {
     );
   });
 
-  // Ruling 21: one title agrees in the singular; two and more keep « les N titres ».
+  // One title agrees in the singular; two and more keep « les N titres ».
   it("with one title in the preview: le titre de l’aperçu", () => {
     expect(confirmText(1)).toBe(
       `${ASK} ${NEXT} reprendra le titre de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
@@ -544,7 +544,7 @@ describe("the confirmation before going live", () => {
   });
 });
 
-// Ruling 20: the status is answered while a job runs; the page names it and asks again until it ends.
+// The status is answered while a job runs; the page names it and asks again until it ends.
 describe("toStatusView: what runs now", () => {
   it("names a running sync with the time it started, and asks to be polled", () => {
     const view = ready({ mode: "live", running: { kind: "sync", since: AT } });

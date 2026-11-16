@@ -3,7 +3,7 @@ import { createDrawWatch } from "../src/content/ui/draw-watch";
 import { MIN_VISIBLE_MS } from "../src/content/ui/star-visibility";
 import { FakeElement, fakeVisibility } from "./ui-fakes";
 
-describe("createDrawWatch: the D7 watch of a block drawn again whole", () => {
+describe("createDrawWatch: the visibility watch of a block drawn again whole", () => {
   it("watches each row it is given, each in a place of its own", () => {
     const v = fakeVisibility();
     const draw = createDrawWatch(v.seen);

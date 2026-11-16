@@ -33,28 +33,28 @@ import {
   type World,
 } from "./runtime-world";
 
-// Model-based fuzz of the whole worker (router, queue, jobs, ports, Plan 2's runSync and handleFinish)
+// Model-based fuzz of the whole worker (router, queue, jobs, ports, the core's runSync and handleFinish)
 // against an in-memory world. It interleaves the five message kinds and the owner's answers (B5a) from their senders, forged messages
 // from the wrong sender or a look-alike site, worker restarts (the in-memory queue, limiters and
 // debounce lost, storage kept), store failures, expired sessions on both sites, a closed tab, orphan
 // tabs, account switches, the owner's list edits and stored thresholds.
 // Oracles, checked at each write (tests/runtime-oracles.ts):
-//   O1 never two jobs at once (per worker); the status answer is no job (Ruling 20);
+//   O1 never two jobs at once (per worker); the status answer is no job;
 //   O2 the stored state always passes parseState (and the settings parseSettings);
 //   O3 no list write while the stored mode is simulation;
 //   O4 no write and no state save while the bound accounts are not the signed-in ones;
-//   O5 Plan 2's re-add: no title written back to a side the owner removed it from, once a completed run
+//   O5 the re-add rule: no title written back to a side the owner removed it from, once a completed run
 //      had seen it in both lists;
-//   O6 Plan 2's re-wish: no wish of a film whose finish saved, unwished or marked it done;
+//   O6 the re-wish rule: no wish of a film whose finish saved, unwished or marked it done;
 //   O7 a job runs, and the status is answered, only for a message its sender may send (forged ones are
 //      ignored);
 //   O9 no SensCritique finish write by a job that started with the hour's 30 finishes spent (the stored
 //      count itself never exceeds 30: O2);
 //   O10 once the job's pinned tab refused a send, or every tab it found did (its tab lost), no later tabs
-//       call of that job (Ruling 17);
+//       call of that job;
 //   O11 a job tries the tabs it found in their query order, pins the first that answers, then sends to it
-//       only, with no new lookup (Rulings 9 and 20); orphan tabs, with no content script, come first;
-//   O12 a status answer, given at once outside the queue, never writes storage (Ruling 20);
+//       only, with no new lookup; orphan tabs, with no content script, come first;
+//   O12 a status answer, given at once outside the queue, never writes storage;
 //   O13 the owner's first rule: every SensCritique finish write (markDone, unwish) comes from a finished
 //       message a Naka tab sent, explicit or with a progress at least the threshold of its kind stored at that moment;
 //   O14 a removal write (unwish, removeFromPlaylist) happens only in an answer-removal job with remove true, on the
@@ -77,7 +77,7 @@ const LOOK_ALIKE = {
 };
 
 const SEEDS = 450;
-// Seeds found by a longer run, kept: 4312 unwished a title through a stale snapshot pair (Ruling 16).
+// Seeds found by a longer run, kept: 4312 unwished a title through a stale snapshot pair.
 const EXTRA_SEEDS = [4312];
 const STEPS = 50;
 
@@ -278,7 +278,7 @@ function burst(w: World, worker: Worker): void {
   w.log.push(`burst of ${count} finishes`);
 }
 
-// I2 on purpose: an owner's answer to a title question while the Naka tab is gone leaves a waiting finish;
+// A waiting finish on purpose: an owner's answer to a title question while the Naka tab is gone leaves a waiting finish;
 // the tab and the sessions come back, and a sync follows, which retries it.
 async function waitingFinish(w: World, worker: Worker): Promise<void> {
   await drain();
@@ -408,7 +408,7 @@ describe("runtime fuzz: the worker against an in-memory world", () => {
     // that closed a stored removal): the last three kinds are rare by nature, a lower floor. The two
     // removal kinds drifted from 15 down to 10 with unrelated changes (2026-11-07): the stored-removal
     // share is 0.4 and « Retirer » 0.7 of removal answers, so that they keep a margin over the floor.
-    // The I2 retry (measured: 61 retry writes over the 450 seeds, the lever at weight 0.02): it needs a
+    // The waiting-finish retry (measured: 61 retry writes over the 450 seeds, the lever at weight 0.02): it needs a
     // waiting note, then a sync with the tab back, so it is rare too.
     const rare = ["hides", "removalWrites", "declines", "retryWrites"];
     for (const [situation, count] of Object.entries(totals)) {

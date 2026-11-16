@@ -146,7 +146,7 @@ describe("a removal that lost its object is closed by the sync", () => {
     expect(removals(w.state)).toEqual([]);
   });
 
-  it("closes the 4a shape {21391, 112240873} gone from both lists, then a re-add is a new addition", async () => {
+  it("closes the recorded shape {21391, 112240873} gone from both lists, then a re-add is a new addition", async () => {
     const pair = { nakaId: 21391, scId: 112240873 };
     const w = world({ state: stored([pair], [{ removeFrom: "naka", pair }]) });
     await runSync(w.ports);

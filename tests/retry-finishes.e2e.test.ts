@@ -1,4 +1,4 @@
-// I2 end to end: the REAL router, queue and jobs over the runtime world (fake sites, a Naka tab running the
+// Finishes waiting for a Naka tab, end to end: the REAL router, queue and jobs over the runtime world (fake sites, a Naka tab running the
 // real tab handler), the oracles of the fuzz watching every write. One deterministic scenario per test.
 import { describe, expect, it } from "vitest";
 import { createRateLimiter } from "../src/core/rate-limiter";
@@ -236,7 +236,7 @@ describe("the retry of a finish, end to end", () => {
     expect(w.violations).toEqual([]);
   });
 
-  // A2: two Naka tabs that load together queue two syncs; their retries make one step, one slot.
+  // Two Naka tabs that load together queue two syncs; their retries make one step, one slot.
   it("two naka-ready at once retry a waiting finish once", async () => {
     const w = calmWorld();
     let armed = false;

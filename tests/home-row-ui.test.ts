@@ -108,7 +108,7 @@ describe("createHomeRowUi", () => {
     ]);
   });
 
-  it("watches the stars it drew (D7), only the last draw's, and none once hidden", () => {
+  it("watches the stars it drew, only the last draw's, and none once hidden", () => {
     const w = world();
     w.ui.show(VIEW, HANDLERS);
     const groups = () =>

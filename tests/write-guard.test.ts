@@ -1,6 +1,6 @@
-// D7 on the player block and the home row's rating tiles (owner's decision, 2026-11-16): a star or a
+// The visibility guard on the player block and the home row's rating tiles: a star or a
 // series confirmation counts only once IntersectionObserver v2 said its row visible for 300 ms unbroken;
-// before v2's first report the click counts (D11), and without v2 every click counts.
+// before v2's first report the click counts, and without v2 every click counts.
 
 import { describe, expect, it, vi } from "vitest";
 import { createDrawWatch } from "../src/content/ui/draw-watch";
@@ -50,7 +50,7 @@ function player() {
   return { doc, v, ui, root };
 }
 
-describe("the player block's stars and confirmation (D7)", () => {
+describe("the player block's stars and confirmation", () => {
   it("a trusted star click while the stars are reported hidden rates nothing; after 300 ms visible it rates", () => {
     const p = player();
     const h = handlers();
@@ -81,7 +81,7 @@ describe("the player block's stars and confirmation (D7)", () => {
     expect(h.onConfirm).toHaveBeenCalledWith(true);
   });
 
-  it("a click before v2's first report counts, as on the title page (D11)", () => {
+  it("a click before v2's first report counts, as on the title page", () => {
     const p = player();
     const h = handlers();
     p.ui.show(FILM(), h);
@@ -132,7 +132,7 @@ describe("the player block's stars and confirmation (D7)", () => {
   });
 });
 
-describe("the home row's rating tile (D7)", () => {
+describe("the home row's rating tile", () => {
   function tile(view: RatingView) {
     const v = fakeVisibility();
     const h = handlers();

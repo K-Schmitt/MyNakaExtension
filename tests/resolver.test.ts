@@ -632,7 +632,7 @@ describe("resolveScIds (mirror)", () => {
 });
 
 // A match whose counterpart the owner is still asked about, on the counterpart's own side, is never
-// mapped: the question goes to the owner, as for the swap guard (G1).
+// mapped: the question goes to the owner, as for the swap guard.
 describe("a match whose counterpart has an open question on its own side", () => {
   type Ambiguity = Extract<SyncState["pending"][number], { kind: "ambiguity" }>;
   const question = (

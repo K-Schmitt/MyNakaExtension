@@ -163,7 +163,7 @@ describe("a choice in the row", () => {
     locked.onChoose(9);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8"]);
-    await w.ready(); // Ruling 27: the lock redrew the row, the neighbour has a fresh grace
+    await w.ready(); // the lock redrew the row, the neighbour has a fresh grace
     w.handlersOf("movie:1").onChoose(6);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 2:: film 8", "rate 1:: film 6"]);
@@ -275,7 +275,7 @@ describe("the série confirmation in an entry", () => {
     expect(w.viewOf(SERIE.key)?.confirm).toBe(true);
     expect(w.viewOf(SERIE.key)?.notice).toBe(chosenLine(7));
     expect(w.viewOf(SERIE.key)?.warning).toBe(SERIES_WARNING);
-    await w.ready(); // Ruling F2
+    await w.ready();
     w.handlersOf(SERIE.key).onConfirm(false);
     await flush();
     expect(sendsOf(w.calls)).toEqual([]);
@@ -286,7 +286,7 @@ describe("the série confirmation in an entry", () => {
     const w = await arrived(SERIE);
     await w.ready();
     w.handlersOf(SERIE.key).onChoose(7);
-    await w.ready(); // Ruling F2: the confirmation view has its own grace
+    await w.ready(); // the confirmation view has its own grace
     w.handlersOf(SERIE.key).onConfirm(true);
     await flush();
     expect(sendsOf(w.calls)).toEqual(["rate 5:1:1 série 7"]);

@@ -266,7 +266,7 @@ describe("the end block série confirmation", () => {
   it("Envoyer sends the chosen rating", async () => {
     const w = await serieShown();
     w.last().handlers.onChoose(9);
-    await w.ready(); // Ruling F2: the confirmation view has its own grace
+    await w.ready(); // the confirmation view has its own grace
     w.last().handlers.onConfirm(true);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([
@@ -277,7 +277,7 @@ describe("the end block série confirmation", () => {
   it("Annuler sends nothing and goes back to the choices", async () => {
     const w = await serieShown();
     w.last().handlers.onChoose(9);
-    await w.ready(); // Ruling F2
+    await w.ready();
     w.last().handlers.onConfirm(false);
     await flush();
     await w.clock.advance(10000);
@@ -286,7 +286,7 @@ describe("the end block série confirmation", () => {
     expect(w.last().view.choices).toHaveLength(10);
     // The choices work again.
     w.last().handlers.onChoose(4);
-    await w.ready(); // Ruling F2
+    await w.ready();
     w.last().handlers.onConfirm(true);
     await flush();
     expect(w.calls).toContain("rate 5:1:1 série 4");
@@ -347,7 +347,7 @@ describe("the end block lock and manual choice", () => {
     await w.clock.advance(2000);
     await w.ready();
     w.last().handlers.onOther("série");
-    await w.ready(); // Ruling F1: another label's buttons have their own grace
+    await w.ready(); // another label's buttons have their own grace
     w.last().handlers.onChoose(5);
     await flush();
     expect(w.calls.filter((c) => c.startsWith("rate"))).toEqual([]);
@@ -365,7 +365,7 @@ describe("the end block waits for a manual choice to show", () => {
     await w.clock.advance(2000);
     await w.ready();
     w.last().handlers.onOther("épisode");
-    await w.ready(); // Ruling F1
+    await w.ready();
     w.last().handlers.onChoose(8);
     await flush();
     await w.clock.advance(2000);
@@ -445,7 +445,7 @@ describe("the end block actions", () => {
     await w.clock.advance(2000);
     await w.ready();
     w.last().handlers.onOther("épisode");
-    await w.ready(); // Ruling F1
+    await w.ready();
     const before = w.last().handlers;
     before.onChoose(8);
     await flush();
@@ -881,7 +881,7 @@ describe("the end block ignores a click right after a label appears", () => {
         : Promise.resolve(true);
     };
     w.last().handlers.onChoose(7);
-    await w.ready(); // Ruling F2
+    await w.ready();
     w.last().handlers.onConfirm(true);
     w.script(
       EP_IDS,
@@ -908,7 +908,7 @@ describe("the end block ignores a click right after a label appears", () => {
     expect(sends).toEqual(["série 7", "série 5"]);
   });
 
-  // Ruling F1 (4a audit, owner's decision of 2026-11-05): the label's buttons are drawn again.
+  // The label's buttons are drawn again (owner's decision of 2026-11-05).
   it("a click on « Noter la saison »: a rating at 100 ms is ignored, at 400 ms taken", async () => {
     const w = world();
     w.script(EP_IDS, answer(toSaison()));
@@ -925,7 +925,7 @@ describe("the end block ignores a click right after a label appears", () => {
     expect(rates(w.calls)).toEqual(["rate 5:1:1 saison 5"]);
   });
 
-  // Ruling F2: entering and leaving the série confirmation view draws the buttons again.
+  // Entering and leaving the série confirmation view draws the buttons again.
   it("Envoyer 100 ms after the confirmation view came is ignored, at 400 ms taken", async () => {
     const w = world();
     w.script(EP_IDS, answer(toSerie(), 7));
@@ -960,7 +960,7 @@ describe("the end block ignores a click right after a label appears", () => {
     expect(rates(w.calls)).toEqual([]);
   });
 
-  // Ruling L3: a re-send of the same rating that succeeds after a failed one closes the block.
+  // A re-send of the same rating that succeeds after a failed one closes the block.
   it("a re-send of a given rating that succeeds after a failed one closes the block", async () => {
     const w = world();
     const failedBefore = toSaison({

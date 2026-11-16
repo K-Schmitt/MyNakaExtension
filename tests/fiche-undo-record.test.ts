@@ -142,7 +142,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
     );
   });
 
-  it("without « Ma liste » in the message, the film removed by the client: kept as listed (R10)", async () => {
+  it("without « Ma liste » in the message, the film removed by the client: kept as listed", async () => {
     const w = world();
     await w.registry.open(TAB, 5, filmTitle(2005), []);
     await w.jobs.ficheRate(TAB, rate());
@@ -501,7 +501,7 @@ const filmCardOf5 = () =>
     targets: [target("film", null, 2005)],
   });
 
-describe("D9: the earlier record comes back only when nothing was written", () => {
+describe("the earlier record comes back only when nothing was written", () => {
   it("a film with no card whose finish wrote, then its ProductRate threw: this film's record kept, « Annuler » undoes the finish", async () => {
     // Arrange: SensCritique follows the finish's writes (out of the wishes, then « vu »).
     let now: Partial<ProductState> = { ...UNSEEN, isWished: true };
@@ -655,7 +655,7 @@ describe("D9: the earlier record comes back only when nothing was written", () =
   });
 });
 
-describe("D9 when the record could not be kept or read", () => {
+describe("nothing written yet, when the record could not be kept or read", () => {
   const storeLost = async () => {
     throw new Error("storage lost");
   };

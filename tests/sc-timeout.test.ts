@@ -16,7 +16,7 @@ import { withRequestTimeout } from "../src/sw/timed-fetch";
 import { strings } from "./naka-bridge-fakes";
 import { countingLimiter, fakeNaka, memoryStore } from "./sw-fakes";
 
-// K4: a SensCritique request the worker's 30 s timer aborted fails with the fixed text
+// A SensCritique request the worker's 30 s timer aborted fails with the fixed text
 // "SensCritique <label>: timeout", and opens the port's breaker like a 429.
 const TOKEN = "T0K3NFAKE0123456789abcdef";
 const HOME = "https://www.senscritique.com/";
@@ -171,7 +171,7 @@ describe("a timed-out request opens its port's breaker", () => {
     sc: countingLimiter([], "s"),
   };
 
-  // The search reads no session (Ruling 20): the home page stalls the ports that read one.
+  // The search reads no session: the home page stalls the ports that read one.
   it.each([
     [APOLLO, "searchSc"],
     [HOME, "addToSc"],

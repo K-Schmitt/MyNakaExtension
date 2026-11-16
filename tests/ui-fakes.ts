@@ -228,7 +228,7 @@ export function descendants(node: FakeNode): FakeElement[] {
 }
 
 /**
- * IntersectionObserver v2 behind the real D7 watch: `observed` holds the rows watched now, `report` says
+ * IntersectionObserver v2 behind the real visibility watch: `observed` holds the rows watched now, `report` says
  * every one of them visible or hidden, `later` moves the watch's clock.
  */
 export function fakeVisibility() {
@@ -256,10 +256,10 @@ export function fakeVisibility() {
   };
 }
 
-/** A D7 watch for tests about something else: every click counts. */
+/** A visibility watch for tests about something else: every click counts. */
 export const COUNTS: RowWatch = () => () => true;
 
-/** A D7 watch as in a browser without IntersectionObserver v2: every click counts. */
+/** A visibility watch as in a browser without IntersectionObserver v2: every click counts. */
 export const noObserverWatch = () =>
   createSeenWatch(
     () => undefined,

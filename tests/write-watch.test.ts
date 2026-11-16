@@ -1,4 +1,4 @@
-// watchWrites (D9): whether a step wrote anything yet, SensCritique writes and sync state saves counted.
+// watchWrites: whether a step wrote anything yet, SensCritique writes and sync state saves counted.
 import { describe, expect, it } from "vitest";
 import { emptyState } from "../src/core/state";
 import type { ScClient } from "../src/sc/sc-client";

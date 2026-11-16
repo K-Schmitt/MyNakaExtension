@@ -87,7 +87,7 @@ describe("a film rating and Naka's « Ma liste » button", () => {
     expect(t.page.clicks).toBe(0);
   });
 
-  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated (D14)", async () => {
+  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated", async () => {
     const t = await filmWith(true);
     t.controller.rateTitle(8);
     t.page.maListe = undefined;
@@ -201,7 +201,7 @@ describe("an undo and Naka's « Ma liste » button", () => {
     expect(t.last()?.maListeMissed).toBeUndefined();
   });
 
-  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated (D14)", async () => {
+  it("gone from the screen when the answer comes: no click, and the panel says Ma liste was not updated", async () => {
     const t = await filmWith(false);
     t.controller.undo();
     t.page.maListe = undefined;

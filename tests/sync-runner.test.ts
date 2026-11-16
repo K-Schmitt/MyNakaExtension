@@ -248,11 +248,11 @@ describe("the deferred port", () => {
   });
 });
 
-describe("removals and D1", () => {
+describe("removals: an unanswered removal is never written back", () => {
   const removalState = (): SyncState =>
     withMapping([p(1)], { snapshot: [p(1)] });
 
-  it("queues a removal without writing and keeps the pair in the snapshot (R2)", async () => {
+  it("queues a removal without writing and keeps the pair in the snapshot", async () => {
     const w = world({ naka: [1], state: removalState() });
     const r = await runSync(w.ports);
     expect(w.writes).toEqual([]);
@@ -284,7 +284,7 @@ describe("removals and D1", () => {
     ]);
   });
 
-  it("never re-adds an unanswered removal over three runs (D1)", async () => {
+  it("never re-adds an unanswered removal over three runs", async () => {
     const w = world({ naka: [1], state: removalState() });
     const r1 = await runSync(w.ports);
     const r2 = await runSync(w.ports);
@@ -308,7 +308,7 @@ describe("removals and D1", () => {
     expect(r3).toEqual(report({ pendingRemovals: 0 }));
   });
 
-  it("after the question is answered 'remove' without the title leaving, asks again and never adds (R2, probe D)", async () => {
+  it("after the question is answered 'remove' without the title leaving, asks again and never adds", async () => {
     const w = world({ naka: [1], state: removalState() });
     const r1 = await runSync(w.ports);
     w.sc.add(1001);
@@ -337,15 +337,15 @@ describe("removals and D1", () => {
       },
     ]);
     expect(r1).toEqual(report({ pendingRemovals: 1 }));
-    // Both lists hold the pair at run 2: the removal is moot and closed (B3), then re-asked from the other side.
+    // Both lists hold the pair at run 2: the removal is moot and closed, then re-asked from the other side.
     expect(r2).toEqual(report({ pendingRemovals: 0 }));
     expect(r3).toEqual(report({ pendingRemovals: 1 }));
     expect(r4).toEqual(report({ pendingRemovals: 1 }));
   });
 
-  it("a remap while the removal is pending writes nothing (D1 as a write guard)", async () => {
+  it("a remap while the removal is pending writes nothing (the pending removal guards the write)", async () => {
     // SC 1777 is a second product titled "Film 1": the resolver raises an
-    // ambiguity (Naka 1 is held by P); the owner answers it in Plan 3.
+    // ambiguity (Naka 1 is held by P); the owner answers it later.
     const w = world({
       sc: [1001, 1777],
       scTitle: { 1777: 1 },
@@ -381,7 +381,7 @@ describe("removals and D1", () => {
     ]);
   });
 
-  it("a conflicted snapshot pair is not re-added once the conflict clears (probe N)", async () => {
+  it("a conflicted snapshot pair is not re-added once the conflict clears", async () => {
     const q = { nakaId: 1, scId: 1777 };
     const w = world({
       sc: [1001, 1777],
@@ -482,7 +482,7 @@ describe("removals and D1", () => {
   });
 });
 
-describe("fail closed (D2)", () => {
+describe("fail closed", () => {
   const live = () => withMapping([p(1)], { snapshot: [p(1)] });
 
   it("rejects when load rejects, calling nothing else", async () => {
@@ -521,7 +521,7 @@ describe("fail closed (D2)", () => {
   });
 });
 
-describe("resolution (D2 step 3)", () => {
+describe("resolution", () => {
   it("passes the first 20 of 30 unresolved Naka ids, one call per side", async () => {
     const w = world({ naka: range(1, 30) });
     const r = await runSync(w.ports);
@@ -564,7 +564,7 @@ describe("resolution (D2 step 3)", () => {
   });
 });
 
-describe("the resolution cap is not wasted (R3)", () => {
+describe("the resolution cap is not wasted", () => {
   const unlinked = (side: "naka" | "sc", id: number): UnlinkedItem => ({
     side,
     id,
@@ -580,7 +580,7 @@ describe("the resolution cap is not wasted (R3)", () => {
   const first = range(101, 120);
   const nakaArg = () => vi.mocked(resolveNakaIds).mock.calls[0]?.[0];
 
-  it("skips 20 unlinked ids ahead of a new title (probe C)", async () => {
+  it("skips 20 unlinked ids ahead of a new title", async () => {
     const w = world({
       naka: [...first, 7],
       state: {
@@ -612,7 +612,7 @@ describe("the resolution cap is not wasted (R3)", () => {
   // Naka pass has just mapped most of the ids the first plan listed (this
   // test). On the Naka side a settled pair evicted from the mapping by an
   // ambiguity answer still shares its Naka id with the new pair (S4 below).
-  it("filters the SC ids against the state after the Naka pass (probe J/K)", async () => {
+  it("filters the SC ids against the state after the Naka pass", async () => {
     const w = world({ naka: range(1, 21), sc: range(1001, 1021) });
     const r1 = await runSync(w.ports);
     expect(w.describes.filter((d) => d.startsWith("sc:"))).toEqual(["sc:1021"]);
@@ -690,7 +690,7 @@ describe("the resolution cap is not wasted (R3)", () => {
   });
 });
 
-describe("failing writes (D2 step 5, R4)", () => {
+describe("failing writes", () => {
   it("one failure does not stop the side; the other side continues", async () => {
     const w = world({
       naka: range(1, 5),
@@ -786,7 +786,7 @@ describe("failing writes (D2 step 5, R4)", () => {
     );
   });
 
-  it("a failed attempt counts against the cap: 1 SC failure then 10 Naka additions (probe B)", async () => {
+  it("a failed attempt counts against the cap: 1 SC failure then 10 Naka additions", async () => {
     const w = world({
       naka: [1],
       sc: range(1011, 1020),
@@ -817,7 +817,7 @@ describe("failing writes (D2 step 5, R4)", () => {
   });
 });
 
-describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
+describe("snapshot from what the sites hold", () => {
   const base = () => withMapping([p(9), p(1)], { snapshot: [p(9)] });
 
   it("keeps out a write that resolved without taking effect", async () => {
@@ -881,7 +881,7 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     expect(w.saved[0]?.snapshot).toEqual([p(1)]);
   });
 
-  it("a re-read never drops a title the owner removed mid-run (probe A)", async () => {
+  it("a re-read never drops a title the owner removed mid-run", async () => {
     const w = world({
       naka: [5],
       sc: [1005, 1001],
@@ -952,7 +952,7 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
     expect(w.saved[0]?.snapshot).toEqual([q1, q2]);
   });
 
-  it("a re-read keeps an id the owner added mid-run: a later removal becomes a question (probe M)", async () => {
+  it("a re-read keeps an id the owner added mid-run: a later removal becomes a question", async () => {
     const w = world({
       sc: range(1001, 1011),
       afterNaka: (naka) => naka.add(11),
@@ -992,7 +992,7 @@ describe("snapshot from what the sites hold (D2 step 7, R1)", () => {
 describe("a failed pair goes last until it succeeds (S3)", () => {
   const retry = (...ps: Pair[]) => ({ retryLast: ps });
 
-  it("does not starve the side over runs (probe I)", async () => {
+  it("does not starve the side over runs", async () => {
     const w = world({
       naka: range(1, 5),
       failSc: [1001, 1002],
@@ -1018,7 +1018,7 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
     expect(r3).toEqual(report({ failed: [p(1), p(2)] }));
   });
 
-  it("failing pairs rotate to the back so they cannot starve the demoted group (probe S3)", async () => {
+  it("failing pairs rotate to the back so they cannot starve the demoted group", async () => {
     const failSc = [1001, 1002];
     const w = world({
       naka: range(1, 5),
@@ -1112,7 +1112,7 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
     expect(w.saved[0]?.retryLast).toEqual([p(1)]);
   });
 
-  it("a planned pair listed twice in retryLast is written once (probe DUP)", async () => {
+  it("a planned pair listed twice in retryLast is written once", async () => {
     const w = world({
       naka: [1],
       state: withMapping([p(1)], retry(p(1), p(1))),
@@ -1141,7 +1141,7 @@ describe("a failed pair goes last until it succeeds (S3)", () => {
   });
 });
 
-describe("purity (D4)", () => {
+describe("purity", () => {
   it("does not mutate a deep-frozen loaded state", async () => {
     const w = world({
       naka: [1, 2],

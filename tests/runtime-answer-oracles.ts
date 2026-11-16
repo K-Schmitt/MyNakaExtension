@@ -165,7 +165,7 @@ function mayRemove(w: World, side: Side, msg: AnswerRemovalMessage): boolean {
   );
 }
 
-// The finish a candidate choice runs (D4): never from a choice outside the stored candidates, and only
+// The finish a candidate choice runs: never from a choice outside the stored candidates, and only
 // for a question that waited on a finish. Any other answer job writing a finish is outside a finish job.
 export function checkAnswerFinish(w: World, what: string): void {
   const ctx = w.current;
@@ -204,7 +204,7 @@ const withoutRetries = (state: unknown): string => {
   return JSON.stringify(rest);
 };
 
-// I2's note that a finish waits for a Naka tab: the state saved is the stored one but for `retryFinishes`,
+// The note that a finish waits for a Naka tab: the state saved is the stored one but for `retryFinishes`,
 // and the finish of the question's own title failed, in this job, for lack of that tab or session.
 function isWaitingNote(w: World, ctx: AnswerContext, saved: unknown): boolean {
   if (withoutRetries(saved) !== withoutRetries(w.storage.get("state"))) {
@@ -231,11 +231,11 @@ function noteWaiting(
   w.stats.waitingNotes += 1;
 }
 
-// A state save the binding check does not judge: the answer only edits the stored questions (D10), with
+// A state save the binding check does not judge: the answer only edits the stored questions, with
 // no site read behind it. That is a dismissal, the « Non » of a STORED removal (the zero-network path),
 // and a choice's own save, the first of its job. The saves after it are those of the finish the choice
 // runs, which checks the binding itself, but for the waiting note (isWaitingNote), saved after a finish
-// that failed for lack of a Naka tab (I2; the retry checks the binding). The block « Non » (no stored
+// that failed for lack of a Naka tab (the retry checks the binding). The block « Non » (no stored
 // item) rests on a Naka read, and « Retirer aussi… » on its job's binding check: O4 judges both.
 export function isLocalAnswer(w: World, saved: unknown): boolean {
   const ctx = w.current;

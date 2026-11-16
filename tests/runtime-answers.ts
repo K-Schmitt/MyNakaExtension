@@ -80,7 +80,7 @@ function questionAnswer(w: World): AnswerSend {
   return { msg: { type: "answer-question", side, id, choice }, role: role(w) };
 }
 
-// The answer the lever of the I2 situation sends: a candidate of an open Naka question that waits on a finish.
+// The answer the lever of the waiting-finish situation sends: a candidate of an open Naka question that waits on a finish.
 export function waitingAnswer(w: World): AnswerSend | undefined {
   const open = (rawState(w).pending ?? []).filter(
     (item) =>
@@ -134,7 +134,7 @@ const isMappedNaka = (state: RawStateLike, n: number): boolean =>
   (state.mapping ?? []).some((pair) => pair.nakaId === n);
 
 // A sync that found two products for a film asks the owner: the question the worker stored, with its
-// candidates and the finish that waits on it (D4). The world has no duplicate titles, so it stores the
+// candidates and the finish that waits on it. The world has no duplicate titles, so it stores the
 // question itself, between two jobs, as the owner's list edits are.
 export function askQuestion(w: World): void {
   const state = w.storage.get("state") as RawStateLike | undefined;

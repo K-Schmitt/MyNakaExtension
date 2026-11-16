@@ -182,7 +182,7 @@ describe("the answers", () => {
     await expect(port.hideQuestion("ambiguity:naka:5")).resolves.toBe(true);
   });
 
-  it("say false, never throw, when the send rejects or throws (4a Ruling 24)", async () => {
+  it("say false, never throw, when the send rejects or throws", async () => {
     for (const send of [
       vi.fn(() => Promise.reject(new Error("gone"))),
       () => {

@@ -202,7 +202,7 @@ describe("chooseCandidate", () => {
     expect(chooseCandidate(state, "naka", 5, 50)).toBeUndefined();
   });
 
-  it("refuses a title held by a settled pair with another product: a settled {5, 60} next to a new {5, 50} (Ruling 5)", () => {
+  it("refuses a title held by a settled pair with another product: a settled {5, 60} next to a new {5, 50}", () => {
     const state = {
       ...withPending(question()),
       mapping: [p(5, 60)],
@@ -291,7 +291,7 @@ describe("linkByHand", () => {
     expect(linkByHand(emptyState(), "naka", 5, 50)).toBeUndefined();
   });
 
-  it("is undefined for a title held by a settled pair: a settled {5, 60} next to a new {5, 50} (Ruling 5)", () => {
+  it("is undefined for a title held by a settled pair: a settled {5, 60} next to a new {5, 50}", () => {
     const state = {
       ...emptyState(),
       unlinked: [unlinked],

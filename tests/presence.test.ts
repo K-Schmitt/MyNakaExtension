@@ -156,7 +156,7 @@ describe("the snapshot a late-mapped pair would have had", () => {
     ).toBe(true);
   });
 
-  it("alternating presence keeps it in (fuzz seed 124's chain)", () => {
+  it("alternating presence keeps it in (a chain a fuzz test found)", () => {
     expect(
       snapshotted(
         [[1, 4]],
@@ -169,7 +169,7 @@ describe("the snapshot a late-mapped pair would have had", () => {
     ).toBe(true);
   });
 
-  it("delayed P7: Naka back one run after SensCritique left: in", () => {
+  it("a delayed swap: Naka back one run after SensCritique left: in", () => {
     expect(
       snapshotted(
         [

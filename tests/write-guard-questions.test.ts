@@ -1,4 +1,4 @@
-// D7 on the question controls whose click can lead to a site write (follow-up of 2026-11-16): the removal
+// The visibility guard on the question controls whose click can lead to a site write: the removal
 // offer's « Retirer » choice (unwish on SC, or a removal from Naka's list) and an ambiguity's candidates
 // (the link runs the finish that waited on the question). « Garder », « Aucun de ceux-là » and the actions
 // write nothing on a site: they stay unguarded.
@@ -84,7 +84,7 @@ describe.each([
       return { v: t.v, h: t.h, root: () => t.el };
     },
   ],
-] as const)("%s's question controls (D7)", (_, make) => {
+] as const)("%s's question controls", (_, make) => {
   it("« Retirer » of a removal offer does nothing while covered, and answers once visible 300 ms", () => {
     const q = make(removal());
     q.v.report(false);
@@ -121,7 +121,7 @@ describe.each([
     expect(a.h.onChoose).toHaveBeenCalledWith({ kind: "none" });
   });
 
-  it("a click before v2's first report counts (D11)", () => {
+  it("a click before v2's first report counts", () => {
     const q = make(removal());
     named(q.root(), REMOVE)?.click(true);
     expect(q.h.onChoose).toHaveBeenCalledWith({ kind: "remove" });

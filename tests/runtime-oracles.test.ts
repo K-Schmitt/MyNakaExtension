@@ -488,7 +488,7 @@ describe("O13 a finish write needs a complete viewing", () => {
     expect(await markDone(w)).toEqual(["O13 threshold rule"]);
   });
 
-  it("with nothing stored, judges the spec's defaults: 90 % for a film, 80 % for an episode", async () => {
+  it("with nothing stored, judges the default thresholds: 90 % for a film, 80 % for an episode", async () => {
     const low = quietWorld();
     finishing(low, film("threshold", 0.89));
     expect(await markDone(low)).toEqual(["O13 threshold rule"]);
