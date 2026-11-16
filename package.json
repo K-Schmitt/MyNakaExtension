@@ -2,6 +2,7 @@
   "name": "my-naka-extension",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Passerelle entre Naka et SensCritique (extension Chromium, Manifest V3)",
   "type": "module",
   "engines": {
