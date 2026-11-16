@@ -96,6 +96,40 @@ describe("the title page's undo after a later write of the same title", () => {
     expect(w.area.data.get("ficheUndo")).toBeNull();
   });
 
+  it.each([
+    ["« Oublier » on the status page", "forgetHandled"],
+    ["« Oublier » asked by a Naka tab", "forgetHandledFromTab"],
+  ] as const)(
+    "%s of an episode nothing holds: the record stays",
+    async (_n, job) => {
+      // Arrange
+      const w = await ratedOnItsPage();
+      const record = w.area.data.get("ficheUndo");
+
+      // Act
+      const episode = { contentId: 5, season: 1, episode: 3 };
+      await w.jobs[job]({ type: "forget-handled", ...episode });
+
+      // Assert
+      expect(w.area.data.get("ficheUndo")).toEqual(record);
+    },
+  );
+
+  it("a Naka tab's « Oublier » over the hour's budget: nothing forgotten, the record stays", async () => {
+    // Arrange
+    const w = await ratedOnItsPage();
+    const record = w.area.data.get("ficheUndo");
+    const full = { from: Date.parse("2026-11-05T12:00:00Z"), count: 10 };
+    w.area.data.set("settings", { ...LIVE, forgetWindow: full });
+
+    // Act
+    await w.jobs.forgetHandledFromTab({ type: "forget-handled", contentId: 5 });
+
+    // Assert
+    expect(w.state().handled).toContain("movie:5");
+    expect(w.area.data.get("ficheUndo")).toEqual(record);
+  });
+
   it("a finish that writes clears this content's undo record", async () => {
     // Arrange: the film's card already exists, so its page's rating sends only the ProductRate and leaves the
     // film unfinished; its finish then marks it seen.
