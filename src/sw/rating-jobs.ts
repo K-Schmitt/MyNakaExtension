@@ -21,6 +21,7 @@ import { isHandled } from "../core/state";
 import type { JobError } from "../ext/job-error";
 import type { DismissRatingMessage, RateMessage } from "../ext/rating-messages";
 import type { Store } from "../ext/store";
+import { savedAfterSent } from "./after-sent";
 import { checkBinding } from "./binding";
 import { explicitFinish } from "./explicit-finish";
 import { finishJob } from "./finish-job";
@@ -35,8 +36,11 @@ type Wrote = { wroteBefore: boolean };
 /** The card's target, or why there is none (a label never rated without its card has no error). */
 type Lookup = Wrote & { found?: Found; error?: JobError };
 type Rated = { cards: RatingCard[]; error?: JobError };
-/** How a rating ended: no error once it went out. */
-export type RateEnd = Wrote & { error?: JobError };
+/**
+ * How a rating ended: no error once it went out. `unsaved`: it went out, and its card's save failed
+ * (after-sent: never a failure of the rating).
+ */
+export type RateEnd = Wrote & { error?: JobError; unsaved?: JobError };
 
 function foundIn(
   cards: RatingCard[],
@@ -127,8 +131,14 @@ export async function rateJob(
   if (found === undefined)
     return { error: error ?? "unavailable", wroteBefore };
   const result = await rated(deps, found, msg);
-  await deps.store.saveRatings(result.cards);
-  return { error: result.error, wroteBefore };
+  if (result.error !== undefined) {
+    await deps.store.saveRatings(result.cards);
+    return { error: result.error, wroteBefore };
+  }
+  const unsaved = await savedAfterSent(() =>
+    deps.store.saveRatings(result.cards),
+  );
+  return unsaved === undefined ? { wroteBefore } : { wroteBefore, unsaved };
 }
 
 export async function dismissJob(

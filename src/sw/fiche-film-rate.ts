@@ -17,9 +17,10 @@ import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
 import type { PanelFlags, RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
+import type { JobError } from "../ext/job-error";
 import type { Store } from "../ext/store";
 import { linkForRating } from "./fiche-link-pair";
-import { leaveNakaList } from "./fiche-list-removal";
+import { type ListLeaving, leaveNakaList } from "./fiche-list-removal";
 import { NotIssuedError } from "./fiche-mine-job";
 import { afterRating, storedFlags } from "./fiche-panel-flags";
 import {
@@ -73,6 +74,16 @@ async function notSent(
   return panel === undefined ? { error } : { error, panel };
 }
 
+// The rating went out but its card was not saved: answered as sent with that code, unless the list step
+// has its own error, or the tab must click « Ma liste » itself (that answer is kept so the click happens).
+function withUnsaved(
+  answer: ListLeaving["answer"],
+  unsaved: JobError | undefined,
+): ListLeaving["answer"] {
+  if (unsaved === undefined || !("ok" in answer)) return answer;
+  return answer.maListe === "tab" ? answer : { sent: true, error: unsaved };
+}
+
 export async function rateFilm(
   deps: JobDeps,
   msg: FicheRateMessage,
@@ -81,7 +92,7 @@ export async function rateFilm(
   await assertCardProduct(deps.store, msg);
   await linkForRating(deps.store, { nakaId: contentId, scId: productId });
   const kept = await recordBefore(deps, msg, "film");
-  const { error, wroteBefore } = await rateJob(deps, {
+  const { error, wroteBefore, unsaved } = await rateJob(deps, {
     type: "rate",
     contentId,
     label: "film",
@@ -96,7 +107,7 @@ export async function rateFilm(
     await noteListed(deps, msg);
   }
   return {
-    ...leaving.answer,
+    ...withUnsaved(leaving.answer, unsaved),
     panel: afterRating(kept.state, rating, kept.record, deps.now()),
   };
 }
