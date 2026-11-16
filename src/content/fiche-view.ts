@@ -2,7 +2,7 @@
 // their averages (and the owner's own rating once read), the write on its way and how the last one ended.
 
 import type { QuestionCandidate } from "../core/state";
-import type { FicheInfo } from "../ext/fiche-answers";
+import type { FicheInfo, SentStep } from "../ext/fiche-answers";
 import type { RunStep } from "../ext/fiche-undo-answers";
 import type { JobError } from "../ext/job-error";
 
@@ -24,8 +24,8 @@ export type FicheOutcome =
   | { kind: "finish-wrote" }
   /** The same, once its « Annuler » timed out: the line no longer offers it. */
   | { kind: "finish-wrote-expired" }
-  /** The rating reached SensCritique; what came after it (the Ma liste removal) failed. */
-  | { kind: "sent-with-error"; error: JobError }
+  /** The rating reached SensCritique; what came after it (`step`: the Ma liste removal, or the local save) failed. */
+  | { kind: "sent-with-error"; step: SentStep; error: JobError }
   /** « Annuler » or « Retirer la note » got no answer, or the worker could not run it. */
   | { kind: "undo-failed"; action: UndoAction }
   /** The worker refused it before any write. */

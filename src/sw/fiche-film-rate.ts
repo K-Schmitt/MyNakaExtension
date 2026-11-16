@@ -81,7 +81,8 @@ function withUnsaved(
   unsaved: JobError | undefined,
 ): ListLeaving["answer"] {
   if (unsaved === undefined || !("ok" in answer)) return answer;
-  return answer.maListe === "tab" ? answer : { sent: true, error: unsaved };
+  if (answer.maListe === "tab") return answer;
+  return { sent: true, step: "local-save", error: unsaved };
 }
 
 export async function rateFilm(

@@ -97,6 +97,7 @@ describe("fiche-rate: a film", () => {
     await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
+      step: "ma-liste",
       error: "unavailable",
       panel: RATED.panel,
     });
@@ -486,7 +487,12 @@ function refuseSaves(w: ReturnType<typeof filmWorld>, key: string): void {
 }
 
 describe("fiche-rate: a rating that went out, then a local save that fails", () => {
-  const SENT = { sent: true, error: "unavailable", panel: RATED.panel };
+  const SENT = {
+    sent: true,
+    step: "local-save",
+    error: "unavailable",
+    panel: RATED.panel,
+  };
 
   it("a film: answered as sent with the save's code, and still out of « Ma liste »", async () => {
     const w = filmWorld();
@@ -523,6 +529,7 @@ describe("fiche-rate: a rating that went out, then a local save that fails", () 
     await w.registry.issue(TAB, 5, [11]);
     expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({
       sent: true,
+      step: "local-save",
       error: "unavailable",
     });
     expect(w.writes()).toEqual(["rate:11:8"]);

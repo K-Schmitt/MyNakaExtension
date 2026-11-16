@@ -137,7 +137,10 @@ describe("a film rating and Naka's « Ma liste » button", () => {
 
   it.each([
     ["simulation (no « tab »)", { ok: true }],
-    ["sent with an error", { sent: true, error: "naka-session" }],
+    [
+      "sent with an error",
+      { sent: true, step: "ma-liste", error: "naka-session" },
+    ],
     ["not sent", { error: "sc-session" }],
     ["lost", undefined],
   ])("an answer %s: no click", async (_n, answer) => {

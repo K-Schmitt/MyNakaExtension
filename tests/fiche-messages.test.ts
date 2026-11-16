@@ -263,10 +263,10 @@ describe("title page answers", () => {
     expect(parseRateAnswer({ error: "sc-session" })).toEqual({
       error: "sc-session",
     });
-    expect(parseRateAnswer({ sent: true, error: "naka-session" })).toEqual({
-      sent: true,
-      error: "naka-session",
-    });
+    for (const step of ["ma-liste", "local-save"]) {
+      const sent = { sent: true, step, error: "naka-session" };
+      expect(parseRateAnswer(sent)).toEqual(sent);
+    }
     expect(parseLinkAnswer({ ok: true })).toEqual({ ok: true });
   });
 
@@ -322,8 +322,17 @@ describe("title page answers", () => {
     () => parseRateAnswer({ ok: false }),
     () => parseRateAnswer({ sent: true }),
     () => parseRateAnswer({ sent: false, error: "sc-session" }),
-    () => parseRateAnswer({ sent: true, error: "nope" }),
-    () => parseRateAnswer({ sent: true, error: "sc-session", ok: true }),
+    () => parseRateAnswer({ sent: true, step: "ma-liste", error: "nope" }),
+    () =>
+      parseRateAnswer({
+        sent: true,
+        step: "ma-liste",
+        error: "sc-session",
+        ok: true,
+      }),
+    () => parseRateAnswer({ sent: true, error: "sc-session" }),
+    () => parseRateAnswer({ sent: true, step: "cards", error: "sc-session" }),
+    () => parseRateAnswer({ sent: true, step: null, error: "sc-session" }),
     () => parseLinkAnswer({ ok: false }),
     () => parseLinkAnswer({ ok: true, x: 1 }),
   ])("rejects a bad answer %#", (parse) => {
@@ -425,7 +434,7 @@ describe("the panel's flags in the answers", () => {
       panel: { canUndo: false, canRemove: false, protected: false },
     };
     expect(parseRateAnswer(bare)).toEqual(bare);
-    const sent = { sent: true, error: "naka-session", panel };
+    const sent = { sent: true, step: "ma-liste", error: "naka-session", panel };
     expect(parseRateAnswer(sent)).toEqual(sent);
   });
 
@@ -447,7 +456,7 @@ describe("the panel's flags in the answers", () => {
     ["by nobody", { ok: true, maListe: "none" }],
     [
       "on a rating sent with an error",
-      { sent: true, error: "sc-session", maListe: "tab" },
+      { sent: true, step: "ma-liste", error: "sc-session", maListe: "tab" },
     ],
     [
       "on a rating that did not go out",

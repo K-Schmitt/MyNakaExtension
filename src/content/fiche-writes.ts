@@ -33,7 +33,11 @@ function endingOf(answer: RateAnswer | undefined): Ending {
   if ("sent" in answer) {
     return {
       sent: true,
-      outcome: { kind: "sent-with-error", error: answer.error },
+      outcome: {
+        kind: "sent-with-error",
+        step: answer.step,
+        error: answer.error,
+      },
     };
   }
   if (answer.panel !== undefined) {
