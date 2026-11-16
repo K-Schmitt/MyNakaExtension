@@ -18,10 +18,21 @@ function world(hash = "") {
     els.set(id, new FakeElement("div"));
   }
   const doc: TabDoc = { getElementById: (id) => els.get(id) ?? null };
-  const win = { location: { hash } };
+  const onHash: (() => void)[] = [];
+  const win = {
+    location: { hash },
+    addEventListener: (type: string, listener: () => void) => {
+      if (type === "hashchange") onHash.push(listener);
+    },
+  };
   mountTabs(doc, win);
   const el = (id: string): FakeElement => els.get(id) as FakeElement;
-  return { el, win };
+  /** The browser moved through its history to `next` (Précédent, Suivant). */
+  const navigate = (next: string) => {
+    win.location.hash = next;
+    for (const listener of onHash) listener();
+  };
+  return { el, win, navigate };
 }
 
 describe("tabFromHash", () => {
@@ -77,6 +88,19 @@ describe("mountTabs", () => {
     expect(el("tab-activite").attributes["aria-selected"]).toBe("false");
     expect(el("tab-reglages").attributes.tabindex).toBe("0");
     expect(el("tab-activite").attributes.tabindex).toBe("-1");
+    expect(win.location.hash).toBe("#reglages");
+  });
+
+  it("Précédent after a click on Réglages shows Activité again, and leaves the hash alone", () => {
+    const { el, win, navigate } = world();
+    el("tab-reglages").click(true);
+    navigate("");
+    expect(el("panel-activite").attributes.hidden).toBeUndefined();
+    expect(el("panel-reglages").attributes.hidden).toBe("");
+    expect(el("tab-activite").attributes["aria-selected"]).toBe("true");
+    expect(win.location.hash).toBe("");
+    navigate("#reglages");
+    expect(el("panel-reglages").attributes.hidden).toBeUndefined();
     expect(win.location.hash).toBe("#reglages");
   });
 
