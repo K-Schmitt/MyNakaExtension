@@ -5,6 +5,7 @@
 
 import { type ArrowPorts, carryScroll, wireArrows } from "./carousel";
 import type { ElementLike, ShadowRootLike, TrackLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import type { HomeHandlers } from "./home-block";
 import { NEXT_LABEL, PREV_LABEL, ROW_SUBTITLE, ROW_TITLE } from "./home-copy";
 import type { HomeQuestion, HomeView } from "./home-view";
@@ -66,6 +67,7 @@ function track(
   doc: Maker,
   view: HomeView,
   handlers: HomeHandlers,
+  watch: RowWatch,
 ): ElementLike {
   const cards = doc.createElement("div");
   cards.className = TRACK_CLASS;
@@ -73,7 +75,8 @@ function track(
     cards.appendChild(questionCard(doc, view.live, handlers));
   }
   for (const { key, view: entry, image } of view.entries) {
-    cards.appendChild(buildRatingTile(doc, entry, image, handlers.entry(key)));
+    const tileHandlers = handlers.entry(key);
+    cards.appendChild(buildRatingTile(doc, entry, image, tileHandlers, watch));
   }
   for (const question of view.questions) {
     cards.appendChild(questionCard(doc, question, handlers));
@@ -92,17 +95,21 @@ const shownTracks = new WeakMap<
   { track: TrackLike; unwatch: () => void }
 >();
 
-/** Replaces whatever the root holds with the row; `arrows` re-measures them on a resize and sets their motion. */
+/**
+ * Replaces whatever the root holds with the row; `watch` guards the tiles' stars and confirmations (D7);
+ * `arrows` re-measures them on a resize and sets their motion.
+ */
 export function renderRow(
   doc: Maker,
   root: ShadowRootLike,
   view: HomeView,
   handlers: HomeHandlers,
+  watch: RowWatch,
   arrows?: ArrowPorts,
 ): void {
   const prev = arrow(doc, PREV_GLYPH, PREV_LABEL);
   const next = arrow(doc, NEXT_GLYPH, NEXT_LABEL);
-  const cards = track(doc, view, handlers);
+  const cards = track(doc, view, handlers, watch);
   const shown = shownTracks.get(root);
   shown?.unwatch();
   // Read before the old track leaves: a detached element scrolls nowhere.

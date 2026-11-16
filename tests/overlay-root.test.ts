@@ -4,7 +4,13 @@ import { createOverlayRoot } from "../src/content/ui/overlay-root";
 import { renderRating } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement, FakeNode } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  FakeNode,
+} from "./ui-fakes";
 
 const EXPECTED = [
   "click",
@@ -89,12 +95,18 @@ describe("createOverlayRoot", () => {
     const doc = new FakeDoc();
     const { root } = createOverlayRoot(doc);
     const onChoose = vi.fn();
-    renderRating(doc, root, ratingView(episodeCard(), "saison", 8), {
-      onChoose,
-      onAction: vi.fn(),
-      onOther: vi.fn(),
-      onConfirm: vi.fn(),
-    });
+    renderRating(
+      doc,
+      root,
+      ratingView(episodeCard(), "saison", 8),
+      {
+        onChoose,
+        onAction: vi.fn(),
+        onOther: vi.fn(),
+        onConfirm: vi.fn(),
+      },
+      COUNTS,
+    );
     const eight = descendants(hostOf(doc).shadow).find(
       (el) => el.tag === "button" && el.attributes["aria-label"] === "8 sur 10",
     );

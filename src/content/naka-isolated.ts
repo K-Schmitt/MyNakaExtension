@@ -23,6 +23,7 @@ import { createFicheUi } from "./ui/fiche-ui";
 import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { maListePorts } from "./ui/ma-liste-button";
+import { type ObserverWindow, pageSeenWatch } from "./ui/star-visibility-dom";
 import { createWorkerPort } from "./ui/worker-port";
 import { createGestureGate, listenToGestures } from "./user-gesture";
 import { readVideo } from "./video-sample";
@@ -61,7 +62,10 @@ const pageTimer = {
 const blocks = wireBlocks({
   port: createWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
   timer: pageTimer,
-  playerUi: createEndUi(document),
+  playerUi: createEndUi(
+    document,
+    pageSeenWatch(window as unknown as ObserverWindow),
+  ),
   homeUi: createHomeRowUi(homeRowPorts(document)),
   now: () => Date.now(),
   titleOf: createTitleLookup((contentId) => client.contentById(contentId)),

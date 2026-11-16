@@ -1,8 +1,10 @@
 // Draws a RatingView in the overlay's shadow root. Every text goes through textContent; every button
-// acts on a trusted click only.
+// acts on a trusted click only. The stars and the series confirmation act only while `watch` says their row
+// counts (D7, owner's decision of 2026-11-16).
 
 import type { RatingLabel } from "../../core/rating-cards";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
+import type { RowWatch } from "./draw-watch";
 import {
   ACTION_LABELS,
   CANCEL_LABEL,
@@ -82,22 +84,45 @@ export function ratingLines(doc: Maker, view: RatingView): ElementLike[] {
   ];
 }
 
+/** A button whose trusted click acts only while `watch` says the button counts (D7). */
+export function watchedButton(
+  doc: Maker,
+  text: string,
+  cls: string,
+  watch: RowWatch,
+  fn: () => void,
+): ElementLike {
+  let counts = (): boolean => false;
+  const el = button(doc, text, cls, () => {
+    if (counts()) fn();
+  });
+  counts = watch(el);
+  return el;
+}
+
+/** « Envoyer » and « Annuler »: a trusted click acts only while `watch` says their row counts (D7). */
 export function confirmRow(
   doc: Maker,
   handlers: Pick<RatingHandlers, "onConfirm">,
+  watch: RowWatch,
 ): ElementLike {
-  return row(doc, [
-    button(doc, SEND_LABEL, PRIMARY_CLASS, () => handlers.onConfirm(true)),
-    button(doc, CANCEL_LABEL, BUTTON_CLASS, () => handlers.onConfirm(false)),
-  ]);
+  const el = row(doc, []);
+  const counts = watch(el);
+  const confirm = (send: boolean) => () => {
+    if (counts()) handlers.onConfirm(send);
+  };
+  el.appendChild(button(doc, SEND_LABEL, PRIMARY_CLASS, confirm(true)));
+  el.appendChild(button(doc, CANCEL_LABEL, BUTTON_CLASS, confirm(false)));
+  return el;
 }
 
 function buttonRows(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
+  watch: RowWatch,
 ): ElementLike[] {
-  if (view.confirm === true) return [confirmRow(doc, handlers)];
+  if (view.confirm === true) return [confirmRow(doc, handlers, watch)];
   const others = view.others.map((label) =>
     button(doc, OTHER_LABELS[label], BUTTON_CLASS, () =>
       handlers.onOther(label),
@@ -110,7 +135,7 @@ function buttonRows(
   );
   return [
     ...(view.choices.length > 0
-      ? [starRater(doc, view.choices, handlers.onChoose)]
+      ? [starRater(doc, view.choices, handlers.onChoose, { watch })]
       : []),
     ...[others, actions]
       .filter((buttons) => buttons.length > 0)
@@ -122,10 +147,11 @@ export function buildBlock(
   doc: Maker,
   view: RatingView,
   handlers: RatingHandlers,
+  watch: RowWatch,
 ): ElementLike {
   const block = doc.createElement("div");
   block.className = BLOCK_CLASS;
-  const rows = buttonRows(doc, view, handlers);
+  const rows = buttonRows(doc, view, handlers, watch);
   for (const el of [...ratingLines(doc, view), ...rows]) block.appendChild(el);
   return block;
 }
@@ -136,6 +162,7 @@ export function renderRating(
   root: ShadowRootLike,
   view: RatingView,
   handlers: RatingHandlers,
+  watch: RowWatch,
 ): void {
-  root.replaceChildren(buildBlock(doc, view, handlers));
+  root.replaceChildren(buildBlock(doc, view, handlers, watch));
 }

@@ -109,7 +109,7 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
   const doc = new FakeDoc();
   const kept = fakeAside(path.includes("/tv/") ? SERIES_ROWS : FILM_ROWS);
   const watchers = new Set<() => void>();
-  /** The star rows watched for D7, and what IntersectionObserver v2 last said of them: `hidden` refuses
+  /** The star rows and write buttons' rows watched for D7, and what IntersectionObserver v2 last said of them: `hidden` refuses
    * every row's clicks, `hiddenRows` only those rows'. */
   const stars = {
     hidden: false,
@@ -117,17 +117,22 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     rows: [] as FakeElement[],
     /** The slot each watched row was drawn in, in the same order as `rows`. */
     slots: [] as object[],
+    /** The slots released, the oldest first. */
+    released: [] as object[],
   };
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: idleTimer,
     boxes: () => boxes.map((b) => b.port),
-    seen: (row, slot) => {
-      stars.rows.push(row as FakeElement);
-      stars.slots.push(slot);
-      return () => !stars.hidden && !stars.hiddenRows.has(row);
-    },
+    seen: Object.assign(
+      (row: unknown, slot: object) => {
+        stars.rows.push(row as FakeElement);
+        stars.slots.push(slot);
+        return () => !stars.hidden && !stars.hiddenRows.has(row);
+      },
+      { release: (slot: object) => stars.released.push(slot) },
+    ),
     watch: (fn) => {
       const watcher = () => fn();
       watchers.add(watcher);

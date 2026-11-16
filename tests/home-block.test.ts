@@ -16,7 +16,13 @@ import type { QuestionOffer } from "../src/sw/question-offers";
 import { flush } from "./end-block-fakes";
 import { answerOf, asksOf, entryOf, homeWorld, sendsOf } from "./home-fakes";
 import { episodeCard, filmCard } from "./rating-fixtures";
-import { descendants, FakeDoc, type FakeElement, FakeShadow } from "./ui-fakes";
+import {
+  COUNTS,
+  descendants,
+  FakeDoc,
+  type FakeElement,
+  FakeShadow,
+} from "./ui-fakes";
 
 const film = (id: number, at: number): RatingCard =>
   filmCard({ key: `movie:${id}`, contentId: id, title: `Film ${id}`, at });
@@ -350,7 +356,7 @@ describe("a tile that slides under the cursor after a card leaves", () => {
   // The star of that value on the row's only tile, drawn from what the block showed last.
   function starOnRow(w: Awaited<ReturnType<typeof arrived>>, n: number) {
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const star = descendants(root).find(
       (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,
     );
@@ -430,7 +436,7 @@ describe("the live card of the home block", () => {
     const { chosen, handlers } = liveHandlers();
     w.block.showLive(REMOVAL.key, liveView(), handlers);
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const keep = descendants(root).find((el: FakeElement) =>
       el.textContent?.startsWith("Non"),
     );
@@ -447,7 +453,7 @@ describe("the live card of the home block", () => {
     await w.ready();
     w.block.hideLive();
     const root = new FakeShadow();
-    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers);
+    renderRow(new FakeDoc(), root, w.last().view, w.last().handlers, COUNTS);
     const star = (n: number) =>
       descendants(root).find(
         (el: FakeElement) => el.attributes["aria-label"] === `${n} sur 10`,

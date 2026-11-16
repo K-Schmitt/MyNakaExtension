@@ -3,10 +3,13 @@
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
 // product, every rare state of step 7 (fiche-rare-states) with step 8b's search field and « Réessayer ».
 // Built again only when what it shows changed; a search field that had the focus gets it back
-// (field-focus). The search field's keys and input stay in the host.
+// (field-focus). The search field's keys and input stay in the host. « Annuler », « Retirer la note » and the
+// series confirmation act only while `seen` says their row visible (D7); a redraw and a hide stop watching
+// the rows of the last draw.
 
 import type { FicheView } from "../fiche-view";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
+import { createDrawWatch, type RowWatch } from "./draw-watch";
 import type { FicheHandlers } from "./fiche-handlers";
 import { actionsPorts, type PanelPlace } from "./fiche-panel-dom";
 import { productActions } from "./fiche-product-actions";
@@ -17,6 +20,7 @@ import { FIELD_STOPPED_EVENTS, stopAtHost } from "./input-stop";
 import type { Maker } from "./rating-render";
 import { createClosedHost } from "./row-host";
 import { createRowKeeper } from "./row-keeper";
+import type { ReleasableWatch } from "./star-visibility";
 
 const ACTIONS_CLASS = "mn-fiche-actions";
 // `all: initial` resets `color-scheme` too: set back to dark, a scrolling candidate list keeps a dark bar.
@@ -28,6 +32,8 @@ const HOST_DECLARATIONS = [
 
 export type FicheActionsPorts = PanelPlace & {
   doc: Pick<DocLike, "createElement">;
+  /** The D7 watch of the write buttons. */
+  seen: ReleasableWatch;
 };
 
 function buildActions(
@@ -35,12 +41,13 @@ function buildActions(
   view: FicheView,
   handlers: FicheHandlers,
   slot: FieldSlot,
+  watch: RowWatch,
 ): ElementLike[] {
   const product = view.info?.product;
   const parts = [
     ...(product === undefined
       ? rareParts(doc, view, handlers, slot)
-      : productActions(doc, view, product, handlers)),
+      : productActions(doc, view, product, handlers, watch)),
     ...seasonLines(doc, view),
   ];
   if (parts.length === 0) return [];
@@ -66,11 +73,11 @@ function draw(
   root: ShadowRootLike,
   view: FicheView,
   handlers: FicheHandlers,
-  inputs: string,
+  watch: RowWatch,
 ): Drawn {
   const slot: FieldSlot = {};
-  root.replaceChildren(...buildActions(doc, view, handlers, slot));
-  return { inputs, handlers, slot };
+  root.replaceChildren(...buildActions(doc, view, handlers, slot, watch));
+  return { inputs: actionsInputs(view), handlers, slot };
 }
 
 function createHost(ports: FicheActionsPorts) {
@@ -90,18 +97,25 @@ export function createFicheActions(ports: FicheActionsPorts): {
 } {
   let made: ReturnType<typeof createHost> | undefined;
   let drawn: Drawn | undefined;
+  const watched = createDrawWatch(ports.seen);
+  // A new draw: the rows of the last one are watched no more.
+  const redrawn = (root: ShadowRootLike, view: FicheView, h: FicheHandlers) => {
+    watched.clear();
+    return draw(ports.doc, root, view, h, watched.watch);
+  };
   return {
     show(view, handlers) {
       made ??= createHost(ports);
       const inputs = actionsInputs(view);
       const redraw = drawn?.inputs !== inputs || drawn.handlers !== handlers;
       const refocus = redraw && hasFocus(made.root, drawn?.slot.field);
-      if (redraw) drawn = draw(ports.doc, made.root, view, handlers, inputs);
+      if (redraw) drawn = redrawn(made.root, view, handlers);
       made.keeper.start();
       const field = drawn?.slot.field;
       if (refocus && field !== undefined) focusAtEnd(field);
     },
     hide() {
+      watched.clear();
       drawn = undefined;
       made?.root.replaceChildren();
       made?.keeper.stop();
