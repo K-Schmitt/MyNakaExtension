@@ -1,0 +1,8 @@
+{
+  "title": "MyNakaExtension",
+  "description": "Extension Chromium (Manifest V3, TypeScript strict) qui relie un site de streaming à SensCritique : fins de visionnage marquées « vu », notes sans quitter le lecteur, listes « à voir » synchronisées. Trois contextes isolés, jeton jamais stocké, 5 400 tests.",
+  "image": "docs/screenshots/activity.png",
+  "status": "done",
+  "language": "TypeScript",
+  "links": "https://github.com/K-Schmitt/MyNakaExtension/releases/latest"
+}
