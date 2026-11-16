@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SyncState } from "../src/core/state";
 import { emptyState } from "../src/core/state";
 import type { Settings } from "../src/ext/settings";
-import { createStore, type StorageArea } from "../src/ext/store";
+import { createStore, STORED_KEYS, type StorageArea } from "../src/ext/store";
 import { StoredStateError } from "../src/ext/stored-error";
 import { episodeCard, filmCard } from "./rating-fixtures";
 
@@ -250,5 +250,21 @@ describe("fiche undo store", () => {
   it("reads a corrupt record as null instead of rejecting", async () => {
     const store = createStore(fakeArea({ ficheUndo: { x: 1 } }).area);
     expect(await store.loadFicheUndo()).toBeNull();
+  });
+});
+
+// Every save, found by name: a new stored key with its save method must be listed in STORED_KEYS.
+describe("STORED_KEYS", () => {
+  it("lists exactly the keys the store's saves write", async () => {
+    const { area, data } = fakeArea();
+    const store = createStore(area);
+    const saves = Object.entries(store).filter(([name]) =>
+      name.startsWith("save"),
+    );
+    for (const [, save] of saves) {
+      await (save as (value: unknown) => Promise<void>)(null);
+    }
+    expect(saves).toHaveLength(STORED_KEYS.length);
+    expect([...data.keys()].sort()).toEqual([...STORED_KEYS].sort());
   });
 });

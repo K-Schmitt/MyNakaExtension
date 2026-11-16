@@ -1,14 +1,7 @@
 // The file the « Exporter mes données » button gives: what the extension stores, as indented JSON.
-// Pure: the manifest version and the clock come in as parameters.
+// Pure: the manifest version and the clock come in as parameters. The keys are the store's own list.
 
-// The storage keys of src/ext/store.ts, listed once here (the store keeps them private).
-export const EXPORTED_KEYS = [
-  "state",
-  "settings",
-  "ratings",
-  "ficheLinks",
-  "ficheUndo",
-] as const;
+import { STORED_KEYS } from "../ext/store";
 
 function two(n: number): string {
   return String(n).padStart(2, "0");
@@ -27,7 +20,7 @@ export function exportText(
   now: Date,
 ): string {
   const data: Record<string, unknown> = {};
-  for (const key of EXPORTED_KEYS) {
+  for (const key of STORED_KEYS) {
     if (Object.hasOwn(stored, key)) data[key] = stored[key];
   }
   return JSON.stringify(

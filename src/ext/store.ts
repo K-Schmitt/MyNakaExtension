@@ -27,11 +27,18 @@ export type Store = {
   saveFicheUndo(record: FicheUndo | null): Promise<void>;
 };
 
-const RATINGS_KEY = "ratings";
-const STATE_KEY = "state";
-const SETTINGS_KEY = "settings";
-const FICHE_LINKS_KEY = "ficheLinks";
-const FICHE_UNDO_KEY = "ficheUndo";
+// One storage key per stored value; the data export reads the same list, so a new key reaches it.
+const KEYS = {
+  state: "state",
+  settings: "settings",
+  ratings: "ratings",
+  ficheLinks: "ficheLinks",
+  ficheUndo: "ficheUndo",
+} as const;
+
+export type StoredKey = (typeof KEYS)[keyof typeof KEYS];
+
+export const STORED_KEYS: readonly StoredKey[] = Object.values(KEYS);
 
 // Only an absent key means a first install; a stored value that does not parse rejects.
 async function read(area: StorageArea, key: string): Promise<unknown> {
@@ -42,35 +49,35 @@ async function read(area: StorageArea, key: string): Promise<unknown> {
 export function createStore(area: StorageArea): Store {
   return {
     async loadState() {
-      const raw = await read(area, STATE_KEY);
+      const raw = await read(area, KEYS.state);
       return raw === undefined ? emptyState() : parseState(raw);
     },
     async saveState(s) {
-      await area.set({ [STATE_KEY]: s });
+      await area.set({ [KEYS.state]: s });
     },
     async loadSettings() {
-      return parseSettings(await read(area, SETTINGS_KEY));
+      return parseSettings(await read(area, KEYS.settings));
     },
     async saveSettings(s) {
-      await area.set({ [SETTINGS_KEY]: s });
+      await area.set({ [KEYS.settings]: s });
     },
     async loadRatings() {
-      return parseRatings(await read(area, RATINGS_KEY));
+      return parseRatings(await read(area, KEYS.ratings));
     },
     async saveRatings(cards) {
-      await area.set({ [RATINGS_KEY]: cards });
+      await area.set({ [KEYS.ratings]: cards });
     },
     async loadFicheLinks() {
-      return parseFicheLinks(await read(area, FICHE_LINKS_KEY));
+      return parseFicheLinks(await read(area, KEYS.ficheLinks));
     },
     async saveFicheLinks(links) {
-      await area.set({ [FICHE_LINKS_KEY]: links });
+      await area.set({ [KEYS.ficheLinks]: links });
     },
     async loadFicheUndo() {
-      return parseFicheUndo(await read(area, FICHE_UNDO_KEY));
+      return parseFicheUndo(await read(area, KEYS.ficheUndo));
     },
     async saveFicheUndo(record) {
-      await area.set({ [FICHE_UNDO_KEY]: record });
+      await area.set({ [KEYS.ficheUndo]: record });
     },
   };
 }
