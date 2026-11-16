@@ -70,7 +70,8 @@ export function liveUndo(
   return age >= 0 && age < UNDO_WINDOW_MS ? record : undefined;
 }
 
-/** A critique or a recommendation SensCritique could lose with the seen mark: such a title is never undone. */
+/** A critique or a recommendation SensCritique could lose with the seen mark: an undo that would take « vu »
+ * off such a title is refused. */
 export function isProtected(current: ProtectedFlags): boolean {
   return current.isReviewed || current.isRecommended;
 }

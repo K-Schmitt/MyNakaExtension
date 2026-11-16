@@ -1,6 +1,6 @@
 // The owner's writes from the title page, each from a trusted click the UI checked: a film rated at once, a
-// series after its confirmation, an episode of the shown season, a link to a candidate the worker offered («
-// Relier à SensCritique » or a search's). One write at a time; an answer that comes once the visit is over
+// series after its confirmation, an episode of the shown season, a link to a candidate the worker offered
+// (« Relier à SensCritique » or a search's). One write at a time; an answer that comes once the visit is over
 // changes nothing. A film's rating takes it out of Naka's « Ma liste » with Naka's own button when it is on
 // screen (fiche-ma-liste). A film's or a series' rating brings the panel's new flags (« Annuler », « Retirer
 // la note », the link). A film's rating that did not go out after its explicit finish wrote brings them too:

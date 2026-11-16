@@ -1,5 +1,5 @@
 // The worker's jobs, as the router queues them. The list, finish and answer jobs never reject: each records
-// its own failure where it can (the title page jobs and the reads reject, as their docs say). A failure it
+// its own failure where it can (the title page jobs and the store reads reject, as their docs say). A failure it
 // cannot record (the settings unreadable, the store down) leaves storage as it was: overwriting unreadable
 // settings would drop the binding.
 

@@ -1,5 +1,5 @@
 // A SensCritique candidate as a button, shared by the home row's questions and the title page: its small
-// poster and its label. A trusted click chooses it only while `watch` says it seen: choosing links, which
+// poster and its label. A trusted click chooses it only while `watch` says it visible: choosing links, which
 // can run a finish waiting on the title.
 
 import type { ElementLike } from "./dom-like";
