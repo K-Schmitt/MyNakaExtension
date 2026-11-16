@@ -4,11 +4,11 @@
 
 import { thumbUrl } from "../../core/image-urls";
 import type { QuestionCandidate } from "../../core/state";
+import { candidateButton } from "./candidate-button";
 import type { ElementLike } from "./dom-like";
 import type { RowWatch } from "./draw-watch";
 import type { FicheHandlers } from "./fiche-handlers";
 import { candidateLabel } from "./question-copy";
-import { candidateButton } from "./question-tile";
 import { type Maker, row } from "./rating-render";
 
 const CHOICES_CLASS = "mn-choices";

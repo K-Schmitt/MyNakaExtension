@@ -13,6 +13,7 @@ import {
   SEND_LABEL,
 } from "./rating-copy";
 import type { RatingView } from "./rating-view";
+import { onSeenTrustedClick } from "./seen-click";
 import { starRater } from "./star-rater";
 import { onTrustedClick } from "./trusted";
 
@@ -44,16 +45,21 @@ export function textLine(
   return line;
 }
 
+function plainButton(doc: Maker, text: string, cls: string): ElementLike {
+  const el = doc.createElement("button");
+  el.textContent = text;
+  el.className = cls;
+  el.setAttribute("type", "button");
+  return el;
+}
+
 export function button(
   doc: Maker,
   text: string,
   cls: string,
   fn: () => void,
 ): ElementLike {
-  const el = doc.createElement("button");
-  el.textContent = text;
-  el.className = cls;
-  el.setAttribute("type", "button");
+  const el = plainButton(doc, text, cls);
   onTrustedClick(el, fn);
   return el;
 }
@@ -92,11 +98,8 @@ export function watchedButton(
   watch: RowWatch,
   fn: () => void,
 ): ElementLike {
-  let counts = (): boolean => false;
-  const el = button(doc, text, cls, () => {
-    if (counts()) fn();
-  });
-  counts = watch(el);
+  const el = plainButton(doc, text, cls);
+  onSeenTrustedClick(el, watch(el), fn);
   return el;
 }
 
@@ -108,11 +111,13 @@ export function confirmRow(
 ): ElementLike {
   const el = row(doc, []);
   const counts = watch(el);
-  const confirm = (send: boolean) => () => {
-    if (counts()) handlers.onConfirm(send);
+  const confirm = (text: string, cls: string, send: boolean): ElementLike => {
+    const b = plainButton(doc, text, cls);
+    onSeenTrustedClick(b, counts, () => handlers.onConfirm(send));
+    return b;
   };
-  el.appendChild(button(doc, SEND_LABEL, PRIMARY_CLASS, confirm(true)));
-  el.appendChild(button(doc, CANCEL_LABEL, BUTTON_CLASS, confirm(false)));
+  el.appendChild(confirm(SEND_LABEL, PRIMARY_CLASS, true));
+  el.appendChild(confirm(CANCEL_LABEL, BUTTON_CLASS, false));
   return el;
 }
 
