@@ -59,6 +59,32 @@ describe("the handled titles controller", () => {
     expect(t.shown).toEqual([{ kind: "none" }]);
   });
 
+  it("a send that rejects after a good load keeps the list on screen", async () => {
+    const t = setup([TITLES, new Error("worker restarting")]);
+    await t.controller.load();
+    await t.controller.load();
+    expect(t.shown).toHaveLength(1);
+    expect(t.shown[0]).toMatchObject({ kind: "list", items: TITLES.titles });
+  });
+
+  it("an answer older than the latest load is dropped", async () => {
+    const answers: ((value: unknown) => void)[] = [];
+    const shown: HandledView[] = [];
+    const controller = createHandledController({
+      send: () => new Promise((resolve) => answers.push(resolve)),
+      show: (view) => shown.push(view),
+    });
+    const older = controller.load();
+    const newer = controller.load();
+    const film = { titles: [{ key: "movie:9", label: "Un film" }] };
+    answers[1]?.(film);
+    await newer;
+    answers[0]?.(TITLES);
+    await older;
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toMatchObject({ items: film.titles });
+  });
+
   it("forget sends one forget-handled with the ids of an episode, then shows the list without it", async () => {
     const t = setup();
     await t.controller.load();

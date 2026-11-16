@@ -1,6 +1,7 @@
 // The « Titres traités » list without the DOM: it asks the worker, shows the view, and sends « Oublier » and « Annuler ».
 // A forgotten title leaves the list at once; the next load shows what the worker holds (its job may still
-// wait behind a sync).
+// wait behind a sync). Only the latest load is shown, and a failed read after a good one keeps the list on
+// screen (a worker restart is not an empty list), as the lists controller does.
 
 import { idsOfKey } from "../core/finish-event";
 import type { ToWorker } from "../ext/messages";
@@ -27,11 +28,12 @@ export type HandledController = {
   cancel(key: string): Promise<void>;
 };
 
-async function ask(ports: HandledPorts): Promise<HandledView> {
+/** The worker's list, or undefined when the send rejected. */
+async function ask(ports: HandledPorts): Promise<HandledView | undefined> {
   try {
     return toHandledView(await ports.send({ type: "handled-titles" }));
   } catch {
-    return { kind: "none" };
+    return undefined;
   }
 }
 
@@ -70,11 +72,23 @@ export function createHandledController(
   let items: HandledItem[] = [];
   let waiting: HandledItem[] = [];
   const sending = new Set<string>();
+  let loads = 0;
+  let loaded = false;
 
   function display(view: HandledView): void {
     items = view.kind === "list" ? view.items : [];
     waiting = view.kind === "list" ? view.waiting : [];
     ports.show(view);
+  }
+
+  async function load(): Promise<void> {
+    loads += 1;
+    const mine = loads;
+    const view = await ask(ports);
+    if (mine !== loads) return;
+    if (view === undefined && loaded) return;
+    loaded ||= view !== undefined;
+    display(view ?? { kind: "none" });
   }
 
   async function forget(key: string): Promise<void> {
@@ -106,7 +120,7 @@ export function createHandledController(
   }
 
   return {
-    load: async () => display(await ask(ports)),
+    load,
     forget,
     cancel,
   };
