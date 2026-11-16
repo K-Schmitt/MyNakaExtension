@@ -9,7 +9,11 @@ import {
   COUNT_ORDER,
   WAITING_LABELS,
 } from "../src/status/status-owner-lines";
-import { toStatusView } from "../src/status/status-view";
+import {
+  LOADING_VIEW,
+  showsSimulation,
+  toStatusView,
+} from "../src/status/status-view";
 import type { Counts, StatusSnapshot } from "../src/sw/status-snapshot";
 
 // French typography: U+202F before « : ; ? ! » and inside « ». Every expected string below spells it
@@ -744,5 +748,23 @@ describe("toStatusView: the ratings waiting", () => {
 
   it("shows no line when the ratings were not read", () => {
     expect(ready({ mode: "live" }).lines).toEqual([]);
+  });
+});
+
+// The « Simulation » section (switch, help, planned writes) shows only once the mode is known.
+describe("showsSimulation", () => {
+  it("hides it while loading, without an engine, and while the mode is unknown", () => {
+    expect(showsSimulation(LOADING_VIEW)).toBe(false);
+    expect(showsSimulation(toStatusView(undefined, UTC))).toBe(false);
+    expect(showsSimulation(toStatusView({ error: "stored-state" }, UTC))).toBe(
+      false,
+    );
+  });
+
+  it("shows it in simulation and in live", () => {
+    expect(showsSimulation(toStatusView({ mode: "simulation" }, UTC))).toBe(
+      true,
+    );
+    expect(showsSimulation(toStatusView({ mode: "live" }, UTC))).toBe(true);
   });
 });

@@ -8,7 +8,7 @@ const html = readFileSync(
 );
 
 function simulationSection(): string {
-  const start = html.indexOf('<section id="simulation">');
+  const start = html.indexOf('<section id="simulation"');
   const end = html.indexOf('<section id="settings"');
   return html.slice(start, end);
 }
@@ -19,6 +19,11 @@ describe("status page headings", () => {
     expect(inside.match(/<h2[ >]/g)?.length).toBe(1);
     expect(inside).toContain("<h3>Écritures prévues</h3>");
     expect(inside).toContain("<h3>Écritures prévues au prochain passage</h3>");
+  });
+
+  // The mode is unknown until the worker answers: the page opens with the section hidden.
+  it("opens with « Simulation » hidden", () => {
+    expect(html).toContain('<section id="simulation" hidden>');
   });
 
   it("styles the sub-headings like the section headings", () => {

@@ -153,6 +153,11 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
   };
 }
 
+// The « Simulation » section explains a switch: hidden while loading, without an engine or with the mode unknown.
+export function showsSimulation(view: StatusView): boolean {
+  return view.kind === "ready" && view.mode !== undefined;
+}
+
 export function toStatusView(raw: unknown, format: StatusFormat): StatusView {
   const snapshot = readSnapshot(raw);
   return snapshot === undefined ? NO_ENGINE_VIEW : readyView(snapshot, format);

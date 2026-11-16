@@ -18,7 +18,7 @@ import { createController, type FocusTarget } from "./status-controller";
 import { localFormat } from "./status-format";
 import { focusIdFor, tabFromHash } from "./status-tabs";
 import { mountTabs } from "./status-tabs-dom";
-import type { StatusView } from "./status-view";
+import { type StatusView, showsSimulation } from "./status-view";
 import { createSyncEnd } from "./sync-end";
 
 function element<T extends HTMLElement>(id: string): T {
@@ -64,8 +64,9 @@ function render(view: StatusView): void {
   element("preview-section").hidden = !ready || view.preview.length === 0;
   fill(element("next"), ready ? view.next : []);
   element("next-section").hidden = !ready || view.next.length === 0;
+  element("simulation").hidden = !showsSimulation(view);
   const toggle = element<HTMLButtonElement>("switch");
-  toggle.hidden = !ready || view.mode === undefined;
+  toggle.hidden = !showsSimulation(view);
   toggle.setAttribute("aria-checked", String(ready && view.simulationOn));
   const firstRun = element("first-run");
   firstRun.textContent = ready ? (view.firstRunLine ?? "") : "";
