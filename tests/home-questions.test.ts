@@ -29,7 +29,7 @@ const REMOVAL: RemovalOffer = {
   key: "removal:naka:21391:112240873",
   removeFrom: "naka",
   pair: { nakaId: 21391, scId: 112240873 },
-  title: "Un Job Mortel",
+  title: "Twin Peaks",
 };
 const AMBIG = (
   id: number,
@@ -94,7 +94,7 @@ describe("the questions of the home row", () => {
     const w = await arrived([], questionsOf(REMOVAL));
     const view = w.questionViewOf(REMOVAL.key);
     expect(view?.heading).toBe(
-      `«${NB}Un Job Mortel${NB}» a quitté tes envies SensCritique.`,
+      `«${NB}Twin Peaks${NB}» a quitté tes envies SensCritique.`,
     );
     expect(view?.question).toBe(`Retirer aussi de Ma liste Naka${NB}?`);
     expect(view?.choices.map((c) => c.label)).toEqual([
@@ -191,13 +191,13 @@ describe("answers from the row", () => {
 describe("the title of an offer", () => {
   it("an untitled removal gets its title from titleOf(21391)", async () => {
     const w = homeWorld();
-    w.state.titles.set(21391, "Un Job Mortel");
+    w.state.titles.set(21391, "Twin Peaks");
     w.state.questions = questionsOf({ ...REMOVAL, title: "" });
     createHomeBlock(w.ports).route("/");
     await flush();
     expect(w.calls).toContain("titleOf 21391");
     expect(w.questionViewOf(REMOVAL.key)?.heading).toContain(
-      `«${NB}Un Job Mortel${NB}»`,
+      `«${NB}Twin Peaks${NB}»`,
     );
   });
 
@@ -488,11 +488,11 @@ describe("a title lookup that never answers", () => {
 
   it("a lookup that answers in time is kept, and its timer is cleared", async () => {
     const w = homeWorld();
-    w.state.titles.set(21391, "Un Job Mortel");
+    w.state.titles.set(21391, "Twin Peaks");
     w.state.questions = questionsOf({ ...REMOVAL, title: "" });
     createHomeBlock(w.ports).route("/");
     await flush();
-    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Un Job Mortel");
+    expect(w.questionViewOf(REMOVAL.key)?.heading).toContain("Twin Peaks");
     expect(w.clock.count()).toBe(0);
   });
 });

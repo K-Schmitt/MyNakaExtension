@@ -29,7 +29,7 @@ const OFFER: RemovalOffer = {
   key: "removal:sc:21391:112240873",
   removeFrom: "sc",
   pair: { nakaId: 21391, scId: 112240873 },
-  title: "Un Job Mortel",
+  title: "Twin Peaks",
 };
 const REMOVE = "Retirer aussi de tes envies SensCritique";
 
@@ -103,7 +103,7 @@ describe("the removal block", () => {
     expect(t.asked).toEqual([21391]);
     expect(t.block.isShown()).toBe(true);
     expect(t.texts()).toContain(
-      `«${NB}Un Job Mortel${NB}» a quitté Ma liste Naka.`,
+      `«${NB}Twin Peaks${NB}» a quitté Ma liste Naka.`,
     );
     expect(t.texts()).toContain(`${REMOVE}${NB}?`);
   });

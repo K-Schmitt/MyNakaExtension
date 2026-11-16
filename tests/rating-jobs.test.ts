@@ -382,7 +382,7 @@ describe("the season list of Naka decides the ends", () => {
     });
   });
 
-  it("an airing last season (VisionQuest: 7 released of 8 announced) does not end at its last released episode", async () => {
+  it("an airing last season (Severance: 7 released of 8 announced) does not end at its last released episode", async () => {
     const w = world({
       episodesPerSeason: 8,
       numberOfSeasons: 1,

@@ -24,7 +24,7 @@ const OFFER: RemovalOffer = {
   key: "removal:sc:21391:112240873",
   removeFrom: "sc",
   pair: { nakaId: 21391, scId: 112240873 },
-  title: "Un Job Mortel",
+  title: "Twin Peaks",
 };
 
 type Removal = Pick<WorkerPort, "askRemovalOffer" | "answerRemoval">;
@@ -103,7 +103,7 @@ describe("the removal block, wired", () => {
       w.blocks.pathChanged(path);
       w.blocks.removed(21391);
       await flush();
-      expect(w.asked.drawn?.view.heading).toContain("Un Job Mortel");
+      expect(w.asked.drawn?.view.heading).toContain("Twin Peaks");
     },
   );
 

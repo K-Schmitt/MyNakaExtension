@@ -78,7 +78,7 @@ const SNAPSHOTS: StatusSnapshot[] = [
       at: AT,
       key: "tv:21391:S1E3",
       outcome: "done",
-      title: "Un Job Mortel",
+      title: "Twin Peaks",
     },
     counts: { pendingRemovals: 1, openQuestions: 2, unlinked: 3 },
     running: { kind: "sync", since: AT },

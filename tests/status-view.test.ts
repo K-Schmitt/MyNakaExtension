@@ -309,10 +309,10 @@ describe("toStatusView: the last run, by its own mode", () => {
       at: AT,
       key: "tv:21391:S1E3",
       outcome: "done",
-      title: "Un Job Mortel",
+      title: "Twin Peaks",
     };
     expect(ready({ mode: "live", lastFinish }).lines).toContain(
-      `Dernière fin de visionnage${NB}: «${NB}Un Job Mortel${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
+      `Dernière fin de visionnage${NB}: «${NB}Twin Peaks${NB}», saison 1, épisode 3, 04/11/2026 14:05, enregistrée`,
     );
   });
 
