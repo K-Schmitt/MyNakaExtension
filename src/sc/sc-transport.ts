@@ -124,7 +124,8 @@ function openEnvelope(json: unknown, label: string): Envelope {
   if (!isRecord(json)) {
     throw new ScUnavailableError(`SensCritique ${label}: unexpected response`);
   }
-  if (json.errors !== undefined) {
+  // `errors: null` is read as an absent key: only a present value is a GraphQL error.
+  if (json.errors !== undefined && json.errors !== null) {
     if (mentionsUnauthenticated(json.errors)) {
       throw new ScUnauthenticatedError();
     }

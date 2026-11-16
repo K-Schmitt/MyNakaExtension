@@ -533,6 +533,12 @@ describe("error mapping", () => {
     },
   );
 
+  it("reads `errors: null` next to valid data as no GraphQL error", async () => {
+    const body = JSON.stringify({ errors: null, data: { done: true } });
+    const { client } = setup(LOGGED_IN, () => raw(200, body));
+    await expect(client.wish(5)).resolves.toBeUndefined();
+  });
+
   it("says when the body is not JSON", async () => {
     const { client } = setup(LOGGED_IN, () =>
       raw(200, "<html>challenge</html>"),

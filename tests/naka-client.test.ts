@@ -526,10 +526,18 @@ describe("contentById", () => {
     }
   });
 
-  it("returns undefined when the object fails the mapping", async () => {
+  it("returns undefined when Naka's entry fails the mapping (another kind, no title)", async () => {
     for (const body of [
       entry(9, { mediaType: "person" }),
       { data: entry(9, { title: "" }) },
+    ]) {
+      const { client } = setup(() => json(body));
+      expect(await client.contentById(9)).toBeUndefined();
+    }
+  });
+
+  it("rejects a 200 that holds no entry: unreadable, never « not in the catalogue »", async () => {
+    for (const body of [
       { data: "x" },
       { data: null },
       [entry(9)],
@@ -538,7 +546,9 @@ describe("contentById", () => {
       {},
     ]) {
       const { client } = setup(() => json(body));
-      expect(await client.contentById(9)).toBeUndefined();
+      const error = await failure(client.contentById(9));
+      expect(error).toBeInstanceOf(NakaUnavailableError);
+      expect(error.message).toBe("Naka content: unexpected response");
     }
   });
 
