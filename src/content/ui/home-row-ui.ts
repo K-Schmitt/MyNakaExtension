@@ -12,7 +12,7 @@ import type { HomeHandlers } from "./home-block";
 import type { HomeView } from "./home-view";
 import { createRowHost } from "./row-host";
 import { createRowKeeper, type KeeperPorts } from "./row-keeper";
-import { renderRow } from "./row-render";
+import { clearRow, renderRow } from "./row-render";
 import { ROW_SHEET } from "./row-styles";
 import type { ReleasableWatch } from "./star-visibility";
 
@@ -50,7 +50,7 @@ export function createHomeRowUi(ports: HomeRowPorts): {
     },
     hide() {
       drawn.clear();
-      row?.root.replaceChildren();
+      if (row !== undefined) clearRow(row.root);
       row?.keeper.stop();
     },
   };
