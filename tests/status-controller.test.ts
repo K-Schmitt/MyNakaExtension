@@ -193,6 +193,15 @@ describe("toggleMode", () => {
     ]);
   });
 
+  it("names « Resynchroniser » alone while the first run waits for a click", async () => {
+    const t = setup([{ mode: "simulation", firstRunPending: true }, LIVE]);
+    await t.controller.load();
+    await t.controller.toggleMode();
+    expect(t.confirms).toHaveLength(1);
+    expect(t.confirms[0]).toContain("La prochaine démarre au clic sur");
+    expect(t.confirms[0]).not.toContain("ouverture de Naka");
+  });
+
   it("does nothing when the owner declines", async () => {
     const t = setup([SIM], false);
     await t.controller.load();

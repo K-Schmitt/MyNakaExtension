@@ -171,7 +171,10 @@ const LISTS_CALLS: CopyCalls<typeof listsCopy> = {
 };
 
 const MODE_CALLS: CopyCalls<typeof statusModeCopy> = {
-  confirmText: () => [0, 1, 3].map(statusModeCopy.confirmText),
+  confirmText: () =>
+    [false, true].flatMap((pending) =>
+      [0, 1, 3].map((count) => statusModeCopy.confirmText(count, pending)),
+    ),
 };
 
 const calls = (table: Record<string, () => readonly string[]>): string[] =>

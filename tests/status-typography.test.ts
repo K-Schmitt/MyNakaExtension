@@ -134,9 +134,9 @@ describe("French typography on the status page", () => {
   it("every error label, both confirmations and the silent-engine state follow it", () => {
     const all = [
       ...Object.values(JOB_ERROR_LABELS),
-      confirmText(0),
-      confirmText(1),
-      confirmText(3),
+      ...[false, true].flatMap((pending) =>
+        [0, 1, 3].map((count) => confirmText(count, pending)),
+      ),
       ...Object.values(CONFIRM_TEXT),
       ...texts(toStatusView(undefined, localFormat("UTC"))),
     ];

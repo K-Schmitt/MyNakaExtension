@@ -516,32 +516,49 @@ describe("toStatusView: the next pass's writes", () => {
 
 describe("the confirmation before going live", () => {
   const ASK = `Activer les écritures${NB}? Chaque synchronisation fera au plus 10 écritures.`;
-  const NEXT = `La prochaine (bouton «${NB}Resynchroniser${NB}» ou prochaine ouverture de Naka)`;
+  const NEXT = `La prochaine démarre au bouton «${NB}Resynchroniser${NB}» ou à la prochaine ouverture de Naka`;
+  const PENDING = `La prochaine démarre au clic sur «${NB}Resynchroniser${NB}»`;
 
-  it("with a preview: the cap, and that the page shows the writes before each pass", () => {
-    expect(confirmText(3)).toBe(
-      `${ASK} ${NEXT} reprendra les 3 titres de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+  it("with a preview: the cap, when the next pass starts and what it takes up", () => {
+    expect(confirmText(3, false)).toBe(
+      `${ASK} ${NEXT} et reprendra les 3 titres de l’aperçu, puis les suivants.`,
     );
   });
 
   // One title agrees in the singular; two and more keep « les N titres ».
   it("with one title in the preview: le titre de l’aperçu", () => {
-    expect(confirmText(1)).toBe(
-      `${ASK} ${NEXT} reprendra le titre de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`,
+    expect(confirmText(1, false)).toBe(
+      `${ASK} ${NEXT} et reprendra le titre de l’aperçu, puis les suivants.`,
     );
   });
 
   it("with two titles: les 2 titres de l’aperçu", () => {
-    expect(confirmText(2)).toContain(
+    expect(confirmText(2, false)).toContain(
       "reprendra les 2 titres de l’aperçu, puis les suivants",
     );
   });
 
-  it("without a preview: the cap, and where the page shows the writes", () => {
-    expect(confirmText(0)).toBe(
-      `${ASK} La page de l’extension montre les écritures prévues au prochain passage.`,
+  it("without a preview: the cap and when the next pass starts", () => {
+    expect(confirmText(0, false)).toBe(`${ASK} ${NEXT}.`);
+  });
+
+  // While the first run waits for a click, opening Naka starts nothing.
+  it("first run pending: the next pass starts on « Resynchroniser » only", () => {
+    expect(confirmText(0, true)).toBe(`${ASK} ${PENDING}.`);
+    expect(confirmText(2, true)).toBe(
+      `${ASK} ${PENDING} et reprendra les 2 titres de l’aperçu, puis les suivants.`,
     );
   });
+
+  // Since lot 9a the page lists the writes in simulation only: no promise that it shows them.
+  it.each([0, 1, 3])(
+    "promises no page showing the writes (%i titles)",
+    (count) => {
+      for (const pending of [false, true]) {
+        expect(confirmText(count, pending)).not.toMatch(/page/);
+      }
+    },
+  );
 });
 
 // The status is answered while a job runs; the page names it and asks again until it ends.

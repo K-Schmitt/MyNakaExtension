@@ -156,7 +156,8 @@ export function createController(ports: Ports): Controller {
   async function toggle(): Promise<void> {
     if (current.kind !== "ready" || current.mode === undefined) return;
     if (current.mode === "live") return switchTo("simulation");
-    if (!ports.confirm(confirmText(current.previewCount))) return;
+    const pending = current.firstRunLine !== undefined;
+    if (!ports.confirm(confirmText(current.previewCount, pending))) return;
     return switchTo("live");
   }
 
