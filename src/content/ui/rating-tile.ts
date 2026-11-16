@@ -1,7 +1,7 @@
 // A rating card of the home row as a tile: the title's picture on top, then the player block's lines,
 // the ten stars and « Ignorer » in small; the série confirmation (warning, « Envoyer », « Annuler »)
 // stays in the tile. Texts go through textContent; every button acts on a trusted click only, the stars
-// and the confirmation only while `watch` says their row counts (D7).
+// and the confirmation only while `watch` says their row counts.
 
 import type { ElementLike } from "./dom-like";
 import type { RowWatch } from "./draw-watch";

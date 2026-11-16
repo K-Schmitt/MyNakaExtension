@@ -1,4 +1,4 @@
-// The title page's undo record is the title's last rating (spec 8 §2, D12): a later write of the same content
+// The title page's undo record is the title's last rating only: a later write of the same content
 // from another surface (a rating from the pause block or the home row, a finish, « Oublier ») clears it, so
 // « Annuler » can never put back a state from before that newer write. Only the record naming that content
 // goes. The write it follows has happened: a store that fails here fails nothing (the record then simply

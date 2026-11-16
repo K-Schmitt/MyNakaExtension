@@ -1,6 +1,6 @@
 // The title's SensCritique info: asked once per visit from the page's `fiche` event of the title the tab's
 // address names (its own tmdbId, never the event's), again after a link, and on « Réessayer » once a read
-// failed (spec 8b §2). Its product opens the seasons.
+// failed. Its product opens the seasons.
 
 import type { FicheInfo } from "../ext/fiche-answers";
 import type { FicheInfoMessage } from "../ext/fiche-messages";
@@ -68,7 +68,7 @@ export async function askInfo(scope: FicheScope): Promise<void> {
 
 /**
  * « Réessayer »: the visit's fiche-info once more, only after its last read failed (never while one is on
- * its way, whatever the flags say, nor while a write is). The last write's line stays (spec §4: what an
+ * its way, whatever the flags say, nor while a write is). The last write's line stays (what an
  * undo did not put back).
  */
 export function retryInfo(scope: FicheScope): void {

@@ -46,7 +46,7 @@ export type FinishRecord = {
   at: number;
   key: string;
   outcome: FinishOutcome["kind"] | "failed";
-  /** Present if and only if the outcome is "failed" (Ruling 13). */
+  /** Present if and only if the outcome is "failed". */
   error?: JobError;
   /** The Naka title of the film or the series, when the finish got as far as reading it. */
   title?: string;
@@ -61,7 +61,7 @@ export type Settings = {
   lastAutoRunAt?: number;
   lastRun?: RunRecord;
   lastFinish?: FinishRecord;
-  /** The hour's budget of finishes (Ruling 15). */
+  /** The hour's budget of finishes (finish-window). */
   finishWindow?: FinishWindow;
   /** The hour's budget of forgets asked by a Naka tab (a forged unticked « vu »). */
   forgetWindow?: FinishWindow;
@@ -69,7 +69,7 @@ export type Settings = {
   thresholds?: Thresholds;
   /** An integer 0 to 99: the progress from which a pause shows the pause block. 0 means "at any time". */
   pauseFromPercent?: number;
-  /** The outcome of the last answer to a question (D8). */
+  /** The outcome of the last answer to a question. */
   lastAnswer?: LastAnswer;
   /** Present (true) when the next pass waits for a click: a first run, or after a reset. Absent means no. */
   firstRunPending?: true;

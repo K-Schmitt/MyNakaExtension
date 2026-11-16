@@ -1,8 +1,8 @@
 // The owner's answer to a title question, and the dismissal of a question from the home row. The worker
 // takes nothing from the message for a site write: the choice must be one of the STORED candidates of an
 // OPEN question (core/questions), else the answer is refused and nothing is saved. A candidate choice then
-// runs the one finish the question waited on (D4), through the finish job: its pre-check, its budget and
-// its binding check. « Aucun de ceux-là » never runs it. Answers work in both modes (design §2.8).
+// runs the one finish the question waited on, through the finish job: its pre-check, its budget and
+// its binding check. « Aucun de ceux-là » never runs it. Answers work in both modes.
 
 import type { FinishedMessage } from "../content/playback-tracker";
 import { idsOfKey } from "../core/finish-event";

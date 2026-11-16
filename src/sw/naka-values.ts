@@ -30,7 +30,8 @@ function posterFields(value: Record<string, unknown>) {
   return { posterPath: image.posterPath, backdropPath: image.backdropPath };
 }
 
-// The same rules as the Plan 2 client: the required fields must be valid. The key is `contentId` here, `id` there.
+// The same rules as the Naka client: the required fields must be valid. The key is `contentId` here, `id`
+// there.
 export function asItem(value: unknown): NakaItem {
   if (!isRecord(value)) return unexpected();
   const item = toItem({

@@ -20,7 +20,7 @@ export type FicheOutcome =
   | { kind: "failed" }
   /** The rating did not reach SensCritique (the budget, a session…). */
   | { kind: "not-sent"; error: JobError }
-  /** The rating did not go out, but its explicit finish marked the title seen: « Annuler » is offered (D9, R2). */
+  /** The rating did not go out, but its explicit finish marked the title seen: « Annuler » is offered. */
   | { kind: "finish-wrote" }
   /** The same, once its « Annuler » timed out: the line no longer offers it. */
   | { kind: "finish-wrote-expired" }
@@ -36,7 +36,7 @@ export type FicheOutcome =
 /** The panel's two writes that take a rating back: « Annuler » and « Retirer la note ». */
 export type UndoAction = "undo" | "remove";
 
-/** « Chercher » (spec 8b §2): the searched words, then what came back; `failed` when no answer did. */
+/** « Chercher »: the searched words, then what came back; `failed` when no answer did. */
 export type FicheSearch =
   | { query: string; state: "searching" }
   | { query: string; state: "done"; candidates: QuestionCandidate[] }
@@ -55,7 +55,7 @@ export type FicheView = {
   pending?: FichePending;
   /** The last write's ending; the info's read and a season's read have their own flags. */
   outcome?: FicheOutcome;
-  /** The tab could not click Naka's « Ma liste » for the last write: the button had left the screen (D14). */
+  /** The tab could not click Naka's « Ma liste » for the last write: the button had left the screen. */
   maListeMissed?: true;
   /** The shown season's episode that `pending` (a rating) or `outcome` is about, when one is. */
   ratedEpisode?: number;

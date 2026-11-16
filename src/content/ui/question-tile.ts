@@ -3,7 +3,7 @@
 // per candidate (a small poster and its label) in a list that scrolls inside the tile, and a footer below
 // it, outside the list, holding « Aucun » and the actions, always visible. A sending view shows its
 // lines and no button. Texts go through textContent; every button acts on a trusted click only, a candidate
-// and « Retirer » only while `watch` says them visible (D7, question-render `writesOnSite`).
+// and « Retirer » only while `watch` says them visible (question-render `writesOnSite`).
 
 import { candidateButton } from "./candidate-button";
 import type { ElementLike } from "./dom-like";

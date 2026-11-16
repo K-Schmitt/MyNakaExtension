@@ -9,7 +9,7 @@ export type Fetch = (
     body?: string;
     credentials: "include" | "omit";
     redirect?: "error" | "follow" | "manual";
-    /** Set by the worker's request timeout (Ruling 16), never by the clients. */
+    /** Set by the worker's request timeout, never by the clients. */
     signal?: AbortSignal;
   },
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;

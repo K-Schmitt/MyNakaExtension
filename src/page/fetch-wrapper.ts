@@ -1,4 +1,4 @@
-// The MAIN-world wrapper of the page's fetch (Ruling 10). It calls the page's fetch with the page's own
+// The MAIN-world wrapper of the page's fetch. It calls the page's fetch with the page's own
 // arguments and receiver and returns the very promise it got: the request and the response are never
 // touched. On the side it resolves the URL against the page, classifies the request, and posts the event
 // only once the response is ok, so a refused "vu" never counts. It reads the method and a string body,
@@ -9,7 +9,7 @@
 // read from the url of its request alone.
 // Any error of its own is swallowed: the page's fetch goes on as if nothing watched it.
 //
-// Two differences the page could notice, both accepted (M10): observing the outcome of a classified
+// Two differences the page could notice, both accepted: observing the outcome of a classified
 // request attaches a handler to the page's promise, which silences the page's `unhandledrejection` for
 // that request; and the wrapper's name, length and toString differ from the native fetch.
 

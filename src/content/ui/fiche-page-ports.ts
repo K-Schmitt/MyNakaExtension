@@ -1,5 +1,5 @@
 // The title page UI's ports in the page: the real document, Naka's info panel, the episode boxes of the grid,
-// the page's change watch, the keepers' timer and the write controls' visibility watch (D7).
+// the page's change watch, the keepers' timer and the write controls' visibility watch.
 
 import type { EndTimer } from "./end-poll";
 import { episodeBoxes } from "./fiche-grid-dom";
@@ -19,7 +19,7 @@ export function fichePagePorts(doc: Document, timer: EndTimer): FicheUiPorts {
     timer,
     boxes: () => episodeBoxes(doc),
     watch: (onChange) => watchPage(doc, onChange),
-    // One observer for the page's star rows and write buttons (D7).
+    // One visibility observer for the page's star rows and write buttons.
     seen: pageSeenWatch(window as unknown as ObserverWindow),
   };
 }

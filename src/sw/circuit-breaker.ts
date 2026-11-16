@@ -1,5 +1,5 @@
 // A port stops calling its site for the rest of a job after a rate-limit, a session error or a timed-out
-// SensCritique request (K4): every later call rejects at once with the error that opened it. Those
+// SensCritique request: every later call rejects at once with the error that opened it. Those
 // errors carry fixed text only (an operation label and a status), so rethrowing one copies nothing of a
 // token or a response.
 
@@ -28,7 +28,7 @@ export function opensBreaker(error: unknown): boolean {
   );
 }
 
-// `onOpen` hears the error that opened the port, once (Ruling 17: the run says what stopped it).
+// `onOpen` hears the error that opened the port, once (the run then says what stopped it).
 export function withBreaker<A extends unknown[], R>(
   call: (...args: A) => Promise<R>,
   onOpen: (error: Error) => void = () => undefined,

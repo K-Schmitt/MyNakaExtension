@@ -42,7 +42,7 @@ function sharedOf(settings: Settings, answering: QuestionKey[]): Shared {
 }
 
 // The home row: removals first, then the ambiguities, in stored order; the dismissed, legacy and
-// « none » questions are the page's only (D15).
+// « none » questions are the page's only.
 function openQuestionsOf(state: SyncState): OpenQuestionsAnswer["questions"] {
   const removals = state.pending.flatMap((item) =>
     item.kind === "removal" && !item.asked ? [removalQuestion(item)] : [],

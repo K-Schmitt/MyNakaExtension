@@ -1,10 +1,10 @@
-// What « Annuler » restores after a rating given from a title page (spec §6 decisions 1, 6 and §7). Pure.
+// What « Annuler » restores after a rating given from a title page. Pure.
 // One record holds the product's state just before that rating; it is live for ten minutes, for its own
 // title only. The steps never send ProductUndone over a critique or a recommendation: a title seen
 // with a rating gets its old rating back, and any other title that is reviewed or recommended now is
 // refused before any request. The steps are planned against the product's state read now, so that a
-// retry after a partial failure skips what is already back (ruling R9). The record also keeps the
-// extension's own state of the title before the rating (ruling R8), put back exactly by the last step.
+// retry after a partial failure skips what is already back. The record also keeps the
+// extension's own state of the title before the rating, put back exactly by the last step.
 
 import type { RatingCard } from "./rating-cards";
 
@@ -20,7 +20,7 @@ export type UndoBefore = {
   inMaListe: boolean | null;
 };
 
-/** The extension's own state of the title just before the rating (ruling R8). */
+/** The extension's own state of the title just before the rating. */
 export type UndoLocal = {
   /** The film's content key was handled (a series' key never is). */
   handled: boolean;
@@ -70,7 +70,7 @@ export function liveUndo(
   return age >= 0 && age < UNDO_WINDOW_MS ? record : undefined;
 }
 
-/** A critique or a recommendation SensCritique could lose with the seen mark (decision 6). */
+/** A critique or a recommendation SensCritique could lose with the seen mark: such a title is never undone. */
 export function isProtected(current: ProtectedFlags): boolean {
   return current.isReviewed || current.isRecommended;
 }
@@ -117,7 +117,8 @@ function listSteps(before: UndoBefore, current: UndoCurrent): UndoStep[] {
   ];
 }
 
-/** The restoration sequence of spec §7, or a single refusal when it would undo a protected title. */
+/** The restoration steps, SensCritique first and the extension's own state last, or a single refusal when
+ * it would undo a protected title. */
 export function undoSteps(record: FicheUndo, current: UndoCurrent): UndoStep[] {
   const rating = ratingSteps(record.before, current);
   if (rating.some((step) => step.kind === "undone") && isProtected(current)) {

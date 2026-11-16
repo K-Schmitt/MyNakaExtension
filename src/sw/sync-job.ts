@@ -1,4 +1,4 @@
-// One list-sync run: the binding first, then Plan 2's runSync, then the run record. Any failure is
+// One list-sync run: the binding first, then core's runSync, then the run record. Any failure is
 // recorded as a JobError code; the stored state is then the one the run saved, or the one before it.
 // A run that completed after a breaker opened or its tab was lost records "ok" with that first code.
 
@@ -30,7 +30,7 @@ function waitsForClick(settings: Settings, trigger: Trigger): boolean {
   return isAutomatic(trigger) && settings.firstRunPending === true;
 }
 
-// The first click that completes lifts the hold; a failed one leaves it.
+// The first click whose run succeeds (outcome ok) lifts the hold; a failed one leaves it.
 function clearsFirstRun(trigger: Trigger, record: RunRecord): boolean {
   return !isAutomatic(trigger) && record.outcome === "ok";
 }

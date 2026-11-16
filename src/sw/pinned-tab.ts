@@ -1,12 +1,12 @@
-// One Naka tab per job (Ruling 9), the first one that answers (Ruling 20). A tab opened before the install,
+// One Naka tab per job, the first one that answers. A tab opened before the install,
 // or any tab after an extension reload, has no content script: its send rejects. So, until a tab is pinned,
 // a call tries the tabs found in their query order, and a rejected send moves on to the next one. The first
 // send that resolves, whatever its reply, pins that tab for every later call of the job: the account the job
 // checked is the account its writes go to. When no tab answers, or once the pinned tab's send rejects, the
-// tab is lost for the job (Ruling 17): no later call reaches the tabs, and every call rejects with the
+// tab is lost for the job: no later call reaches the tabs, and every call rejects with the
 // code of the loss. When the pinned tab's send rejects, one tabs.query tells a tab that changed page or
 // was reloaded (still listed: naka-tab-changed) from a closed one (no-naka-tab; so is a query that
-// throws); nothing is retried on that tab (Ruling 22). A job that found no tab at all looks again at its
+// throws); nothing is retried on that tab. A job that found no tab at all looks again at its
 // next call.
 //
 // The proxy's 20 s timeout covers a whole call, its tries included. A try still running when its call timed

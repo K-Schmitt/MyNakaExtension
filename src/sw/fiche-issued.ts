@@ -31,7 +31,7 @@ async function titleOf(
   }
 }
 
-/** The series' product issued to the tab as that content's title, which an episode's star links (D6). */
+/** The series' product issued to the tab as that content's title, which an episode's star links. */
 export async function issuedSeries(
   asker: FicheAsker,
   contentId: number,

@@ -132,7 +132,7 @@ export function chooseCandidate(
   return resolvePending(upsertMapping(state, pair), question);
 }
 
-// « Aucun de ceux-là » is never an unlinked entry (Plan 2): the question stays, with nothing to choose.
+// « Aucun de ceux-là » is never an unlinked entry: the question stays, with nothing to choose.
 export function chooseNone(
   state: SyncState,
   side: Side,

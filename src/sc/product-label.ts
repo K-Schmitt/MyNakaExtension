@@ -1,6 +1,6 @@
-// The public title and year of a product, read from a ProductCurrentUserInfos answer for the preview.
-// Lenient and NEVER throwing (the 4a I5 lesson): an unexpected value only drops the label, or its year,
-// never the state the caller needs for a finish or a live addition.
+// The public title and year of a product, read from a ProductCurrentUserInfos answer for the preview. Lenient
+// and NEVER throwing, since it reads an answer the caller needs for more than the label: an unexpected value
+// only drops the label, or its year, never the state the caller needs for a finish or a live addition.
 
 import { MAX_YEAR, MIN_YEAR } from "../core/year-range";
 

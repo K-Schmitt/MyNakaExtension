@@ -18,7 +18,7 @@ import {
 } from "./playback-tracker";
 import type { VideoSample } from "./video-sample";
 
-// Ruling 10: Naka is a single-page app, so the URL is polled every second; the video every 5 s.
+// Naka is a single-page app, so the URL is polled every second; the video every 5 s.
 const URL_POLL_MS = 1000;
 const SAMPLE_MS = 5000;
 

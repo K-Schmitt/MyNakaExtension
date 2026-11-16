@@ -25,8 +25,8 @@ function isHeld(state: SyncState, scId: number): boolean {
   return state.mapping.some((pair) => pair.scId === scId);
 }
 
-// An SC-side question lists NAKA ids: the owner is asked about the product itself, and the stored
-// question stays as it is.
+// A SensCritique-side question is about the product itself, so the id returned is the product's; the
+// stored question stays as it is.
 function mappedMatch(state: SyncState, pair: Pair): ScMatch {
   if (openAmbiguity(state, "sc", pair.scId)) {
     return { kind: "asked", candidateIds: [pair.scId] };

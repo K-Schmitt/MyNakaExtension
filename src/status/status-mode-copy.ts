@@ -1,7 +1,7 @@
 // The words of each mode: the headline, the switch's help, the mode's name in a sentence, the first-run line
-// and the confirmation before going live. A finish writes in both modes (spec §8quinquies); the simulation's
-// help says so. Live mode does not name itself in the headline (spec §5).
-// French typography: U+202F before « : ; ? ! » and inside « ».
+// and the confirmation before going live. A finish writes in both modes (the simulation covers the lists
+// only); the simulation's help says so. Live mode does not name itself in the headline. French typography:
+// U+202F before « : ; ? ! » and inside « ».
 
 import { MAX_WRITES_PER_RUN } from "../core/sync-writes";
 import type { Mode } from "../ext/settings";
@@ -29,7 +29,7 @@ export const MODE_LABELS: Record<Mode, string> = {
 
 const CAP = `Chaque synchronisation fera au plus ${MAX_WRITES_PER_RUN} écritures`;
 
-// `count` is the number of titles in the simulation's preview; one agrees in the singular (Ruling 21).
+// `count` is the number of titles in the simulation's preview; one agrees in the singular.
 export function confirmText(count: number): string {
   const ask = "Activer les écritures\u202F?";
   if (count === 0) {

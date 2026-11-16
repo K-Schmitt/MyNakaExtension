@@ -149,7 +149,8 @@ const lists = createListsController({
   answered: () => void handled.load(),
 });
 
-// A sync that ended may have changed what is handled and asked: both lists are asked again after it.
+// Both lists are asked again once the click is answered; syncEnd asks them again when the poll sees the
+// sync end, the read that shows what the sync changed.
 element("resync").addEventListener(
   "click",
   () =>

@@ -1,6 +1,6 @@
-// The candidates the worker offered the title page, step 7's (« Relier à SensCritique ») or a search's: one
+// The candidates the worker offered the title page, for « Relier à SensCritique » or a search: one
 // button each, its small poster and its label, in a list; a trusted click links it while `watch` says it
-// visible (D7): a link can run the finish that waited on the title.
+// visible: a link can run the finish that waited on the title.
 
 import { thumbUrl } from "../../core/image-urls";
 import type { QuestionCandidate } from "../../core/state";

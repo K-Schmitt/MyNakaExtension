@@ -1,6 +1,6 @@
 // Draws a RatingView in the overlay's shadow root. Every text goes through textContent; every button
 // acts on a trusted click only. The stars and the series confirmation act only while `watch` says their row
-// counts (D7, owner's decision of 2026-11-16).
+// counts (star-visibility).
 
 import type { RatingLabel } from "../../core/rating-cards";
 import type { DocLike, ElementLike, ShadowRootLike } from "./dom-like";
@@ -90,7 +90,7 @@ export function ratingLines(doc: Maker, view: RatingView): ElementLike[] {
   ];
 }
 
-/** A button whose trusted click acts only while `watch` says the button counts (D7). */
+/** A button whose trusted click acts only while `watch` says the button counts. */
 export function watchedButton(
   doc: Maker,
   text: string,
@@ -103,7 +103,7 @@ export function watchedButton(
   return el;
 }
 
-/** « Envoyer » and « Annuler »: a trusted click acts only while `watch` says their row counts (D7). */
+/** « Envoyer » and « Annuler »: a trusted click acts only while `watch` says their row counts. */
 export function confirmRow(
   doc: Maker,
   handlers: Pick<RatingHandlers, "onConfirm">,

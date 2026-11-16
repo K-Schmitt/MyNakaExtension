@@ -17,7 +17,7 @@ type ForgetStore = Pick<
   "loadState" | "saveState" | "loadRatings" | "saveRatings"
 >;
 
-// A finish waiting for a Naka tab (I2) is held too: once unticked, no retry may mark the title seen.
+// A finish waiting for a Naka tab (retry-job) is held too: once unticked, no retry may mark the title seen.
 function holds(state: SyncState, key: string): boolean {
   return holdsKey(state, key) || isWaiting(state, key);
 }
@@ -47,7 +47,8 @@ export async function forgetHandledJob(
   return forgot || dropped;
 }
 
-// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds nothing.
+// Something is kept under the key: handled, a question's or a waiting finish, or a card. A forged id holds
+// nothing.
 async function heldBy(store: ForgetStore, key: string): Promise<boolean> {
   if (holds(await store.loadState(), key)) return true;
   return cardFor(await store.loadRatings(), key) !== undefined;

@@ -1,6 +1,6 @@
-// « Chercher » under « Pas trouvé sur SensCritique » (spec 8b §2): a field holding Naka's title (or the
-// words searched last) and the button, then the search's line or its results, shown as step 7's
-// candidates. The field's words reach the controller only on a trusted click or a trusted Enter.
+// « Chercher » under « Pas trouvé sur SensCritique »: a field holding Naka's title (or the
+// words searched last) and the button, then the search's line or its results, shown as the offered
+// candidates are. The field's words reach the controller only on a trusted click or a trusted Enter.
 
 import { MAX_SEARCH_QUERY } from "../../ext/fiche-messages";
 import type { FicheView } from "../fiche-view";

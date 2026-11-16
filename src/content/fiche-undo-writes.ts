@@ -1,8 +1,8 @@
-// « Annuler » and « Retirer la note » from the title page (spec §6): the worker puts back what the last
+// « Annuler » and « Retirer la note » from the title page: the worker puts back what the last
 // rating changed, or takes the rating off. The tab sends either for the shown product, never while another
 // write is on its way (its `pending` turns a double click into one message), and gives the film back to
 // Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste). The answer's line stays
-// shown; the info is then asked again, since these answers carry no panel flags (ruling R11), and with it
+// shown; the info is then asked again, since these answers carry no panel flags, and with it
 // the shown season.
 
 import type { FicheUndoMessage } from "../ext/fiche-messages";
@@ -50,7 +50,7 @@ function begin(scope: FicheScope, action: UndoAction): void {
 
 // Every fiche-info resets what the worker issued to the tab: the seasons are read again, as after a link.
 // A lost read leaves no product of the old page on screen (its stars would be refused): the read failure
-// shows, with « Réessayer », and the answer's line stays next to it (spec §4).
+// shows, with « Réessayer », and the answer's line stays next to it.
 async function refreshInfo(scope: FicheScope): Promise<void> {
   const msg = scope.page.infoMessage;
   const info = msg === undefined ? undefined : await readInfo(scope, msg);

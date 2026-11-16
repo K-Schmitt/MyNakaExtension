@@ -10,7 +10,7 @@ type Maker = Pick<DocLike, "createElement">;
 
 const STAR_GLYPH = "★";
 
-// Two choices can be marked (the start and the current value): the stars show the highest one.
+// At most one choice is marked (the current value, else the start); the stars show it, else none.
 function shownIndex(stars: Star[]): number {
   return Math.max(
     0,
@@ -109,7 +109,7 @@ export type StarOptions = {
   name?: string;
   /** The hover preview. */
   preview?: true;
-  /** Watches the group of stars; a click chooses only while the answer says it counts (D7). */
+  /** Watches the group of stars; a click chooses only while the answer says it counts. */
   watch?: (group: ElementLike) => () => boolean;
 };
 

@@ -1,7 +1,7 @@
-// What the status page lists, and what its count line counts: one function, so that they never disagree.
-// The questions of the page are every stored question (the dismissed ones hidden, the ones saved before
-// 4b legacy), except a « none » ambiguity: it is listed with the unlinked titles, so no row shows twice
-// (D3, D15). The unlinked titles are those still present at the last completed run (D16).
+// What the status page lists, and what its count line counts: one function, so that they never disagree. The
+// questions of the page are every stored question (the dismissed ones hidden, the ones saved by an older
+// version marked legacy), except a « none » ambiguity: it is listed with the unlinked titles, so no row shows twice.
+// The unlinked titles are those still present at the last completed run.
 
 import { linkKey } from "../core/questions";
 import type { PendingItem, SyncState, UnlinkedItem } from "../core/state";

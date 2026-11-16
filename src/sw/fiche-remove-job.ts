@@ -1,7 +1,7 @@
-// « Retirer la note » on a title page (fiche-remove, spec §6 decision 2 and §7), queued like every write.
+// « Retirer la note » on a title page (fiche-remove), queued like every write.
 // Refused before any request unless the product is issued to the asking tab as that content's title.
 // The product's state is read again: a title with a critique or a recommendation (ProductUndone could
-// erase it, decision 6) or with no rating is refused with no write. The binding is checked, then the one
+// erase it) or with no rating is refused with no write. The binding is checked, then the one
 // ProductUndone takes the rating, « vu » and its date. No list is touched and the link stays; the cards
 // naming the product lose its rating, and the undo record of this very title goes (« Annuler » would put
 // back the rating just taken off). A card or a record that cannot be saved then is not an error: the

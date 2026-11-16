@@ -1,7 +1,7 @@
-// The status page's search for an unlinked title (B6). `side` is the item's side, so the search runs on the
+// The status page's search for an unlinked title. `side` is the item's side, so the search runs on the
 // OTHER site: for a Naka title, both SensCritique universes (no session needed, the limiter is the site's);
 // for a SensCritique title, one Naka search through a tab (a read, so the next tab may be tried). Read-only
-// and answered outside the queue (D9): it never saves. A failure is a fixed code, never the error's text.
+// and answered outside the queue: it never saves. A failure is a fixed code, never the error's text.
 
 import { toCandidates } from "../core/questions";
 import { checkQuery } from "../core/search-query";

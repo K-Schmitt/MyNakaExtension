@@ -131,7 +131,7 @@ export function createController(ports: Ports): Controller {
 
   // One action at a time: a click during an answer is ignored, and the buttons are disabled meanwhile. A
   // poll due meanwhile asks nothing: the action's own answer arms the next one. Disabling the pressed
-  // button drops its focus, so it gets it back once the buttons are enabled again (Ruling 19).
+  // button drops its focus, so it gets it back once the buttons are enabled again.
   async function exclusive(
     action: () => Promise<void>,
     pressed?: Pressed,

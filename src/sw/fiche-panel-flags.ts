@@ -1,4 +1,4 @@
-// The title panel's flags (spec §6 decisions 1, 2, 6): « Annuler » while a live undo record names this very
+// The title panel's flags: « Annuler » while a live undo record names this very
 // title and product, « Retirer la note » for a rated product with no critique or recommendation, and the
 // product's page, and whether a critique or recommendation is tied to its rating (an unrated title has no
 // rating to take off, so no protected line). Unknown flags fail closed: no undo, no removal, no link, no

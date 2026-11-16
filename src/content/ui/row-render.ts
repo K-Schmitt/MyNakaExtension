@@ -97,7 +97,7 @@ const shownTracks = new WeakMap<
 >();
 
 /**
- * Replaces whatever the root holds with the row; `watch` guards the tiles' writing controls (D7);
+ * Replaces whatever the root holds with the row; `watch` guards the tiles' writing controls;
  * `arrows` re-measures them on a resize and sets their motion.
  */
 export function renderRow(

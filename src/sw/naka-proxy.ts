@@ -60,7 +60,7 @@ function replyValue(raw: unknown): unknown {
 }
 
 // A late answer, after the timeout, settles an already settled promise: it changes nothing. A timeout is
-// not a lost tab: it stays unavailable (Ruling 17).
+// not a lost tab: it stays unavailable.
 function withTimeout<T>(timer: Timer, work: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const handle = timer.set(

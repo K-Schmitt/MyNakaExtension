@@ -1,7 +1,7 @@
-// The step 7 states the actions host shows instead of, or under, its buttons: loading, its failure with
-// « Réessayer », the candidates to link with their posters, « Pas trouvé » with its search (step 8b), a
-// series' confirmation, the write's and the season's error lines. Texts go through textContent; every
-// button acts on a trusted click only.
+// The states of a title with no product to rate, that the actions host shows instead of, or under, its
+// buttons: loading, its failure with « Réessayer », the candidates to link with their posters, « Pas trouvé »
+// with its search, a series' confirmation, the write's and the season's error lines. Texts go through
+// textContent; every button acts on a trusted click only.
 
 import type { QuestionCandidate } from "../../core/state";
 import type { FicheView } from "../fiche-view";
@@ -47,7 +47,7 @@ export function seasonLines(doc: Maker, view: FicheView): ElementLike[] {
   return [textLine(doc, seasonFailedLine(view.season), ERROR_CLASS)];
 }
 
-/** The series' warning, then « Envoyer » and « Annuler », acting only while `watch` says them visible (D7). */
+/** The series' warning, then « Envoyer » and « Annuler », acting only while `watch` says them visible. */
 export function seriesConfirm(
   doc: Maker,
   handlers: FicheHandlers,
@@ -111,7 +111,7 @@ function notFoundParts(
 
 /**
  * What shows while the title has no product to rate: loading, its failure, the candidates, « Pas trouvé ».
- * The search field it makes, if any, goes into `slot`; `watch` guards the candidates (D7).
+ * The search field it makes, if any, goes into `slot`; `watch` guards the candidates.
  */
 export function rareParts(
   doc: Maker,

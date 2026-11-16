@@ -1,6 +1,6 @@
-// The extension's own state of a title after « Annuler » and « Retirer la note » (spec §7, ruling R8).
-// « Annuler » puts back exactly what the undo record kept before the rating, as its very last step (spec
-// §8: no removal offer or question appears between its SensCritique and Naka steps):
+// The extension's own state of a title after « Annuler » and « Retirer la note ».
+// « Annuler » puts back exactly what the undo record kept before the rating, as its very last step (so
+// that no removal offer or question appears between its SensCritique and Naka steps):
 // - the settled pair and, for a film, its handled key, each in or out as they were (a waiting finish, a
 //   question's finish and the stored title are left as they are now);
 // - the title's cards as stored: each kept card replaced by its copy, and a film's card that did not exist

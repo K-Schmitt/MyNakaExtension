@@ -1,4 +1,4 @@
-// The reads a job makes on both sites, as the Plan 2 ports expect them. Searches and Naka content reads
+// The reads a job makes on both sites, as the core's sync ports expect them. Searches and Naka content reads
 // take a slot of their site's limiter (shared by every job); the wishlist and the playlist do not.
 
 import {
@@ -15,7 +15,7 @@ import type { ScWishItem } from "../sc/wishlist-page";
 
 export type SiteLimiters = { naka: RateLimiter; sc: RateLimiter };
 
-// Ruling 2: the port carries no type, so it searches both universes, one slot each; matchTitle filters by type.
+// The port carries no type, so it searches both universes, one slot each; matchTitle filters by type.
 export async function searchScBoth(
   sc: ScClient,
   limiter: RateLimiter,

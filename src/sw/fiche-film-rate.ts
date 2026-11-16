@@ -1,17 +1,17 @@
-// A film rated from its title page (Q9, Q11, Q12): linked first when it has no pair, then the pause path
+// A film rated from its title page: linked first when it has no pair, then the pause path
 // of the rating (rateJob: the card, or the explicit finish with its pre-check, its slot of the hour's
 // budget and its binding, then the ProductRate), then out of « Ma liste » (live mode only). An error of
 // the rate path is answered and stops there: no list removal; an error of the list removal is answered
-// `{ sent: true, error }` (the rating went out). A finish that waited on the film's
+// `{ sent: true, error, step }` (the rating went out). A finish that waited on the film's
 // question is not run: rateJob's explicit finish is of the same key. A stored card that would rate another
 // product than the one issued refuses the write before any request. Once the link holds, the film's state is
 // read and kept as the undo record (fiche-undo-record), before any SensCritique write: after the link's
 // checks, so a refused link still sends nothing. A rating that does not go out puts the older record back,
-// unless its explicit finish wrote first (D9: then this film's record stays, and its `{ error }` answer
-// carries the panel read from the stored record, ruling R2, so « Annuler » shows at once). An answer of a
+// unless its explicit finish wrote first (write-watch: then this film's record stays, and its `{ error }`
+// answer carries the panel read from the stored record, so « Annuler » shows at once). An answer of a
 // rating that went out carries the panel.
 // With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal);
-// without it, a film the client removed is noted as listed on the undo record (ruling R10).
+// without it, a film the client removed is noted as listed on the undo record.
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -59,7 +59,7 @@ async function keptPanel(
 }
 
 // The rating did not go out. Nothing written before it: the older record is put back. Its explicit finish
-// wrote (D9): this film's record stays and the answer offers its « Annuler » (R2).
+// wrote: this film's record stays and the answer offers its « Annuler ».
 async function notSent(
   deps: JobDeps,
   msg: FicheRateMessage,
@@ -103,7 +103,7 @@ export async function rateFilm(
     return notSent(deps, msg, kept, { error, wroteBefore });
   }
   const leaving = await leaveNakaList(deps, contentId, msg.listByTab === true);
-  // The tab could not read the button: the client's removal tells the record (R10).
+  // The tab could not read the button: the client's removal tells the record.
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }

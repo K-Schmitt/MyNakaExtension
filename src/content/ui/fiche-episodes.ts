@@ -2,7 +2,7 @@
 // number of an episode SensCritique lists, and names no other season, gets its badge and its stars; any other
 // box is left bare, never given a neighbour's values. Naka redraws its grid (a season change can keep the
 // boxes and rewrite their codes), so every change of the page runs the pass again while there are episodes
-// to show. A box's stars stop being watched (D7) once its decorations come off, once Naka drops the box, and
+// to show. A box's stars stop being watched once its decorations come off, once Naka drops the box, and
 // when the episodes are cleared, so a thrown-away box is not kept alive by the watch.
 
 import type { FicheView } from "../fiche-view";

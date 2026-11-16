@@ -1,4 +1,4 @@
-// I2: after a sync that ran and succeeded, the finishes that wait for a Naka tab are retried in stored
+// After a sync that ran and succeeded, the finishes that wait for a Naka tab are retried in stored
 // order, each through the one finish job (pre-check, budget, binding). Only `state.retryFinishes` decides
 // what is retried. A failure that keeps waiting stops the chain; any other end drops the entry. A content
 // Naka no longer knows is recorded as the last finish, under the title the waiting list showed, before the

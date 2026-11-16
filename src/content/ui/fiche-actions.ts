@@ -1,10 +1,10 @@
-// The actions under Naka's info panel (spec §2): a closed host right after `div.dca-panel`, kept there by the
+// The actions under Naka's info panel: a closed host right after `div.dca-panel`, kept there by the
 // row keeper whenever Naka redraws the aside. It holds the product's actions (fiche-product-actions:
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
-// product, every rare state of step 7 (fiche-rare-states) with step 8b's search field and « Réessayer ».
+// product, every rare state of the title (fiche-rare-states) with the search field and « Réessayer ».
 // Built again only when what it shows changed; a search field that had the focus gets it back
 // (field-focus). The search field's keys and input stay in the host. « Annuler », « Retirer la note », the
-// series confirmation and the candidates act only while `seen` says them visible (D7); a redraw and a hide
+// series confirmation and the candidates act only while `seen` says them visible; a redraw and a hide
 // stop watching the rows of the last draw.
 
 import type { FicheView } from "../fiche-view";
@@ -32,7 +32,7 @@ const HOST_DECLARATIONS = [
 
 export type FicheActionsPorts = PanelPlace & {
   doc: Pick<DocLike, "createElement">;
-  /** The D7 watch of the write buttons. */
+  /** The visibility watch of the write buttons. */
   seen: ReleasableWatch;
 };
 

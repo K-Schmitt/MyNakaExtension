@@ -30,11 +30,11 @@ export type StatusView =
       simulationOn: boolean;
       /** The first pass waits for a click: what it will do, shown above « Resynchroniser ». */
       firstRunLine?: string;
-      /** A mode change waits in the worker: a second click would stack another (Ruling 22). */
+      /** A mode change waits in the worker: a second click would stack another. */
       switchDisabled: boolean;
       /** A forget or a reset waits in the worker: both buttons stay disabled (a second would stack). */
       actionsDisabled: boolean;
-      /** A job runs or a mode change waits: the page asks again soon (Ruling 20). */
+      /** A job runs or a mode change waits: the page asks again soon. */
       inProgress: boolean;
       /** A settings change waits or runs in the worker: the values shown may be the old ones. */
       settingsPending: boolean;

@@ -1,4 +1,4 @@
-// I2, A2: at most one retry step waits in the queue. A step queued while another still waits replaces it:
+// At most one retry step waits in the queue. A step queued while another still waits replaces it:
 // the new one runs after the last sync and keeps the earliest time, since a sync stamps its run at its
 // start and the later time alone would miss the first sync's success. A step already started is left alone.
 // A step is tracked as a finish only when it will try an entry: a status read must not show one otherwise.

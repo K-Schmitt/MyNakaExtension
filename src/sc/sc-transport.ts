@@ -50,7 +50,7 @@ export async function readSession(deps: ScDeps): Promise<ScSession> {
   }
 }
 
-// A rate limit or a timeout on the home page stays one, so that the breaker opens (M2, K4): only the
+// A rate limit or a timeout on the home page stays one, so that the breaker opens: only the
 // class and the status are read, and the error is rebuilt from fixed text. Anything else, even an error
 // that throws while it is looked at, is the one fixed "could not be read".
 function sessionError(error: unknown): ScUnavailableError {

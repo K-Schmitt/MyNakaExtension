@@ -24,7 +24,7 @@ import type { JobError } from "./job-error";
 import { asRating } from "./rating-schema";
 import { ERROR_CODES } from "./run-record-schema";
 
-/** The title panel's actions (spec §6): « Annuler », « Retirer la note », « Voir sur SensCritique ». */
+/** The title panel's actions: « Annuler », « Retirer la note », « Voir sur SensCritique ». */
 export type PanelFlags = {
   /** A live undo record names this title and this product. */
   canUndo: boolean;
@@ -68,7 +68,7 @@ export type RateOkAnswer = OkAnswer & Paneled & ListedByTab;
 /** The write did not go out. */
 export type NotSentAnswer = { error: JobError };
 /**
- * The rating did not go out. With a panel only when a film's explicit finish wrote before it (D9, ruling R2):
+ * The rating did not go out. With a panel only when a film's explicit finish wrote before it:
  * the title is « vu » on SensCritique and its « Annuler » is live.
  */
 export type RateNotSentAnswer = NotSentAnswer & Paneled;

@@ -1,7 +1,8 @@
-// Whether a step wrote anything yet (D9): the deps of one step, with each SensCritique write and each save of
-// the sync state (the settled pair, the handled key) noted as it starts. A write that throws may still have
-// reached SensCritique, so it counts. The settings' saves (the hour's slot, the finish record) and the cards
-// are bookkeeping of the step, not counted. A new ScClient method fails the compile until it is sorted here.
+// Whether a step wrote anything yet, so that a failure after it knows what already stands: the deps of one
+// step, with each SensCritique write and each save of the sync state (the settled pair, the handled key)
+// noted as it starts. A write that throws may still have reached SensCritique, so it counts. The settings'
+// saves (the hour's slot, the finish record) and the cards are bookkeeping of the step, not counted. A new
+// ScClient method fails the compile until it is sorted here.
 
 import type { Store } from "../ext/store";
 import type { ScClient } from "../sc/sc-client";

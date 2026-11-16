@@ -1,7 +1,8 @@
-// Where the end and pause blocks draw, a rating or a question: the overlay root, made on the first show so that a page without a block gets
-// no element from the extension. Before every draw the host is put back if the page removed it. The stars,
-// the series confirmation and a question's writing choices are guarded by D7 (`seen`): each draw stops watching the rows of the last one,
-// and so does a hide (no row stays observed once the block is gone).
+// Where the end and pause blocks draw, a rating or a question: the overlay root, made on the first show so
+// that a page without a block gets no element from the extension. Before every draw the host is put back if
+// the page removed it. The stars, the series confirmation and a question's writing choices are guarded by the
+// visibility watch (`seen`): each draw stops watching the rows of the last one, and so does a hide (no row
+// stays observed once the block is gone).
 
 import { BLOCK_SHEET } from "./block-styles";
 import type { DocLike } from "./dom-like";

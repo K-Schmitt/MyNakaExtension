@@ -1,4 +1,4 @@
-// The real IntersectionObserver v2 behind the write buttons' visibility (D7): `trackVisibility` with the
+// The real IntersectionObserver v2 behind the write buttons' visibility: `trackVisibility` with the
 // smallest delay v2 allows. A browser without the observer, or without v2's `isVisible`, gets none, so every
 // click counts there (star-visibility).
 
@@ -44,7 +44,8 @@ export function intersectionObserverV2(win: ObserverWindow): ObserverMaker {
   };
 }
 
-/** One surface's D7 watch in the page: the isolated world's own observer, which a page script cannot patch. */
+/** One surface's visibility watch in the page: the isolated world's own observer, which a page script
+ * cannot patch. */
 export function pageSeenWatch(win: ObserverWindow): ReleasableWatch {
   return createSeenWatch(intersectionObserverV2(win), () => performance.now());
 }

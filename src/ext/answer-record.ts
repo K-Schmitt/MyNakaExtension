@@ -1,4 +1,4 @@
-// The outcome of the last answer the owner gave to a question: one record in the settings (D8). It is
+// The outcome of the last answer the owner gave to a question: one record in the settings. It is
 // read from storage and, by the Naka tab and the status page, from the worker's answers.
 
 import { QUESTION_KEY, type QuestionKey } from "../core/questions";

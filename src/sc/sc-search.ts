@@ -1,5 +1,5 @@
-// Searches SensCritique products by title. Search is public (spec §5, probe 3: it answers without a token,
-// with currentUserInfos null), so it reads no session and sends no authorization (Ruling 20): a sync of
+// Searches SensCritique products by title. Search is public (a probe showed it answers without a token,
+// with currentUserInfos null), so it reads no session and sends no authorization: a sync of
 // many titles makes no home-page read for its searches. Only the first page (16 results, by relevance) is
 // read.
 
@@ -55,7 +55,8 @@ function entriesOf({ data }: Envelope): unknown[] {
   return result.items;
 }
 
-// Every entry must become an item before the filter runs: an unreadable entry means the answer cannot be trusted.
+// Every entry must become an item before the filter runs: an unreadable entry means the answer cannot be
+// trusted.
 function parseAll(entries: unknown[]): ScWishItem[] {
   return entries.map((entry) => {
     const item = parseWishItem(entry);

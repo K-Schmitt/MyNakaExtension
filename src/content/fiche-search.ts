@@ -1,7 +1,7 @@
-// « Chercher » from the title page (spec 8b §2, §4): the owner's own words, sent only while SensCritique
-// found nothing, and never while another search or a write is on its way (one at a time, ruling R1).
-// Searching is a read: its results are candidates the worker issued to this tab, and only a trusted click
-// on one links it, as step 7's choice does. An answer that comes once the visit is over changes nothing.
+// « Chercher » from the title page: the owner's own words, sent only while SensCritique found nothing, and
+// never while another search or a write is on its way (one at a time). Searching is a read: its results are
+// candidates the worker issued to this tab, and only a trusted click on one links it, as a choice among the
+// offered candidates does. An answer that comes once the visit is over changes nothing.
 
 import { isSearchQuery } from "../ext/fiche-messages";
 import {

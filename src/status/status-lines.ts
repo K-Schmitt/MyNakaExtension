@@ -48,7 +48,7 @@ export function runLine(run: RunRecord, format: StatusFormat): string {
   return `Dernière synchronisation${which}\u202F: ${format.dateTime(run.at)} (${TRIGGERS[run.trigger]})`;
 }
 
-// Failed writes, in either mode, only when there are some (Ruling 21): Plan 2 retries them next run.
+// Failed writes, in either mode, only when there are some: the next run retries them.
 function failedLines(failed: number): string[] {
   if (failed === 0) return [];
   return [`Échecs (nouvel essai au prochain passage)\u202F: ${failed}`];
