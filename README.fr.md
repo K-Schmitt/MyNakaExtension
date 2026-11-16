@@ -99,9 +99,10 @@ où il naît :
   fantôme fermée, au moins 0,4 s après son apparition, et visible à l’écran depuis 300 ms
   (IntersectionObserver v2), contre les clics cachés. Les écritures automatiques sont bornées par des
   budgets : une synchronisation des listes fait 10 écritures au plus, et la toute première attend un
-  clic ; une fin de visionnage ne compte que pour le titre en cours de lecture, après une vraie lecture,
-  30 par heure au plus et une en attente par titre. Le mode simulation liste les écritures de listes
-  qu’une synchronisation ferait sans les faire (les fins restent écrites).
+  clic ; une fin de visionnage compte pour le titre en cours de lecture une fois son seuil ou son
+  générique atteint, ou pour un « vu » que tu coches toi-même (un vrai clic, un par clic) ; 30 par
+  heure au plus et une en attente par titre. Le mode simulation liste les écritures de listes qu’une
+  synchronisation ferait sans les faire (les fins restent écrites).
 - **Échec fermé.** Un autre compte connecté sur l’un des deux sites arrête tout travail avant la moindre
   écriture. Un coupe-circuit cesse d’appeler un site pour le reste du travail après un refus pour trop de
   requêtes (HTTP 429) ou une erreur de session sur l’un des deux sites, ou une requête SensCritique
