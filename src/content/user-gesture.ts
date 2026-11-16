@@ -3,8 +3,10 @@
 // for any id, but it cannot make an event with isTrusted true. One gesture lets one such « vu » through, and
 // each « vu » uses up the oldest gesture still recent: ticking three episodes in a row gives three.
 
-// Assumption, no probe behind it (to confirm at acceptance): Naka's PUT /history/watched, and so the page
-// event, follows the click within one request round-trip.
+// Known limits, stated without a probe: the window assumes Naka's PUT /history/watched, and so the page event,
+// follows the click within 3 s; on a slower connection the « vu » arrives too late and does not count. A Naka
+// action that marks a whole season or series seen in one click sends several PUTs: one click is one gesture,
+// so only the first of them counts.
 export const GESTURE_WINDOW_MS = 3000;
 // One click fires pointerup then click, and Enter on a button fires a click too: one gesture.
 export const GESTURE_MERGE_MS = 300;
