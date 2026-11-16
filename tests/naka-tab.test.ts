@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { TitlePageEvent } from "../src/content/fiche-ports";
 import { startNakaTab, type TabEnv } from "../src/content/naka-tab";
 import { createTabListener } from "../src/content/naka-tab-listener";
+import {
+  createGestureGate,
+  GESTURE_WINDOW_MS,
+} from "../src/content/user-gesture";
 import { readVideo } from "../src/content/video-sample";
 import type { ContentIds } from "../src/core/finish-event";
 import { PAGE_CHANNEL, type ToWorker } from "../src/ext/messages";
@@ -139,6 +143,8 @@ function tab(start = PLAYER(3)) {
     origin: string;
     data: unknown;
   }) => void)[] = [];
+  const clock = { now: 1_000_000 };
+  const gestures = createGestureGate(() => clock.now);
   const page = {
     href: start,
     video: undefined as
@@ -170,6 +176,7 @@ function tab(start = PLAYER(3)) {
     removed: (contentId) => {
       removals.push(contentId);
     },
+    takeGesture: gestures.take,
     fiche: {
       path: (pathname) => {
         fichePaths.push(pathname);
@@ -205,6 +212,8 @@ function tab(start = PLAYER(3)) {
     page,
     tick,
     post,
+    clock,
+    gestures,
   };
 }
 
@@ -443,6 +452,81 @@ describe("the Naka tab", () => {
         season: 1,
         episode: 3,
       },
+    ]);
+  });
+
+  it("a vu off the player counts right after a real click", () => {
+    const t = tab("https://naka.cx/content/tv/2004");
+    t.tick(1000);
+    t.gestures.note({ type: "click", isTrusted: true });
+    t.clock.now += 400;
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "watched",
+      contentId: 1428,
+      season: 1,
+      episode: 2,
+    });
+    expect(t.sent.slice(1)).toEqual([
+      {
+        type: "finished",
+        source: "explicit",
+        progress: 1,
+        contentId: 1428,
+        season: 1,
+        episode: 2,
+      },
+    ]);
+    expect(t.ended).toEqual([{ contentId: 1428, season: 1, episode: 2 }]);
+  });
+
+  it("a vu for another episode, in the player, counts right after a real click", () => {
+    const t = tab(EPISODE(7, 1, 2));
+    t.tick(1000);
+    t.gestures.note({ type: "pointerup", isTrusted: true });
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "watched",
+      contentId: 7,
+      season: 1,
+      episode: 5,
+    });
+    expect(t.sent.slice(1).map((m) => m.type)).toEqual(["finished"]);
+  });
+
+  it("a vu off the player, after the gesture window, sends nothing", () => {
+    const t = tab("https://naka.cx/content/movie/3");
+    t.gestures.note({ type: "click", isTrusted: true });
+    t.clock.now += GESTURE_WINDOW_MS + 1;
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
+    expect(t.sent.slice(1)).toEqual([]);
+  });
+
+  it("a click made up by the page never lets a vu off the player through", () => {
+    const t = tab("https://naka.cx/content/movie/3");
+    t.gestures.note({ type: "click", isTrusted: false });
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
+    expect(t.sent.slice(1)).toEqual([]);
+  });
+
+  it("one real click lets only one forged vu through", () => {
+    const t = tab("https://naka.cx/");
+    t.gestures.note({ type: "click", isTrusted: true });
+    for (const contentId of [11, 12, 13]) {
+      t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId });
+    }
+    expect(t.sent.slice(1)).toEqual([
+      { type: "finished", source: "explicit", progress: 1, contentId: 11 },
+    ]);
+  });
+
+  it("the playing title's vu uses up the click that made it", () => {
+    const t = tab(PLAYER(3));
+    t.gestures.note({ type: "click", isTrusted: true });
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 4242 });
+    expect(t.sent.slice(1)).toEqual([
+      { type: "finished", source: "explicit", progress: 1, contentId: 3 },
     ]);
   });
 

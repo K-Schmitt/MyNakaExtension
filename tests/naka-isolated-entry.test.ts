@@ -22,15 +22,16 @@ type PageListener = (ev: {
 const runtimeListeners: Listener[] = [];
 const toWorker: unknown[] = [];
 const intervals: { ms: number; fn: () => void }[] = [];
-const pageListeners: { type: string; fn: PageListener }[] = [];
+const pageListeners: { type: string; fn: PageListener; capture?: boolean }[] =
+  [];
 const documentListeners: { type: string; fn: unknown; capture: boolean }[] = [];
 const requests: { url: string; init: RequestInit }[] = [];
 // What the entry sent while it loaded, kept apart from what later tests make it send.
 const sentAtLoad: unknown[] = [];
 
 const page = {
-  addEventListener: (type: string, fn: PageListener) => {
-    pageListeners.push({ type, fn });
+  addEventListener: (type: string, fn: PageListener, capture?: boolean) => {
+    pageListeners.push({ type, fn, capture });
   },
 };
 const player = {
@@ -110,8 +111,22 @@ describe("isolated-world entry", () => {
 
   it("binds one runtime listener, one page listener, the URL poll and the sampler", () => {
     expect(runtimeListeners).toHaveLength(1);
-    expect(pageListeners.map((l) => l.type)).toEqual(["message"]);
+    expect(
+      pageListeners.filter((l) => l.type === "message").map((l) => l.capture),
+    ).toEqual([undefined]);
     expect(intervals.map((i) => i.ms).sort()).toEqual([1000, 5000]);
+  });
+
+  it("listens to the owner's gestures on the window, in capture", () => {
+    expect(
+      pageListeners
+        .filter((l) => l.type !== "message")
+        .map((l) => [l.type, l.capture]),
+    ).toEqual([
+      ["click", true],
+      ["pointerup", true],
+      ["keydown", true],
+    ]);
   });
 
   it("listens to the video's pause and play on the document, in capture", () => {
@@ -163,7 +178,8 @@ describe("isolated-world entry", () => {
 
   it("relays a Ma liste change from its own window", async () => {
     const before = toWorker.length;
-    const listener = pageListeners[0]?.fn as PageListener;
+    const listener = pageListeners.find((l) => l.type === "message")
+      ?.fn as PageListener;
     listener({
       source: page,
       origin: "https://naka.cx",

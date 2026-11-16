@@ -43,6 +43,8 @@ export type TabEnv = {
   pathChanged(pathname: string): void;
   /** Naka just answered a removal of this title from « Ma liste » (an id the page reported). */
   removed(contentId: number): void;
+  /** Uses up the owner's last real gesture on the page: true when it was recent enough. */
+  takeGesture(): boolean;
   /** The title page controller: the pathname at every URL poll, and the page's fiche and season events. */
   fiche: FicheInput;
 };
@@ -91,7 +93,7 @@ function relay(
   }
   // A « vu » is judged against the player URL of this moment, not the last poll's.
   follow();
-  const finished = tracker.watched(event);
+  const finished = tracker.watched(event, env.takeGesture);
   if (finished) sendFinished(env, finished);
 }
 
