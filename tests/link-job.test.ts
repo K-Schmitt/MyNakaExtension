@@ -124,8 +124,12 @@ describe("link-title", () => {
     expect(w.settings().lastAnswer).toMatchObject({ outcome: "done" });
   });
 
-  it("simulation mode (the default settings): the same mapping and done", async () => {
-    const w = answerWorld({ state: unlinkedFilm(), ...sc(1) });
+  it("simulation mode (stored settings): the same mapping and done", async () => {
+    const w = answerWorld({
+      state: unlinkedFilm(),
+      settings: { mode: "simulation" },
+      ...sc(1),
+    });
     await w.jobs.linkTitle(link());
     expect(w.settings().mode).toBe("simulation");
     expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);

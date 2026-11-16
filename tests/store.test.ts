@@ -97,9 +97,12 @@ describe("settings store", () => {
     expect(data.get("settings")).toEqual(settings);
   });
 
-  it("gives simulation when the key is absent", async () => {
+  it("gives live with the first run pending when the key is absent", async () => {
     const store = createStore(fakeArea().area);
-    expect(await store.loadSettings()).toEqual({ mode: "simulation" });
+    expect(await store.loadSettings()).toEqual({
+      mode: "live",
+      firstRunPending: true,
+    });
   });
 
   it("rejects invalid stored settings", async () => {
