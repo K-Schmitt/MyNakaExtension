@@ -22,7 +22,7 @@ describe("the event is checked before any port call", () => {
   const PROGRESS = "finish event: progress must be a finite number from 0 to 1";
   const TITLE = "finish event: title must not be empty";
   const ORIGINAL = "finish event: originalTitle must be a string";
-  const YEAR = "finish event: year must be a whole number from 1800 to 3000";
+  const YEAR = "finish event: year must be a whole number from 1800 to 2100";
   const withTitled = (extra: Record<string, unknown>) =>
     asEvent({ ...film(), titled: { ...FILM_TITLE, ...extra } });
   const MEDIA = "finish event: unknown media type";
@@ -112,7 +112,7 @@ describe("the event is checked before any port call", () => {
     ],
     ["a null originalTitle", withTitled({ originalTitle: null }), ORIGINAL],
     ["year 1799", withTitled({ year: 1799 }), YEAR],
-    ["year 3001", withTitled({ year: 3001 }), YEAR],
+    ["year 2101", withTitled({ year: 2101 }), YEAR],
     ["year 2001.5", withTitled({ year: 2001.5 }), YEAR],
     ["year as a string", withTitled({ year: "2001" }), YEAR],
     ["year NaN", withTitled({ year: Number.NaN }), YEAR],
@@ -197,7 +197,7 @@ describe("the event is checked before any port call", () => {
 
   it.each([
     ["year 1800", withTitled({ year: 1800 })],
-    ["year 3000", withTitled({ year: 3000 })],
+    ["year 2100", withTitled({ year: 2100 })],
     ["no year", withTitled({ year: undefined })],
     ["a string originalTitle", withTitled({ originalTitle: "The Film" })],
     ["an empty originalTitle", withTitled({ originalTitle: "" })],
