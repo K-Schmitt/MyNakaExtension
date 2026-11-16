@@ -93,7 +93,12 @@ async function contentById(
     }
     throw error;
   }
-  const item = toItem(unwrap(parseJson(text, "content")));
+  // A 200 that holds no entry is unreadable, not « not in the catalogue » (that is the 404 above).
+  const entry = unwrap(parseJson(text, "content"));
+  if (!isRecord(entry)) {
+    throw new NakaUnavailableError("Naka content: unexpected response");
+  }
+  const item = toItem(entry);
   if (item !== undefined && item.contentId !== contentId) {
     throw new NakaUnavailableError("Naka content: unexpected item");
   }
