@@ -1,6 +1,7 @@
 // The status page's entry: binds the controller to the DOM, `chrome.runtime`, `window.confirm` and the clock.
 // Everything shown goes through textContent: titles are remote catalogue text.
 
+import { downloadText, mountExport } from "./data-export-dom";
 import { createHandledController } from "./handled-controller";
 import { showHandled } from "./handled-dom";
 import { createListsController } from "./lists-controller";
@@ -183,6 +184,12 @@ element("save-settings").addEventListener("click", () => {
   markSaved();
   void controller.saveSettings(readDraft());
 });
+mountExport(
+  document,
+  chrome.storage.local,
+  downloadText,
+  chrome.runtime.getManifest().version,
+);
 mountTabs(document, window);
 void controller.load();
 void handled.load();
