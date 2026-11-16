@@ -14,7 +14,13 @@ export const MODE_TEXT: Record<Mode, { headline: string }> = {
   live: { headline: "Synchronisation active" },
 };
 
-export const FIRST_RUN_LINE = `Premier passage\u202F: il ajoutera aux deux listes les titres qui manquent, au plus ${MAX_WRITES_PER_RUN} écritures. Clique sur «\u202FResynchroniser\u202F» pour le lancer.`;
+const PRESS = "Clique sur «\u202FResynchroniser\u202F» pour le lancer.";
+
+// What the first pass will do depends on the mode: simulation writes nothing.
+export const FIRST_RUN_LINE: Record<Mode, string> = {
+  simulation: `Premier passage\u202F: il montrera dans Réglages ce qu’une synchronisation écrirait. ${PRESS}`,
+  live: `Premier passage\u202F: il ajoutera aux deux listes les titres qui manquent, au plus ${MAX_WRITES_PER_RUN} écritures. ${PRESS}`,
+};
 
 export const MODE_LABELS: Record<Mode, string> = {
   simulation: "simulation",

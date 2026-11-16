@@ -137,7 +137,6 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
     lines: viewLines(snapshot, format),
     preview,
     next: nextLines(snapshot),
-    ...(snapshot.firstRunPending ? { firstRunLine: FIRST_RUN_LINE } : {}),
   };
   if (snapshot.mode === undefined) {
     return { ...base, headline: UNKNOWN_MODE, simulationOn: false };
@@ -147,6 +146,9 @@ function readyView(snapshot: StatusSnapshot, format: StatusFormat): StatusView {
     ...base,
     ...text,
     mode: snapshot.mode,
+    ...(snapshot.firstRunPending
+      ? { firstRunLine: FIRST_RUN_LINE[snapshot.mode] }
+      : {}),
     simulationOn: snapshot.mode === "simulation",
   };
 }

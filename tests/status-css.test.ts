@@ -36,6 +36,15 @@ describe("status stylesheet", () => {
     expect(css).toMatch(/accent-color:\s*var\(--mn-color-accent-text\)/);
   });
 
+  it("shows the switch state from aria-checked, with a focus ring and calm motion", () => {
+    expect(css).toMatch(/\[role="switch"\]\[aria-checked="true"\]::after\s*\{/);
+    expect(css).toMatch(/\[role="switch"\]::after\s*\{/);
+    expect(css).toMatch(/\[role="switch"\]:focus-visible/);
+    expect(css).toMatch(
+      /prefers-reduced-motion[\s\S]*\[role="switch"\]::after\s*\{\s*transition:\s*none/,
+    );
+  });
+
   it("is linked by the page and copied by the build", () => {
     expect(read("src/status/status.html")).toContain(
       '<link rel="stylesheet" href="status.css" />',

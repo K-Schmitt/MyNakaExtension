@@ -102,12 +102,19 @@ describe("toStatusView: mode", () => {
     expect(view.next).toHaveLength(1);
   });
 
-  it("firstRunPending gives the first-run line", () => {
+  it("firstRunPending in live: the first pass adds to the lists", () => {
     const view = ready({ mode: "live", firstRunPending: true });
     expect(view.firstRunLine).toBe(
       `Premier passage${NB}: il ajoutera aux deux listes les titres qui manquent, au plus 10 écritures. Clique sur ${LAQ}${NB}Resynchroniser${NB}${RAQ} pour le lancer.`,
     );
     expect(ready({ mode: "live" }).firstRunLine).toBeUndefined();
+  });
+
+  it("firstRunPending in simulation: the first pass promises no write", () => {
+    const view = ready({ mode: "simulation", firstRunPending: true });
+    expect(view.firstRunLine).toBe(
+      `Premier passage${NB}: il montrera dans Réglages ce qu’une synchronisation écrirait. Clique sur ${LAQ}${NB}Resynchroniser${NB}${RAQ} pour le lancer.`,
+    );
   });
 
   it("offers no switch when the settings cannot be read", () => {
