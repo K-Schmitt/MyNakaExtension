@@ -530,11 +530,16 @@ describe("the ratings the owner sends", () => {
   it("shows a rating that went out before an error as sent, without reading it again", async () => {
     const t = await filmShown();
     t.controller.rateTitle(8);
-    t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
+    t.ofType("fiche-rate")[0]?.answer({
+      sent: true,
+      step: "ma-liste",
+      error: "naka-session",
+    });
     await settle();
     expect(t.ofType("fiche-mine")).toEqual([]);
     expect(t.last()?.outcome).toEqual({
       kind: "sent-with-error",
+      step: "ma-liste",
       error: "naka-session",
     });
     expect(t.last()?.info?.product?.mine).toBe(8);

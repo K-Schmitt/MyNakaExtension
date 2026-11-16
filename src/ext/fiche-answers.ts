@@ -72,8 +72,14 @@ export type NotSentAnswer = { error: JobError };
  * the title is « vu » on SensCritique and its « Annuler » is live.
  */
 export type RateNotSentAnswer = NotSentAnswer & Paneled;
-/** The rating went out and a later step failed (a film's removal from « Ma liste »). */
-export type SentWithErrorAnswer = { sent: true; error: JobError } & Paneled;
+/** The step after the rating that failed: a film's removal from « Ma liste », or the extension's own save. */
+export type SentStep = "ma-liste" | "local-save";
+/** The rating went out and a later step, named, failed. */
+export type SentWithErrorAnswer = {
+  sent: true;
+  step: SentStep;
+  error: JobError;
+} & Paneled;
 export type RateAnswer = RateOkAnswer | RateNotSentAnswer | SentWithErrorAnswer;
 export type LinkAnswer = OkAnswer;
 /** « Chercher »'s results, at most MAX_SEARCH_RESULTS, each issued to the tab as a candidate. */
@@ -135,9 +141,11 @@ const NOT_SENT_KEYS = valuesOf<keyof RateNotSentAnswer>({
 });
 const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
   sent: true,
+  step: true,
   error: true,
   panel: true,
 });
+const SENT_STEPS = valuesOf<SentStep>({ "ma-liste": true, "local-save": true });
 
 function asAverage(raw: unknown, path: string): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return fail(path);
@@ -277,7 +285,8 @@ export function parseRateAnswer(raw: unknown): RateAnswer {
   }
   onlyKeys(record, SENT_WITH_ERROR_KEYS, "answer");
   if (record.sent !== true) return fail("sent");
-  return withPanel({ sent: true as const, error }, record.panel);
+  const step = asOneOf(record.step, SENT_STEPS, "step");
+  return withPanel({ sent: true as const, step, error }, record.panel);
 }
 
 export function parseLinkAnswer(raw: unknown): LinkAnswer {

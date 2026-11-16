@@ -3,7 +3,7 @@
 // With Naka's button on screen (listByTab) the tab clicks it itself, so Naka's page does its own request and
 // its button follows: the worker answers `maListe: "tab"` and calls no client. Otherwise the binding is
 // checked first; a film not in the list (or an empty list) is left alone. The rating has gone out by then:
-// a failure here is answered `{ sent: true, error }`. The job is told whether the client took the film out,
+// a failure here is answered `{ sent: true, step: "ma-liste", error }`. The job is told whether the client took the film out,
 // so the undo record can say it was listed (ruling R10).
 
 import type { RateOkAnswer, SentWithErrorAnswer } from "../ext/fiche-answers";
@@ -55,6 +55,11 @@ export async function leaveNakaList(
   try {
     return await leave(deps, contentId, listByTab);
   } catch (error) {
-    return { answer: { sent: true, error: toJobError(error) }, removed: false };
+    const answer = {
+      sent: true,
+      step: "ma-liste",
+      error: toJobError(error),
+    } as const;
+    return { answer, removed: false };
   }
 }

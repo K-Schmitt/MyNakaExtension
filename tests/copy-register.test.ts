@@ -135,7 +135,14 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
     ficheCopy.outcomeLine({ kind: "failed" }, ficheCopy.LINK_FAILED_LINE),
     ...CODES.flatMap((error) => [
       ficheCopy.outcomeLine({ kind: "not-sent", error }, ""),
-      ficheCopy.outcomeLine({ kind: "sent-with-error", error }, ""),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "ma-liste", error },
+        "",
+      ),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "local-save", error },
+        "",
+      ),
     ]),
     ficheCopy.outcomeLine({ kind: "finish-wrote" }, ""),
     ficheCopy.outcomeLine({ kind: "finish-wrote-expired" }, ""),
@@ -353,5 +360,28 @@ describe("every shown sentence speaks in « tu » with ’", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
     expect(all.flatMap(registerFaults)).toEqual([]);
+  });
+});
+
+describe("the line of a rating sent but not saved", () => {
+  it("uses ’, names no list, blames no site, and asks for no retry", () => {
+    const line = ficheCopy.outcomeLine(
+      { kind: "sent-with-error", step: "local-save", error: "unavailable" },
+      "",
+    );
+    expect(line).toBe(
+      "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.",
+    );
+    expect(registerFaults(line)).toEqual([]);
+    expect(line).not.toMatch(/ [:;?!]|Ma liste|réessaie|ne répond pas/);
+  });
+
+  it("keeps the « Ma liste » line for a failed removal", () => {
+    expect(
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "ma-liste", error: "naka-session" },
+        "",
+      ),
+    ).toBe(ficheCopy.sentWithErrorLine("naka-session"));
   });
 });

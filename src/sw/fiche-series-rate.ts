@@ -12,7 +12,7 @@
 // go out: the ProductRate is the series' only write, so nothing was written before it, D9); its answer
 // carries the panel. An episode's
 // rating keeps nothing and answers no panel. Once the rating went out, the local saves after it (the settled
-// pair, the cards) are best-effort: a failure is answered `{ sent: true, error }`, never as not sent.
+// pair, the cards) are best-effort: a failure is answered `{ sent: true, step: "local-save", error }`, never as not sent.
 
 import { contentKeyOf } from "../core/finish-event";
 import type { Pair } from "../core/list-diff";
@@ -38,7 +38,7 @@ import { toJobError } from "./to-job-error";
 const sentAnswer = (unsaved: JobError | undefined) =>
   unsaved === undefined
     ? { ok: true as const }
-    : { sent: true as const, error: unsaved };
+    : { sent: true as const, step: "local-save" as const, error: unsaved };
 
 function names(card: RatingCard, label: RatingLabel, productId: number) {
   return card.targets.some(

@@ -93,9 +93,10 @@ describe("createFicheWorkerPort", () => {
       season: 1,
       episode: 2,
     } as const;
-    const send = ok({ sent: true, error: "unavailable" });
+    const send = ok({ sent: true, step: "local-save", error: "unavailable" });
     expect(await createFicheWorkerPort(send).rate(rate)).toEqual({
       sent: true,
+      step: "local-save",
       error: "unavailable",
     });
     expect(send).toHaveBeenCalledWith(rate);

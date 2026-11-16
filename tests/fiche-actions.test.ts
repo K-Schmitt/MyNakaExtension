@@ -473,12 +473,41 @@ describe("every step 7 rare state, in the actions host", () => {
   it("says « Note envoyée, mais … » when a later step failed", async () => {
     const t = await film();
     star(t.parts(), 9)?.click(true);
-    t.ofType("fiche-rate")[0]?.answer({ sent: true, error: "naka-session" });
+    t.ofType("fiche-rate")[0]?.answer({
+      sent: true,
+      step: "ma-liste",
+      error: "naka-session",
+    });
     await settle();
     expect(texts(t.parts())).toContain(
       `Note envoyée, mais le retrait de Ma liste Naka n’a pas abouti${NB}: reconnecte-toi sur Naka.`,
     );
     expect(checked(t.parts())).toEqual(["9 sur 10"]);
+  });
+
+  const NOT_SAVED =
+    "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.";
+  const notSaved = { sent: true, step: "local-save", error: "unavailable" };
+
+  it("a film whose rating went out but was not saved: says so, blames no site, asks for nothing", async () => {
+    const t = await film();
+    star(t.parts(), 9)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer(notSaved);
+    await settle();
+    expect(texts(t.parts())).toContain(NOT_SAVED);
+    expect(texts(t.parts()).join(" ")).not.toContain("Ma liste");
+    expect(texts(t.parts()).join(" ")).not.toContain("réessaie");
+    expect(checked(t.parts())).toEqual(["9 sur 10"]);
+  });
+
+  it("a series whose rating went out but was not saved: the same line", async () => {
+    const t = await series();
+    star(t.parts(), 6)?.click(true);
+    buttonNamed(t.parts(), "Envoyer")?.click(true);
+    t.ofType("fiche-rate")[0]?.answer(notSaved);
+    await settle();
+    expect(texts(t.parts())).toContain(NOT_SAVED);
+    expect(texts(t.parts()).join(" ")).not.toContain("Ma liste");
   });
 
   it("shows the error lines of a rating that did not go out", async () => {

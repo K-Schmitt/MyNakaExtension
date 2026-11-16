@@ -526,6 +526,21 @@ describe("an episode rating on its box", () => {
     expect(checked(shadowParts(starsHostOf(three)))).toEqual(["6 sur 10"]);
   });
 
+  it("an episode whose rating went out but was not saved: its box says so, and shows the rating", async () => {
+    const { t, three } = await twoBoxes();
+    starOf(three, 6)?.click(true);
+    t.ofType("fiche-rate")[0]?.answer({
+      sent: true,
+      step: "local-save",
+      error: "unavailable",
+    });
+    await settle();
+    expect(linesOf(three)).toEqual([
+      "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.",
+    ]);
+    expect(checked(shadowParts(starsHostOf(three)))).toEqual(["6 sur 10"]);
+  });
+
   it("the box of the same episode in another season shows nothing of it", async () => {
     const box = fakeBox("E3");
     const t = await seasonOne([box]);

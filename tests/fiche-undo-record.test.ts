@@ -307,6 +307,7 @@ describe("fiche-rate keeps what a film rating changes", () => {
     await w.registry.open(TAB, 5, filmTitle(2005), []);
     expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
       sent: true,
+      step: "ma-liste",
       error: "unavailable",
       panel: {
         canUndo: true,
@@ -405,7 +406,11 @@ describe("a rating refused before any SensCritique write keeps the earlier « An
 
     const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
 
-    expect(answer).toMatchObject({ sent: true, error: "unavailable" });
+    expect(answer).toMatchObject({
+      sent: true,
+      step: "ma-liste",
+      error: "unavailable",
+    });
     expect(stored(w)).toEqual(filmRecord());
   });
 
