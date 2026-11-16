@@ -77,8 +77,12 @@ export async function linkTitleJob(
     );
     return "failed";
   }
-  await recordAnswer(deps.store, target, result.ending, deps.now());
-  if (result.finish !== undefined) await finishJob(deps, result.finish);
+  try {
+    await recordAnswer(deps.store, target, result.ending, deps.now());
+  } finally {
+    // The saved link resolved the question that held the finish: it is run even when the log threw.
+    if (result.finish !== undefined) await finishJob(deps, result.finish);
+  }
   return result.ending;
 }
 

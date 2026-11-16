@@ -199,6 +199,31 @@ describe("link-title", () => {
     });
   });
 
+  it("the answer log unsaveable after the link: the waiting finish still runs once", async () => {
+    const state = stateWith({
+      pending: [
+        ambiguity(5, { candidateIds: [], candidates: [], finish: "movie:5" }),
+      ],
+    });
+    const w = answerWorld({ state, settings: LIVE, ...sc(1) });
+    const realSet = w.area.set;
+    let refused = false;
+    w.area.set = async (items) => {
+      if ("settings" in items && !refused) {
+        refused = true;
+        throw new Error("quota");
+      }
+      await realSet(items);
+    };
+    await w.jobs.linkTitle(link());
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 2005 }]);
+    expect(w.writes()).toContain("markDone:2005:2026-11-05");
+    expect(w.settings().lastFinish).toMatchObject({
+      key: "movie:5",
+      outcome: "done",
+    });
+  });
+
   it("a question without finish runs no finish", async () => {
     const state = stateWith({
       pending: [ambiguity(5, { candidateIds: [], candidates: [] })],

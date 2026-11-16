@@ -416,6 +416,20 @@ describe("fiche-rate: a linked title's waiting finish", () => {
     expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
   });
 
+  it("the state unsaveable after the link: the waiting finish still runs once", async () => {
+    const w = seriesWorld(question("tv:5:S1E2"));
+    const realSet = w.area.set;
+    let stateSaves = 0;
+    w.area.set = async (items) => {
+      if ("state" in items && ++stateSaves === 2) throw new Error("quota");
+      await realSet(items);
+    };
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.jobs.ficheRate(TAB, seriesRate()).catch(() => undefined);
+    expect(w.state().mapping).toEqual([{ nakaId: 5, scId: 13 }]);
+    expect(markDones(w.sk.calls)).toEqual(["markDone:1302:2026-11-05"]);
+  });
+
   it("an episode of a series whose question holds an episode finish: linked, the episode rated, then that finish once", async () => {
     const w = seriesWorld(question("tv:5:S1E2"));
     await w.registry.open(TAB, 5, seriesTitle(13), []);
