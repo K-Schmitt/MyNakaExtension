@@ -189,6 +189,9 @@ mountExport(
   chrome.storage.local,
   downloadText,
   chrome.runtime.getManifest().version,
+  (text) => {
+    element("export-note").textContent = text;
+  },
 );
 mountTabs(document, window);
 void controller.load();
