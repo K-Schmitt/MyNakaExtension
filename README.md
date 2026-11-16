@@ -139,8 +139,7 @@ npm run check   # Biome (lint + format), tsc on src and tests, Vitest, then the 
 
 TypeScript strict, no UI framework, no runtime dependency. Beyond unit tests, the list sync is checked
 by a randomised simulation of thousands of histories whose safety rules judge what the simulated world
-did. Design decisions, rejected options and known limits are logged in [NOTES.md](NOTES.md) (in
-French); changes per version are in [CHANGELOG.md](CHANGELOG.md).
+did. Known limits are listed below; changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Limits
 
