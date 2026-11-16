@@ -753,11 +753,13 @@ describe("isTrustedSender", () => {
     ).toBeUndefined();
   });
 
-  it("rejects a status url with a query or fragment, or lookalikes", () => {
+  it("rejects a status url with a query, an encoded fragment, or lookalikes", () => {
     for (const url of [
       `${STATUS}?x`,
       `${STATUS}?x#reglages`,
+      `${STATUS}%23reglages`,
       `${STATUS}x`,
+      `chrome-extension://${ID}/#reglages`,
       `chrome-extension://${ID}/other.html`,
       `chrome-extension://${ID}/other.html#reglages`,
       "chrome-extension://other/status.html",
