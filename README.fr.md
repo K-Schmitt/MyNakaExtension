@@ -157,10 +157,8 @@ version sont dans [CHANGELOG.md](CHANGELOG.md) (en anglais).
 - Il repose sur des API internes non documentées des deux sites. Elles peuvent changer à tout moment, et
   l’extension peut cesser de fonctionner sans préavis.
 - Navigateurs Chromium de bureau seulement : les navigateurs mobiles n’exécutent pas d’extensions.
-- Un « vu » coché hors du lecteur ne compte que dans les 3 s qui suivent ton clic, un par clic. Une action
-  de Naka qui marque vue toute une saison ou une série d’un seul clic envoie plusieurs « vu » : seul le
-  premier compte. Sur une connexion lente, où la requête de Naka part plus de 3 s après le clic, le
-  « vu » ne compte pas.
+- Un « vu » coché hors du lecteur ne compte que dans les 3 s qui suivent ton clic, un par clic. Sur une
+  connexion lente, où la requête de Naka part plus de 3 s après le clic, le « vu » ne compte pas.
 - Tu es responsable de ton usage des deux sites et de leurs conditions.
 
 ## Licence
