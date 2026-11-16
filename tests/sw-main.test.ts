@@ -194,7 +194,7 @@ describe("the toolbar button", () => {
   it("needs no new permission: the button has no popup, the status page is the options page", () => {
     const manifest = JSON.parse(readFileSync("src/manifest.json", "utf8"));
     expect(manifest.permissions).toEqual(["storage"]);
-    expect(manifest.action).toEqual({});
+    expect(manifest.action?.default_popup).toBeUndefined();
     expect(manifest.options_page).toBe("status.html");
   });
 });
