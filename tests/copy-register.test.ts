@@ -239,7 +239,7 @@ const SNAPSHOTS: unknown[] = [
       ],
       next: [{ side: "naka", title: "Dune", year: 2021, type: "serie" }],
     }),
-    lastFinish: finish({ key: "tv:21391:S1E3", title: "Un Job Mortel" }),
+    lastFinish: finish({ key: "tv:21391:S1E3", title: "Twin Peaks" }),
   },
   {
     mode: "live",
