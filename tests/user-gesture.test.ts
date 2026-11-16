@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   createGestureGate,
+  GESTURE_MERGE_MS,
   GESTURE_WINDOW_MS,
   type GestureEvent,
   isRecentGesture,
   listenToGestures,
+  MAX_GESTURES,
 } from "../src/content/user-gesture";
 
 const click: GestureEvent = { type: "click", isTrusted: true };
@@ -35,8 +37,63 @@ describe("isRecentGesture", () => {
 });
 
 describe("the gesture gate", () => {
-  it("the window is 3 seconds", () => {
+  it("the window is 3 seconds, 300 ms make one gesture, 5 are kept", () => {
     expect(GESTURE_WINDOW_MS).toBe(3000);
+    expect(GESTURE_MERGE_MS).toBe(300);
+    expect(MAX_GESTURES).toBe(5);
+  });
+
+  it("two clicks let two takes through", () => {
+    const { clock, gate } = gateAt();
+    gate.note(click);
+    clock.now += 500;
+    gate.note(click);
+    clock.now += 500;
+    expect(gate.take()).toBe(true);
+    expect(gate.take()).toBe(true);
+    expect(gate.take()).toBe(false);
+  });
+
+  it("one click (pointerup, click and Enter together) is one gesture", () => {
+    const { clock, gate } = gateAt();
+    gate.note({ type: "pointerup", isTrusted: true });
+    clock.now += 20;
+    gate.note(click);
+    clock.now += 20;
+    gate.note({ type: "keydown", isTrusted: true, key: "Enter" });
+    expect(gate.take()).toBe(true);
+    expect(gate.take()).toBe(false);
+  });
+
+  it("each take uses up the oldest gesture still in the window", () => {
+    const { clock, gate } = gateAt(0);
+    gate.note(click);
+    clock.now = 2000;
+    gate.note(click);
+    clock.now = 2500;
+    expect(gate.take()).toBe(true);
+    clock.now = 4500;
+    expect(gate.take()).toBe(true);
+  });
+
+  it("drops the gestures past the window", () => {
+    const { clock, gate } = gateAt(0);
+    gate.note(click);
+    clock.now = 2500;
+    gate.note(click);
+    clock.now = 3500;
+    expect(gate.take()).toBe(true);
+    expect(gate.take()).toBe(false);
+  });
+
+  it("keeps at most 5 gestures, dropping the oldest", () => {
+    const { clock, gate } = gateAt();
+    for (let i = 0; i < 7; i += 1) {
+      gate.note(click);
+      clock.now += 400;
+    }
+    const takes = Array.from({ length: 6 }, () => gate.take());
+    expect(takes).toEqual([true, true, true, true, true, false]);
   });
 
   it("gives nothing with no gesture", () => {

@@ -192,6 +192,12 @@ function tab(start = PLAYER(3)) {
   const tick = (ms: number) => {
     for (const timer of timers) if (timer.ms === ms) timer.fn();
   };
+  // One counted sample at 10 % (no mark): the tracker knows the content of the URL really plays.
+  const played = (src = "blob:played") => {
+    page.video = { currentTime: 600, duration: 6000, src };
+    tick(5000);
+    page.video = undefined;
+  };
   const post = (
     data: unknown,
     source: unknown = SELF,
@@ -211,6 +217,7 @@ function tab(start = PLAYER(3)) {
     timers,
     page,
     tick,
+    played,
     post,
     clock,
     gestures,
@@ -295,6 +302,7 @@ describe("the Naka tab", () => {
 
   it("the explicit finished send calls the end block with the same ids", () => {
     const t = tab(EPISODE(7, 1, 2));
+    t.played();
     t.post({
       channel: PAGE_CHANNEL,
       kind: "watched",
@@ -372,6 +380,7 @@ describe("the Naka tab", () => {
 
   it("an explicit vu of the episode playing gives one finished candidate", () => {
     const t = tab(EPISODE(7, 1, 2));
+    t.played();
     const watched = {
       channel: PAGE_CHANNEL,
       kind: "watched",
@@ -436,13 +445,15 @@ describe("the Naka tab", () => {
     expect(t.sent.slice(1)).toEqual([]);
   });
 
-  it("a vu reads the player URL first: the episode just opened counts before the next poll", () => {
+  it("the episode just opened, before the next poll, counts with the click that ticked it", () => {
     const t = tab(EPISODE(7, 1, 2));
-    t.tick(1000);
+    t.played();
     t.page.href = EPISODE(7, 1, 3);
+    t.gestures.note({ type: "click", isTrusted: true });
     const watched = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
-    t.post({ ...watched, season: 1, episode: 2 });
     t.post({ ...watched, season: 1, episode: 3 });
+    t.tick(1000);
+    t.post({ ...watched, season: 1, episode: 2 });
     expect(t.sent.slice(1)).toEqual([
       {
         type: "finished",
@@ -520,8 +531,45 @@ describe("the Naka tab", () => {
     ]);
   });
 
+  it("a page that pushStates to another id gets no vu without a sample or a click", () => {
+    const t = tab(PLAYER(3));
+    t.played("blob:3");
+    t.page.href = PLAYER(50);
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 50 });
+    t.tick(1000);
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 50 });
+    expect(t.sent.slice(1)).toEqual([]);
+  });
+
+  it("the new id's vu counts once a sample of it counted", () => {
+    const t = tab(PLAYER(3));
+    t.played("blob:3");
+    t.page.href = PLAYER(50);
+    t.played("blob:50");
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 50 });
+    expect(t.sent.slice(1)).toEqual([
+      { type: "finished", source: "explicit", progress: 1, contentId: 50 },
+    ]);
+  });
+
+  it("two real clicks on two episodes of the fiche give two finishes", () => {
+    const t = tab("https://naka.cx/content/tv/2004");
+    t.gestures.note({ type: "click", isTrusted: true });
+    t.clock.now += 600;
+    t.gestures.note({ type: "click", isTrusted: true });
+    t.clock.now += 300;
+    const watched = { channel: PAGE_CHANNEL, kind: "watched", contentId: 1428 };
+    t.post({ ...watched, season: 1, episode: 1 });
+    t.post({ ...watched, season: 1, episode: 2 });
+    t.post({ ...watched, season: 1, episode: 3 });
+    expect(
+      t.sent.slice(1).map((m) => m.type === "finished" && m.episode),
+    ).toEqual([1, 2]);
+  });
+
   it("the playing title's vu uses up the click that made it", () => {
     const t = tab(PLAYER(3));
+    t.played();
     t.gestures.note({ type: "click", isTrusted: true });
     t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 3 });
     t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 4242 });
@@ -532,6 +580,7 @@ describe("the Naka tab", () => {
 
   it("after an unticked vu, the next tick of that title gives a finished again", () => {
     const t = tab(PLAYER(7));
+    t.played();
     const on = { channel: PAGE_CHANNEL, kind: "watched", contentId: 7 };
     t.post(on);
     t.post({ ...on, kind: "unwatched" });
