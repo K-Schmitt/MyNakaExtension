@@ -1,5 +1,7 @@
 // Binds the tab buttons and panels of status.html. The ports below are the slice of the DOM used: the real
 // `document` and the fakes of the tests both satisfy them. `hidden` goes through the attribute for that reason.
+// A tab click writes the hash (one history entry); Précédent and Suivant change it back, and `hashchange` then
+// shows the tab it names, without writing the hash again.
 
 import { TAB_IDS, type TabId, tabAfterKey, tabFromHash } from "./status-tabs";
 
@@ -16,7 +18,10 @@ export interface TabDoc {
   getElementById(id: string): TabElement | null;
 }
 
-export type TabWindow = { location: { hash: string } };
+export type TabWindow = {
+  location: { hash: string };
+  addEventListener(type: "hashchange", listener: () => void): void;
+};
 
 function byId(doc: TabDoc, id: string): TabElement {
   const found = doc.getElementById(id);
@@ -56,4 +61,7 @@ function bindTab(doc: TabDoc, win: TabWindow, id: TabId): void {
 export function mountTabs(doc: TabDoc, win: TabWindow): void {
   show(doc, tabFromHash(win.location.hash));
   for (const id of TAB_IDS) bindTab(doc, win, id);
+  win.addEventListener("hashchange", () =>
+    show(doc, tabFromHash(win.location.hash)),
+  );
 }
