@@ -682,7 +682,12 @@ la licence MIT, les READMEs et la politique de confidentialité.
   « vu » coché hors du lecteur ne compte que dans les 3 s d’un geste de confiance, un geste chacun.
   Restent : un « vu » inventé par vrai clic ; une page qui joue une vraie vidéo de 5 minutes ou plus ;
   le « vu » de l’épisode précédent avant l’échantillon suivant, qui compte sans geste ; deux clics à
-  moins de 300 ms comptent pour un geste.
+  moins de 300 ms comptent pour un geste ; une action de Naka qui marque vue une saison ou une série
+  entière d’un clic envoie plusieurs « vu », dont seul le premier compte (un clic, un geste) ; la fenêtre
+  de 3 s suppose que la requête de Naka suit le clic en moins de 3 s (sur une connexion lente, le
+  « vu » ne compte pas). Ces deux limites sont écrites sans sonde du propriétaire.
+- Accepté sans changement : un échec d’enregistrement de la fiche après une note du lecteur ou de
+  l’accueil est tu (`jobs.ts`, `rate`) ; un second envoi de la note à SensCritique est sans effet nuisible.
 - F2 (faible) : la garde de visibilité (300 ms visible sans interruption) couvre désormais chaque
   contrôle qui écrit : étoiles du lecteur et de l’accueil, « Retirer la note », « Annuler », « Envoyer »
   des séries, offre de retrait et choix d’un titre ambigu.
