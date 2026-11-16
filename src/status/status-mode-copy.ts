@@ -29,14 +29,18 @@ export const MODE_LABELS: Record<Mode, string> = {
 
 const CAP = `Chaque synchronisation fera au plus ${MAX_WRITES_PER_RUN} écritures`;
 
-// `count` is the number of titles in the simulation's preview; one agrees in the singular.
-export function confirmText(count: number): string {
-  const ask = "Activer les écritures\u202F?";
-  if (count === 0) {
-    return `${ask} ${CAP}. La page de l’extension montre les écritures prévues au prochain passage.`;
-  }
-  const next =
-    "La prochaine (bouton «\u202FResynchroniser\u202F» ou prochaine ouverture de Naka)";
+// When the next pass starts: while the first run waits for a click, opening Naka starts nothing.
+function nextStart(firstRunPending: boolean): string {
+  return firstRunPending
+    ? "La prochaine démarre au clic sur «\u202FResynchroniser\u202F»"
+    : "La prochaine démarre au bouton «\u202FResynchroniser\u202F» ou à la prochaine ouverture de Naka";
+}
+
+// `count` is the number of titles in the simulation's preview; one agrees in the singular. The page lists
+// the writes in simulation only, so the confirmation promises no list.
+export function confirmText(count: number, firstRunPending: boolean): string {
+  const lead = `Activer les écritures\u202F? ${CAP}. ${nextStart(firstRunPending)}`;
+  if (count === 0) return `${lead}.`;
   const titles = count === 1 ? "le titre" : `les ${count} titres`;
-  return `${ask} ${CAP}. ${next} reprendra ${titles} de l’aperçu, puis les suivants, que cette page montre avant chaque passage.`;
+  return `${lead} et reprendra ${titles} de l’aperçu, puis les suivants.`;
 }
