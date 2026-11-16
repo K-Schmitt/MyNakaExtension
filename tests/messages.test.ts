@@ -730,6 +730,17 @@ describe("isTrustedSender", () => {
     ).toBe("status-page");
   });
 
+  it("accepts the status page whose url carries a fragment", () => {
+    const tabbed = `${STATUS}#reglages`;
+    expect(isTrustedSender({ id: ID, url: tabbed }, ID)).toBe("status-page");
+    expect(
+      isTrustedSender({ id: ID, url: tabbed, tab: { url: tabbed } }, ID),
+    ).toBe("status-page");
+    expect(
+      isTrustedSender({ id: ID, url: STATUS, tab: { url: tabbed } }, ID),
+    ).toBe("status-page");
+  });
+
   it("rejects the status url in a tab with another or no url", () => {
     expect(
       isTrustedSender({ id: ID, url: STATUS, tab: { url: NAKA } }, ID),
@@ -745,10 +756,13 @@ describe("isTrustedSender", () => {
   it("rejects a status url with a query or fragment, or lookalikes", () => {
     for (const url of [
       `${STATUS}?x`,
-      `${STATUS}#x`,
+      `${STATUS}?x#reglages`,
       `${STATUS}x`,
       `chrome-extension://${ID}/other.html`,
+      `chrome-extension://${ID}/other.html#reglages`,
       "chrome-extension://other/status.html",
+      `chrome-extension://other/status.html#reglages`,
+      `https://${ID}/status.html#reglages`,
     ]) {
       expect(isTrustedSender({ id: ID, url }, ID)).toBeUndefined();
       expect(
