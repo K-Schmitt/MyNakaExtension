@@ -247,6 +247,57 @@ describe("fiche-rate keeps what a film rating changes", () => {
     });
   });
 
+  it("a failed record save: still rated, no record kept (an older one cleared), no undo offered", async () => {
+    // Arrange: the store fails once, on saving this rating's record.
+    const w = world({ product: () => ({ ...UNSEEN, ...SEEN }) });
+    const { store } = w.jobDeps;
+    const saveFicheUndo = store.saveFicheUndo.bind(store);
+    let failNext = true;
+    store.saveFicheUndo = async (record) => {
+      if (!failNext) return saveFicheUndo(record);
+      failNext = false;
+      throw new Error("storage");
+    };
+    w.area.data.set("ficheUndo", filmRecord({ at: NOW - 1000 }));
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert
+    expect(w.sk.calls.filter((c) => c.startsWith("rate:"))).toEqual([
+      "rate:2005:8",
+    ]);
+    expect(stored(w)).toBeNull();
+    expect(answer).toEqual({
+      ok: true,
+      panel: {
+        canUndo: false,
+        canRemove: true,
+        protected: false,
+        url: FILM_URL,
+      },
+    });
+  });
+
+  it("a record save and its clearing both failing: still rated, no undo offered", async () => {
+    // Arrange: every save of the record fails.
+    const w = world({ product: () => ({ ...UNSEEN, ...SEEN }) });
+    w.jobDeps.store.saveFicheUndo = async () => {
+      throw new Error("storage");
+    };
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+
+    // Act
+    const answer = await w.jobs.ficheRate(TAB, rate({ inMaListe: true }));
+
+    // Assert
+    expect(w.sk.calls.filter((c) => c.startsWith("rate:"))).toEqual([
+      "rate:2005:8",
+    ]);
+    expect(answer).toMatchObject({ ok: true, panel: { canUndo: false } });
+  });
+
   it("a list removal that fails after the rating: answered as sent, with the panel", async () => {
     const w = world({
       playlist: () => {
