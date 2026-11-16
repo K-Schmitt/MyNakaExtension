@@ -206,6 +206,7 @@ const SNAPSHOTS: unknown[] = [
   undefined,
   { mode: "simulation", pendingRatings: 0 },
   { mode: "live", pendingRatings: 3, pendingActions: ["forget", "reset"] },
+  { mode: "live", firstRunPending: true },
   ...CODES.map((error) => ({ error })),
   ...CODES.map((error) => ({
     mode: "live",
@@ -247,7 +248,7 @@ function viewTexts(view: StatusView): string[] {
   if (view.kind !== "ready") return [view.message];
   return [
     view.headline,
-    view.switchLabel ?? "",
+    view.firstRunLine ?? "",
     ...view.lines,
     ...view.preview,
     ...view.next,

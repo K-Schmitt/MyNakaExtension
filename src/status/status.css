@@ -87,7 +87,7 @@ details#handled,
   border-radius: var(--mn-radius-lg);
 }
 
-#status section {
+#simulation section {
   margin: var(--mn-space-3) 0 0;
   background: var(--mn-color-surface-raised);
 }

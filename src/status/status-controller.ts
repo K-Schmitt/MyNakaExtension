@@ -75,7 +75,7 @@ function focusTarget(pressed: Pressed, view: StatusView): FocusTarget {
   if (pressed === "resync") return pressed;
   if (view.kind !== "ready") return "headline";
   if (pressed === "switch") {
-    return view.switchLabel === undefined ? "headline" : pressed;
+    return view.mode === undefined ? "headline" : pressed;
   }
   return view.actionsDisabled ? "headline" : pressed;
 }

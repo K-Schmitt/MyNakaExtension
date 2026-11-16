@@ -94,13 +94,14 @@ const SNAPSHOTS: StatusSnapshot[] = [
   { mode: "live", pendingActions: ["forget", "reset"] },
   { mode: "live", pendingRatings: 0 },
   { mode: "live", pendingRatings: 3 },
+  { mode: "live", firstRunPending: true },
 ];
 
 function texts(view: StatusView): string[] {
   if (view.kind !== "ready") return [view.message];
   return [
     view.headline,
-    view.switchLabel ?? "",
+    view.firstRunLine ?? "",
     ...view.lines,
     ...view.preview,
     ...view.next,

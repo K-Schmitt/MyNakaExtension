@@ -66,25 +66,54 @@ function ready(snapshot: StatusSnapshot, format = UTC) {
 }
 
 describe("toStatusView: mode", () => {
-  it("says what simulation leaves alone and what it still writes, and offers live", () => {
+  it("simulation: the headline says so and points to Réglages, the switch is on", () => {
     const view = ready({ mode: "simulation", counts: COUNTS });
     expect(view.headline).toBe(
-      `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      `Mode simulation actif${NB}: tes listes ne sont pas modifiées. Voir Réglages.`,
     );
     expect(view.mode).toBe("simulation");
-    expect(view.switchLabel).toBe("Activer les écritures");
+    expect(view.simulationOn).toBe(true);
   });
 
-  it("labels live and offers the way back", () => {
+  it("live: the headline no longer names the mode and the switch is off", () => {
     const view = ready({ mode: "live", counts: COUNTS });
-    expect(view.headline).toBe("Écritures actives");
-    expect(view.switchLabel).toBe("Revenir en simulation");
+    expect(view.headline).toBe("Synchronisation active");
+    expect(view.simulationOn).toBe(false);
+    expect(view.preview).toEqual([]);
+  });
+
+  it("live with next: next is empty in the Activité view", () => {
+    const view = ready({
+      mode: "live",
+      lastRun: run({
+        next: [{ side: "sc", title: "Film 3", year: 2003, type: "film" }],
+      }),
+    });
+    expect(view.next).toEqual([]);
+  });
+
+  it("simulation with next: next is listed", () => {
+    const view = ready({
+      mode: "simulation",
+      lastRun: run({
+        next: [{ side: "sc", title: "Film 3", year: 2003, type: "film" }],
+      }),
+    });
+    expect(view.next).toHaveLength(1);
+  });
+
+  it("firstRunPending gives the first-run line", () => {
+    const view = ready({ mode: "live", firstRunPending: true });
+    expect(view.firstRunLine).toBe(
+      `Premier passage${NB}: il ajoutera aux deux listes les titres qui manquent, au plus 10 écritures. Clique sur ${LAQ}${NB}Resynchroniser${NB}${RAQ} pour le lancer.`,
+    );
+    expect(ready({ mode: "live" }).firstRunLine).toBeUndefined();
   });
 
   it("offers no switch when the settings cannot be read", () => {
     const view = ready({ error: "stored-state" });
     expect(view.mode).toBeUndefined();
-    expect(view.switchLabel).toBeUndefined();
+    expect(view.simulationOn).toBe(false);
     expect(view.lines).toContain(
       `Lecture de l’état impossible${NB}: État enregistré illisible`,
     );
@@ -463,11 +492,11 @@ describe("toStatusView: the next pass's writes", () => {
     `Ma liste Naka${NB}: (titre inconnu)`,
   ];
 
-  it("lists them in live mode", () => {
-    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual(lines);
+  it("hides them in live mode: the section only shows in Réglages under simulation", () => {
+    expect(ready({ mode: "live", lastRun: run({ next }) }).next).toEqual([]);
   });
 
-  it("lists them in simulation too", () => {
+  it("lists them in simulation", () => {
     const view = ready({ mode: "simulation", lastRun: run({ next }) });
     expect(view.next).toEqual(lines);
   });
