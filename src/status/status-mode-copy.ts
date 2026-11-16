@@ -1,24 +1,20 @@
-// The words of each mode: the headline, the switch, the mode's name in a sentence, and the confirmation
-// before going live. A finish writes in both modes (spec §8quinquies), and the headline says so.
+// The words of each mode: the headline, the switch's help, the mode's name in a sentence, the first-run line
+// and the confirmation before going live. A finish writes in both modes (spec §8quinquies); the simulation's
+// help says so. Live mode does not name itself in the headline (spec §5).
 // French typography: U+202F before « : ; ? ! » and inside « ».
 
 import { MAX_WRITES_PER_RUN } from "../core/sync-writes";
 import type { Mode } from "../ext/settings";
 
-export const MODE_TEXT: Record<
-  Mode,
-  { headline: string; switchLabel: string }
-> = {
+export const MODE_TEXT: Record<Mode, { headline: string }> = {
   simulation: {
     headline:
-      "Simulation\u202F: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.",
-    switchLabel: "Activer les écritures",
+      "Mode simulation actif\u202F: tes listes ne sont pas modifiées. Voir Réglages.",
   },
-  live: {
-    headline: "Écritures actives",
-    switchLabel: "Revenir en simulation",
-  },
+  live: { headline: "Synchronisation active" },
 };
+
+export const FIRST_RUN_LINE = `Premier passage\u202F: il ajoutera aux deux listes les titres qui manquent, au plus ${MAX_WRITES_PER_RUN} écritures. Clique sur «\u202FResynchroniser\u202F» pour le lancer.`;
 
 export const MODE_LABELS: Record<Mode, string> = {
   simulation: "simulation",

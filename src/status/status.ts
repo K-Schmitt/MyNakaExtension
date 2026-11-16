@@ -64,8 +64,11 @@ function render(view: StatusView): void {
   fill(element("next"), ready ? view.next : []);
   element("next-section").hidden = !ready || view.next.length === 0;
   const toggle = element<HTMLButtonElement>("switch");
-  toggle.hidden = !ready || view.switchLabel === undefined;
-  toggle.textContent = ready ? (view.switchLabel ?? "") : "";
+  toggle.hidden = !ready || view.mode === undefined;
+  toggle.setAttribute("aria-checked", String(ready && view.simulationOn));
+  const firstRun = element("first-run");
+  firstRun.textContent = ready ? (view.firstRunLine ?? "") : "";
+  firstRun.hidden = firstRun.textContent === "";
   switchLocked = ready && view.switchDisabled;
   syncSwitch();
   // Also shown on an unreadable state: the reset is the repair.
@@ -74,7 +77,8 @@ function render(view: StatusView): void {
   syncActions();
 }
 
-// The headline takes the focus when the pressed button is hidden (tabindex -1 in status.html).
+// The pressed button gets its focus back; the headline takes it when that button is hidden (tabindex -1 in
+// status.html), and the selected tab when the target sits in the other panel.
 function focus(target: FocusTarget): void {
   element(focusIdFor(target, tabFromHash(window.location.hash))).focus();
 }

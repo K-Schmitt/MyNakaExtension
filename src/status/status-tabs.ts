@@ -1,5 +1,7 @@
 // The two tabs of the status page: which one shows, and where an arrow key leads. No DOM here.
 
+import type { FocusTarget } from "./status-controller";
+
 export type TabId = "activite" | "reglages";
 
 export const TAB_IDS: readonly TabId[] = ["activite", "reglages"];
@@ -18,15 +20,15 @@ export function tabAfterKey(current: TabId, key: string): TabId | undefined {
   return undefined;
 }
 
-const PANEL_OF: Record<string, TabId> = {
+const PANEL_OF: Record<FocusTarget, TabId> = {
   resync: "activite",
-  switch: "activite",
+  switch: "reglages",
   headline: "activite",
   forget: "reglages",
   reset: "reglages",
 };
 
 // The id to focus: the target itself, or the selected tab button when the target sits in a hidden panel.
-export function focusIdFor(target: string, selected: TabId): string {
+export function focusIdFor(target: FocusTarget, selected: TabId): string {
   return PANEL_OF[target] === selected ? target : `tab-${selected}`;
 }

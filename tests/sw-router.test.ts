@@ -2377,9 +2377,9 @@ describe("worker end to end: a first naka-ready in simulation", () => {
     expect(w.answers).toHaveLength(1);
     expect(toStatusView(w.answers[0], localFormat("UTC"))).toEqual({
       kind: "ready",
-      headline: `Simulation${NB}: tes listes ne sont pas modifiées. Les fins de visionnage sont enregistrées sur SensCritique.`,
+      headline: `Mode simulation actif${NB}: tes listes ne sont pas modifiées. Voir Réglages.`,
       mode: "simulation",
-      switchLabel: "Activer les écritures",
+      simulationOn: true,
       switchDisabled: false,
       actionsDisabled: false,
       inProgress: false,

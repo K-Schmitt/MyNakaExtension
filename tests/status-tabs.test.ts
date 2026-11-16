@@ -103,5 +103,10 @@ describe("focusIdFor", () => {
   it("falls back to the selected tab when the target is in a hidden panel", () => {
     expect(focusIdFor("headline", "reglages")).toBe("tab-reglages");
     expect(focusIdFor("forget", "activite")).toBe("tab-activite");
+    expect(focusIdFor("switch", "activite")).toBe("tab-activite");
+  });
+
+  it("finds the switch in Réglages", () => {
+    expect(focusIdFor("switch", "reglages")).toBe("switch");
   });
 });
