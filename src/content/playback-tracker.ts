@@ -11,8 +11,9 @@
 // CREDITS_FLOOR of the video. The page names an episode by its season and episode only, a film by neither,
 // so a start is bound to the content playing when it arrives (none playing: it is ignored).
 //
-// An explicit « vu » counts only for the content playing (same id, season and episode): a page script can
-// post one for any id. None playing, another title, another episode or the whole series: it is ignored.
+// An explicit « vu » counts for the content playing (same id, season and episode): a page script can post
+// one for any id. For any other content (none playing, another title, another episode, the whole series)
+// it counts only right after a real gesture on the page, and each gesture is used up by one « vu ».
 
 import { contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
@@ -47,7 +48,11 @@ type Reference = { src: string; duration: number };
 export type PlaybackTracker = {
   context(ctx: PlayerContext | undefined): void;
   sample(s: VideoSample): FinishedMessage | undefined;
-  watched(ev: PageEvent): FinishedMessage | undefined;
+  /** `takeGesture` uses up the last real gesture: true when it was recent enough (none given: false). */
+  watched(
+    ev: PageEvent,
+    takeGesture?: () => boolean,
+  ): FinishedMessage | undefined;
   /** Where the credits start, for the episode (or the film) the event names. */
   credits(ev: PageEvent): void;
   /** An unticked « vu »: that key can send its explicit finish again. */
@@ -180,14 +185,15 @@ export function createPlaybackTracker(): PlaybackTracker {
       const state = states.get(keyOf(idsOf(ev)));
       if (state !== undefined) state.watched = false;
     },
-    watched(ev) {
+    watched(ev, takeGesture = () => false) {
       if (ev.kind !== "watched") return undefined;
       const playing = idsOf(ev);
-      // A page script can name any id: only the content the player plays may finish (F1).
-      if (current === undefined || !sameKey(current, playing)) return undefined;
-      const state = stateOf(playing);
-      if (state.watched) return undefined;
-      state.watched = true;
+      if (states.get(keyOf(playing))?.watched === true) return undefined;
+      // A page script can name any id (F1): the content playing, or one real gesture per other content.
+      const isPlaying = current !== undefined && sameKey(current, playing);
+      const hadGesture = takeGesture();
+      if (!isPlaying && !hadGesture) return undefined;
+      stateOf(playing).watched = true;
       return {
         type: "finished",
         source: "explicit",

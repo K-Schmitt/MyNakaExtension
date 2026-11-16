@@ -24,6 +24,7 @@ import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { maListePorts } from "./ui/ma-liste-button";
 import { createWorkerPort } from "./ui/worker-port";
+import { createGestureGate, listenToGestures } from "./user-gesture";
 import { readVideo } from "./video-sample";
 
 const NAKA_ORIGIN = "https://naka.cx";
@@ -83,6 +84,9 @@ listenToPauses(document, {
   resumed: blocks.resumed,
 });
 
+const gestures = createGestureGate(() => Date.now());
+listenToGestures(window, gestures);
+
 startNakaTab({
   self: window,
   href: () => location.href,
@@ -98,5 +102,6 @@ startNakaTab({
   urlChanged: blocks.urlChanged,
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
+  takeGesture: gestures.take,
   fiche: guardFicheInput(fiche),
 });

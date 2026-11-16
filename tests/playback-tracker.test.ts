@@ -466,6 +466,58 @@ describe("watched", () => {
     ).toBeUndefined();
   });
 
+  it("a vu for a title not playing counts right after a real gesture", () => {
+    const t = film();
+    expect(t.watched({ ...ev, contentId: 6 }, () => true)).toEqual({
+      type: "finished",
+      source: "explicit",
+      progress: 1,
+      contentId: 6,
+    });
+  });
+
+  it("a vu with nothing playing counts right after a real gesture", () => {
+    const t = createPlaybackTracker();
+    expect(
+      t.watched({ ...ev, contentId: 9, season: 1, episode: 4 }, () => true),
+    ).toEqual({
+      type: "finished",
+      source: "explicit",
+      progress: 1,
+      contentId: 9,
+      season: 1,
+      episode: 4,
+    });
+  });
+
+  it("a vu for a title not playing, without a gesture, sends nothing", () => {
+    const t = film();
+    expect(t.watched({ ...ev, contentId: 6 }, () => false)).toBeUndefined();
+  });
+
+  it("the playing title's vu needs no gesture, and uses up any recent one", () => {
+    const t = film();
+    let takes = 0;
+    const take = () => {
+      takes += 1;
+      return false;
+    };
+    expect(t.watched(ev, take)?.source).toBe("explicit");
+    expect(takes).toBe(1);
+  });
+
+  it("a repeated off-player vu of a title already sent leaves the gesture unused", () => {
+    const t = film();
+    t.watched({ ...ev, contentId: 6 }, () => true);
+    let takes = 0;
+    const take = () => {
+      takes += 1;
+      return true;
+    };
+    expect(t.watched({ ...ev, contentId: 6 }, take)).toBeUndefined();
+    expect(takes).toBe(0);
+  });
+
   it("ignores an episode's vu while a film with the same id plays", () => {
     const t = film();
     expect(t.watched({ ...ev, season: 1, episode: 1 })).toBeUndefined();
