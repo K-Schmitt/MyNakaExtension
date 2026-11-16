@@ -148,10 +148,8 @@ French); changes per version are in [CHANGELOG.md](CHANGELOG.md).
 - It relies on undocumented internal APIs of both sites. They can change at any time, and the extension
   may stop working without notice.
 - Chromium desktop browsers only: mobile browsers do not run extensions.
-- A « vu » ticked outside the player counts only within 3 s of your click, one per click. A Naka action
-  that marks a whole season or series seen in one click sends several « vu »: only the first one counts.
-  On a slow connection, where Naka's request leaves more than 3 s after the click, the « vu » does not
-  count.
+- A « vu » ticked outside the player counts only within 3 s of your click, one per click. On a slow
+  connection, where Naka's request leaves more than 3 s after the click, the « vu » does not count.
 - You are responsible for your use of both sites and of their terms.
 
 ## License
