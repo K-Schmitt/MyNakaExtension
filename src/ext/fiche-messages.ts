@@ -45,7 +45,7 @@ export type FicheMessage =
       inMaListe?: boolean;
       /** A film's only: the button is on screen, so the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
-      /** A film's or an episode's: Naka's « Déjà vu » button is on screen, so the tab clicks it itself (`dejaVu: "tab"`). */
+      /** A film's or an episode's: Naka's « Déjà vu » / « Vu » button is on screen: the tab clicks it if it is still off (`dejaVu: "tab"`). */
       vuByTab?: boolean;
     }
   | { type: "fiche-link"; contentId: number; productId: number }

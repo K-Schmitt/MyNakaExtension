@@ -1,5 +1,5 @@
 // What the title page controller needs from the tab: the worker's eight fiche answers (already checked,
-// undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
+// undefined when lost or refused), four readings of the page, the reading and click of Naka's « Ma liste » and « Déjà vu » buttons (the « Déjà vu » ports), the
 // drawing of its view, the announcement of a visit to the page's relay and the page's timer.
 
 import type { ContentIds } from "../core/finish-event";

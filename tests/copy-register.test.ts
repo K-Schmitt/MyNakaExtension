@@ -383,7 +383,7 @@ describe("the line of a rating sent but not passed to « Déjà vu »", () => {
     );
     expect(line).toBe(ficheCopy.DEJA_VU_FAILED_LINE);
     expect(line).toBe(
-      "Note envoyée, mais Naka n’a pas pu passer le titre en \u00AB\u202FDéjà vu\u202F\u00BB.",
+      "Note envoyée, mais Naka n’a pas pu le marquer comme vu.",
     );
     expect(registerFaults(line)).toEqual([]);
   });

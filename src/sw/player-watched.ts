@@ -1,4 +1,5 @@
-// After the player's card rated a film or an episode: the title is also « vu » on Naka. Best effort: the
+// After the `rate` job (the end and pause cards AND the home-row tiles) rated a film or an episode: the title
+// is also « vu » on Naka. Best effort: the
 // card's answer has no step for it, so a failure is not reported (the title shows on its page later). A
 // season or a series is never marked: only the title that was watched.
 
