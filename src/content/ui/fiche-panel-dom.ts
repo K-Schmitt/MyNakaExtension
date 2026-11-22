@@ -18,7 +18,7 @@ export type PanelElement = {
 };
 
 export type PanelPlace = {
-  /** Naka's info panel, or null when the page shows none. */
+  /** Naka's « À propos » facts, or null when the page shows none. */
   panel(): PanelElement | null;
   watch(onChange: () => void): () => void;
   timer: EndTimer;

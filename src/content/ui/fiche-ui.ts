@@ -1,5 +1,6 @@
-// The title page UI the controller renders into: our two rows in Naka's info panel, the actions right after
-// it and the episode boxes, all taken off when the tab leaves the title page (an undefined view).
+// The title page UI the controller renders into: our two rows in Naka's « À propos » facts, the actions right
+// after them, the hero chip and the episode boxes, all taken off when the tab leaves the title page (an
+// undefined view).
 
 import type { FicheView } from "../fiche-view";
 import { createFicheActions, type FicheActionsPorts } from "./fiche-actions";

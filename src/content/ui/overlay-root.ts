@@ -9,8 +9,8 @@ import { attachSheet } from "./sheet";
 
 // The rating blocks sit on the right, at most 40% wide, from 7% to at most 76% of the height (top 7% plus
 // max-height 69%). Naka's bars take 1.7-6.4% and 90.8-98.3% of the height, and its "Lire maintenant" next
-// card starts at 77.5% (to 87%): the column ends above it (probes of 2026-11-22). Every declaration is !important: an author rule marked
-// !important must not hide or fade the host.
+// card starts at 77.5% (to 87%): the column ends above it (probes of 2026-11-22). Every declaration is
+// !important: an author rule marked !important must not hide or fade the host.
 const HOST_STYLE = [
   "all: initial",
   "color-scheme: dark",

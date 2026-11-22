@@ -44,7 +44,7 @@ export const BADGE_SHEET: string = themeCss(":host") + BADGE_RULES.join("");
 export const EPISODE_STARS_SHEET: string =
   themeCss(":host") + [...BLOCK_RULES, ...EPISODE_STARS_RULES].join("");
 
-// The « Ta note » row of the info panel: ten stars beside the label leave no room for « 7/10 », which then
+// The « Ta note » row of the « À propos » facts: ten stars beside the label leave no room for « 7/10 », which then
 // wrapped under them and made the row taller than Naka's. The row shows the stars only,
 // right-aligned like Naka's values; the marked star still carries the rating (aria-checked).
 const PANEL_STARS_RULES = [

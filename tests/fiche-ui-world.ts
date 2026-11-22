@@ -1,5 +1,5 @@
 // The title page UI tests' world: the real controller on the fake ports of its own tests, drawing into a
-// fake of Naka's aside (its info panel) and the episode boxes on DOM fakes. A click on a star goes through the controller to the ports.
+// fake of Naka's « À propos » facts and the episode boxes on DOM fakes. A click on a star goes through the controller to the ports.
 
 import { createFicheController } from "../src/content/fiche-controller";
 import type { FicheView } from "../src/content/fiche-view";

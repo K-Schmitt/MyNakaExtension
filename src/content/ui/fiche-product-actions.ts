@@ -1,4 +1,4 @@
-// The product's actions under Naka's info panel: « Voir sur SensCritique », an
+// The product's actions under Naka's « À propos » facts: « Voir sur SensCritique », an
 // `<a target="_blank">` to the validated product page, and « Annuler » or « Retirer la note » (the
 // protected-title line instead of the latter), then the write on its way and its ending. A series'
 // confirmation replaces them while it is shown, so its « Annuler » never sits by the undo one. Each button

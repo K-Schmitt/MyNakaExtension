@@ -66,7 +66,7 @@ const titleStars = (t: ReturnType<typeof fakeUi>) =>
 const valueSpan = (row: FakeElement | undefined) =>
   row?.children[1] as FakeElement | undefined;
 
-describe("the SensCritique rows in Naka's info panel", () => {
+describe("the SensCritique rows in Naka's « À propos » facts", () => {
   it.each([
     ["a film's 7-fact list", film, FILM_FACTS],
     ["a series' 7-fact list", series, SERIES_FACTS],

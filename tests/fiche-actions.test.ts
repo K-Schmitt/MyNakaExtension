@@ -77,7 +77,7 @@ const star = (parts: FakeElement[], value: number) =>
 
 const linkOf = (parts: FakeElement[]) => parts.find((p) => p.tag === "a");
 
-describe("the actions under Naka's info panel", () => {
+describe("the actions under Naka's « À propos » facts", () => {
   it("draws the native controls dark: the reset of the host sets its color scheme back (the candidates scroll)", async () => {
     const t = await film();
     const css = (t.kept.actions() as FakeElement).style.cssText;

@@ -123,6 +123,13 @@ describe("the home row's DOM ports", () => {
     expect(byText.ports.snapshot()?.host).toBe(0);
   });
 
+  it("takes the row with h2#cw-title over an earlier row whose title reads « Reprendre la lecture »", () => {
+    const decoy = new Box({ h2: { text: "Reprendre la lecture" } });
+    const byId = new Box({ h2: { text: "Continuer", id: "cw-title" } });
+    const { ports } = page(decoy, byId);
+    expect(ports.snapshot()?.reprendre).toBe(1);
+  });
+
   it("counts rows after the carousel: the host right after it snapshots as host 0", () => {
     const { ports, list, host } = page(carousel(), reprendre(), new Box());
     expect(ports.snapshot()).toEqual({ reprendre: 0, host: -1, age: 0 });

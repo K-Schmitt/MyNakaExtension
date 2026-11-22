@@ -68,7 +68,11 @@ function moveToTop(host: HTMLElement, { list, carousel }: Place): void {
   if (carousel.nextElementSibling !== host) carousel.after(host);
 }
 
-function moveHost(host: HTMLElement, place: Place, move: string): void {
+function moveHost(
+  host: HTMLElement,
+  place: Place,
+  move: Parameters<KeeperPorts["apply"]>[0],
+): void {
   if (move === "top" || place.reprendre === undefined) {
     moveToTop(host, place);
     return;
