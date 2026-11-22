@@ -1,12 +1,14 @@
 // « Annuler » and « Retirer la note » from the title page: the worker puts back what the last
 // rating changed, or takes the rating off. The tab sends either for the shown product, never while another
 // write is on its way (its `pending` turns a double click into one message), and gives the film back to
-// Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste). The answer's line stays
+// Naka's « Ma liste » itself when the worker leaves that to it (fiche-ma-liste), and clicks a lit
+// « Déjà vu » off the same way (fiche-deja-vu). The answer's line stays
 // shown; the info is then asked again, since these answers carry no panel flags, and with it
 // the shown season.
 
 import type { FicheUndoMessage } from "../ext/fiche-messages";
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
+import { clickVuOff, undoVuField } from "./fiche-deja-vu";
 import { readInfo } from "./fiche-info-reader";
 import { givenBackByTab, setMaListe, undoListField } from "./fiche-ma-liste";
 import { contentOf, type FicheScope, forgetEnding } from "./fiche-page";
@@ -78,6 +80,12 @@ async function end(
   scope.show();
 }
 
+/** The worker left the « Déjà vu » to the tab (ok, or partial after that step). */
+function vuOffByTab(answer: UndoAnswer | undefined): boolean {
+  if (answer === undefined) return false;
+  return ("ok" in answer || "partial" in answer) && answer.dejaVu === "tab";
+}
+
 export async function undoTitle(
   scope: FicheScope,
 ): Promise<UndoAnswer | undefined> {
@@ -87,11 +95,12 @@ export async function undoTitle(
   const msg: FicheUndoMessage = {
     type: "fiche-undo",
     ...title,
-    ...(film ? undoListField(scope) : {}),
+    ...(film ? { ...undoListField(scope), ...undoVuField(scope) } : {}),
   };
   begin(scope, "undo");
   const answer = await scope.ports.undo(msg);
   if (msg.listByTab === true && givenBackByTab(answer)) setMaListe(scope, true);
+  if (msg.vuByTab === true && vuOffByTab(answer)) clickVuOff(scope);
   await end(scope, "undo", answer);
   return answer;
 }

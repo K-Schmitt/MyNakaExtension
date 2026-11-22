@@ -198,3 +198,85 @@ describe("a series rating", () => {
     expect(t.page.vuLog).toEqual([]);
   });
 });
+
+describe("an undo and Naka's « Déjà vu » button", () => {
+  const filmUndone = async (vuFilm: boolean | undefined, answer: unknown) => {
+    const t = await filmWith(vuFilm);
+    t.controller.undo();
+    t.ofType("fiche-undo")[0]?.answer(answer);
+    await settle();
+    return t;
+  };
+  const UNDO_TAB = { ok: true, maListe: "none", dejaVu: "tab" };
+
+  it("the button on screen: sends vuByTab, and clicks a lit button once on « tab »", async () => {
+    const t = await filmUndone(true, UNDO_TAB);
+    expect(t.ofType("fiche-undo")[0]?.msg).toMatchObject({ vuByTab: true });
+    expect(t.page.vuLog).toEqual(["click:film"]);
+  });
+
+  it("never notes the ids: the click is not a finish to hide", async () => {
+    const t = await filmUndone(true, UNDO_TAB);
+    expect(t.page.vuLog.some((entry) => entry.startsWith("note"))).toBe(false);
+  });
+
+  it("a partial undo that left the « Déjà vu » to the tab: one click", async () => {
+    const t = await filmUndone(true, {
+      partial: { done: [{ kind: "dejaVu" }], failed: { kind: "localRestore" } },
+      maListe: "none",
+      dejaVu: "tab",
+      error: "unavailable",
+    });
+    expect(t.page.vuLog).toEqual(["click:film"]);
+  });
+
+  it("the button already off when the answer comes: no click", async () => {
+    const t = await filmUndone(false, UNDO_TAB);
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("the button gone when the answer comes: no click", async () => {
+    const t = await filmWith(true);
+    t.controller.undo();
+    t.page.vuFilm = undefined;
+    t.ofType("fiche-undo")[0]?.answer(UNDO_TAB);
+    await settle();
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("the visit moved on: no click", async () => {
+    const t = await filmWith(true);
+    t.controller.undo();
+    t.page.path = "/content/movie/1";
+    t.ofType("fiche-undo")[0]?.answer(UNDO_TAB);
+    await settle();
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("no button: no vuByTab, and no click on a « tab » nobody asked for", async () => {
+    const t = await filmWith(undefined);
+    t.controller.undo();
+    expect(t.ofType("fiche-undo")[0]?.msg).not.toHaveProperty("vuByTab");
+    t.page.vuFilm = true;
+    t.ofType("fiche-undo")[0]?.answer(UNDO_TAB);
+    await settle();
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("an answer without « tab »: no click", async () => {
+    const t = await filmUndone(true, { ok: true, maListe: "none" });
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("a series' undo sends no vuByTab", async () => {
+    const t = fakePorts();
+    const controller = createFicheController(t.ports);
+    controller.path(SERIES_PATH);
+    controller.event(seriesEvent());
+    t.ofType("fiche-info")[0]?.answer(linked(66));
+    await settle();
+    t.page.vuFilm = true;
+    controller.undo();
+    expect(t.ofType("fiche-undo")[0]?.msg).not.toHaveProperty("vuByTab");
+  });
+});

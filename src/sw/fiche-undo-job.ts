@@ -7,13 +7,14 @@
 // who gave « Ma liste » back so far), and the record is kept so the owner can try again; the retry plans
 // from the state read then, skipping what is already back (undoSteps). Once every step ran the
 // record is cleared: a clear that fails still answers ok, the steps being done (it then simply expires).
-// In simulation the « Ma liste » step is dropped: everything else is sent.
+// In simulation the « Ma liste » and « Déjà vu » steps (Naka writes) are dropped: everything else is sent.
 
 import { type FicheUndo, type UndoStep, undoSteps } from "../core/fiche-undo";
 import type { FicheUndoMessage } from "../ext/fiche-messages";
 import type {
   RunStep,
   UndoAnswer,
+  UndoDejaVu,
   UndoMaListe,
 } from "../ext/fiche-undo-answers";
 import type { Mode } from "../ext/settings";
@@ -28,11 +29,12 @@ import { toJobError } from "./to-job-error";
 const isRun = (step: UndoStep): step is RunStep =>
   step.kind !== "refused-protected";
 
-/** The steps of this mode: « Ma liste » is a list write, live mode only. */
+const isNakaWrite = (step: RunStep): boolean =>
+  step.kind === "maListe" || step.kind === "dejaVu";
+
+/** The steps of this mode: « Ma liste » and « Déjà vu » are Naka writes, live mode only. */
 function forMode(steps: RunStep[], mode: Mode): RunStep[] {
-  return mode === "live"
-    ? steps
-    : steps.filter((step) => step.kind !== "maListe");
+  return mode === "live" ? steps : steps.filter((step) => !isNakaWrite(step));
 }
 
 async function liveRecord(
@@ -61,19 +63,23 @@ async function plan(
 async function runAll(run: StepRun, steps: RunStep[]): Promise<UndoAnswer> {
   let done: RunStep[] = [];
   let maListe: UndoMaListe = "none";
+  let dejaVu: UndoDejaVu | undefined;
   for (const step of steps) {
     try {
-      maListe = (await runStep(run, step)) ?? maListe;
+      const hand = await runStep(run, step);
+      maListe = hand.maListe ?? maListe;
+      dejaVu = hand.dejaVu ?? dejaVu;
     } catch (error) {
       return {
         partial: { done, failed: step },
         maListe,
+        ...(dejaVu === undefined ? {} : { dejaVu }),
         error: toJobError(error),
       };
     }
     done = [...done, step];
   }
-  return { ok: true, maListe };
+  return { ok: true, maListe, ...(dejaVu === undefined ? {} : { dejaVu }) };
 }
 
 async function restored(
@@ -87,7 +93,13 @@ async function restored(
     const settings = await deps.store.loadSettings();
     const naka = jobNaka(deps);
     await checkBinding(settings.binding, jobAccounts(naka, deps));
-    const run = { deps, record, naka, listByTab: msg.listByTab === true };
+    const run = {
+      deps,
+      record,
+      naka,
+      listByTab: msg.listByTab === true,
+      vuByTab: msg.vuByTab === true,
+    };
     return await runAll(run, forMode(steps, settings.mode));
   } catch (error) {
     return { error: toJobError(error) };

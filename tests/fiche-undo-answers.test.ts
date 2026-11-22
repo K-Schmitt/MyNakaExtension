@@ -9,6 +9,13 @@ describe("the undo answer", () => {
     { ok: true, maListe: "tab" },
     { ok: true, maListe: "client" },
     { ok: true, maListe: "none" },
+    { ok: true, maListe: "none", dejaVu: "tab" },
+    {
+      partial: { done: [{ kind: "dejaVu" }], failed: { kind: "localRestore" } },
+      maListe: "none",
+      dejaVu: "tab",
+      error: "unavailable",
+    },
     { refused: "protected" },
     { refused: "expired" },
     { error: "sc-session" },
@@ -50,6 +57,16 @@ describe("the undo answer", () => {
     ["a bad « Ma liste »", { ok: true, maListe: "page" }],
     ["ok without « Ma liste »", { ok: true }],
     ["an extra key on ok", { ok: true, maListe: "tab", x: 1 }],
+    ["a bad dejaVu on ok", { ok: true, maListe: "none", dejaVu: "client" }],
+    [
+      "a bad dejaVu on a partial",
+      {
+        partial: { done: [], failed: { kind: "wish" } },
+        maListe: "none",
+        dejaVu: "none",
+        error: "unavailable",
+      },
+    ],
     ["a removal's refusal", { refused: "unrated" }],
     ["a bad error", { error: "nope" }],
     [

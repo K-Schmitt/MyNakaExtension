@@ -3,6 +3,8 @@
 // ids watched in its playback tracker (so Naka's own « vu » is not taken for a finish) and THEN clicks once.
 // The button is read again right before: already on, gone, a visit that is over, or an episode whose season
 // is no longer the shown one gets no click. A series has no such button: it is never read.
+// « Annuler » on a film turns it off again the same way (undoVuField, clickVuOff): `vuByTab` on the undo, and
+// on `dejaVu: "tab"` one click, only on a lit button, never noting the ids (the tracker has nothing to hide).
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
@@ -25,6 +27,11 @@ export function filmVuFields(
   return lit === undefined ? {} : { vuByTab: true, dejaVuOn: lit };
 }
 
+/** An undo's field: the button is on screen, so the tab turns it off itself. */
+export function undoVuField(scope: FicheScope): { vuByTab?: true } {
+  return scope.ports.dejaVu() === undefined ? {} : { vuByTab: true };
+}
+
 /** The worker left the « Déjà vu » to the tab. */
 export function vuLeftToTab(answer: RateAnswer | undefined): boolean {
   return answer !== undefined && "ok" in answer && answer.dejaVu === "tab";
@@ -43,4 +50,11 @@ export function clickVu(
   if (ports.dejaVu(place?.episode) !== false) return;
   ports.noteOwnVu({ contentId, ...place });
   ports.clickDejaVu(place?.episode);
+}
+
+/** One click when the visit goes on and the film's button is lit: Naka's own « vu » off, nothing noted. */
+export function clickVuOff(scope: FicheScope): void {
+  if (!scope.live() || !stillOnTitle(scope)) return;
+  if (scope.ports.dejaVu() !== true) return;
+  scope.ports.clickDejaVu();
 }

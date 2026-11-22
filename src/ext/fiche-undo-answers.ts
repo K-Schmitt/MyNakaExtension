@@ -21,11 +21,20 @@ import { ERROR_CODES } from "./run-record-schema";
 export type UndoMaListe = "tab" | "client" | "none";
 /** A step the worker runs: never the refusal, which runs nothing. */
 export type RunStep = Exclude<UndoStep, { kind: "refused-protected" }>;
-export type UndoOkAnswer = { ok: true; maListe: UndoMaListe };
+/** Who turns Naka's « Déjà vu » off again: only the tab ever answers, the worker's client leaves no mark. */
+export type UndoDejaVu = "tab";
+export type UndoOkAnswer = {
+  ok: true;
+  maListe: UndoMaListe;
+  /** The tab clicks Naka's « Déjà vu » off itself; absent otherwise. */
+  dejaVu?: UndoDejaVu;
+};
 export type UndoPartialAnswer = {
   partial: { done: RunStep[]; failed: RunStep };
   /** Who gave « Ma liste » back before the failure: the tab still clicks on "tab". */
   maListe: UndoMaListe;
+  /** The « Déjà vu » step was left to the tab before the failure: the tab still clicks. */
+  dejaVu?: UndoDejaVu;
   error: JobError;
 };
 /** Refused with no write: a critique or recommendation to keep, the ten minutes gone, nothing to remove. */
@@ -76,10 +85,16 @@ const DATE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "markDone" }>>({
 const BARE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "wish" }>>({
   kind: true,
 });
-const OK_KEYS = valuesOf<keyof UndoOkAnswer>({ ok: true, maListe: true });
+const DEJA_VU = valuesOf<UndoDejaVu>({ tab: true });
+const OK_KEYS = valuesOf<keyof UndoOkAnswer>({
+  ok: true,
+  maListe: true,
+  dejaVu: true,
+});
 const PARTIAL_KEYS = valuesOf<keyof UndoPartialAnswer>({
   partial: true,
   maListe: true,
+  dejaVu: true,
   error: true,
 });
 const STEPS_KEYS = valuesOf<keyof UndoPartialAnswer["partial"]>({
@@ -106,6 +121,14 @@ function parseStep(raw: unknown, path: string): RunStep {
   return { kind: asOneOf(kind, BARE_KINDS, `${path}.kind`) };
 }
 
+/** The answer's `dejaVu`, kept only when present. */
+function dejaVuOf(record: Record<string, unknown>): {
+  dejaVu?: UndoDejaVu;
+} {
+  if (record.dejaVu === undefined) return {};
+  return { dejaVu: asOneOf(record.dejaVu, DEJA_VU, "dejaVu") };
+}
+
 function parsePartial(record: Record<string, unknown>): UndoPartialAnswer {
   onlyKeys(record, PARTIAL_KEYS, "answer");
   const steps = asRecord(record.partial, "partial");
@@ -116,6 +139,7 @@ function parsePartial(record: Record<string, unknown>): UndoPartialAnswer {
       failed: parseStep(steps.failed, "partial.failed"),
     },
     maListe: asOneOf(record.maListe, MA_LISTE, "maListe"),
+    ...dejaVuOf(record),
     error: asOneOf(record.error, ERROR_CODES, "error"),
   };
 }
@@ -137,7 +161,11 @@ export function parseUndoAnswer(raw: unknown): UndoAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, OK_KEYS, "answer");
-    return { ok: true, maListe: asOneOf(record.maListe, MA_LISTE, "maListe") };
+    return {
+      ok: true,
+      maListe: asOneOf(record.maListe, MA_LISTE, "maListe"),
+      ...dejaVuOf(record),
+    };
   }
   if (record.partial !== undefined) return parsePartial(record);
   if (record.refused !== undefined) return parseRefused(record, UNDO_REFUSALS);

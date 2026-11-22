@@ -57,6 +57,8 @@ export type FicheMessage =
       productId: number;
       /** Naka's « Ma liste » button is on screen: the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
+      /** A film's only: Naka's « Déjà vu » button is on screen: the tab clicks it off if it is still lit (`dejaVu: "tab"`). */
+      vuByTab?: boolean;
     }
   | { type: "fiche-remove"; contentId: number; productId: number }
   /** « Chercher » on the title page: the owner's own words, trimmed, a search query (isSearchQuery). */
