@@ -32,7 +32,7 @@ function arrow(doc: Maker, glyph: string, label: string): ElementLike {
   return el;
 }
 
-// An h2, as Naka's own row titles (`h2.dc-h2`); the sheet resets its default margin.
+// An h2, as Naka's own row titles (`h2.nh-h2`); the sheet resets its default margin.
 function title(doc: Maker): ElementLike {
   const el = doc.createElement("h2");
   el.textContent = ROW_TITLE;
