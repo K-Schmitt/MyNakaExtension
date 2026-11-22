@@ -40,7 +40,7 @@ const NAKA_VARS: Readonly<Partial<Record<keyof typeof THEME.color, string>>> = {
   text: "--color-text-primary",
   textSecondary: "--color-text-secondary",
   accent: "--color-accent",
-  accentHover: "--color-naka-500",
+  accentHover: "--color-accent-light",
   accentSelected: "--color-accent-soft",
   accentText: "--color-accent",
   onAccent: "--color-accent-foreground",

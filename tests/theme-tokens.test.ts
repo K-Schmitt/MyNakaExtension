@@ -45,6 +45,14 @@ describe("themeCss", () => {
     );
   });
 
+  it("reads the hover accent from Naka's --color-accent-light, which replaced --color-naka-500", () => {
+    const css = themeCss(":host");
+    expect(css).toContain(
+      "--mn-color-accent-hover:var(--color-accent-light,#B89352);",
+    );
+    expect(css).not.toContain("--color-naka-500");
+  });
+
   it("keeps the fixed copy on the extension page", () => {
     const css = themeCss(":root");
     expect(css).toContain("--mn-color-surface:#1D1915;");
