@@ -4,6 +4,7 @@
 // cached. The token lives in a local variable of that call and goes only to naka-transport's `send`, in the
 // `authorization` header. See naka-transport.ts for the rules on the wire and in error messages.
 
+import type { ContentIds } from "../core/finish-event";
 import { checkQuery } from "../core/search-query";
 import { NakaUnavailableError } from "./naka-errors";
 import { checkContentId } from "./naka-input";
@@ -30,6 +31,12 @@ export type NakaClient = {
   search(query: string): Promise<NakaItem[]>;
   contentById(contentId: number): Promise<NakaItem | undefined>;
   availableSeasons(contentId: number): Promise<NakaSeasons | undefined>;
+};
+
+// The client the tab itself holds: the worker's proxy relays no « Déjà vu » call, the tab ticks it.
+export type NakaTabClient = NakaClient & {
+  /** Ticks « Déjà vu » on Naka for a film, or an episode when the ids hold both numbers. */
+  markWatched(ids: ContentIds): Promise<void>;
 };
 
 async function run(deps: NakaDeps, request: Request): Promise<string> {
@@ -61,6 +68,27 @@ async function removeFromPlaylist(deps: NakaDeps, contentId: number) {
     method: "DELETE",
     path: `/playlist/${contentId}`,
     label: "remove from playlist",
+  });
+}
+
+function watchedBody({ contentId, season, episode }: ContentIds) {
+  return season === undefined || episode === undefined
+    ? { contentId, watched: true }
+    : {
+        contentId,
+        seasonNumber: season,
+        episodeNumber: episode,
+        watched: true,
+      };
+}
+
+async function markWatched(deps: NakaDeps, ids: ContentIds) {
+  checkContentId(ids.contentId);
+  await run(deps, {
+    method: "PUT",
+    path: "/history/watched",
+    label: "mark watched",
+    body: watchedBody(ids),
   });
 }
 
@@ -135,11 +163,12 @@ function unwrap(json: unknown): unknown {
   return json;
 }
 
-export function createNakaClient(deps: NakaDeps): NakaClient {
+export function createNakaClient(deps: NakaDeps): NakaTabClient {
   return {
     playlistIds: () => playlistIds(deps),
     addToPlaylist: (contentId) => addToPlaylist(deps, contentId),
     removeFromPlaylist: (contentId) => removeFromPlaylist(deps, contentId),
+    markWatched: (ids) => markWatched(deps, ids),
     search: (query) => search(deps, query),
     contentById: (contentId) => contentById(deps, contentId),
     availableSeasons: (contentId) => availableSeasons(deps, contentId),

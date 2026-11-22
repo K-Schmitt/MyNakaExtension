@@ -16,7 +16,7 @@
 // other content (none playing, not yet sampled, another title, another episode, the whole series) it counts
 // only right after a real gesture on the page, and each « vu » uses up one gesture.
 
-import { contentKeyOf } from "../core/finish-event";
+import { type ContentIds, contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import {
   type CreditsStarts,
@@ -57,6 +57,8 @@ export type PlaybackTracker = {
   credits(ev: PageEvent): void;
   /** An unticked « vu »: that key can send its explicit finish again. */
   unwatched(ev: PageEvent): void;
+  /** Our own « Déjà vu » just ticked these ids on Naka: the page's « vu » that follows is ignored. */
+  noteWatched(ids: ContentIds): void;
 };
 
 // The worker keys the same content with the same function.
@@ -188,6 +190,9 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (ev.kind !== "unwatched") return;
       const state = states.get(keyOf(idsOf(ev)));
       if (state !== undefined) state.watched = false;
+    },
+    noteWatched(ids) {
+      stateOf(idsOf(ids)).watched = true;
     },
     watched(ev, takeGesture = () => false) {
       if (ev.kind !== "watched") return undefined;

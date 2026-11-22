@@ -92,7 +92,9 @@ function pathOf(href: string): string {
 const keyOfIds = (ids: ContentIds | undefined): string =>
   ids === undefined ? "" : contentKeyOf(ids);
 
-export function startNakaTab(env: TabEnv): void {
+export type NakaTabHandle = { noteWatched(ids: ContentIds): void };
+
+export function startNakaTab(env: TabEnv): NakaTabHandle {
   const tracker = createPlaybackTracker();
   let lastKey = "";
   // The tracker ignores a context it already follows, so the URL is handed over at every poll.
@@ -123,4 +125,5 @@ export function startNakaTab(env: TabEnv): void {
     const event = acceptPageEvent(ev, env.self);
     if (event) relay(env, tracker, event);
   });
+  return { noteWatched: tracker.noteWatched };
 }

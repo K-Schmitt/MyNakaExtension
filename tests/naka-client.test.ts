@@ -118,6 +118,37 @@ describe("requests on the wire", () => {
     });
   });
 
+  it("PUTs {contentId, watched: true} on markWatched for a film", async () => {
+    const { client, calls } = setup();
+    await client.markWatched({ contentId: 18590 });
+    const call = only(calls);
+    expect(call.url).toBe(`${BASE}/history/watched`);
+    expect(call.init).toEqual({
+      method: "PUT",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ contentId: 18590, watched: true }),
+      credentials: "include",
+      redirect: "error",
+    });
+  });
+
+  it("PUTs the season and episode numbers for an episode", async () => {
+    const { client, calls } = setup();
+    await client.markWatched({ contentId: 7, season: 2, episode: 5 });
+    expect(only(calls).init.body).toBe(
+      JSON.stringify({
+        contentId: 7,
+        seasonNumber: 2,
+        episodeNumber: 5,
+        watched: true,
+      }),
+    );
+  });
+
   it("DELETEs /playlist/{id} without a body on remove", async () => {
     const { client, calls } = setup();
     await client.removeFromPlaylist(18590);

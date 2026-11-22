@@ -188,7 +188,7 @@ function tab(start = PLAYER(3)) {
       },
     },
   };
-  startNakaTab(env);
+  const handle = startNakaTab(env);
   const tick = (ms: number) => {
     for (const timer of timers) if (timer.ms === ms) timer.fn();
   };
@@ -221,6 +221,7 @@ function tab(start = PLAYER(3)) {
     post,
     clock,
     gestures,
+    noteWatched: handle.noteWatched,
   };
 }
 
@@ -421,6 +422,21 @@ describe("the Naka tab", () => {
     const t = tab();
     t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
     expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
+  });
+
+  it("hands the tracker's noteWatched to its caller", () => {
+    const t = tab(EPISODE(7, 1, 2));
+    t.played();
+    t.noteWatched({ contentId: 7, season: 1, episode: 2 });
+    t.post({
+      channel: PAGE_CHANNEL,
+      kind: "watched",
+      contentId: 7,
+      season: 1,
+      episode: 2,
+    });
+    expect(t.sent.slice(1)).toEqual([]);
+    expect(t.ended).toEqual([]);
   });
 
   it("a forged vu for a title that is not playing sends nothing", () => {
