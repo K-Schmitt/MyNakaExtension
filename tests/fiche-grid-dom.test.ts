@@ -53,12 +53,14 @@ describe("the episode rows of Naka's grid", () => {
       "span.nh-row-title": { textContent: "Pilote" },
     });
     const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    expect(box).toBeDefined();
     expect(box?.code()).toBe("12");
     expect(box?.title()).toBe("Pilote");
   });
 
   it("reads nothing from a row without them", () => {
     const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [node({})] }).doc);
+    expect(box).toBeDefined();
     expect(box?.code()).toBeUndefined();
     expect(box?.title()).toBeUndefined();
   });
@@ -71,6 +73,7 @@ describe("the episode rows of Naka's grid", () => {
     };
     const row = node({ "span.nh-row-title": title });
     const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    expect(box).toBeDefined();
     box?.placeStars(host);
     expect(calls).toEqual([host]);
   });
@@ -83,12 +86,14 @@ describe("the episode rows of Naka's grid", () => {
     };
     const row = node({ "span.nh-row-title": title });
     const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    expect(box).toBeDefined();
     box?.placeStars(host);
     expect(calls).toEqual([]);
   });
 
   it("does nothing without a title to follow", () => {
     const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [node({})] }).doc);
+    expect(box).toBeDefined();
     expect(() => box?.placeStars(host)).not.toThrow();
   });
 });
