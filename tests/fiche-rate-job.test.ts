@@ -904,3 +904,44 @@ describe("the player's rate job: « Déjà vu » best effort", () => {
     expect(rates(w.sk.calls)).toEqual(["rate:2005:6"]);
   });
 });
+
+describe("fiche-rate: « Déjà vu » over a local save that failed", () => {
+  const SENT = {
+    sent: true,
+    step: "local-save",
+    error: "unavailable",
+  };
+
+  it("a film with vuByTab: the local-save error is kept, the client writes « vu »", async () => {
+    const w = filmWorld();
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate({ vuByTab: true }))).toEqual({
+      ...SENT,
+      panel: RATED.panel,
+    });
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5"]);
+  });
+
+  it("an episode with vuByTab: the local-save error is kept, the client writes « vu »", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    w.area.data.set("ratings", [episodeCard()]);
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(
+      await w.jobs.ficheRate(TAB, { ...episodeRate(), vuByTab: true }),
+    ).toEqual(SENT);
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5:1:1"]);
+  });
+
+  it("an episode in simulation: nothing written on Naka", async () => {
+    const w = filmWorld({ state: linkedTo(13), settings: SIMULATION });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(
+      await w.jobs.ficheRate(TAB, { ...episodeRate(), vuByTab: true }),
+    ).toEqual({ ok: true });
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+});

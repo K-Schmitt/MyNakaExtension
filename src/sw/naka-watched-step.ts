@@ -38,8 +38,9 @@ export async function markedWatched(
 
 type RatedAnswer = RateOkAnswer | SentWithErrorAnswer;
 
-// The first error of an answer is the one kept: a step that already failed (« Ma liste ») leaves Naka alone,
-// and a failed « vu » does not replace it. A tab click is kept over a local save that failed, so it happens.
+// One error per answer, the first one: a step that already failed (« Ma liste ») leaves Naka alone, and a
+// failed « vu » does not replace an earlier error. An answer that carries the failed local save is kept as it
+// is: the tab never clicks over it (its « ok » would hide the error), the client writes « vu » instead.
 export async function withWatched(
   deps: JobDeps,
   ids: ContentIds,
@@ -47,12 +48,12 @@ export async function withWatched(
   answer: RatedAnswer,
 ): Promise<RatedAnswer> {
   if ("step" in answer && answer.step !== "local-save") return answer;
-  const step = await markedWatched(deps, ids, byTab);
+  const step = await markedWatched(deps, ids, byTab && "ok" in answer);
   if ("error" in step) {
     return "ok" in answer
       ? { sent: true, step: "deja-vu", error: step.error }
       : answer;
   }
-  if (step.dejaVu === undefined) return answer;
-  return { ...("ok" in answer ? answer : { ok: true }), dejaVu: step.dejaVu };
+  if (step.dejaVu === undefined || !("ok" in answer)) return answer;
+  return { ...answer, dejaVu: step.dejaVu };
 }

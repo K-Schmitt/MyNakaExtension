@@ -76,14 +76,14 @@ async function notSent(
   return panel === undefined ? { error } : { error, panel };
 }
 
-// The rating went out but its card was not saved: answered as sent with that code, unless a later step
-// has its own error, or the tab must click « Ma liste » or « Déjà vu » itself (that answer is kept so the click happens).
+// The rating went out but its card was not saved: answered as sent with that code, unless the list step
+// has its own error, or the tab must click « Ma liste » itself (that answer is kept so the click happens).
 function withUnsaved(
   answer: ListLeaving["answer"],
   unsaved: JobError | undefined,
 ): ListLeaving["answer"] {
   if (unsaved === undefined || !("ok" in answer)) return answer;
-  if (answer.maListe === "tab" || answer.dejaVu === "tab") return answer;
+  if (answer.maListe === "tab") return answer;
   return { sent: true, step: "local-save", error: unsaved };
 }
 
@@ -112,7 +112,8 @@ export async function rateFilm(
   const watched = await withWatched(
     deps,
     { contentId },
-    msg.vuByTab === true,
+    // An unsaved rating is answered `local-save`: the tab does not click, the client writes « vu ».
+    msg.vuByTab === true && unsaved === undefined,
     leaving.answer,
   );
   return {
