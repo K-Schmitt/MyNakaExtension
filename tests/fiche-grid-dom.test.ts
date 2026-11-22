@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ElementLike } from "../src/content/ui/dom-like";
-import { episodeBoxes, gridPorts } from "../src/content/ui/fiche-grid-dom";
+import {
+  dropdownSeason,
+  episodeBoxes,
+  gridPorts,
+} from "../src/content/ui/fiche-grid-dom";
 
 type Slice = {
   textContent?: string | null;
@@ -117,5 +121,16 @@ describe("the grid and the season dropdown", () => {
     expect(grid.shownSeason()).toBe(2);
     expect(grid.asked).toEqual([sel]);
     expect(ports({}).shownSeason()).toBeUndefined();
+  });
+
+  it("tells no dropdown from a dropdown that names no season", () => {
+    const sel = 'button.nh-select-trigger[aria-label="Saison"]';
+    const read = (one: Record<string, Slice | null>) =>
+      dropdownSeason(docOf(one).doc as unknown as Document);
+    expect(read({ [sel]: { textContent: "Saison 3 · 8 ép." } })).toBe(3);
+    expect(read({ [sel]: { textContent: "Spéciaux" } })).toBeUndefined();
+    expect(read({})).toBeNull();
+    const specials = ports({ [sel]: { textContent: "Spéciaux" } });
+    expect(specials.shownSeason()).toBeUndefined();
   });
 });

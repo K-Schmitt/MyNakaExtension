@@ -609,9 +609,10 @@ describe("the season guard", () => {
     expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
     await toSeasonTwo(t);
     t.advance(1000);
+    t.page.shown = undefined;
     t.controller.path("/");
-    t.controller.path(SERIES_PATH);
     t.page.shown = 1;
+    t.controller.path(SERIES_PATH);
     t.controller.event(seriesEvent());
     t.controller.event(seasonEvent(1));
     t.ofType("fiche-info")[1]?.answer(linked(66));
@@ -619,6 +620,63 @@ describe("the season guard", () => {
     t.ofType("fiche-season")[2]?.answer(SEASON_ONE);
     await settle();
     expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+  });
+
+  it("keeps the rows bare as soon as the dropdown names another season, before the tab's poll sees it", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    t.page.shown = 2;
+    retitle(boxes, "Départ", "Arrivée");
+    t.pageChanged();
+    expect(isBare(boxes)).toBe(true);
+    t.advance(5000);
+    t.pageChanged();
+    expect(isBare(boxes)).toBe(true);
+    expect(t.ofType("fiche-rate")).toEqual([]);
+  });
+
+  it("lets the rows go on the wait's timing once the poll catches up with the dropdown", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    t.page.shown = 2;
+    t.pageChanged();
+    t.advance(100);
+    retitle(boxes, "Départ", "Arrivée");
+    t.pageChanged();
+    t.advance(100);
+    t.controller.path(SERIES_PATH);
+    await settle();
+    t.ofType("fiche-season")[1]?.answer(SEASON_TWO);
+    await settle();
+    t.advance(199);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["8,1"], ["5,2"]]);
+  });
+
+  it("keeps the rows bare while the dropdown names no season (Spéciaux)", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    t.dropdown.label = "Spéciaux";
+    t.page.shown = undefined;
+    t.pageChanged();
+    t.controller.path(SERIES_PATH);
+    t.advance(5000);
+    t.pageChanged();
+    expect(isBare(boxes)).toBe(true);
+  });
+
+  it("keeps one timer however many held changes come", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    await toSeasonTwo(t);
+    for (const title of ["Départ", "Arrivée", "Retour"]) {
+      t.advance(100);
+      retitle(boxes, title, title);
+      t.pageChanged();
+    }
+    t.pageChanged();
+    expect(t.clock.pending).toHaveLength(1);
   });
 
   it("starts the wait again when the season changes back during it", async () => {

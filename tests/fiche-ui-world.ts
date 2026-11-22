@@ -4,6 +4,7 @@
 import { createFicheController } from "../src/content/fiche-controller";
 import type { FicheView } from "../src/content/fiche-view";
 import type { EpisodeBox } from "../src/content/ui/fiche-episodes";
+import { seasonNumber } from "../src/content/ui/fiche-numbers";
 import { createFicheUi } from "../src/content/ui/fiche-ui";
 import { fakePorts } from "./fiche-controller-fakes";
 import { descendants, FakeDoc, FakeElement, type FakeNode } from "./ui-fakes";
@@ -186,11 +187,20 @@ export function fakeUi(
     released: [] as object[],
   };
   const hero = fakeHero();
+  /**
+   * Naka's season dropdown as the UI reads it at each pass: the season the page shows (`page.shown`, no
+   * dropdown when undefined), or, once `label` is set, a dropdown with that text (« Spéciaux » names none).
+   */
+  const dropdown = { label: undefined as string | undefined };
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: clockTimer(clock),
     now: () => clock.now,
+    dropdownSeason: () =>
+      dropdown.label === undefined
+        ? (fake.page.shown ?? null)
+        : seasonNumber(dropdown.label),
     badges: () => (hero.shown ? hero.badges : null),
     rating: () => (hero.rating.parent === hero.badges ? hero.rating : null),
     boxes: () => boxes.map((b) => b.port),
@@ -229,6 +239,7 @@ export function fakeUi(
     },
     watching: () => watchers.size > 0,
     clock,
+    dropdown,
     advance: (ms: number) => advanceClock(clock, ms),
   };
 }

@@ -1,15 +1,13 @@
 // The episode boxes of the shown season: each `li.nh-ep-row` whose number (`span.nh-ep-num`) is the number
 // of an episode SensCritique lists gets its badge and its stars; any other box is left bare, never given a
 // neighbour's values. Naka redraws its grid, so every change of the page runs the pass again while there are
-// episodes to show. When the shown season replaces another, Naka may still show the old season's rows: every
-// box stays bare until the rows' titles stood still long enough (season-settle), as a star on an old row
-// would rate the wrong episode. The first season of a visit has no wait: its rows and dropdown come together.
+// episodes to show. When the shown season replaces another, every box stays bare until the season guard
+// trusts the rows again (season-guard): a star on a row of the old season would rate the wrong episode.
 // A box's stars stop being watched once its decorations come off, once Naka drops the box, and when the
 // episodes are cleared, so a thrown-away box is not kept alive by the watch.
 
 import type { FicheView } from "../fiche-view";
 import type { DocLike, ElementLike } from "./dom-like";
-import type { EndTimer } from "./end-poll";
 import {
   boxWriteOf,
   createDecor,
@@ -19,12 +17,7 @@ import {
 } from "./fiche-episode-decor";
 import type { FicheHandlers } from "./fiche-handlers";
 import { episodeNumber } from "./fiche-numbers";
-import {
-  noteRows,
-  type SeasonTurn,
-  startTurn,
-  waitLeft,
-} from "./season-settle";
+import { createSeasonGuard, type SeasonGuardPorts } from "./season-guard";
 import type { ReleasableWatch } from "./star-visibility";
 
 export type EpisodeBox = {
@@ -40,11 +33,9 @@ export type EpisodeBox = {
   placeStars(host: ElementLike): void;
 };
 
-export type FicheEpisodesPorts = {
+export type FicheEpisodesPorts = SeasonGuardPorts & {
   doc: Pick<DocLike, "createElement">;
   seen: ReleasableWatch;
-  timer: EndTimer;
-  now(): number;
   boxes(): EpisodeBox[];
   watch(onChange: () => void): () => void;
 };
@@ -63,9 +54,7 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
   const drawn = new Map<object, EpisodeDecor>(); // the decorations on the page now, by box
   let shown: Shown | undefined;
   let unwatch: (() => void) | undefined;
-  let season: number | undefined; // the last season shown
-  let turn: SeasonTurn | undefined; // the wait after a season change
-  let wake: { handle: unknown } | undefined; // the wait's one timer
+  const guard = createSeasonGuard(ports, () => pass());
 
   function takeOff(key: object): void {
     const decor = drawn.get(key);
@@ -77,41 +66,6 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
 
   function takeOffAll(): void {
     for (const key of [...drawn.keys()]) takeOff(key);
-  }
-
-  function stopWake(): void {
-    if (wake !== undefined) ports.timer.clear(wake.handle);
-    wake = undefined;
-  }
-
-  function wakeIn(ms: number): void {
-    stopWake();
-    wake = { handle: ports.timer.set(pass, ms) }; // clearing it once run does nothing
-  }
-
-  // A season replacing another one starts the wait, on the rows as they are when the change is seen.
-  function noteSeason(next: number | undefined): void {
-    if (next === undefined) return;
-    if (season !== undefined && next !== season) {
-      turn = startTurn(rowsKey(ports.boxes()), ports.now());
-    }
-    season = next;
-  }
-
-  // While the wait runs, every box is bare and one timer runs the pass again when the wait may end.
-  function holdBare(boxes: EpisodeBox[]): boolean {
-    if (turn === undefined) return false;
-    const now = ports.now();
-    turn = noteRows(turn, rowsKey(boxes), now);
-    const left = waitLeft(turn, now);
-    if (left === 0) {
-      turn = undefined;
-      stopWake();
-      return false;
-    }
-    takeOffAll();
-    wakeIn(left);
-    return true;
   }
 
   function decorate(box: EpisodeBox, { view, handlers }: Shown): void {
@@ -134,7 +88,10 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
   function pass(): void {
     if (shown === undefined) return;
     const boxes = ports.boxes();
-    if (holdBare(boxes)) return;
+    if (guard.hold(shown.view.season, rowsKey(boxes))) {
+      takeOffAll();
+      return;
+    }
     const present = new Set(boxes.map((box) => box.key));
     for (const key of [...drawn.keys()]) if (!present.has(key)) takeOff(key);
     for (const box of boxes) decorate(box, shown);
@@ -148,7 +105,6 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
   return {
     draw(view, handlers) {
       shown = { view, handlers };
-      noteSeason(view.season);
       pass();
       if (view.episodes.size === 0) stopWatching();
       else unwatch ??= ports.watch(pass);
@@ -156,9 +112,7 @@ export function createFicheEpisodes(ports: FicheEpisodesPorts): {
     clear() {
       stopWatching();
       shown = undefined;
-      season = undefined;
-      turn = undefined;
-      stopWake();
+      guard.stop();
       takeOffAll();
     },
   };

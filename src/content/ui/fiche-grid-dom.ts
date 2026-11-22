@@ -51,6 +51,14 @@ export function episodeBoxes(doc: Document): EpisodeBox[] {
   return [...doc.querySelectorAll(BOX)].map(boxOf);
 }
 
+/** The season Naka's dropdown names: null without a dropdown, undefined when it names none (« Spéciaux »). */
+export function dropdownSeason(
+  doc: Pick<Document, "querySelector">,
+): number | null | undefined {
+  const dropdown = doc.querySelector(SEASON_DROPDOWN);
+  return dropdown === null ? null : seasonNumber(dropdown.textContent);
+}
+
 const onScreen = (box: Element, height: number): boolean => {
   const rect = box.getBoundingClientRect();
   return rect.bottom > 0 && rect.top < height;
@@ -61,8 +69,7 @@ export function gridPorts(
   viewportHeight: () => number,
 ): Pick<FichePorts, "shownSeason" | "hasEpisodeGrid" | "visibleFirst"> {
   return {
-    shownSeason: () =>
-      seasonNumber(doc.querySelector(SEASON_DROPDOWN)?.textContent),
+    shownSeason: () => dropdownSeason(doc) ?? undefined,
     hasEpisodeGrid: () => doc.querySelector(GRID) !== null,
     visibleFirst(numbers) {
       const height = viewportHeight();
