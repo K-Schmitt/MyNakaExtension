@@ -923,6 +923,22 @@ describe("fiche-rate: « Déjà vu » over a local save that failed", () => {
     expect(watches(w.nk.calls)).toEqual(["markWatched:5"]);
   });
 
+  it("a film whose « vu » write fails too: the local-save error is kept", async () => {
+    const w = filmWorld({
+      naka: {
+        markWatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
+      ...SENT,
+      panel: RATED.panel,
+    });
+  });
+
   it("an episode with vuByTab: the local-save error is kept, the client writes « vu »", async () => {
     const w = filmWorld({ state: linkedTo(13) });
     w.area.data.set("ratings", [episodeCard()]);

@@ -109,15 +109,16 @@ export async function rateFilm(
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }
+  // An unsaved rating is answered `local-save` first: the tab does not click, the client writes « vu ».
+  const saved = withUnsaved(leaving.answer, unsaved);
   const watched = await withWatched(
     deps,
     { contentId },
-    // An unsaved rating is answered `local-save`: the tab does not click, the client writes « vu ».
     msg.vuByTab === true && unsaved === undefined,
-    leaving.answer,
+    saved,
   );
   return {
-    ...withUnsaved(watched, unsaved),
+    ...watched,
     panel: afterRating(kept.state, rating, kept.record, deps.now()),
   };
 }
