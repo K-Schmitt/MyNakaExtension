@@ -60,10 +60,10 @@ const groupOf = (b: FakeBox) =>
   shadowParts(starsHostOf(b)).find((el) => el.attributes.role === "radiogroup");
 
 describe("the episode number of a box", () => {
-  it("reads the number that ends span.dcf-ep-code", () => {
+  it("reads the bare number of span.nh-ep-num", () => {
+    expect(episodeNumber("1")).toBe(1);
+    expect(episodeNumber("12")).toBe(12);
     expect(episodeNumber("S1 E3")).toBe(3);
-    expect(episodeNumber("E12 ")).toBe(12);
-    expect(episodeNumber("7")).toBe(7);
   });
 
   it("reads nothing from a code without a positive number at its end", () => {
@@ -195,9 +195,11 @@ describe("the episodes on screen first", () => {
 });
 
 describe("the episode boxes", () => {
-  it("puts the average badge in the thumb and ten stars under the title of a known episode", async () => {
+  it("puts the average badge in the thumb and ten stars right after the title of a known episode", async () => {
     const box = fakeBox("S1 E3");
     await seasonOne([box]);
+    expect(box.titleSpan.nextElementSibling).toBe(starsHostOf(box));
+    expect(box.port.title()).toBe("Épisode");
     expect(texts(shadowParts(badgeOf(box)))).toEqual(["7,4"]);
     expect(badgeOf(box)?.shadowInit).toEqual([{ mode: "closed" }]);
     expect(starsOf(shadowParts(starsHostOf(box)))).toHaveLength(10);
@@ -240,7 +242,7 @@ describe("the episode boxes", () => {
     );
   });
 
-  it("keeps a star's click from the box (and its hit button) and sends the episode's rating", async () => {
+  it("keeps a star's click from the box (the whole row starts the episode) and sends the episode's rating", async () => {
     const box = fakeBox("S1 E3");
     const t = await seasonOne([box]);
     const star = starsOf(shadowParts(starsHostOf(box)))[5];
@@ -257,6 +259,17 @@ describe("the episode boxes", () => {
         episode: 3,
       },
     ]);
+  });
+
+  it("keeps click, pointerdown, mousedown and keydown on our hosts from the row", async () => {
+    const box = fakeBox("S1 E3");
+    await seasonOne([box]);
+    const hosts = [starsHostOf(box), badgeOf(box)];
+    expect(hosts.every((host) => host !== undefined)).toBe(true);
+    for (const type of ["click", "pointerdown", "mousedown", "keydown"]) {
+      for (const host of hosts) expect(host?.dispatch(type, true)).toBe(false);
+      expect(box.heard[type]).toEqual([]);
+    }
   });
 
   it("keeps a click on the badge from the box too", async () => {

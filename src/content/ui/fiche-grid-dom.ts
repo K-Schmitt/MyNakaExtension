@@ -1,4 +1,4 @@
-// The title page's episode grid in the real document: its boxes (`div.dcf-ep`) for the decorations, the
+// The title page's episode grid in the real document: its rows (`li.nh-ep-row`) for the decorations, the
 // season its dropdown names, whether the grid is there, which boxes are on screen. Read only: the only
 // writes are our own hosts, put in a box's thumb and after its title.
 
@@ -8,12 +8,12 @@ import type { EpisodeBox } from "./fiche-episodes";
 import { episodeNumber, seasonNumber } from "./fiche-numbers";
 import { visibleFirstOrder } from "./fiche-visible-order";
 
-const BOX = "div.dcf-ep";
-const CODE = "span.dcf-ep-code";
-const THUMB = "div.dcf-ep-thumb";
-const TITLE = "p.dcf-ep-title";
-const GRID = "div.dcf-ep-grid";
-const SEASON_DROPDOWN = "button.dcf-season-dd";
+const BOX = "li.nh-ep-row";
+const CODE = "span.nh-ep-num";
+const THUMB = "span.nh-ep-thumb";
+const TITLE = "span.nh-row-title";
+const GRID = "ol.nh-list > li.nh-ep-row";
+const SEASON_DROPDOWN = 'button.nh-select-trigger[aria-label="Saison"]';
 
 const layoutOf = (thumb: Element, host: HTMLElement): ThumbLayout => ({
   holdsBadge: host.parentNode === thumb,
@@ -41,6 +41,7 @@ function boxOf(box: Element): EpisodeBox {
   return {
     key: box,
     code: () => box.querySelector(CODE)?.textContent,
+    title: () => box.querySelector(TITLE)?.textContent,
     placeBadge: (host) => placeBadge(box, host as unknown as HTMLElement),
     placeStars: (host) => placeStars(box, host as unknown as HTMLElement),
   };

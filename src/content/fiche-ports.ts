@@ -35,7 +35,7 @@ export type FichePorts = {
   search(msg: FicheSearchMessage): Promise<FicheSearchAnswer | undefined>;
   /** The season the page's dropdown names (« Saison 2 » → 2), if one can be read. */
   shownSeason(): number | undefined;
-  /** Whether the page shows its episode grid (`div.dcf-ep-grid`). */
+  /** Whether the page shows its episode grid (`ol.nh-list > li.nh-ep-row`). */
   hasEpisodeGrid(): boolean;
   /** These episode numbers, the ones whose boxes are on screen first. */
   visibleFirst(numbers: readonly number[]): number[];

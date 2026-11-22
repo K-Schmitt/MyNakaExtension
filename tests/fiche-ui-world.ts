@@ -8,31 +8,52 @@ import { createFicheUi } from "../src/content/ui/fiche-ui";
 import { fakePorts } from "./fiche-controller-fakes";
 import { descendants, FakeDoc, FakeElement, type FakeNode } from "./ui-fakes";
 
-/** An episode box as Naka draws it: thumb (with its code), body (with its title), the hit button over it all. */
-export function fakeBox(code: string | undefined) {
-  const box = new FakeElement("div");
-  const thumb = new FakeElement("div");
-  const body = new FakeElement("div");
-  const title = new FakeElement("p");
-  const hit = new FakeElement("button");
-  const codeSpan = new FakeElement("span");
-  codeSpan.textContent = code ?? null;
-  if (code !== undefined) thumb.appendChild(codeSpan);
-  body.appendChild(title);
-  for (const part of [thumb, body, hit]) box.appendChild(part);
-  const clicks: unknown[] = [];
-  box.addEventListener("click", (event) => clicks.push(event));
+/**
+ * An episode row as Naka's new front draws it (capture `cap-saison-1`): `li.nh-ep-row` > the number
+ * (`span.nh-ep-num`), the thumb (`span.nh-ep-thumb`: img, « Vu » button), a span holding the title
+ * (`span.nh-row-title`) and the overview, the actions. The whole `li` starts the episode: it hears the
+ * input events in `heard` (its clicks in `clicks`).
+ */
+export function fakeBox(code: string | undefined, title = "Épisode") {
+  const box = new FakeElement("li");
+  const num = new FakeElement("span");
+  num.className = "nh-ep-num";
+  num.textContent = code ?? null;
+  const thumb = new FakeElement("span");
+  thumb.className = "nh-ep-thumb";
+  const vu = new FakeElement("button");
+  vu.className = "nh-ep-vu";
+  vu.textContent = "Vu";
+  for (const part of [new FakeElement("img"), vu]) thumb.appendChild(part);
+  const body = new FakeElement("span");
+  const titleSpan = new FakeElement("span");
+  titleSpan.className = "nh-row-title";
+  titleSpan.textContent = title;
+  const overview = new FakeElement("span");
+  overview.className = "nh-ep-overview";
+  for (const part of [titleSpan, overview]) body.appendChild(part);
+  const actions = new FakeElement("span");
+  actions.className = "nh-ep-actions";
+  if (code !== undefined) box.appendChild(num);
+  for (const part of [thumb, body, actions]) box.appendChild(part);
+  const heard: Record<string, unknown[]> = {};
+  for (const type of ["click", "pointerdown", "mousedown", "keydown"]) {
+    heard[type] = [];
+    box.addEventListener(type, (event) => heard[type]?.push(event));
+  }
+  const clicks = heard.click as unknown[];
   const port: EpisodeBox = {
     key: box,
-    code: () => (code === undefined ? undefined : codeSpan.textContent),
+    code: () => (code === undefined ? undefined : num.textContent),
+    title: () => titleSpan.textContent,
     placeBadge: (host) => {
       if (host.parentNode !== thumb) thumb.appendChild(host);
     },
     placeStars: (host) => {
-      if (host.parentNode !== body) body.appendChild(host);
+      if (titleSpan.nextElementSibling !== host) titleSpan.after(host);
     },
   };
-  return { box, thumb, body, hit, codeSpan, clicks, port };
+  return { box, thumb, body, titleSpan, codeSpan: num, clicks, heard, port };
 }
 
 export type FakeBox = ReturnType<typeof fakeBox>;

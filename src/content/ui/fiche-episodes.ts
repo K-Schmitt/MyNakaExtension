@@ -1,4 +1,4 @@
-// The episode boxes of the shown season: each `div.dcf-ep` whose code (`span.dcf-ep-code`) ends with the
+// The episode boxes of the shown season: each `li.nh-ep-row` whose number (`span.nh-ep-num`) ends with the
 // number of an episode SensCritique lists, and names no other season, gets its badge and its stars; any other
 // box is left bare, never given a neighbour's values. Naka redraws its grid (a season change can keep the
 // boxes and rewrite their codes), so every change of the page runs the pass again while there are episodes
@@ -21,11 +21,13 @@ import type { ReleasableWatch } from "./star-visibility";
 export type EpisodeBox = {
   /** The box element: its decoration is kept per box. */
   key: object;
-  /** The text of the box's `span.dcf-ep-code`, read at each pass. */
+  /** The text of the box's `span.nh-ep-num`, read at each pass. */
   code(): string | null | undefined;
+  /** The text of the box's `span.nh-row-title`, read at each pass. */
+  title(): string | null | undefined;
   /** Puts the host in the thumb's top-right corner, left of a control of Naka's there; idempotent. */
   placeBadge(host: ElementLike): void;
-  /** Puts the host right under `p.dcf-ep-title`; idempotent. */
+  /** Puts the host right after `span.nh-row-title`; idempotent. */
   placeStars(host: ElementLike): void;
 };
 

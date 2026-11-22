@@ -10,7 +10,7 @@ function positiveInt(digits: string | undefined): number | undefined {
   return Number.isSafeInteger(value) && value >= 1 ? value : undefined;
 }
 
-/** The number that ends `span.dcf-ep-code` (« S1 E3 » → 3); undefined when the code has none. */
+/** The number that ends `span.nh-ep-num` (« 12 » → 12); undefined when the code has none. */
 export function episodeNumber(
   code: string | null | undefined,
 ): number | undefined {
@@ -19,7 +19,7 @@ export function episodeNumber(
 }
 
 /**
- * The season `span.dcf-ep-code` names (« S1 E3 », « S01E03 » → 1; « S0 » → 0), or undefined when the code
+ * The season `span.nh-ep-num` names (« S1 E3 », « S01E03 » → 1; « S0 » → 0), or undefined when the code
  * names none. Any digits count, so that a code for another season never passes for the shown one.
  */
 export function codeSeason(

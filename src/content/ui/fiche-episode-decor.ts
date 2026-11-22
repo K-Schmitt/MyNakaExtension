@@ -1,8 +1,8 @@
 // The decoration of one episode box: an average badge for the thumb and ten stars for under the title,
 // named after the SensCritique episode when it has a title. While the box's rating is on its way its stars
 // are dimmed and busy; when it failed, the panel's error line sits under them until the next view without
-// that outcome. Each in its own closed host that keeps the page's input events (the box's
-// `button.dcf-ep-hit` starts the episode: a click meant for a star must never reach it). Drawn again only
+// that outcome. Each in its own closed host that keeps the page's input events (the whole `li.nh-ep-row`
+// starts the episode: a click meant for a star must never reach it). Drawn again only
 // when what it shows changed.
 
 import type { FicheEpisode, FicheView } from "../fiche-view";
@@ -28,7 +28,7 @@ export type EpisodeDecor = {
   drawn?: { key: string; handlers: FicheHandlers };
 };
 
-// Above Naka's `button.dcf-ep-hit`, which covers the whole box.
+// Above Naka's row, which starts the episode on a click anywhere in it.
 const ABOVE_HIT = ["position: absolute", "z-index: 5"];
 const BADGE_DECLARATIONS = [
   "all: initial",
