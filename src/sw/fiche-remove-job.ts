@@ -3,7 +3,7 @@
 // The product's state is read again: a title with a critique or a recommendation (ProductUndone could
 // erase it) or with no rating is refused with no write. The binding is checked, then the one
 // ProductUndone takes the rating, « vu » and its date. No list is touched and the link stays; a film's
-// Naka « Déjà vu » is then turned off (live mode only): by the tab's click when it said the button is on
+// Naka « Déjà vu » is then turned off (live mode only, through the proxy the binding was checked through): by the tab's click when it said the button is on
 // screen (`dejaVu: "tab"`), else by the worker's client; a Naka failure answers `removed` with its code,
 // the removal staying a success on SensCritique. A series has no such button. The cards
 // naming the product lose its rating, and the undo record of this very title goes (« Annuler » would put
@@ -19,6 +19,7 @@ import type { FicheAsker } from "./fiche-asker";
 import { issuedTitle } from "./fiche-issued";
 import { type CardTitle, unrateCards } from "./fiche-local-restore";
 import { type JobDeps, jobAccounts, jobNaka } from "./job-deps";
+import type { NakaProxy } from "./naka-proxy";
 import { toJobError } from "./to-job-error";
 
 function refusalOf(state: ProductState): RemoveAnswer | undefined {
@@ -30,6 +31,7 @@ function refusalOf(state: ProductState): RemoveAnswer | undefined {
 
 async function removeOnSc(
   deps: JobDeps,
+  naka: NakaProxy,
   productId: number,
 ): Promise<RemoveAnswer | undefined> {
   try {
@@ -39,7 +41,7 @@ async function removeOnSc(
     const refusal = refusalOf(state);
     if (refusal !== undefined) return refusal;
     const settings = await deps.store.loadSettings();
-    await checkBinding(settings.binding, jobAccounts(jobNaka(deps), deps));
+    await checkBinding(settings.binding, jobAccounts(naka, deps));
     await deps.limiters.sc.run(() => deps.sc.unmarkDone(productId));
     return undefined;
   } catch (error) {
@@ -71,6 +73,7 @@ async function unrateTitle(deps: JobDeps, title: CardTitle): Promise<void> {
 /** A film's « Déjà vu » turned off after the removal (live only): the tab's click, or the client. */
 async function turnVuOff(
   deps: JobDeps,
+  naka: NakaProxy,
   contentId: number,
   byTab: boolean,
 ): Promise<RemoveAnswer> {
@@ -78,7 +81,7 @@ async function turnVuOff(
     const settings = await deps.store.loadSettings();
     if (settings.mode !== "live") return { ok: true };
     if (byTab) return { ok: true, dejaVu: "tab" };
-    await jobNaka(deps).markUnwatched({ contentId });
+    await naka.markUnwatched({ contentId });
     return { ok: true };
   } catch (error) {
     return { removed: true, error: toJobError(error) };
@@ -91,11 +94,13 @@ export async function ficheRemoveJob(
   { contentId, productId, vuByTab }: FicheRemoveMessage,
 ): Promise<RemoveAnswer> {
   const role = await issuedTitle(asker, contentId, productId);
-  const failed = await removeOnSc(deps, productId);
+  // One proxy: the write goes to the tab whose account the binding check read.
+  const naka = jobNaka(deps);
+  const failed = await removeOnSc(deps, naka, productId);
   if (failed !== undefined) return failed;
   const title = { role, contentId, productId };
   await unrateTitle(deps, title);
   await forgetUndo(deps, title);
   if (role !== "film") return { ok: true };
-  return turnVuOff(deps, contentId, vuByTab === true);
+  return turnVuOff(deps, naka, contentId, vuByTab === true);
 }

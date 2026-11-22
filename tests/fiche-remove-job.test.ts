@@ -176,6 +176,23 @@ describe("fiche-remove and Naka's « Déjà vu »", () => {
     expect(unwatched(w)).toEqual(["markUnwatched:5"]);
   });
 
+  it("the binding check and the « non vu » write go through one pinned Naka tab", async () => {
+    let queries = 0;
+    const w = world(RATED, {
+      tabs: (real) => ({
+        query: (url) => {
+          queries += 1;
+          return real.query(url);
+        },
+        send: (id, msg) => real.send(id, msg),
+      }),
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove())).toEqual({ ok: true });
+    expect(unwatched(w)).toEqual(["markUnwatched:5"]);
+    expect(queries).toBe(1);
+  });
+
   it("the client fails: removed with its error, cards unrated, record forgotten", async () => {
     const w = world(RATED, {
       naka: {
