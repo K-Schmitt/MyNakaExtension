@@ -1,6 +1,7 @@
-// The title page's episode grid in the real document: its rows (`li.nh-ep-row`) for the decorations, the
-// season its dropdown names, whether the grid is there, which boxes are on screen. Read only: the only
-// writes are our own hosts, put in a box's thumb and after its title.
+// The title page's episode grid in the real document: its rows (`li.nh-ep-row` inside `ol.nh-list` only, so a
+// row elsewhere on the page never gets the shown season's stars) for the decorations, the season its dropdown
+// names, whether the grid is there, which boxes are on screen. Read only: the only writes are our own hosts,
+// put in a box's thumb and after its title.
 
 import type { FichePorts } from "../fiche-ports";
 import { badgeInsertOffset, type ThumbLayout } from "./fiche-badge-place";
@@ -8,11 +9,11 @@ import type { EpisodeBox } from "./fiche-episodes";
 import { episodeNumber, seasonNumber } from "./fiche-numbers";
 import { visibleFirstOrder } from "./fiche-visible-order";
 
-const BOX = "li.nh-ep-row";
+const BOX = "ol.nh-list > li.nh-ep-row";
 const CODE = "span.nh-ep-num";
 const THUMB = "span.nh-ep-thumb";
 const TITLE = "span.nh-row-title";
-const GRID = "ol.nh-list > li.nh-ep-row";
+const GRID = BOX;
 const SEASON_DROPDOWN = 'button.nh-select-trigger[aria-label="Saison"]';
 
 const layoutOf = (thumb: Element, host: HTMLElement): ThumbLayout => ({

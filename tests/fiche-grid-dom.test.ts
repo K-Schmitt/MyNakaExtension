@@ -41,13 +41,15 @@ function docOf(
 }
 
 const host = {} as unknown as ElementLike;
+/** The episode rows, read only inside Naka's episode list. */
+const ROW = "ol.nh-list > li.nh-ep-row";
 
 describe("the episode rows of Naka's grid", () => {
-  it("lists li.nh-ep-row and nothing else", () => {
+  it("lists the li.nh-ep-row of ol.nh-list and nothing else", () => {
     const row = node({});
-    const { doc, asked } = docOf({}, { "li.nh-ep-row": [row] });
+    const { doc, asked } = docOf({}, { [ROW]: [row] });
     const boxes = episodeBoxes(doc);
-    expect(asked).toEqual(["li.nh-ep-row"]);
+    expect(asked).toEqual([ROW]);
     expect(boxes.map((b) => b.key)).toEqual([row]);
   });
 
@@ -56,14 +58,14 @@ describe("the episode rows of Naka's grid", () => {
       "span.nh-ep-num": { textContent: "12" },
       "span.nh-row-title": { textContent: "Pilote" },
     });
-    const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    const [box] = episodeBoxes(docOf({}, { [ROW]: [row] }).doc);
     expect(box).toBeDefined();
     expect(box?.code()).toBe("12");
     expect(box?.title()).toBe("Pilote");
   });
 
   it("reads nothing from a row without them", () => {
-    const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [node({})] }).doc);
+    const [box] = episodeBoxes(docOf({}, { [ROW]: [node({})] }).doc);
     expect(box).toBeDefined();
     expect(box?.code()).toBeUndefined();
     expect(box?.title()).toBeUndefined();
@@ -76,7 +78,7 @@ describe("the episode rows of Naka's grid", () => {
       after: (h: unknown) => calls.push(h),
     };
     const row = node({ "span.nh-row-title": title });
-    const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    const [box] = episodeBoxes(docOf({}, { [ROW]: [row] }).doc);
     expect(box).toBeDefined();
     box?.placeStars(host);
     expect(calls).toEqual([host]);
@@ -89,14 +91,14 @@ describe("the episode rows of Naka's grid", () => {
       after: (h: unknown) => calls.push(h),
     };
     const row = node({ "span.nh-row-title": title });
-    const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [row] }).doc);
+    const [box] = episodeBoxes(docOf({}, { [ROW]: [row] }).doc);
     expect(box).toBeDefined();
     box?.placeStars(host);
     expect(calls).toEqual([]);
   });
 
   it("does nothing without a title to follow", () => {
-    const [box] = episodeBoxes(docOf({}, { "li.nh-ep-row": [node({})] }).doc);
+    const [box] = episodeBoxes(docOf({}, { [ROW]: [node({})] }).doc);
     expect(box).toBeDefined();
     expect(() => box?.placeStars(host)).not.toThrow();
   });
@@ -113,6 +115,12 @@ describe("the grid and the season dropdown", () => {
     expect(grid.hasEpisodeGrid()).toBe(true);
     expect(grid.asked).toEqual(["ol.nh-list > li.nh-ep-row"]);
     expect(ports({}).hasEpisodeGrid()).toBe(false);
+  });
+
+  it("orders the episodes on screen from the rows of ol.nh-list only", () => {
+    const grid = ports({});
+    grid.visibleFirst([3, 4]);
+    expect(grid.asked).toEqual([ROW]);
   });
 
   it("reads the season in the Saison trigger", () => {
