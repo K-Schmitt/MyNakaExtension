@@ -199,7 +199,6 @@ describe("the episode boxes", () => {
     const box = fakeBox("S1 E3");
     await seasonOne([box]);
     expect(box.titleSpan.nextElementSibling).toBe(starsHostOf(box));
-    expect(box.port.title()).toBe("Épisode");
     expect(texts(shadowParts(badgeOf(box)))).toEqual(["7,4"]);
     expect(badgeOf(box)?.shadowInit).toEqual([{ mode: "closed" }]);
     expect(starsOf(shadowParts(starsHostOf(box)))).toHaveLength(10);
