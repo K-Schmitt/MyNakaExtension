@@ -759,9 +759,12 @@ describe("fiche-undo: « Déjà vu »", () => {
     expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
   });
 
-  it("a button already lit before the rating (true): no step", async () => {
+  it("a button already lit before the rating (true): no step, no « tab » answer", async () => {
     const w = await ready(LIVE, true);
-    await w.jobs.ficheUndo(TAB, undo());
+    // The button is on screen on the real path: the tab sends vuByTab.
+    const answer = await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }));
+    expect(answer).toEqual({ ok: true, maListe: "none" });
+    expect(answer).not.toHaveProperty("dejaVu");
     expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
   });
 });
