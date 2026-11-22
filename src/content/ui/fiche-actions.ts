@@ -1,5 +1,5 @@
-// The actions under Naka's info panel: a closed host right after `div.dca-panel`, kept there by the
-// row keeper whenever Naka redraws the aside. It holds the product's actions (fiche-product-actions:
+// The actions under Naka's « À propos » facts: a closed host right after `dl.nh-fiche-facts`, kept there by the
+// row keeper whenever Naka redraws the section. It holds the product's actions (fiche-product-actions:
 // « Voir sur SensCritique », « Annuler » or « Retirer la note », the protected-title line) or, without a
 // product, every rare state of the title (fiche-rare-states) with the search field and « Réessayer ».
 // Built again only when what it shows changed; a search field that had the focus gets it back

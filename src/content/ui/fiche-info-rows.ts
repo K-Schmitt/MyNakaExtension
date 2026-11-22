@@ -1,7 +1,8 @@
-// The two SensCritique rows at the end of Naka's info panel, in Naka's own style: « SensCritique » and the
-// average, « Ta note » and the ten stars. They copy Naka's rows (`div.dcf-info-row`: a label `span`, a value
-// `span`) so its styles apply; the stars sit in a closed host inside the value. The row keeper puts them back
-// at the end of the panel whenever Naka redraws the aside. Input stops at the rows. Texts go through
+// The two SensCritique rows at the end of Naka's « À propos » facts (`dl.nh-fiche-facts`), in Naka's own
+// style: « SensCritique » and the average, « Ta note » and the ten stars. They copy Naka's facts (a bare
+// `div` holding a `dt` label and a `dd` value) so its styles apply; the stars sit in a closed host inside the
+// value, and their row spans both columns of the facts grid (ten stars are 216 px, a cell 213). The row
+// keeper puts them back at the end of the list whenever Naka redraws the section. Input stops at the rows. Texts go through
 // textContent; the stars are built again only when what they show changed, so their focus stays.
 
 import type { FicheProduct } from "../../ext/fiche-answers";
@@ -24,7 +25,7 @@ import { createClosedHost } from "./row-host";
 import { createRowKeeper } from "./row-keeper";
 import type { SeenWatch } from "./star-visibility";
 
-const NAKA_ROW_CLASS = "dcf-info-row";
+const WIDE_ROW = "grid-column: span 2";
 const STARS_DECLARATIONS = [
   "all: initial",
   "display: inline-block",
@@ -36,12 +37,12 @@ export type FicheRowsPorts = PanelPlace & {
   seen: SeenWatch;
 };
 
-function infoRow(doc: Maker, label: string) {
+function infoRow(doc: Maker, label: string, style = "") {
   const row = doc.createElement("div");
-  row.className = NAKA_ROW_CLASS;
-  const name = doc.createElement("span");
+  if (style !== "") row.style.cssText = style;
+  const name = doc.createElement("dt");
   name.textContent = label;
-  const value = doc.createElement("span");
+  const value = doc.createElement("dd");
   row.appendChild(name);
   row.appendChild(value);
   stopAtHost(row, ROW_STOPPED_EVENTS);
@@ -70,7 +71,7 @@ function starsOf(
 function createRows(ports: FicheRowsPorts) {
   const { doc } = ports;
   const average = infoRow(doc, PANEL_TITLE);
-  const mine = infoRow(doc, MINE_LABEL);
+  const mine = infoRow(doc, MINE_LABEL, WIDE_ROW);
   const stars = createClosedHost(
     doc,
     "span",

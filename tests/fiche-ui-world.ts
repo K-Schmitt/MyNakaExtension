@@ -37,62 +37,58 @@ export function fakeBox(code: string | undefined) {
 
 export type FakeBox = ReturnType<typeof fakeBox>;
 
-/** Naka's info panel rows (owner's probe, 2026-11-13): « Note TMDB » is the last one on both. */
-export const FILM_ROWS = ["Audio", "Titre original", "Sortie", "Note TMDB"];
-export const SERIES_ROWS = [
+/** The labels of Naka's « À propos » facts (probe 2026-11-22): a film and a series show the same list. */
+export const FILM_FACTS = [
+  "Sortie",
+  "Durée",
   "Audio",
   "Sous-titres",
   "Titre original",
-  "Diffusion",
-  "Saisons",
-  "Note TMDB",
+  "Hors ligne",
+  "Source",
 ];
+export const SERIES_FACTS = FILM_FACTS;
 
-function nakaRow(label: string): FakeElement {
+function nakaFact(label: string): FakeElement {
   const row = new FakeElement("div");
-  row.className = "dcf-info-row";
-  const name = new FakeElement("span");
-  name.textContent = label;
-  row.appendChild(name);
-  row.appendChild(new FakeElement("span"));
+  const term = new FakeElement("dt");
+  term.textContent = label;
+  row.appendChild(term);
+  row.appendChild(new FakeElement("dd"));
   return row;
 }
 
 /**
- * Naka's aside as the probe saw it: the poster, `div.dca-panel` with its rows, a bare `div`, then the links.
- * `redraw` makes it all again, as Naka does: a fresh panel, our rows and host left out until put back.
+ * Naka's « À propos » column as the probe saw it: `div.nh-sechead`, then `dl.nh-fiche-facts` with one
+ * `div > dt + dd` per fact. `redraw` makes it all again, as Naka does: a fresh list, our rows and host left
+ * out until put back.
  */
-export function fakeAside(labels: readonly string[]) {
-  const aside = new FakeElement("aside");
+export function fakeAbout(labels: readonly string[]) {
+  const about = new FakeElement("div");
   const naka = new Set<FakeNode>();
-  let panel = new FakeElement("div");
+  let panel = new FakeElement("dl");
   const redraw = () => {
-    for (const child of [...aside.children]) aside.drop(child);
-    panel = new FakeElement("div");
-    panel.className = "dca-panel";
+    for (const child of [...about.children]) about.drop(child);
+    const head = new FakeElement("div");
+    head.className = "nh-sechead";
+    panel = new FakeElement("dl");
+    panel.className = "nh-fiche-facts";
     for (const label of labels) {
-      const row = nakaRow(label);
+      const row = nakaFact(label);
       naka.add(row);
       panel.appendChild(row);
     }
-    const links = new FakeElement("div");
-    links.className = "flex flex-col gap-2 mt-3.5";
-    const parts = [
-      new FakeElement("div"),
-      panel,
-      new FakeElement("div"),
-      links,
-    ];
-    for (const part of parts) aside.appendChild(part);
+    about.appendChild(head);
+    about.appendChild(panel);
   };
   redraw();
   return {
-    aside,
+    about,
     redraw,
     panel: () => panel,
-    /** The panel's children that are not Naka's: our rows. */
+    /** The list's children that are not Naka's: our rows. */
     ours: () => panel.children.filter((c) => !naka.has(c)) as FakeElement[],
-    /** The element right after the panel, when it is one of our closed hosts. */
+    /** The element right after the list, when it is one of our closed hosts. */
     actions: () => {
       const next = panel.nextElementSibling;
       return next !== null && next.shadowInit.length > 0 ? next : undefined;
@@ -100,14 +96,14 @@ export function fakeAside(labels: readonly string[]) {
   };
 }
 
-export type FakeAside = ReturnType<typeof fakeAside>;
+export type FakeAbout = ReturnType<typeof fakeAbout>;
 
 export const idleTimer = { set: () => 0, clear: () => {} };
 
 export function fakeUi(path: string, boxes: FakeBox[] = []) {
   const fake = fakePorts();
   const doc = new FakeDoc();
-  const kept = fakeAside(path.includes("/tv/") ? SERIES_ROWS : FILM_ROWS);
+  const kept = fakeAbout(path.includes("/tv/") ? SERIES_FACTS : FILM_FACTS);
   const watchers = new Set<() => void>();
   /** The star rows and write buttons' rows watched for visibility, and what IntersectionObserver v2 last said of them: `hidden` refuses
    * every row's clicks, `hiddenRows` only those rows'. */
@@ -171,8 +167,8 @@ export function deepParts(node: FakeNode): FakeElement[] {
   return all.filter((el) => el.tag !== "style");
 }
 
-/** What we drew on the title page: our two rows in the panel, then the actions host after it. */
-export const panelParts = (kept: FakeAside): FakeElement[] => {
+/** What we drew on the title page: our two rows in the facts list, then the actions host after it. */
+export const panelParts = (kept: FakeAbout): FakeElement[] => {
   const actions = kept.actions();
   return [
     ...kept.ours().flatMap((row) => [row, ...deepParts(row)]),

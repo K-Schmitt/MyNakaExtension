@@ -58,7 +58,7 @@ async function infoFailed() {
   t.controller.event(ficheEvent());
   t.ofType("fiche-info")[0]?.answer(undefined);
   await settle();
-  const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.aside);
+  const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.about);
   return { ...t, parts, retry: () => buttonNamed(parts(), "Réessayer") };
 }
 
@@ -209,7 +209,7 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     await settle();
     t.ofType("fiche-info")[1]?.answer(linked(80, null));
     await settle();
-    expect(starsOf(deepParts(t.kept.aside))).toHaveLength(10);
+    expect(starsOf(deepParts(t.kept.about))).toHaveLength(10);
     expect(t.field()).toBeUndefined();
   });
 
@@ -291,7 +291,7 @@ describe("« Chercher » under « Pas trouvé sur SensCritique »", () => {
     const seen: string[] = [];
     const types = ["keydown", "keyup", "keypress", "beforeinput", "input"];
     for (const type of types) {
-      t.kept.aside.addEventListener(type, () => seen.push(type));
+      t.kept.about.addEventListener(type, () => seen.push(type));
     }
     t.field().press("s");
     t.field().press("Enter");
@@ -344,7 +344,7 @@ describe("« Réessayer » under « SensCritique n’a pas pu être lu »", () =
     expect(texts(t.parts())).toEqual(["Recherche sur SensCritique\u2026"]);
     t.ofType("fiche-info")[1]?.answer(linked(55, 7));
     await settle();
-    expect(texts(deepParts(t.kept.aside))).toContain("6,9 / 10");
+    expect(texts(deepParts(t.kept.about))).toContain("6,9 / 10");
     expect(t.retry()).toBeUndefined();
   });
 

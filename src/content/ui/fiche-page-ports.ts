@@ -1,4 +1,4 @@
-// The title page UI's ports in the page: the real document, Naka's info panel, the episode boxes of the grid,
+// The title page UI's ports in the page: the real document, Naka's « À propos » facts, the episode boxes of the grid,
 // the page's change watch, the keepers' timer and the write controls' visibility watch.
 
 import type { EndTimer } from "./end-poll";
@@ -8,7 +8,7 @@ import type { PanelElement } from "./fiche-panel-dom";
 import type { FicheUiPorts } from "./fiche-ui";
 import { type ObserverWindow, pageSeenWatch } from "./star-visibility-dom";
 
-const INFO_PANEL = "aside.dcf-aside div.dca-panel";
+const INFO_PANEL = "section.nh-fiche-about dl.nh-fiche-facts";
 
 export function fichePagePorts(doc: Document, timer: EndTimer): FicheUiPorts {
   return {

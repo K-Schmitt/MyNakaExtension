@@ -24,7 +24,7 @@ import {
   buttonNamed,
   checked,
   deepParts,
-  fakeAside,
+  fakeAbout,
   fakeUi,
   idleTimer,
   panelParts,
@@ -425,7 +425,7 @@ describe("every rare state of a title with no product, in the actions host", () 
     t.controller.event(seriesEvent());
     t.ofType("fiche-info")[0]?.answer(productOf({ id: 66, canUndo: true }));
     await settle();
-    const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.aside);
+    const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.about);
     expect(buttonNamed(parts(), "Annuler")).toBeDefined();
     t.controller.rateTitle(6);
     expect(parts().filter((p) => p.textContent === "Annuler")).toHaveLength(1);
@@ -622,7 +622,7 @@ describe("the actions between two views", () => {
 
   function actions() {
     const doc = new FakeDoc();
-    const aside = fakeAside(["Note TMDB"]);
+    const aside = fakeAbout(["Sortie"]);
     const shown = createFicheActions({
       doc,
       panel: aside.panel,

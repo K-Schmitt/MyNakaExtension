@@ -1,5 +1,5 @@
 // The stylesheets of the title page hosts, in Naka's palette (the theme tokens on :host): the actions under
-// the info panel (280 px wide), the average badge on an episode's thumb, the stars under its title (the
+// the facts list (the width of its column), the average badge on an episode's thumb, the stars under its title (the
 // panel's « Ta note » row uses them too).
 
 import { themeCss } from "../../ui/theme-tokens";
