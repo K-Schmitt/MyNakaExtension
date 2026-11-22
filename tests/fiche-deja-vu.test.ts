@@ -49,12 +49,19 @@ describe("a film rating and Naka's « Déjà vu » button", () => {
     expect(rateMsg(t)).toMatchObject({ vuByTab: true });
   });
 
-  it("does not send vuByTab when the button is on, or off screen", async () => {
-    for (const state of [true, undefined]) {
-      const t = await filmWith(state);
-      t.controller.rateTitle(8);
-      expect(rateMsg(t)).not.toHaveProperty("vuByTab");
-    }
+  it("sends vuByTab when the button is already on: the worker writes nothing", async () => {
+    const t = await filmWith(true);
+    t.controller.rateTitle(8);
+    expect(rateMsg(t)).toMatchObject({ vuByTab: true });
+    t.ofType("fiche-rate")[0]?.answer(TAB);
+    await settle();
+    expect(t.page.vuLog).toEqual([]);
+  });
+
+  it("does not send vuByTab when the button is off screen", async () => {
+    const t = await filmWith(undefined);
+    t.controller.rateTitle(8);
+    expect(rateMsg(t)).not.toHaveProperty("vuByTab");
   });
 
   it("clicks the button once after the answer « tab »", async () => {
@@ -114,6 +121,12 @@ describe("an episode rating and its row's « Vu » button", () => {
     t.ofType("fiche-rate")[0]?.answer(TAB);
     await settle();
     expect(t.page.vuLog).toEqual(["note:6:2:3", "click:3"]);
+  });
+
+  it("sends vuByTab when the row's button is already on", async () => {
+    const t = await episodesShown([[3, true]]);
+    t.controller.rateEpisode(3, 9);
+    expect(rateMsg(t)).toMatchObject({ episode: 3, vuByTab: true });
   });
 
   it("does not click a row that is already on", async () => {
