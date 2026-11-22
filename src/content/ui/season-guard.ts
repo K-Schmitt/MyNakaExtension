@@ -4,10 +4,13 @@
 // poll); without a dropdown (a lone season), the view's. The last one is kept: a season replacing another one
 // starts the wait on the rows' titles (season-settle). While the wait runs, or while the page's season is not
 // the view's (a dropdown naming none, « Spéciaux », never is), the rows stay bare, and one timer runs the pass
-// again when the wait may end. The first season of a visit has no wait.
+// again when the wait may end. The wait never ends while the view is behind the page: Naka's own season request
+// may outlast it, and the view catching up over unchanged rows starts it again (season-settle). The first season
+// of a visit has no wait.
 
 import type { EndTimer } from "./end-poll";
 import {
+  catchUp,
   noteRows,
   type SeasonTurn,
   startTurn,
@@ -48,16 +51,18 @@ export function createSeasonGuard(
     wake = { handle: ports.timer.set(rerun, ms) }; // clearing it once run does nothing
   }
 
-  // While the wait runs, one timer runs the pass again when it may end.
-  function waiting(rows: string): boolean {
+  // While the wait runs, one timer runs the pass again when it may end; it ends only under a view that shows
+  // the page's season.
+  function waiting(rows: string, viewOnPage: boolean): boolean {
     if (turn === undefined) return false;
     const now = ports.now();
     turn = noteRows(turn, rows, now);
+    if (viewOnPage) turn = catchUp(turn, now);
     const left = waitLeft(turn, now);
     if (left > 0) wakeIn(left);
     else {
-      turn = undefined;
       stopWake();
+      if (viewOnPage) turn = undefined;
     }
     return left > 0;
   }
@@ -81,8 +86,8 @@ export function createSeasonGuard(
     hold(viewSeason, rows) {
       const onPage = pageSeason(viewSeason);
       note(onPage, rows);
-      const waits = waiting(rows);
-      return onPage !== viewSeason || waits;
+      const viewOnPage = onPage === viewSeason;
+      return waiting(rows, viewOnPage) || !viewOnPage;
     },
     stop() {
       season = undefined;

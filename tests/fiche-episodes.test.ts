@@ -654,6 +654,57 @@ describe("the season guard", () => {
     expect(badgesOf(boxes)).toEqual([["8,1"], ["5,2"]]);
   });
 
+  /**
+   * Naka's season request outlasts the wait: the dropdown names season 2 at 0 ms, the tab's poll opens season 2
+   * in the view (its read answered at once) at `catchUp` ms, and Naka redraws its rows only at 1,500 ms.
+   */
+  async function slowRequest(catchUp: number) {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    t.page.shown = 2;
+    t.pageChanged();
+    t.advance(catchUp);
+    t.controller.path(SERIES_PATH);
+    await settle();
+    t.ofType("fiche-season")[1]?.answer(SEASON_TWO);
+    await settle();
+    t.advance(1499 - catchUp);
+    t.pageChanged();
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    retitle(boxes, "Départ", "Arrivée");
+    t.pageChanged();
+    t.advance(299);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["8,1"], ["5,2"]]);
+    expect(starCounts(boxes)).toEqual([10, 10]);
+  }
+
+  it("holds Naka's old rows when its season request is slow and the poll catches up before the wait ends", async () => {
+    await slowRequest(900);
+  });
+
+  it("holds Naka's old rows when its season request is slow and the poll catches up after the wait ends", async () => {
+    await slowRequest(1200);
+  });
+
+  it("brings season 1's stars back after the wait when the dropdown goes from Spéciaux back to Saison 1", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    t.dropdown.label = "Spéciaux";
+    t.pageChanged();
+    t.advance(2000);
+    expect(isBare(boxes)).toBe(true);
+    t.dropdown.label = "Saison 1 · 2 ép.";
+    t.pageChanged();
+    t.advance(999);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+    expect(starCounts(boxes)).toEqual([10, 10]);
+  });
+
   it("keeps the rows bare while the dropdown names no season (Spéciaux)", async () => {
     const boxes = rows();
     const t = await seasonOne(boxes, SEASON_ONE);
