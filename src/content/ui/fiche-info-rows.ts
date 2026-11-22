@@ -81,6 +81,7 @@ function createRows(ports: FicheRowsPorts) {
   mine.value.appendChild(stars.host);
   const rows = [average.row, mine.row];
   return {
+    first: average.row,
     average: average.value,
     stars: stars.root,
     keeper: createRowKeeper(rowsPorts(ports, rows)),
@@ -90,6 +91,7 @@ function createRows(ports: FicheRowsPorts) {
 export function createFicheRows(ports: FicheRowsPorts): {
   show(view: FicheView, handlers: FicheHandlers): void;
   hide(): void;
+  reveal(): void;
 } {
   let made: ReturnType<typeof createRows> | undefined;
   let drawn: { key: string; handlers: FicheHandlers } | undefined;
@@ -109,6 +111,9 @@ export function createFicheRows(ports: FicheRowsPorts): {
     },
     hide() {
       made?.keeper.stop();
+    },
+    reveal() {
+      made?.first.scrollIntoView({ behavior: "smooth", block: "center" });
     },
   };
 }

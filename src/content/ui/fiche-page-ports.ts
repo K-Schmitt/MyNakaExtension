@@ -3,11 +3,13 @@
 
 import type { EndTimer } from "./end-poll";
 import { episodeBoxes } from "./fiche-grid-dom";
+import type { HeroBadges, HeroRating } from "./fiche-hero-place";
 import { watchPage } from "./fiche-page-watch";
 import type { PanelElement } from "./fiche-panel-dom";
 import type { FicheUiPorts } from "./fiche-ui";
 import { type ObserverWindow, pageSeenWatch } from "./star-visibility-dom";
 
+const BADGES = "header.nh-fiche-hero div.nh-fiche-badges";
 const INFO_PANEL = "section.nh-fiche-about dl.nh-fiche-facts";
 
 export function fichePagePorts(doc: Document, timer: EndTimer): FicheUiPorts {
@@ -17,6 +19,11 @@ export function fichePagePorts(doc: Document, timer: EndTimer): FicheUiPorts {
     panel: () =>
       doc.querySelector(INFO_PANEL) as unknown as PanelElement | null,
     timer,
+    badges: () => doc.querySelector(BADGES) as unknown as HeroBadges | null,
+    rating: () =>
+      doc.querySelector(
+        `${BADGES} > span.nh-rating`,
+      ) as unknown as HeroRating | null,
     boxes: () => episodeBoxes(doc),
     watch: (onChange) => watchPage(doc, onChange),
     // One visibility observer for the page's star rows and write buttons.

@@ -25,6 +25,7 @@ export const SEARCHING_LINE = "Recherche en cours\u2026";
 /** A row's value when SensCritique gives none (no average, nothing read yet). */
 export const NO_VALUE = "—";
 export const SERIES_CONFIRM = "SensCritique va retirer la série de tes envies.";
+export const HERO_CHIP_LABEL = "Voir la note SensCritique";
 export const SC_LINK_LABEL = "Voir sur SensCritique";
 export const UNDO_LABEL = "Annuler";
 export const REMOVE_LABEL = "Retirer la note";
@@ -125,4 +126,13 @@ export function nothingFoundLine(query: string): string {
 
 export function seasonFailedLine(season: number): string {
   return `Les notes de la saison ${season} n’ont pas pu être lues.`;
+}
+
+/** The hero chip: « ★ 7,4 SC · ta note 8 »; without an average « SC · ta note 8 »; without a rating no tail. */
+export function heroChipText(
+  average: number | null,
+  mine: number | null,
+): string {
+  const head = average === null ? "SC" : `★ ${frenchAverage(average)} SC`;
+  return mine === null ? head : `${head} · ta note ${mine}`;
 }

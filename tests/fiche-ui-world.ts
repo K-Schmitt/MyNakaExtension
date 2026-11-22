@@ -98,6 +98,16 @@ export function fakeAbout(labels: readonly string[]) {
 
 export type FakeAbout = ReturnType<typeof fakeAbout>;
 
+/** Naka's hero badges: a first badge, its own rating, a last badge. `shown: false` is a page without them. */
+export function fakeHero() {
+  const badges = new FakeElement("div");
+  const rating = new FakeElement("span");
+  const last = new FakeElement("span");
+  for (const badge of [new FakeElement("span"), rating, last])
+    badges.appendChild(badge);
+  return { badges, rating, shown: true };
+}
+
 export const idleTimer = { set: () => 0, clear: () => {} };
 
 export function fakeUi(path: string, boxes: FakeBox[] = []) {
@@ -116,10 +126,13 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     /** The slots released, the oldest first. */
     released: [] as object[],
   };
+  const hero = fakeHero();
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
     timer: idleTimer,
+    badges: () => (hero.shown ? hero.badges : null),
+    rating: () => (hero.rating.parent === hero.badges ? hero.rating : null),
     boxes: () => boxes.map((b) => b.port),
     seen: Object.assign(
       (row: unknown, slot: object) => {
@@ -149,6 +162,7 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
     ...fake,
     controller,
     kept,
+    hero,
     stars,
     pageChanged: () => {
       for (const watcher of [...watchers]) watcher();

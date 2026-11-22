@@ -131,6 +131,11 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
   ],
   sentWithErrorLine: () => CODES.map(ficheCopy.sentWithErrorLine),
   episodeStarsName: () => [ficheCopy.episodeStarsName("Pilote")],
+  heroChipText: () => [
+    ficheCopy.heroChipText(7.4, 8),
+    ficheCopy.heroChipText(7.4, null),
+    ficheCopy.heroChipText(null, 8),
+  ],
   outcomeLine: () => [
     ficheCopy.outcomeLine({ kind: "failed" }, ficheCopy.LINK_FAILED_LINE),
     ...CODES.flatMap((error) => [

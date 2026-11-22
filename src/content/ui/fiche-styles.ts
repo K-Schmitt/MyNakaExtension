@@ -54,3 +54,9 @@ const PANEL_STARS_RULES = [
 
 export const PANEL_STARS_SHEET: string =
   EPISODE_STARS_SHEET + PANEL_STARS_RULES.join("");
+
+// The chip in the hero badges: 23 px, the height of Naka's own rating badge.
+export const CHIP_SHEET: string =
+  themeCss(":host") +
+  ".mn-chip{display:inline-flex;align-items:center;height:23px;box-sizing:border-box;padding:0 8px;font:600 13px/21px var(--mn-font);color:var(--mn-color-text);background:var(--mn-color-surface-raised);border:1px solid var(--mn-color-border);border-radius:var(--mn-radius-pill);cursor:pointer;}" +
+  ".mn-chip:focus-visible{outline:2px solid var(--mn-color-accent-text);outline-offset:2px;}";
