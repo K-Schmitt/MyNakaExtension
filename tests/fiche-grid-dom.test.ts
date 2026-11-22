@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ElementLike } from "../src/content/ui/dom-like";
 import {
+  clickEpisodeVu,
   dropdownSeason,
   episodeBoxes,
+  episodeVuState,
   gridPorts,
 } from "../src/content/ui/fiche-grid-dom";
 
@@ -140,5 +142,41 @@ describe("the grid and the season dropdown", () => {
     expect(read({})).toBeNull();
     const specials = ports({ [sel]: { textContent: "Spéciaux" } });
     expect(specials.shownSeason()).toBeUndefined();
+  });
+});
+
+describe("the « Vu » button of an episode row", () => {
+  const vuRow = (num: string, classes: string[]) => {
+    const button = {
+      clicks: 0,
+      classList: { contains: (name: string) => classes.includes(name) },
+      click() {
+        this.clicks += 1;
+      },
+    };
+    const row = node({
+      "span.nh-ep-num": { textContent: num },
+      "button.nh-ep-vu": button as unknown as Slice,
+    });
+    return { row, button };
+  };
+
+  it("is read in the row of that number: off with is-off, else on", () => {
+    const off = vuRow("3", ["nh-ep-vu", "is-off"]);
+    const on = vuRow("4", ["nh-ep-vu"]);
+    const { doc, asked } = docOf({}, { [ROW]: [off.row, on.row] });
+    expect(episodeVuState(doc, 3)).toBe(false);
+    expect(episodeVuState(doc, 4)).toBe(true);
+    expect(episodeVuState(doc, 5)).toBeUndefined();
+    expect(asked).toEqual([ROW, ROW, ROW]);
+  });
+
+  it("is clicked once, in its own row only", () => {
+    const one = vuRow("3", ["nh-ep-vu", "is-off"]);
+    const two = vuRow("4", ["nh-ep-vu", "is-off"]);
+    const { doc } = docOf({}, { [ROW]: [one.row, two.row] });
+    clickEpisodeVu(doc, 4);
+    expect([one.button.clicks, two.button.clicks]).toEqual([0, 1]);
+    expect(() => clickEpisodeVu(doc, 9)).not.toThrow();
   });
 });

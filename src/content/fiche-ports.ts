@@ -2,6 +2,7 @@
 // undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
 // drawing of its view, the announcement of a visit to the page's relay and the page's timer.
 
+import type { ContentIds } from "../core/finish-event";
 import type {
   FicheInfo,
   FicheSearchAnswer,
@@ -43,6 +44,15 @@ export type FichePorts = {
   maListe(): boolean | undefined;
   /** One programmatic click on that button, when it is on screen. */
   clickMaListe(): void;
+  /**
+   * Naka's « Déjà vu » (a film, no argument) or the « Vu » of an episode row (its number): undefined when not
+   * on screen, else whether it is lit.
+   */
+  dejaVu(episode?: number): boolean | undefined;
+  /** One programmatic click on that button when it is on screen and off. */
+  clickDejaVu(episode?: number): void;
+  /** The tab's own tracker is told these ids are watched, just before the click that makes Naka say so. */
+  noteOwnVu(ids: ContentIds): void;
   /** The tab's address path now; `path` learns it only at the next poll. */
   pathname(): string;
   /** The view of the title page, or undefined off a title page. */

@@ -74,6 +74,14 @@ export function fakePorts() {
     maListe: undefined as boolean | undefined,
     /** The programmatic clicks on it; each one flips it, as Naka's handler does. */
     clicks: 0,
+    /** Naka's film « Déjà vu » button: undefined off screen, else on or off. */
+    vuFilm: undefined as boolean | undefined,
+    /** The episode rows' « Vu » buttons by number: absent off screen, else on or off. */
+    vuRows: new Map<number, boolean>(),
+    /** What the tab did, in order: `note:<key>` for the tracker, `click:film` or `click:<episode>`. */
+    vuLog: [] as string[],
+    /** The « Déjà vu » asks (`dejaVu(episode)`), to see which button was read. */
+    vuReads: [] as (number | undefined)[],
     /**
      * The tab's address now, once the test moves it ahead of the controller's next poll (`path`); until then,
      * the address of the last visit the controller announced.
@@ -106,6 +114,21 @@ export function fakePorts() {
       if (page.maListe === undefined) return;
       page.clicks += 1;
       page.maListe = !page.maListe;
+    },
+    dejaVu: (episode) => {
+      page.vuReads.push(episode);
+      return episode === undefined ? page.vuFilm : page.vuRows.get(episode);
+    },
+    clickDejaVu: (episode) => {
+      page.vuLog.push(`click:${episode ?? "film"}`);
+      if (episode === undefined)
+        page.vuFilm = page.vuFilm === undefined ? undefined : true;
+      else if (page.vuRows.has(episode)) page.vuRows.set(episode, true);
+    },
+    noteOwnVu: (ids) => {
+      page.vuLog.push(
+        `note:${ids.contentId}:${ids.season ?? ""}:${ids.episode ?? ""}`,
+      );
     },
     pathname: () => page.path ?? announced[announced.length - 1] ?? "",
     render: (view) => {

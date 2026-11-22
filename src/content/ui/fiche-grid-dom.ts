@@ -14,6 +14,8 @@ const CODE = "span.nh-ep-num";
 const THUMB = "span.nh-ep-thumb";
 const TITLE = "span.nh-row-title";
 const GRID = BOX;
+const VU = "button.nh-ep-vu";
+const VU_OFF = "is-off";
 const SEASON_DROPDOWN = 'button.nh-select-trigger[aria-label="Saison"]';
 
 const layoutOf = (thumb: Element, host: HTMLElement): ThumbLayout => ({
@@ -58,6 +60,42 @@ export function dropdownSeason(
 ): number | null | undefined {
   const dropdown = doc.querySelector(SEASON_DROPDOWN);
   return dropdown === null ? null : seasonNumber(dropdown.textContent);
+}
+
+/** The slice of an episode row's « Vu » button read and clicked: a real `button` has all of it. */
+type VuButton = {
+  classList: { contains(name: string): boolean };
+  click(): void;
+};
+
+function vuButtonOf(
+  doc: Pick<Document, "querySelectorAll">,
+  episode: number,
+): VuButton | null {
+  for (const row of doc.querySelectorAll(BOX)) {
+    const code = row.querySelector(CODE)?.textContent;
+    if (episodeNumber(code) === episode)
+      return row.querySelector<HTMLElement>(VU);
+  }
+  return null;
+}
+
+/** The row's « Vu » button of this episode: undefined without it, else whether it is lit (no `is-off`). */
+export function episodeVuState(
+  doc: Pick<Document, "querySelectorAll">,
+  episode: number,
+): boolean | undefined {
+  const button = vuButtonOf(doc, episode);
+  return button === null ? undefined : !button.classList.contains(VU_OFF);
+}
+
+/** One click on this episode's « Vu » button when it is off; a lit button or none gets nothing. */
+export function clickEpisodeVu(
+  doc: Pick<Document, "querySelectorAll">,
+  episode: number,
+): void {
+  const button = vuButtonOf(doc, episode);
+  if (button?.classList.contains(VU_OFF)) button.click();
 }
 
 const onScreen = (box: Element, height: number): boolean => {
