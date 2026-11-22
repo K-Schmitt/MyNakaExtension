@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { watchPlayerPanels } from "../src/content/ui/player-panels-dom";
 
-function setup() {
-  let present = false;
+function setup(initiallyOpen = false) {
+  let present = initiallyOpen;
   let mutate: () => void = () => {};
   const disconnect = vi.fn();
   const doc = {
@@ -43,5 +43,15 @@ describe("watchPlayerPanels", () => {
     const { stop, disconnect } = setup();
     stop();
     expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the state once at watch start: a panel already open is reported without any mutation", () => {
+    const { onChange } = setup(true);
+    expect(onChange.mock.calls).toEqual([[true]]);
+  });
+
+  it("says nothing at watch start when no panel is open", () => {
+    const { onChange } = setup(false);
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

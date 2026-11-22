@@ -145,6 +145,37 @@ describe("createOverlayRoot", () => {
     expect(hostOf(doc).shadow).toBe(root);
   });
 
+  it("keeps the hidden state through attach() and a fullscreen move", () => {
+    const doc = new FakeDoc();
+    const player = new FakeNode();
+    let notify: (open: boolean) => void = () => {};
+    const overlay = createOverlayRoot(doc, "", (onChange) => {
+      notify = onChange;
+      return () => {};
+    });
+    notify(true);
+    hostOf(doc).remove();
+    overlay.attach();
+    expect(hostOf(doc).style.cssText).toContain("display: none !important");
+    doc.enterFullscreen(player);
+    expect(hostOf(doc).parent).toBe(player);
+    expect(hostOf(doc).style.cssText).toContain("display: none !important");
+  });
+
+  it("every declaration of the hidden style is important", () => {
+    const doc = new FakeDoc();
+    createOverlayRoot(doc, "", (onChange) => {
+      onChange(true);
+      return () => {};
+    });
+    const declarations = hostOf(doc)
+      .style.cssText.split(";")
+      .map((d) => d.trim())
+      .filter((d) => d !== "");
+    expect(declarations.at(-1)).toBe("display: none !important");
+    for (const d of declarations) expect(d, d).toMatch(/ !important$/);
+  });
+
   it("every declaration of the host style is important", () => {
     const doc = new FakeDoc();
     createOverlayRoot(doc, "", NO_PANELS);

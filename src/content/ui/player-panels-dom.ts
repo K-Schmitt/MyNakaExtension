@@ -13,12 +13,15 @@ export function watchPlayerPanels(
   onChange: (open: boolean) => void,
 ): () => void {
   let open = false;
-  return observe(doc.body, () => {
+  const check = (): void => {
     const now = doc.querySelector(NAKA_PANELS) !== null;
     if (now === open) return;
     open = now;
     onChange(open);
-  });
+  };
+  const stop = observe(doc.body, check);
+  check();
+  return stop;
 }
 
 export function observeBody(target: Node, onMutation: () => void): () => void {
