@@ -31,7 +31,7 @@ function createChip(ports: HeroChipPorts, onClick: () => void) {
   const button = ports.doc.createElement("button");
   button.setAttribute("type", "button");
   button.className = "mn-chip";
-  button.setAttribute("aria-label", HERO_CHIP_LABEL);
+  button.setAttribute("title", HERO_CHIP_LABEL); // its accessible name stays its visible value
   onTrustedClick(button, onClick);
   root.appendChild(button);
   return { button, keeper: createRowKeeper(chipPorts(ports, host)) };

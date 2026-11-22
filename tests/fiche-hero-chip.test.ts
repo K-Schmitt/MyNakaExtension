@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heroChipText } from "../src/content/ui/fiche-copy";
+import { HERO_CHIP_LABEL, heroChipText } from "../src/content/ui/fiche-copy";
 import type { FicheInfo } from "../src/ext/fiche-answers";
 import {
   FILM_PATH,
@@ -90,6 +90,17 @@ describe("hero chip", () => {
     expect(row.scrolls).toEqual([]);
     button.click(true);
     expect(row.scrolls).toEqual([{ behavior: "smooth", block: "center" }]);
+  });
+
+  it("lets screen readers read its value: a title, no aria-label over the text", async () => {
+    const t = await film(linked(55, 8));
+    const button = deepParts((t.chip() as FakeElement).shadow).find(
+      (e) => e.tag === "button",
+    ) as FakeElement;
+    expect(HERO_CHIP_LABEL).toBe("Voir la note SensCritique");
+    expect(button.attributes.title).toBe(HERO_CHIP_LABEL);
+    expect(button.attributes["aria-label"]).toBeUndefined();
+    expect(button.textContent).toBe("★ 6,9 SC · ta note 8");
   });
 
   it("sends nothing on a click", async () => {
