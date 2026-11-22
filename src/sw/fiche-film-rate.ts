@@ -11,7 +11,8 @@
 // answer carries the panel read from the stored record, so « Annuler » shows at once). An answer of a
 // rating that went out carries the panel.
 // With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal);
-// without it, a film the client removed is noted as listed on the undo record.
+// without it, a film the client removed is noted as listed on the undo record. Then « Déjà vu » on Naka
+// (naka-watched-step): the tab's click (vuByTab) or the client's write; the « Ma liste » error, if any, stays.
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -30,6 +31,7 @@ import {
   recordBefore,
 } from "./fiche-undo-record";
 import type { JobDeps } from "./job-deps";
+import { withWatched } from "./naka-watched-step";
 import { type RateEnd, rateJob } from "./rating-jobs";
 
 async function assertCardProduct(
@@ -74,14 +76,14 @@ async function notSent(
   return panel === undefined ? { error } : { error, panel };
 }
 
-// The rating went out but its card was not saved: answered as sent with that code, unless the list step
-// has its own error, or the tab must click « Ma liste » itself (that answer is kept so the click happens).
+// The rating went out but its card was not saved: answered as sent with that code, unless a later step
+// has its own error, or the tab must click « Ma liste » or « Déjà vu » itself (that answer is kept so the click happens).
 function withUnsaved(
   answer: ListLeaving["answer"],
   unsaved: JobError | undefined,
 ): ListLeaving["answer"] {
   if (unsaved === undefined || !("ok" in answer)) return answer;
-  if (answer.maListe === "tab") return answer;
+  if (answer.maListe === "tab" || answer.dejaVu === "tab") return answer;
   return { sent: true, step: "local-save", error: unsaved };
 }
 
@@ -107,8 +109,14 @@ export async function rateFilm(
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }
+  const watched = await withWatched(
+    deps,
+    { contentId },
+    msg.vuByTab === true,
+    leaving.answer,
+  );
   return {
-    ...withUnsaved(leaving.answer, unsaved),
+    ...withUnsaved(watched, unsaved),
     panel: afterRating(kept.state, rating, kept.record, deps.now()),
   };
 }

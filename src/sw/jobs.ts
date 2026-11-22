@@ -66,6 +66,7 @@ import {
 import type { JobDeps } from "./job-deps";
 import { linkTitleJob, requeueJob } from "./link-job";
 import { memorySession } from "./memory-session";
+import { watchedAfterPlayerRating } from "./player-watched";
 import {
   answerOpenQuestions,
   answerPageLists,
@@ -201,7 +202,9 @@ export function createJobs(
       quietly(() => settingsJob(deps.store, thresholds, pause)),
     rate: (msg) =>
       quietly(async () => {
-        await forgettingUndo(deps, msg.contentId, (d) => rateJob(d, msg));
+        await forgettingUndo(deps, msg.contentId, async (d) => {
+          await watchedAfterPlayerRating(d, msg, await rateJob(d, msg));
+        });
       }),
     dismissRating: (msg) => quietly(() => dismissJob(deps.store, msg)),
     answerQuestion: (msg) => quietly(() => answerQuestionJob(deps, msg)),

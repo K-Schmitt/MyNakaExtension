@@ -7,7 +7,7 @@
 import type { ContentIds } from "../core/finish-event";
 import { checkQuery } from "../core/search-query";
 import { NakaUnavailableError } from "./naka-errors";
-import { checkContentId } from "./naka-input";
+import { checkContentId, checkWatchedIds } from "./naka-input";
 import { type NakaItem, toItem, toItems, toPlaylistIds } from "./naka-items";
 import { type NakaSeasons, toSeasons } from "./naka-seasons";
 import {
@@ -28,15 +28,11 @@ export type NakaClient = {
   playlistIds(): Promise<number[]>;
   addToPlaylist(contentId: number): Promise<void>;
   removeFromPlaylist(contentId: number): Promise<void>;
+  /** Ticks « Déjà vu » on Naka for a film, or an episode when the ids hold both numbers. */
+  markWatched(ids: ContentIds): Promise<void>;
   search(query: string): Promise<NakaItem[]>;
   contentById(contentId: number): Promise<NakaItem | undefined>;
   availableSeasons(contentId: number): Promise<NakaSeasons | undefined>;
-};
-
-// The client the tab itself holds: the worker's proxy relays no « Déjà vu » call, the tab ticks it.
-export type NakaTabClient = NakaClient & {
-  /** Ticks « Déjà vu » on Naka for a film, or an episode when the ids hold both numbers. */
-  markWatched(ids: ContentIds): Promise<void>;
 };
 
 async function run(deps: NakaDeps, request: Request): Promise<string> {
@@ -83,7 +79,7 @@ function watchedBody({ contentId, season, episode }: ContentIds) {
 }
 
 async function markWatched(deps: NakaDeps, ids: ContentIds) {
-  checkContentId(ids.contentId);
+  checkWatchedIds(ids);
   await run(deps, {
     method: "PUT",
     path: "/history/watched",
@@ -163,7 +159,7 @@ function unwrap(json: unknown): unknown {
   return json;
 }
 
-export function createNakaClient(deps: NakaDeps): NakaTabClient {
+export function createNakaClient(deps: NakaDeps): NakaClient {
   return {
     playlistIds: () => playlistIds(deps),
     addToPlaylist: (contentId) => addToPlaylist(deps, contentId),

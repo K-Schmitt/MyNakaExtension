@@ -1,5 +1,6 @@
 // Test-only fakes for the worker suites: SensCritique and Naka clients that log every call, a limiter that
 // logs every slot, and a store over an in-memory storage area (the REAL store and its validation).
+import type { ContentIds } from "../src/core/finish-event";
 import { type RateLimiter, SkippedError } from "../src/core/rate-limiter";
 import { createStore, type StorageArea } from "../src/ext/store";
 import type { NakaClient, NakaItem } from "../src/naka/naka-client";
@@ -114,12 +115,17 @@ export function fakeSc(over: Partial<ScClient> = {}) {
   return { client, calls };
 }
 
+/** `5` for a film, `7:2:3` for an episode. */
+const watchedKey = ({ contentId, season, episode }: ContentIds) =>
+  season === undefined ? `${contentId}` : `${contentId}:${season}:${episode}`;
+
 export function fakeNaka(over: Partial<NakaClient> = {}) {
   const calls: string[] = [];
   const base: NakaClient = {
     playlistIds: async () => [],
     addToPlaylist: async () => undefined,
     removeFromPlaylist: async () => undefined,
+    markWatched: async () => undefined,
     search: async () => [],
     contentById: async () => undefined,
     availableSeasons: async () => undefined,
@@ -137,6 +143,10 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     removeFromPlaylist: (id) => {
       calls.push(`removeFromPlaylist:${id}`);
       return base.removeFromPlaylist(id);
+    },
+    markWatched: (ids) => {
+      calls.push(`markWatched:${watchedKey(ids)}`);
+      return base.markWatched(ids);
     },
     search: (q) => {
       calls.push(`search:${q}`);
