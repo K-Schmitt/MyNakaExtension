@@ -130,6 +130,11 @@ export function fakePorts() {
         `note:${ids.contentId}:${ids.season ?? ""}:${ids.episode ?? ""}`,
       );
     },
+    noteOwnUnvu: (ids) => {
+      page.vuLog.push(
+        `unvu:${ids.contentId}:${ids.season ?? ""}:${ids.episode ?? ""}`,
+      );
+    },
     pathname: () => page.path ?? announced[announced.length - 1] ?? "",
     render: (view) => {
       views.push(view);

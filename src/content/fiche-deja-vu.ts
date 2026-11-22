@@ -4,7 +4,8 @@
 // The button is read again right before: already on, gone, a visit that is over, or an episode whose season
 // is no longer the shown one gets no click. A series has no such button: it is never read.
 // « Annuler » on a film turns it off again the same way (undoVuField, clickVuOff): `vuByTab` on the undo, and
-// on `dejaVu: "tab"` one click, only on a lit button, never noting the ids (the tracker has nothing to hide).
+// on `dejaVu: "tab"` one click, only on a lit button, noting the ids first as our own untick (noteOwnUnvu): the page's
+// "unwatched" that follows is then not relayed as the owner's untick (which would forget the title).
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage } from "../ext/fiche-messages";
@@ -52,9 +53,12 @@ export function clickVu(
   ports.clickDejaVu(place?.episode);
 }
 
-/** One click when the visit goes on and the film's button is lit: Naka's own « vu » off, nothing noted. */
+/** One click when the visit goes on and the film's button is lit: Naka's own « vu » off, our untick noted first. */
 export function clickVuOff(scope: FicheScope): void {
   if (!scope.live() || !stillOnTitle(scope)) return;
   if (scope.ports.dejaVu() !== true) return;
+  const contentId = contentOf(scope.page);
+  if (contentId === undefined) return;
+  scope.ports.noteOwnUnvu({ contentId });
   scope.ports.clickDejaVu();
 }

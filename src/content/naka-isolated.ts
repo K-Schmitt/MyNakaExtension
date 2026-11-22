@@ -83,6 +83,7 @@ const fiche = createFicheController({
   ...dejaVuPorts(document),
   // `tab` is bound once `startNakaTab` returns: a click comes long after, from an answer.
   noteOwnVu: (ids) => tab?.noteWatched(ids),
+  noteOwnUnvu: (ids) => tab?.noteUnwatched(ids),
   pathname: () => location.pathname,
   // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
@@ -114,5 +115,6 @@ tab = startNakaTab({
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
   takeGesture: gestures.take,
+  now: () => Date.now(),
   fiche: guardFicheInput(fiche),
 });

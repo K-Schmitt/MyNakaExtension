@@ -177,6 +177,7 @@ function tab(start = PLAYER(3)) {
       removals.push(contentId);
     },
     takeGesture: gestures.take,
+    now: () => clock.now,
     fiche: {
       path: (pathname) => {
         fichePaths.push(pathname);
@@ -222,6 +223,7 @@ function tab(start = PLAYER(3)) {
     clock,
     gestures,
     noteWatched: handle.noteWatched,
+    noteUnwatched: handle.noteUnwatched,
   };
 }
 
@@ -420,6 +422,36 @@ describe("the Naka tab", () => {
 
   it("an unticked film asks for the film", () => {
     const t = tab();
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
+  });
+
+  it("an own untick (noted first) sends no forget-handled; the next one does", () => {
+    const t = tab();
+    t.noteUnwatched({ contentId: 7 });
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    expect(t.sent.slice(1)).toEqual([]);
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
+  });
+
+  it("an own untick still sets the tracker's watched=false", () => {
+    const t = tab(PLAYER(7));
+    t.played();
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 7 });
+    expect(t.sent.slice(1)).toHaveLength(1);
+    t.noteUnwatched({ contentId: 7 });
+    t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
+    t.post({ channel: PAGE_CHANNEL, kind: "watched", contentId: 7 });
+    expect(t.sent.slice(1).filter((m) => m.type === "finished")).toHaveLength(
+      2,
+    );
+  });
+
+  it("a mark older than 10 s does not swallow the owner's untick", () => {
+    const t = tab();
+    t.noteUnwatched({ contentId: 7 });
+    t.clock.now += 10_001;
     t.post({ channel: PAGE_CHANNEL, kind: "unwatched", contentId: 7 });
     expect(t.sent.slice(1)).toEqual([{ type: "forget-handled", contentId: 7 }]);
   });

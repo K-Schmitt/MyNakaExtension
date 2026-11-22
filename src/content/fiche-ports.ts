@@ -53,6 +53,8 @@ export type FichePorts = {
   clickDejaVu(episode?: number): void;
   /** The tab's own tracker is told these ids are watched, just before the click that makes Naka say so. */
   noteOwnVu(ids: ContentIds): void;
+  /** Same, for our own click that turns « Déjà vu » off: the page's "unwatched" that follows is not the owner's untick. */
+  noteOwnUnvu(ids: ContentIds): void;
   /** The tab's address path now; `path` learns it only at the next poll. */
   pathname(): string;
   /** The view of the title page, or undefined off a title page. */
