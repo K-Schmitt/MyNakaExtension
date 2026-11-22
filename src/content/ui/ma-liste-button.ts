@@ -1,11 +1,12 @@
-// Naka's own « Ma liste » button on a title page: `.dcpl-split > button.dc-btn-soft`, `.is-active`
-// while the title is in the list. Clicking it lets Naka's page send its own request and update the class, so
-// the button stays right after our writes. Read only, but for that one programmatic click.
+// Naka's own « Ma liste » button on a title page: the first `button.nh-btn` of `div.dcpl-split`. In the list it
+// carries `.is-on` and the title « Retirer de Ma liste »; out of it, `.nh-btn-card` and « Ajouter à Ma liste ».
+// The second child, `button.dcpl-split-toggle` (playlists), is ignored. Clicking it lets Naka's page send its own
+// request and update the class, so the button stays right after our writes. Read only, but for that one click.
 
 import type { FichePorts } from "../fiche-ports";
 
-const BUTTON = ".dcpl-split > button.dc-btn-soft";
-const ACTIVE = "is-active";
+const BUTTON = "div.dcpl-split > button.nh-btn:first-child";
+const ACTIVE = "is-on";
 
 /** The slice of Naka's button read and clicked here: a real `button` has all of it. */
 export type MaListeElement = {
