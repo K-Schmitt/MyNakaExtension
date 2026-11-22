@@ -367,6 +367,29 @@ describe("parseToNakaTab", () => {
     });
   });
 
+  it("accepts markUnwatched with its ids, like markWatched", () => {
+    const unwatched = (extra: object) =>
+      parseToNakaTab({
+        type: "naka-call",
+        call: "markUnwatched",
+        contentId: 7,
+        ...extra,
+      });
+    expect(unwatched({})).toEqual({
+      type: "naka-call",
+      call: "markUnwatched",
+      contentId: 7,
+    });
+    expect(unwatched({ season: 2, episode: 5 })).toEqual({
+      type: "naka-call",
+      call: "markUnwatched",
+      contentId: 7,
+      season: 2,
+      episode: 5,
+    });
+    expect(unwatched({ season: 2 })).toBeUndefined();
+  });
+
   it("rejects a markWatched with a lone or bad season or episode, or a bad id", () => {
     const watched = (extra: object, contentId: unknown) =>
       parseToNakaTab({

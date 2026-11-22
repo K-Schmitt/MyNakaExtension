@@ -136,6 +136,28 @@ describe("requests on the wire", () => {
     });
   });
 
+  it("markUnwatched PUTs /history/watched with watched false", async () => {
+    const { client, calls } = setup();
+    await client.markUnwatched({ contentId: 7 });
+    const call = only(calls);
+    expect(call.url).toBe(`${BASE}/history/watched`);
+    expect(call.init.method).toBe("PUT");
+    expect(call.init.body).toBe(
+      JSON.stringify({ contentId: 7, watched: false }),
+    );
+  });
+
+  it("markUnwatched throws on invalid ids before any request", async () => {
+    const { client, calls } = setup();
+    await expect(client.markUnwatched({ contentId: 0 })).rejects.toThrow(
+      RangeError,
+    );
+    await expect(
+      client.markUnwatched({ contentId: 1, season: 2 }),
+    ).rejects.toThrow(RangeError);
+    expect(calls).toHaveLength(0);
+  });
+
   it("PUTs the season and episode numbers for an episode", async () => {
     const { client, calls } = setup();
     await client.markWatched({ contentId: 7, season: 2, episode: 5 });

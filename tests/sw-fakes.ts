@@ -126,6 +126,7 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     addToPlaylist: async () => undefined,
     removeFromPlaylist: async () => undefined,
     markWatched: async () => undefined,
+    markUnwatched: async () => undefined,
     search: async () => [],
     contentById: async () => undefined,
     availableSeasons: async () => undefined,
@@ -147,6 +148,10 @@ export function fakeNaka(over: Partial<NakaClient> = {}) {
     markWatched: (ids) => {
       calls.push(`markWatched:${watchedKey(ids)}`);
       return base.markWatched(ids);
+    },
+    markUnwatched: (ids) => {
+      calls.push(`markUnwatched:${watchedKey(ids)}`);
+      return base.markUnwatched(ids);
     },
     search: (q) => {
       calls.push(`search:${q}`);

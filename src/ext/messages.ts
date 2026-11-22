@@ -83,7 +83,7 @@ export type ToNakaTab =
       call: "add" | "remove" | "contentById" | "availableSeasons";
       contentId: number;
     }
-  | ({ type: "naka-call"; call: "markWatched" } & ContentIds)
+  | ({ type: "naka-call"; call: "markWatched" | "markUnwatched" } & ContentIds)
   | { type: "naka-call"; call: "search"; query: string }
   | { type: "naka-account" };
 
@@ -95,7 +95,7 @@ export type NakaReplyError =
   | "not-found";
 
 // `value` is untrusted, whatever the parser did: the worker re-validates it with the Naka client's parsers.
-// It is absent for void calls (add, remove, markWatched): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
+// It is absent for void calls (add, remove, markWatched, markUnwatched): Chrome messaging drops `undefined`, so `{ ok: true }` is normal.
 export type NakaReply =
   | { ok: true; value?: unknown }
   | { ok: false; error: NakaReplyError };
@@ -158,6 +158,7 @@ const CALLS = valuesOf<NakaCall>({
   add: true,
   remove: true,
   markWatched: true,
+  markUnwatched: true,
   contentById: true,
   availableSeasons: true,
 });
@@ -249,7 +250,7 @@ function parseNakaCall(record: Record<string, unknown>): ToNakaTab {
     return { type: "naka-call", call, query: asSearchQuery(record.query) };
   }
   const contentId = asId(record.contentId, "contentId");
-  if (call === "markWatched") {
+  if (call === "markWatched" || call === "markUnwatched") {
     return { type: "naka-call", call, contentId, ...playbackContext(record) };
   }
   return { type: "naka-call", call, contentId };

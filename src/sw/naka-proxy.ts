@@ -137,6 +137,12 @@ export function createNakaProxy(
         await call({ type: "naka-call", call: "markWatched", ...idsOf(ids) }),
       );
     },
+    markUnwatched: async (ids) => {
+      checkWatchedIds(ids);
+      asNothing(
+        await call({ type: "naka-call", call: "markUnwatched", ...idsOf(ids) }),
+      );
+    },
     search: async (query) => {
       const trimmed = checkQuery(query);
       return asItems(

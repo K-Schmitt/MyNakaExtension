@@ -29,6 +29,7 @@ function failing(error: unknown): NakaClient {
     addToPlaylist: boom,
     removeFromPlaylist: boom,
     markWatched: boom,
+    markUnwatched: boom,
     search: boom,
     contentById: boom,
     availableSeasons: boom,
@@ -154,6 +155,25 @@ describe("handleNakaCall: results", () => {
     expect(api.calls.map((x) => JSON.parse(String(x.init.body)))).toEqual([
       { contentId: 5, watched: true },
       { contentId: 7, seasonNumber: 2, episodeNumber: 3, watched: true },
+    ]);
+  });
+
+  it("markUnwatched: PUTs watched false for the ids it was given", async () => {
+    const api = fakeApi(standardApi);
+    const c = clientOn(api.fetch);
+    const msg: ToNakaTab = {
+      type: "naka-call",
+      call: "markUnwatched",
+      contentId: 5,
+    };
+    expect(await handleNakaCall(msg, c, noAccount)).toStrictEqual({
+      ok: true,
+    });
+    expect(api.calls.map((x) => `${x.init.method} ${x.url}`)).toEqual([
+      "PUT https://naka.cx/api/v1/history/watched",
+    ]);
+    expect(api.calls.map((x) => JSON.parse(String(x.init.body)))).toEqual([
+      { contentId: 5, watched: false },
     ]);
   });
 

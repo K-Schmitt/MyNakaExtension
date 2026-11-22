@@ -30,6 +30,8 @@ export type NakaClient = {
   removeFromPlaylist(contentId: number): Promise<void>;
   /** Ticks « Déjà vu » on Naka for a film, or an episode when the ids hold both numbers. */
   markWatched(ids: ContentIds): Promise<void>;
+  /** Unticks « Déjà vu » on Naka: the same write with `watched: false`. */
+  markUnwatched(ids: ContentIds): Promise<void>;
   search(query: string): Promise<NakaItem[]>;
   contentById(contentId: number): Promise<NakaItem | undefined>;
   availableSeasons(contentId: number): Promise<NakaSeasons | undefined>;
@@ -67,14 +69,17 @@ async function removeFromPlaylist(deps: NakaDeps, contentId: number) {
   });
 }
 
-function watchedBody({ contentId, season, episode }: ContentIds) {
+function watchedBody(
+  { contentId, season, episode }: ContentIds,
+  watched: boolean,
+) {
   return season === undefined || episode === undefined
-    ? { contentId, watched: true }
+    ? { contentId, watched }
     : {
         contentId,
         seasonNumber: season,
         episodeNumber: episode,
-        watched: true,
+        watched,
       };
 }
 
@@ -84,7 +89,17 @@ async function markWatched(deps: NakaDeps, ids: ContentIds) {
     method: "PUT",
     path: "/history/watched",
     label: "mark watched",
-    body: watchedBody(ids),
+    body: watchedBody(ids, true),
+  });
+}
+
+async function markUnwatched(deps: NakaDeps, ids: ContentIds) {
+  checkWatchedIds(ids);
+  await run(deps, {
+    method: "PUT",
+    path: "/history/watched",
+    label: "mark unwatched",
+    body: watchedBody(ids, false),
   });
 }
 
@@ -165,6 +180,7 @@ export function createNakaClient(deps: NakaDeps): NakaClient {
     addToPlaylist: (contentId) => addToPlaylist(deps, contentId),
     removeFromPlaylist: (contentId) => removeFromPlaylist(deps, contentId),
     markWatched: (ids) => markWatched(deps, ids),
+    markUnwatched: (ids) => markUnwatched(deps, ids),
     search: (query) => search(deps, query),
     contentById: (contentId) => contentById(deps, contentId),
     availableSeasons: (contentId) => availableSeasons(deps, contentId),

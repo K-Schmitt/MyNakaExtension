@@ -63,6 +63,8 @@ async function run(
       return client.removeFromPlaylist(msg.contentId);
     case "markWatched":
       return client.markWatched(idsOf(msg));
+    case "markUnwatched":
+      return client.markUnwatched(idsOf(msg));
     default:
       return unknownCall(msg);
   }

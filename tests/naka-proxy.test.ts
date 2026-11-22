@@ -141,6 +141,14 @@ describe("round trip through a fake tab (real tab handler, fake fetch)", () => {
     ]);
   });
 
+  it("markUnwatched sends its message and resolves on ok", async () => {
+    const { port, proxy } = proxyAnswering(() => ok());
+    expect(await proxy.markUnwatched({ contentId: 7 })).toBeUndefined();
+    expect(port.sent.map((s) => s.msg)).toEqual([
+      { type: "naka-call", call: "markUnwatched", contentId: 7 },
+    ]);
+  });
+
   it("account returns String(user.id)", async () => {
     const { proxy } = both();
     expect(await proxy.account()).toBe("42");
