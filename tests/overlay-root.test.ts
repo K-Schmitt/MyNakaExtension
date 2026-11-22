@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { STOPPED_EVENTS } from "../src/content/ui/input-stop";
-import { createOverlayRoot } from "../src/content/ui/overlay-root";
+import { createOverlayRoot, NO_PANELS } from "../src/content/ui/overlay-root";
 import { renderRating } from "../src/content/ui/rating-render";
 import { ratingView } from "../src/content/ui/rating-view";
 import { episodeCard } from "./rating-fixtures";
@@ -37,7 +37,7 @@ function hostOf(doc: FakeDoc): FakeElement {
 describe("createOverlayRoot", () => {
   it("attaches the host to body when nothing is fullscreen", () => {
     const doc = new FakeDoc();
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     expect(hostOf(doc).parent).toBe(doc.body);
   });
 
@@ -45,14 +45,14 @@ describe("createOverlayRoot", () => {
     const doc = new FakeDoc();
     const player = new FakeNode();
     doc.fullscreenElement = player;
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     expect(hostOf(doc).parent).toBe(player);
   });
 
   it("moves into the fullscreen element, then back to body, on fullscreenchange", () => {
     const doc = new FakeDoc();
     const player = new FakeNode();
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     doc.enterFullscreen(player);
     expect(hostOf(doc).parent).toBe(player);
     doc.enterFullscreen(null);
@@ -61,14 +61,14 @@ describe("createOverlayRoot", () => {
 
   it("opens a closed shadow root and returns it", () => {
     const doc = new FakeDoc();
-    const { root } = createOverlayRoot(doc);
+    const { root } = createOverlayRoot(doc, "", NO_PANELS);
     expect(hostOf(doc).shadowInit).toEqual([{ mode: "closed" }]);
     expect(root).toBe(hostOf(doc).shadow);
   });
 
-  it("styles the host: reset, right, above everything, between Naka's top bar (5%) and its bottom bar (95%)", () => {
+  it("styles the host: reset, right, above everything, from 7% to 76% of the height (max-height 69%)", () => {
     const doc = new FakeDoc();
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     const css = hostOf(doc).style.cssText;
     expect(css).toContain("all: initial");
     expect(css).toContain("z-index: 2147483647");
@@ -76,7 +76,7 @@ describe("createOverlayRoot", () => {
     expect(css).toContain("top: 7%");
     expect(css).toContain("right: 0");
     expect(css).toContain("max-width: 40%");
-    expect(css).toContain("max-height: 80%");
+    expect(css).toContain("max-height: 69%");
     expect(css).toContain("color-scheme: dark !important");
   });
 
@@ -86,14 +86,14 @@ describe("createOverlayRoot", () => {
 
   it.each(EXPECTED)("stops %s at the host", (type) => {
     const doc = new FakeDoc();
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     const reached = hostOf(doc).dispatch(type);
     expect(reached).toBe(false);
   });
 
   it("a click on an inner rating button runs its handler once, and stops at the host", () => {
     const doc = new FakeDoc();
-    const { root } = createOverlayRoot(doc);
+    const { root } = createOverlayRoot(doc, "", NO_PANELS);
     const onChoose = vi.fn();
     renderRating(
       doc,
@@ -117,7 +117,7 @@ describe("createOverlayRoot", () => {
 
   it("attach puts the host back when the page removed it, and leaves it alone otherwise", () => {
     const doc = new FakeDoc();
-    const overlay = createOverlayRoot(doc);
+    const overlay = createOverlayRoot(doc, "", NO_PANELS);
     const added = vi.spyOn(doc.body, "appendChild");
     overlay.attach();
     expect(added).not.toHaveBeenCalled();
@@ -126,9 +126,28 @@ describe("createOverlayRoot", () => {
     expect(hostOf(doc).parent).toBe(doc.body);
   });
 
+  it("hides the host while a panel is open and shows the same root again once it closes", () => {
+    const doc = new FakeDoc();
+    let notify: (open: boolean) => void = () => {};
+    const { root } = createOverlayRoot(doc, "", (onChange) => {
+      notify = onChange;
+      return () => {};
+    });
+    const child = new FakeNode();
+    root.replaceChildren(child);
+    notify(true);
+    expect(hostOf(doc).style.cssText).toContain("display: none !important");
+    expect(hostOf(doc).shadow).toBe(root);
+    expect(hostOf(doc).shadow.children).toContain(child);
+    notify(false);
+    expect(hostOf(doc).style.cssText).not.toContain("display: none");
+    expect(hostOf(doc).shadow.children).toContain(child);
+    expect(hostOf(doc).shadow).toBe(root);
+  });
+
   it("every declaration of the host style is important", () => {
     const doc = new FakeDoc();
-    createOverlayRoot(doc);
+    createOverlayRoot(doc, "", NO_PANELS);
     const declarations = hostOf(doc)
       .style.cssText.split(";")
       .map((d) => d.trim())
@@ -140,7 +159,11 @@ describe("createOverlayRoot", () => {
   it("keeps the sheet when the host moves", () => {
     const doc = new FakeDoc();
     const player = new FakeNode();
-    const { root } = createOverlayRoot(doc, ".mn-card { color: red; }");
+    const { root } = createOverlayRoot(
+      doc,
+      ".mn-card { color: red; }",
+      NO_PANELS,
+    );
     root.replaceChildren(new FakeNode());
     doc.enterFullscreen(player);
     root.replaceChildren(new FakeNode());

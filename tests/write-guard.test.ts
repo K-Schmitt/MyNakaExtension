@@ -5,6 +5,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDrawWatch } from "../src/content/ui/draw-watch";
 import { createEndUi } from "../src/content/ui/end-ui";
+import { NO_PANELS } from "../src/content/ui/overlay-root";
 import { questionView } from "../src/content/ui/question-view";
 import { CANCEL_LABEL, SEND_LABEL } from "../src/content/ui/rating-copy";
 import { buildRatingTile } from "../src/content/ui/rating-tile";
@@ -45,7 +46,7 @@ const starOf = (node: FakeNode, n: number) =>
 function player() {
   const doc = new FakeDoc();
   const v = fakeVisibility();
-  const ui = createEndUi(doc, v.seen);
+  const ui = createEndUi(doc, v.seen, NO_PANELS);
   const root = () => doc.created[0]?.shadow ?? new FakeNode();
   return { doc, v, ui, root };
 }
@@ -105,7 +106,7 @@ describe("the player block's stars and confirmation", () => {
       () => undefined,
       () => 0,
     );
-    const ui = createEndUi(doc, seen);
+    const ui = createEndUi(doc, seen, NO_PANELS);
     const h = handlers();
     ui.show(FILM(), h);
     starOf(doc.created[0]?.shadow ?? new FakeNode(), 3)?.click(true);

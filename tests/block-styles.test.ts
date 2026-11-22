@@ -5,6 +5,7 @@ import {
 } from "../src/content/ui/block-styles";
 import { createEndUi } from "../src/content/ui/end-ui";
 import { ACTIONS_SHEET } from "../src/content/ui/fiche-styles";
+import { NO_PANELS } from "../src/content/ui/overlay-root";
 import { ratingView } from "../src/content/ui/rating-view";
 import { themeCss } from "../src/ui/theme-tokens";
 import { filmCard } from "./rating-fixtures";
@@ -109,12 +110,15 @@ describe("BLOCK_SHEET", () => {
 describe("the overlays get the sheet", () => {
   it("the end block's shadow root carries BLOCK_SHEET in a style node", () => {
     const doc = new FakeDoc();
-    createEndUi(doc, noObserverWatch()).show(ratingView(filmCard(), "film"), {
-      onChoose: () => {},
-      onAction: () => {},
-      onOther: () => {},
-      onConfirm: () => {},
-    });
+    createEndUi(doc, noObserverWatch(), NO_PANELS).show(
+      ratingView(filmCard(), "film"),
+      {
+        onChoose: () => {},
+        onAction: () => {},
+        onOther: () => {},
+        onConfirm: () => {},
+      },
+    );
     const style = doc.created[0]?.shadow.children[0];
     expect((style as { tag?: string }).tag).toBe("style");
     expect((style as { textContent?: string }).textContent).toBe(BLOCK_SHEET);

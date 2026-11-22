@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDrawWatch } from "../src/content/ui/draw-watch";
 import { createEndUi } from "../src/content/ui/end-ui";
+import { NO_PANELS } from "../src/content/ui/overlay-root";
 import { KEEP_LABEL, NONE_LABEL } from "../src/content/ui/question-copy";
 import { buildQuestionTile } from "../src/content/ui/question-tile";
 import {
@@ -49,7 +50,7 @@ const named = (node: FakeNode, text: string) =>
 function player(view: QuestionView) {
   const doc = new FakeDoc();
   const v = fakeVisibility();
-  const ui = createEndUi(doc, v.seen);
+  const ui = createEndUi(doc, v.seen, NO_PANELS);
   const h = handlers();
   ui.showQuestion(view, h);
   const root = () => doc.created[0]?.shadow ?? new FakeNode();

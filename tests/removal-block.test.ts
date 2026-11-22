@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { END_POLL_MS } from "../src/content/ui/end-poll";
 import { createEndUi } from "../src/content/ui/end-ui";
+import { NO_PANELS } from "../src/content/ui/overlay-root";
 import {
   NONE_LABEL,
   REFUSED_LINE,
@@ -46,7 +47,7 @@ function lastFor(target: QuestionKey, seq: number): LastAnswer {
 function setup(first: RemovalOfferAnswer = { offer: OFFER }) {
   const clock = fakeClock();
   const doc = new FakeDoc();
-  const ui = createEndUi(doc, noObserverWatch());
+  const ui = createEndUi(doc, noObserverWatch(), NO_PANELS);
   const sent: unknown[][] = [];
   const asked: number[] = [];
   const script = { answer: first as RemovalOfferAnswer | undefined };

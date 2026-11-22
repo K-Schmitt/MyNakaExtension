@@ -7,25 +7,29 @@
 import { BLOCK_SHEET } from "./block-styles";
 import type { DocLike } from "./dom-like";
 import { createDrawWatch } from "./draw-watch";
-import { createOverlayRoot } from "./overlay-root";
+import { createOverlayRoot, type PanelWatch } from "./overlay-root";
 import { type QuestionHandlers, renderQuestion } from "./question-render";
 import type { QuestionView } from "./question-view";
 import { type RatingHandlers, renderRating } from "./rating-render";
 import type { RatingView } from "./rating-view";
 import type { ReleasableWatch } from "./star-visibility";
 
-export function createEndUi(doc: DocLike, seen: ReleasableWatch) {
+export function createEndUi(
+  doc: DocLike,
+  seen: ReleasableWatch,
+  panels: PanelWatch,
+) {
   let overlay: ReturnType<typeof createOverlayRoot> | undefined;
   const drawn = createDrawWatch(seen);
   return {
     show(view: RatingView, handlers: RatingHandlers): void {
-      overlay ??= createOverlayRoot(doc, BLOCK_SHEET);
+      overlay ??= createOverlayRoot(doc, BLOCK_SHEET, panels);
       overlay.attach();
       drawn.clear();
       renderRating(doc, overlay.root, view, handlers, drawn.watch);
     },
     showQuestion(view: QuestionView, handlers: QuestionHandlers): void {
-      overlay ??= createOverlayRoot(doc, BLOCK_SHEET);
+      overlay ??= createOverlayRoot(doc, BLOCK_SHEET, panels);
       overlay.attach();
       drawn.clear();
       renderQuestion(doc, overlay.root, view, handlers, drawn.watch);

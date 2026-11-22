@@ -23,6 +23,7 @@ import { createFicheUi } from "./ui/fiche-ui";
 import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { maListePorts } from "./ui/ma-liste-button";
+import { observeBody, watchPlayerPanels } from "./ui/player-panels-dom";
 import { type ObserverWindow, pageSeenWatch } from "./ui/star-visibility-dom";
 import { createWorkerPort } from "./ui/worker-port";
 import { createGestureGate, listenToGestures } from "./user-gesture";
@@ -65,6 +66,7 @@ const blocks = wireBlocks({
   playerUi: createEndUi(
     document,
     pageSeenWatch(window as unknown as ObserverWindow),
+    (onChange) => watchPlayerPanels(document, observeBody, onChange),
   ),
   homeUi: createHomeRowUi(homeRowPorts(document)),
   now: () => Date.now(),
