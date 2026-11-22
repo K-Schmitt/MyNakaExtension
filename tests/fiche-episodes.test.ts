@@ -4,7 +4,6 @@ import {
   badgeRight,
 } from "../src/content/ui/fiche-badge-place";
 import {
-  codeSeason,
   episodeNumber,
   frenchAverage,
   seasonNumber,
@@ -72,28 +71,6 @@ describe("the episode number of a box", () => {
     expect(episodeNumber("Bonus")).toBeUndefined();
     expect(episodeNumber("E0")).toBeUndefined();
     expect(episodeNumber("E99999999999999999999")).toBeUndefined();
-  });
-});
-
-describe("the season a box's code carries", () => {
-  it("reads S<n> in both forms, in any case", () => {
-    expect(codeSeason("S1 E3")).toBe(1);
-    expect(codeSeason("S01E03")).toBe(1);
-    expect(codeSeason("s2 e5")).toBe(2);
-    expect(codeSeason("S12E1")).toBe(12);
-  });
-
-  it("reads no season from a code without one", () => {
-    expect(codeSeason(undefined)).toBeUndefined();
-    expect(codeSeason(null)).toBeUndefined();
-    expect(codeSeason("")).toBeUndefined();
-    expect(codeSeason("E3")).toBeUndefined();
-    expect(codeSeason("3")).toBeUndefined();
-    expect(codeSeason("Bonus")).toBeUndefined();
-  });
-
-  it("reads S0 as season 0, which no shown season matches", () => {
-    expect(codeSeason("S0 E1")).toBe(0);
   });
 });
 
@@ -236,6 +213,7 @@ describe("the episode boxes", () => {
     await settle();
     t.ofType("fiche-season")[1]?.answer(titled("Retour"));
     await settle();
+    t.advance(1000);
     expect(groupOf(box)?.attributes.title).toBe(
       `Noter «${NB}Retour${NB}» sur SensCritique`,
     );
@@ -295,36 +273,6 @@ describe("the episode boxes", () => {
       expect(hostsIn(b.body)).toEqual([]);
     }
     expect(texts(shadowParts(badgeOf(four)))).toEqual(["6,8"]);
-  });
-
-  it("leaves bare a box whose code names another season than the shown one", async () => {
-    const two = fakeBox("S2 E3");
-    const zero = fakeBox("S0 E3");
-    const packed = fakeBox("S02E03");
-    await seasonOne([two, zero, packed]);
-    for (const b of [two, zero, packed]) {
-      expect(hostsIn(b.thumb)).toEqual([]);
-      expect(hostsIn(b.body)).toEqual([]);
-    }
-  });
-
-  it("decorates a box whose code names the shown season, in either form", async () => {
-    const spaced = fakeBox("s1 e3");
-    const packed = fakeBox("S01E03");
-    await seasonOne([spaced, packed]);
-    for (const b of [spaced, packed]) {
-      expect(texts(shadowParts(badgeOf(b)))).toEqual(["7,4"]);
-      expect(starsOf(shadowParts(starsHostOf(b)))).toHaveLength(10);
-    }
-  });
-
-  it("takes a box's decorations off when Naka rewrites its code for another season", async () => {
-    const box = fakeBox("S1 E3");
-    const t = await seasonOne([box]);
-    box.codeSpan.textContent = "S2 E3";
-    t.pageChanged();
-    expect(hostsIn(box.thumb)).toEqual([]);
-    expect(hostsIn(box.body)).toEqual([]);
   });
 
   it("leaves bare a box whose episode SensCritique does not list", async () => {
@@ -448,14 +396,6 @@ describe("an episode rating on its box", () => {
     expect(t.stars.released).toEqual([slot]);
   });
 
-  it("stops watching a box's stars when Naka rewrites its code for another season", async () => {
-    const { t, three } = await twoBoxes();
-    const slot = starsSlotOf(t, three);
-    three.codeSpan.textContent = "S2 E3";
-    t.pageChanged();
-    expect(t.stars.released).toEqual([slot]);
-  });
-
   it("draws each box's stars in a slot of its own, kept when the box is drawn again", async () => {
     const { t, three, four } = await twoBoxes();
     const slotOf = (b: FakeBox) =>
@@ -564,6 +504,7 @@ describe("an episode rating on its box", () => {
     await settle();
     t.ofType("fiche-season")[1]?.answer(episodes([3, 7.4]));
     await settle();
+    t.advance(1000);
     expect(starsOf(shadowParts(starsHostOf(box)))).toHaveLength(10);
     expect(linesOf(box)).toEqual([]);
   });
@@ -580,5 +521,129 @@ describe("the preview on an episode's stars", () => {
     groupOf(box)?.pointer("pointerleave", "mouse");
     expect(stars.filter((s) => s.className.includes("lit"))).toHaveLength(0);
     expect(t.ofType("fiche-rate")).toHaveLength(before);
+  });
+});
+
+describe("the season guard", () => {
+  const SEASON_ONE = episodes([3, 7.4], [4, 6.8]);
+  const SEASON_TWO = episodes([3, 8.1], [4, 5.2]);
+  const rows = () => [fakeBox("3", "Pilote"), fakeBox("4", "Retour")];
+  const retitle = (boxes: FakeBox[], ...titles: string[]) => {
+    boxes.forEach((b, i) => {
+      b.titleSpan.textContent = titles[i] ?? null;
+    });
+  };
+  const isBare = (boxes: FakeBox[]) =>
+    boxes.every(
+      (b) => hostsIn(b.thumb).length === 0 && hostsIn(b.body).length === 0,
+    );
+  const badgesOf = (boxes: FakeBox[]) =>
+    boxes.map((b) => texts(shadowParts(badgeOf(b))));
+  const starCounts = (boxes: FakeBox[]) =>
+    boxes.map((b) => starsOf(shadowParts(starsHostOf(b))).length);
+  type World = Awaited<ReturnType<typeof seasonOne>>;
+
+  /** The dropdown turns to season 2 (seen at the next poll), and season 2's read is answered. */
+  async function toSeasonTwo(t: World) {
+    t.page.shown = 2;
+    t.controller.path(SERIES_PATH);
+    await settle();
+    t.ofType("fiche-season")[1]?.answer(SEASON_TWO);
+    await settle();
+  }
+
+  it("takes every decoration off at a season change and puts them back 300 ms after Naka rewrote the titles", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+    await toSeasonTwo(t);
+    expect(isBare(boxes)).toBe(true);
+    retitle(boxes, "Départ", "Arrivée");
+    t.pageChanged();
+    t.advance(299);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["8,1"], ["5,2"]]);
+    expect(starCounts(boxes)).toEqual([10, 10]);
+  });
+
+  it("waits 1,000 ms when Naka redrew the rows before the change was seen", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    retitle(boxes, "Départ", "Arrivée");
+    await toSeasonTwo(t);
+    t.pageChanged();
+    t.advance(999);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["8,1"], ["5,2"]]);
+  });
+
+  it("keeps rows whose titles did not change bare until they stood still 1,000 ms", async () => {
+    const same = rows();
+    const t = await seasonOne(same, SEASON_ONE);
+    await toSeasonTwo(t);
+    t.advance(500);
+    t.pageChanged();
+    t.advance(499);
+    expect(isBare(same)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(same)).toEqual([["8,1"], ["5,2"]]);
+
+    const late = rows();
+    const u = await seasonOne(late, SEASON_ONE);
+    await toSeasonTwo(u);
+    u.advance(600);
+    retitle(late, "Départ", "Arrivée");
+    u.pageChanged();
+    u.advance(299);
+    expect(isBare(late)).toBe(true);
+    u.advance(1);
+    expect(badgesOf(late)).toEqual([["8,1"], ["5,2"]]);
+  });
+
+  it("decorates the first season of a visit at once", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    expect(t.clock.now).toBe(0);
+    expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+    await toSeasonTwo(t);
+    t.advance(1000);
+    t.controller.path("/");
+    t.controller.path(SERIES_PATH);
+    t.page.shown = 1;
+    t.controller.event(seriesEvent());
+    t.controller.event(seasonEvent(1));
+    t.ofType("fiche-info")[1]?.answer(linked(66));
+    await settle();
+    t.ofType("fiche-season")[2]?.answer(SEASON_ONE);
+    await settle();
+    expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+  });
+
+  it("starts the wait again when the season changes back during it", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    await toSeasonTwo(t);
+    t.advance(500);
+    t.page.shown = 1;
+    t.controller.path(SERIES_PATH);
+    await settle();
+    t.advance(999);
+    expect(isBare(boxes)).toBe(true);
+    t.advance(1);
+    expect(badgesOf(boxes)).toEqual([["7,4"], ["6,8"]]);
+  });
+
+  it("stops the wait and its timer when the tab leaves the title page", async () => {
+    const boxes = rows();
+    const t = await seasonOne(boxes, SEASON_ONE);
+    await toSeasonTwo(t);
+    expect(t.clock.pending).toHaveLength(1);
+    t.controller.path("/");
+    expect(t.clock.pending).toEqual([]);
+    t.advance(1000);
+    expect(isBare(boxes)).toBe(true);
+    expect(t.watching()).toBe(false);
   });
 });

@@ -131,7 +131,45 @@ export function fakeHero() {
 
 export const idleTimer = { set: () => 0, clear: () => {} };
 
-export function fakeUi(path: string, boxes: FakeBox[] = []) {
+/** A manual clock: `now` in ms, and the timers set on it, each with the time it is due. */
+export type FakeClock = {
+  now: number;
+  pending: { fn: () => void; at: number }[];
+};
+
+function clockTimer(clock: FakeClock) {
+  return {
+    set: (fn: () => void, ms: number) => {
+      const entry = { fn, at: clock.now + ms };
+      clock.pending.push(entry);
+      return entry;
+    },
+    clear: (handle: unknown) => {
+      clock.pending = clock.pending.filter((entry) => entry !== handle);
+    },
+  };
+}
+
+/** Moves the clock on by `ms`, running each timer due on the way at its own time, the earliest first. */
+function advanceClock(clock: FakeClock, ms: number): void {
+  const end = clock.now + ms;
+  for (;;) {
+    const due = clock.pending
+      .filter((entry) => entry.at <= end)
+      .sort((a, b) => a.at - b.at)[0];
+    if (due === undefined) break;
+    clock.pending = clock.pending.filter((entry) => entry !== due);
+    clock.now = Math.max(clock.now, due.at);
+    due.fn();
+  }
+  clock.now = end;
+}
+
+export function fakeUi(
+  path: string,
+  boxes: FakeBox[] = [],
+  clock: FakeClock = { now: 0, pending: [] },
+) {
   const fake = fakePorts();
   const doc = new FakeDoc();
   const kept = fakeAbout(path.includes("/tv/") ? SERIES_FACTS : FILM_FACTS);
@@ -151,7 +189,8 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
   const ui = createFicheUi({
     doc,
     panel: () => kept.panel(),
-    timer: idleTimer,
+    timer: clockTimer(clock),
+    now: () => clock.now,
     badges: () => (hero.shown ? hero.badges : null),
     rating: () => (hero.rating.parent === hero.badges ? hero.rating : null),
     boxes: () => boxes.map((b) => b.port),
@@ -189,6 +228,8 @@ export function fakeUi(path: string, boxes: FakeBox[] = []) {
       for (const watcher of [...watchers]) watcher();
     },
     watching: () => watchers.size > 0,
+    clock,
+    advance: (ms: number) => advanceClock(clock, ms),
   };
 }
 

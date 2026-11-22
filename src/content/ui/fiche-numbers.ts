@@ -3,7 +3,6 @@
 
 const TRAILING_NUMBER = /(\d+)\s*$/;
 const SEASON_LABEL = /saison\s*(\d+)/i;
-const CODE_SEASON = /\bS(\d+)/i;
 
 function positiveInt(digits: string | undefined): number | undefined {
   const value = Number(digits);
@@ -16,17 +15,6 @@ export function episodeNumber(
 ): number | undefined {
   const match = TRAILING_NUMBER.exec(code ?? "");
   return match === null ? undefined : positiveInt(match[1]);
-}
-
-/**
- * The season `span.nh-ep-num` names (« S1 E3 », « S01E03 » → 1; « S0 » → 0), or undefined when the code
- * names none. Any digits count, so that a code for another season never passes for the shown one.
- */
-export function codeSeason(
-  code: string | null | undefined,
-): number | undefined {
-  const match = CODE_SEASON.exec(code ?? "");
-  return match === null ? undefined : Number(match[1]);
 }
 
 /** The season the dropdown names (« Saison 2 » → 2). */
