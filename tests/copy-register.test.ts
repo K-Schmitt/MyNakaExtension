@@ -120,6 +120,7 @@ const RUN_STEPS = valuesOf<RunStep["kind"]>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 

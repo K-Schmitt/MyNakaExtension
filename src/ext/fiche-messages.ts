@@ -43,6 +43,8 @@ export type FicheMessage =
       episode?: number;
       /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
       inMaListe?: boolean;
+      /** A film's only: Naka's « Déjà vu » button was lit before the rating (read by the tab), for the undo record. */
+      dejaVuOn?: boolean;
       /** A film's only: the button is on screen, so the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
       /** A film's or an episode's: Naka's « Déjà vu » / « Vu » button is on screen: the tab clicks it if it is still off (`dejaVu: "tab"`). */
@@ -148,6 +150,7 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   season: true,
   episode: true,
   inMaListe: true,
+  dejaVuOn: true,
   listByTab: true,
   vuByTab: true,
 });
@@ -156,9 +159,16 @@ const SEARCH_KEYS = valuesOf<keyof FicheSearchMessage>({
   contentId: true,
   query: true,
 });
-/** The rating's fields of Naka's « Ma liste » button: a film's only. */
-type FilmOnlyKey = Extract<keyof FicheRateMessage, "inMaListe" | "listByTab">;
-const FILM_ONLY = valuesOf<FilmOnlyKey>({ inMaListe: true, listByTab: true });
+/** The rating's fields of Naka's « Ma liste » button and the state of its « Déjà vu »: a film's only. */
+type FilmOnlyKey = Extract<
+  keyof FicheRateMessage,
+  "inMaListe" | "listByTab" | "dejaVuOn"
+>;
+const FILM_ONLY = valuesOf<FilmOnlyKey>({
+  inMaListe: true,
+  listByTab: true,
+  dejaVuOn: true,
+});
 /** The rating's field of Naka's « Déjà vu » button: any target but a series. */
 type NotSeriesKey = Extract<keyof FicheRateMessage, "vuByTab">;
 const NOT_SERIES = valuesOf<NotSeriesKey>({ vuByTab: true });

@@ -17,6 +17,14 @@ export function vuField(
   return scope.ports.dejaVu(episode) !== undefined ? { vuByTab: true } : {};
 }
 
+/** A film's `vuByTab` and the lit state of its button, read once (`dejaVuOn` is what « Annuler » puts back). */
+export function filmVuFields(
+  scope: FicheScope,
+): Pick<FicheRateMessage, "vuByTab" | "dejaVuOn"> {
+  const lit = scope.ports.dejaVu();
+  return lit === undefined ? {} : { vuByTab: true, dejaVuOn: lit };
+}
+
 /** The worker left the « Déjà vu » to the tab. */
 export function vuLeftToTab(answer: RateAnswer | undefined): boolean {
   return answer !== undefined && "ok" in answer && answer.dejaVu === "tab";

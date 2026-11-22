@@ -167,6 +167,7 @@ describe("fiche-remove and the undo record", () => {
       dateDone: "2024-03-02",
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   });

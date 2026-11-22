@@ -52,6 +52,7 @@ const BARE_KINDS = valuesOf<Exclude<RunStep["kind"], "rate" | "markDone">>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 const KINDS = valuesOf<RunStep["kind"]>({
@@ -61,6 +62,7 @@ const KINDS = valuesOf<RunStep["kind"]>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 const RATE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "rate" }>>({

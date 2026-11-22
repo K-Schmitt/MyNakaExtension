@@ -19,7 +19,7 @@ export type StepRun = {
   listByTab: boolean;
 };
 
-type ScStep = Exclude<RunStep, { kind: "maListe" | "localRestore" }>;
+type ScStep = Exclude<RunStep, { kind: "maListe" | "dejaVu" | "localRestore" }>;
 
 function scStep(sc: ScClient, id: number, step: ScStep): Promise<void> {
   switch (step.kind) {
@@ -51,6 +51,7 @@ export async function runStep(
 ): Promise<UndoMaListe | undefined> {
   const { deps, record } = run;
   if (step.kind === "maListe") return listAgain(run);
+  if (step.kind === "dejaVu") return undefined; // activated by Task 3
   if (step.kind === "localRestore") {
     await restoreLocal(deps.store, record);
     return undefined;

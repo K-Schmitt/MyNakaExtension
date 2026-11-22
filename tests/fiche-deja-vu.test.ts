@@ -157,6 +157,33 @@ describe("an episode rating and its row's « Vu » button", () => {
   });
 });
 
+describe("a film rating and the state of the « Déjà vu » button", () => {
+  it.each([
+    [true, { vuByTab: true, dejaVuOn: true }],
+    [false, { vuByTab: true, dejaVuOn: false }],
+  ])("sends the lit state (%s) with vuByTab", async (lit, fields) => {
+    const t = await filmWith(lit);
+    t.controller.rateTitle(8);
+    expect(rateMsg(t)).toMatchObject(fields);
+  });
+
+  it("reads the button once and sends neither field when it is off screen", async () => {
+    const t = await filmWith(undefined);
+    t.page.vuReads.length = 0;
+    t.controller.rateTitle(8);
+    expect(rateMsg(t)).not.toHaveProperty("vuByTab");
+    expect(rateMsg(t)).not.toHaveProperty("dejaVuOn");
+    expect(t.page.vuReads).toEqual([undefined]);
+  });
+
+  it("sends only vuByTab for an episode", async () => {
+    const t = await episodesShown([[3, false]]);
+    t.controller.rateEpisode(3, 9);
+    expect(rateMsg(t)).toMatchObject({ episode: 3, vuByTab: true });
+    expect(rateMsg(t)).not.toHaveProperty("dejaVuOn");
+  });
+});
+
 describe("a series rating", () => {
   it("sends no vuByTab and never reads a « Déjà vu » button", async () => {
     const t = await episodesShown([]);

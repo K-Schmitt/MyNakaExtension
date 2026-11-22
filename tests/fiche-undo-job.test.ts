@@ -459,6 +459,7 @@ describe("fiche-undo: « Ma liste »", () => {
       dateDone: null,
       isWished: false,
       inMaListe: true,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   };
@@ -613,6 +614,7 @@ describe("fiche-undo: refused before any request", () => {
       dateDone: null,
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   };

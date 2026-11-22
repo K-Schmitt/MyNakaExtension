@@ -70,6 +70,7 @@ const filmRecord = (over: Partial<FicheUndo> = {}): FicheUndo => ({
     dateDone: "2024-03-02",
     isWished: false,
     inMaListe: true,
+    dejaVuOn: null,
   },
   local: { handled: false, settled: false, cards: [] },
   ...over,
@@ -149,6 +150,17 @@ describe("fiche-rate keeps what a film rating changes", () => {
     expect(stored(w)).toEqual(
       filmRecord({ before: { ...filmRecord().before, inMaListe: true } }),
     );
+  });
+
+  it("keeps the « Déjà vu » state the tab read, lit or off, else unknown", async () => {
+    const w = world();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    for (const dejaVuOn of [true, false, undefined]) {
+      await w.jobs.ficheRate(TAB, rate({ inMaListe: true, dejaVuOn }));
+      expect(stored(w)).toMatchObject({
+        before: { ...filmRecord().before, dejaVuOn: dejaVuOn ?? null },
+      });
+    }
   });
 
   it("replaces an older record, of another title", async () => {
@@ -329,6 +341,19 @@ describe("fiche-rate keeps what a film rating changes", () => {
 });
 
 describe("fiche-rate keeps what a series rating changes", () => {
+  it("never keeps a « Déjà vu » state for a series", async () => {
+    const w = world({
+      state: linkedTo(13),
+      product: () => ({ ...SEEN, rating: null, url: undefined }),
+    });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.jobs.ficheRate(TAB, { ...seriesRate(), dejaVuOn: false });
+    expect(stored(w)).toMatchObject({
+      role: "série",
+      before: { dejaVuOn: null },
+    });
+  });
+
   it("stores the record as a « série », « Ma liste » unknown", async () => {
     const w = world({
       state: linkedTo(13),
@@ -552,6 +577,7 @@ describe("the earlier record comes back only when nothing was written", () => {
           dateDone: null,
           isWished: true,
           inMaListe: true,
+          dejaVuOn: null,
         },
       }),
     );

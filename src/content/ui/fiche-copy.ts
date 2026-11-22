@@ -58,6 +58,7 @@ const NOT_PUT_BACK: Record<RunStep["kind"], string> = {
   undone: `la note et le ${SEEN} n’ont pas été retirés`,
   wish: "le titre n’est pas revenu dans tes envies",
   maListe: "le film n’est pas revenu dans Ma liste Naka",
+  dejaVu: `le «${NB}Déjà vu${NB}» de Naka est resté allumé`,
   localRestore: "l’extension n’a pas repris son état d’avant",
 };
 

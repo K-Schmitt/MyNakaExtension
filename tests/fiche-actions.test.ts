@@ -302,6 +302,9 @@ describe("the undo and refusal copy", () => {
     expect(partialUndoLine("markDone")).toBe(
       `L’annulation s’est arrêtée${NB}: le «${NB}vu${NB}» et sa date ne sont pas revenus, et la suite n’a pas été faite.`,
     );
+    expect(partialUndoLine("dejaVu")).toBe(
+      `L’annulation s’est arrêtée${NB}: le «${NB}Déjà vu${NB}» de Naka est resté allumé, et la suite n’a pas été faite.`,
+    );
     expect(partialUndoLine("maListe")).toContain(
       "le film n’est pas revenu dans Ma liste Naka",
     );

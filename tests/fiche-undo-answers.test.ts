@@ -30,6 +30,11 @@ describe("the undo answer", () => {
       error: "other-account",
     },
     {
+      partial: { done: [{ kind: "maListe" }], failed: { kind: "dejaVu" } },
+      maListe: "client",
+      error: "unavailable",
+    },
+    {
       partial: {
         done: [{ kind: "maListe" }],
         failed: { kind: "localRestore" },

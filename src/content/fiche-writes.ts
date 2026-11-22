@@ -8,7 +8,7 @@
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
-import { clickVu, vuField, vuLeftToTab } from "./fiche-deja-vu";
+import { clickVu, filmVuFields, vuField, vuLeftToTab } from "./fiche-deja-vu";
 import { askInfo } from "./fiche-info-reader";
 import { rateListFields, removedByTab, setMaListe } from "./fiche-ma-liste";
 import {
@@ -90,7 +90,7 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
   const msg = {
     ...rateMessage(contentId, target, product.id, rating),
     ...(film ? rateListFields(scope) : {}),
-    ...(film ? vuField(scope) : {}),
+    ...(film ? filmVuFields(scope) : {}),
   };
   const answer = await sendRate(scope, msg, (mine, sent) => {
     if (page.info?.product?.id !== product.id) return;
