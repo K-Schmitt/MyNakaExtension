@@ -148,6 +148,10 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
         { kind: "sent-with-error", step: "local-save", error },
         "",
       ),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "deja-vu", error },
+        "",
+      ),
     ]),
     ficheCopy.outcomeLine({ kind: "finish-wrote" }, ""),
     ficheCopy.outcomeLine({ kind: "finish-wrote-expired" }, ""),
@@ -368,6 +372,20 @@ describe("every shown sentence speaks in « tu » with ’", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
     expect(all.flatMap(registerFaults)).toEqual([]);
+  });
+});
+
+describe("the line of a rating sent but not passed to « Déjà vu »", () => {
+  it("is the exact line, whatever the error, in the register", () => {
+    const line = ficheCopy.outcomeLine(
+      { kind: "sent-with-error", step: "deja-vu", error: "naka-session" },
+      "",
+    );
+    expect(line).toBe(ficheCopy.DEJA_VU_FAILED_LINE);
+    expect(line).toBe(
+      "Note envoyée, mais Naka n’a pas pu passer le titre en \u00AB\u202FDéjà vu\u202F\u00BB.",
+    );
+    expect(registerFaults(line)).toEqual([]);
   });
 });
 

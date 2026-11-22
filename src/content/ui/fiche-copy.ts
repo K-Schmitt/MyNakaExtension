@@ -1,6 +1,7 @@
 // Every sentence of the title page's rows and actions. French typography: U+202F before « : ; ? ! » and
 // inside « », apostrophe ’, « tu ». A rating that did not go out reuses the rating block's lines.
 
+import type { SentStep } from "../../ext/fiche-answers";
 import type { RunStep } from "../../ext/fiche-undo-answers";
 import type { JobError } from "../../ext/job-error";
 import type { ProductLabel } from "../../sc/product-label";
@@ -83,6 +84,9 @@ export function sentWithErrorLine(error: JobError): string {
 export const SENT_NOT_SAVED_LINE =
   "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.";
 
+/** The rating went out; Naka's « Déjà vu » did not follow. No site is blamed: the owner can click it on Naka. */
+export const DEJA_VU_FAILED_LINE = `Note envoyée, mais Naka n’a pas pu passer le titre en «${NB}Déjà vu${NB}».`;
+
 /** A film's rating that did not go out after its explicit finish wrote: « Annuler » puts the title back. */
 export const FINISH_WROTE_LINE = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}${UNDO_LABEL}${NB}» le remet comme avant.`;
 
@@ -95,6 +99,18 @@ export function episodeStarsName(title: string): string {
   return `Noter «${NB}${title}${NB}» sur SensCritique`;
 }
 
+/** The line of the step after the rating that failed. */
+function sentStepLine(step: SentStep, error: JobError): string {
+  switch (step) {
+    case "local-save":
+      return SENT_NOT_SAVED_LINE;
+    case "deja-vu":
+      return DEJA_VU_FAILED_LINE;
+    case "ma-liste":
+      return sentWithErrorLine(error);
+  }
+}
+
 /** The error line of a write's outcome; `failed` names what an unanswered or refused write was. */
 export function outcomeLine(outcome: FicheOutcome, failed: string): string {
   switch (outcome.kind) {
@@ -103,9 +119,7 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
     case "not-sent":
       return errorLine(outcome.error);
     case "sent-with-error":
-      return outcome.step === "local-save"
-        ? SENT_NOT_SAVED_LINE
-        : sentWithErrorLine(outcome.error);
+      return sentStepLine(outcome.step, outcome.error);
     case "finish-wrote":
       return FINISH_WROTE_LINE;
     case "finish-wrote-expired":

@@ -44,6 +44,10 @@ const VALID = [
   { ...FILM, inMaListe: false },
   { ...FILM, inMaListe: true, listByTab: true },
   { ...FILM, listByTab: false },
+  { ...FILM, vuByTab: true },
+  { ...FILM, vuByTab: false },
+  { ...EPISODE, vuByTab: true },
+  { ...FILM, inMaListe: true, listByTab: true, vuByTab: true },
   UNDO,
   { ...UNDO, listByTab: true },
   { ...UNDO, listByTab: false },
@@ -90,6 +94,8 @@ describe("title page messages", () => {
     ["a rating's listByTab as text", { ...FILM, listByTab: "true" }],
     ["listByTab on a series", { ...FILM, target: "série", listByTab: true }],
     ["listByTab on an episode", { ...EPISODE, listByTab: true }],
+    ["vuByTab as text", { ...FILM, vuByTab: "true" }],
+    ["vuByTab on a series", { ...FILM, target: "série", vuByTab: true }],
     ["an extra key on info", { ...INFO, token: "t" }],
     ["an extra key on rate", { ...FILM, tmdbId: 1 }],
     ["an extra key on mine", { ...MINE, x: 1 }],
@@ -263,10 +269,14 @@ describe("title page answers", () => {
     expect(parseRateAnswer({ error: "sc-session" })).toEqual({
       error: "sc-session",
     });
-    for (const step of ["ma-liste", "local-save"]) {
+    for (const step of ["ma-liste", "local-save", "deja-vu"]) {
       const sent = { sent: true, step, error: "naka-session" };
       expect(parseRateAnswer(sent)).toEqual(sent);
     }
+    expect(parseRateAnswer({ ok: true, dejaVu: "tab" })).toEqual({
+      ok: true,
+      dejaVu: "tab",
+    });
     expect(parseLinkAnswer({ ok: true })).toEqual({ ok: true });
   });
 
@@ -316,6 +326,8 @@ describe("title page answers", () => {
     () => parseMineAnswer({ mine: 6, average: "7" }),
     () => parseMineAnswer({ mine: 6, average: Number.NaN }),
     () => parseRateAnswer({ ok: true, x: 1 }),
+    () => parseRateAnswer({ ok: true, dejaVu: "click" }),
+    () => parseRateAnswer({ ok: true, dejaVu: true }),
     () => parseRateAnswer({ error: "sc-session", x: 1 }),
     () => parseRateAnswer({ error: "nope" }),
     () => parseRateAnswer({ ok: true, error: "sc-session" }),
