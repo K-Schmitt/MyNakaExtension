@@ -5,6 +5,7 @@ import {
   PROTECTED_LINE,
   partialUndoLine,
   REFUSED_LINES,
+  REMOVE_VU_FAILED_LINE,
   REMOVING_LINE,
   UNDO_FAILED_LINES,
   UNDOING_LINE,
@@ -263,6 +264,12 @@ describe("the actions under Naka's « À propos » facts", () => {
       REFUSED_LINES.unrated,
     ],
     ["a protected removal", "remove", { refused: "protected" }, PROTECTED_LINE],
+    [
+      "a removal that left « Déjà vu » on",
+      "remove",
+      { removed: true, error: "unavailable" },
+      REMOVE_VU_FAILED_LINE,
+    ],
     [
       "a partial undo",
       "undo",

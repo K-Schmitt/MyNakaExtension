@@ -145,6 +145,8 @@ describe("the undo answer", () => {
 describe("the removal answer", () => {
   it.each([
     { ok: true },
+    { ok: true, dejaVu: "tab" },
+    { removed: true, error: "unavailable" },
     { refused: "protected" },
     { refused: "unrated" },
     { error: "unavailable" },
@@ -157,6 +159,14 @@ describe("the removal answer", () => {
     ["ok with « Ma liste »", { ok: true, maListe: "tab" }],
     ["ok false", { ok: false }],
     ["an error and ok", { ok: true, error: "unavailable" }],
+    ["a bad dejaVu", { ok: true, dejaVu: "client" }],
+    ["removed without an error", { removed: true }],
+    ["removed false", { removed: false, error: "unavailable" }],
+    ["removed with a bad error", { removed: true, error: "nope" }],
+    [
+      "removed with an extra key",
+      { removed: true, error: "unavailable", x: 1 },
+    ],
   ])("rejects %s", (_name, raw) => {
     expect(() => parseRemoveAnswer(raw)).toThrow();
   });

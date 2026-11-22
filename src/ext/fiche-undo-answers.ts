@@ -3,7 +3,7 @@
 // the steps done and the step that failed, so the tab can say what was not put back.
 
 import type { UndoStep } from "../core/fiche-undo";
-import type { NotSentAnswer, OkAnswer } from "./fiche-answers";
+import type { NotSentAnswer } from "./fiche-answers";
 import { asDateDone } from "./fiche-undo-schema";
 import {
   asList,
@@ -45,7 +45,15 @@ export type UndoAnswer =
   | UndoPartialAnswer
   | UndoRefusedAnswer
   | NotSentAnswer;
-export type RemoveAnswer = OkAnswer | RemoveRefusedAnswer | NotSentAnswer;
+/** The rating is off on SensCritique; the tab clicks Naka's « Déjà vu » off itself when `dejaVu` is "tab". */
+export type RemoveOkAnswer = { ok: true; dejaVu?: UndoDejaVu };
+/** The rating is off on SensCritique, but the worker's Naka client could not turn « Déjà vu » off. */
+export type RemoveVuFailedAnswer = { removed: true; error: JobError };
+export type RemoveAnswer =
+  | RemoveOkAnswer
+  | RemoveVuFailedAnswer
+  | RemoveRefusedAnswer
+  | NotSentAnswer;
 
 const MA_LISTE = valuesOf<UndoMaListe>({ tab: true, client: true, none: true });
 const UNDO_REFUSALS = valuesOf<UndoRefusedAnswer["refused"]>({
@@ -103,7 +111,14 @@ const STEPS_KEYS = valuesOf<keyof UndoPartialAnswer["partial"]>({
 });
 const REFUSED_KEYS = valuesOf<keyof UndoRefusedAnswer>({ refused: true });
 const ERROR_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
-const REMOVE_OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
+const REMOVE_OK_KEYS = valuesOf<keyof RemoveOkAnswer>({
+  ok: true,
+  dejaVu: true,
+});
+const REMOVE_VU_FAILED_KEYS = valuesOf<keyof RemoveVuFailedAnswer>({
+  removed: true,
+  error: true,
+});
 
 function parseStep(raw: unknown, path: string): RunStep {
   const record = asRecord(raw, path);
@@ -176,7 +191,15 @@ export function parseRemoveAnswer(raw: unknown): RemoveAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, REMOVE_OK_KEYS, "answer");
-    return { ok: true };
+    return { ok: true, ...dejaVuOf(record) };
+  }
+  if (record.removed !== undefined) {
+    onlyKeys(record, REMOVE_VU_FAILED_KEYS, "answer");
+    if (record.removed !== true) fail("removed");
+    return {
+      removed: true,
+      error: asOneOf(record.error, ERROR_CODES, "error"),
+    };
   }
   if (record.refused !== undefined) {
     return parseRefused(record, REMOVE_REFUSALS);

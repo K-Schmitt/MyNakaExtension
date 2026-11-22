@@ -280,3 +280,38 @@ describe("an undo and Naka's « Déjà vu » button", () => {
     expect(t.ofType("fiche-undo")[0]?.msg).not.toHaveProperty("vuByTab");
   });
 });
+
+describe("a removal and Naka's « Déjà vu » button", () => {
+  const REMOVE_TAB = { ok: true, dejaVu: "tab" };
+  const filmRemoved = async (vuFilm: boolean | undefined, answer: unknown) => {
+    const t = await filmWith(vuFilm);
+    t.controller.remove();
+    t.ofType("fiche-remove")[0]?.answer(answer);
+    await settle();
+    return t;
+  };
+
+  it("the button on screen: sends vuByTab, and clicks a lit button once on « tab »", async () => {
+    const t = await filmRemoved(true, REMOVE_TAB);
+    expect(t.ofType("fiche-remove")[0]?.msg).toMatchObject({ vuByTab: true });
+    expect(t.page.vuLog).toEqual(["click:film"]);
+  });
+
+  it("no button: no vuByTab", async () => {
+    const t = await filmWith(undefined);
+    t.controller.remove();
+    expect(t.ofType("fiche-remove")[0]?.msg).not.toHaveProperty("vuByTab");
+  });
+
+  it("a series' removal sends no vuByTab", async () => {
+    const t = fakePorts();
+    const controller = createFicheController(t.ports);
+    controller.path(SERIES_PATH);
+    controller.event(seriesEvent());
+    t.ofType("fiche-info")[0]?.answer(linked(66));
+    await settle();
+    t.page.vuFilm = true;
+    controller.remove();
+    expect(t.ofType("fiche-remove")[0]?.msg).not.toHaveProperty("vuByTab");
+  });
+});

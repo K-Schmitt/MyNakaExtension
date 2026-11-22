@@ -60,7 +60,13 @@ export type FicheMessage =
       /** A film's only: Naka's « Déjà vu » button is on screen: the tab clicks it off if it is still lit (`dejaVu: "tab"`). */
       vuByTab?: boolean;
     }
-  | { type: "fiche-remove"; contentId: number; productId: number }
+  | {
+      type: "fiche-remove";
+      contentId: number;
+      productId: number;
+      /** A film's only: Naka's « Déjà vu » button is on screen: the tab clicks it off if it is still lit (`dejaVu: "tab"`). */
+      vuByTab?: boolean;
+    }
   /** « Chercher » on the title page: the owner's own words, trimmed, a search query (isSearchQuery). */
   | { type: "fiche-search"; contentId: number; query: string };
 

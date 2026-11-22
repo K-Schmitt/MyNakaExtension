@@ -6,7 +6,10 @@
 // shown; the info is then asked again, since these answers carry no panel flags, and with it
 // the shown season.
 
-import type { FicheUndoMessage } from "../ext/fiche-messages";
+import type {
+  FicheRemoveMessage,
+  FicheUndoMessage,
+} from "../ext/fiche-messages";
 import type { RemoveAnswer, UndoAnswer } from "../ext/fiche-undo-answers";
 import { clickVuOff, undoVuField } from "./fiche-deja-vu";
 import { readInfo } from "./fiche-info-reader";
@@ -34,6 +37,7 @@ function undoOutcome(
 ): FicheOutcome | undefined {
   if (answer === undefined) return { kind: "undo-failed", action };
   if ("ok" in answer) return undefined;
+  if ("removed" in answer) return { kind: "remove-vu-failed" };
   if ("refused" in answer)
     return { kind: "undo-refused", reason: answer.refused };
   if ("partial" in answer) {
@@ -81,7 +85,7 @@ async function end(
 }
 
 /** The worker left the « Déjà vu » to the tab (ok, or partial after that step). */
-function vuOffByTab(answer: UndoAnswer | undefined): boolean {
+function vuOffByTab(answer: UndoAnswer | RemoveAnswer | undefined): boolean {
   if (answer === undefined) return false;
   return ("ok" in answer || "partial" in answer) && answer.dejaVu === "tab";
 }
@@ -108,7 +112,14 @@ export async function undoTitle(
 export async function removeTitle(scope: FicheScope): Promise<void> {
   const title = shownTitle(scope);
   if (title === undefined) return;
+  const film = scope.page.title.mediaType === "movie";
+  const msg: FicheRemoveMessage = {
+    type: "fiche-remove",
+    ...title,
+    ...(film ? undoVuField(scope) : {}),
+  };
   begin(scope, "remove");
-  const answer = await scope.ports.remove({ type: "fiche-remove", ...title });
+  const answer = await scope.ports.remove(msg);
+  if (msg.vuByTab === true && vuOffByTab(answer)) clickVuOff(scope);
   await end(scope, "remove", answer);
 }

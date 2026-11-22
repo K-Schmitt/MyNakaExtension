@@ -165,6 +165,7 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
     ...RUN_STEPS.map((failed) =>
       ficheCopy.outcomeLine({ kind: "undo-partial", failed }, ""),
     ),
+    ficheCopy.outcomeLine({ kind: "remove-vu-failed" }, ""),
   ],
   seasonFailedLine: () => [ficheCopy.seasonFailedLine(2)],
   partialUndoLine: () => RUN_STEPS.map(ficheCopy.partialUndoLine),
@@ -373,6 +374,17 @@ describe("every shown sentence speaks in « tu » with ’", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
     expect(all.flatMap(registerFaults)).toEqual([]);
+  });
+});
+
+describe("the line of a removal that left « Déjà vu » on", () => {
+  it("is the exact line, in the register", () => {
+    const line = ficheCopy.outcomeLine({ kind: "remove-vu-failed" }, "");
+    expect(line).toBe(ficheCopy.REMOVE_VU_FAILED_LINE);
+    expect(line).toBe(
+      "Note retirée, mais Naka n’a pas pu enlever le «\u202FDéjà vu\u202F».",
+    );
+    expect(registerFaults(line)).toEqual([]);
   });
 });
 

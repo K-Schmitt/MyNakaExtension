@@ -22,6 +22,7 @@ const REMOVE_KEYS = valuesOf<keyof FicheRemoveMessage>({
   type: true,
   contentId: true,
   productId: true,
+  vuByTab: true,
 });
 
 export function parseUndo(record: Record<string, unknown>): FicheUndoMessage {
@@ -46,9 +47,11 @@ export function parseRemove(
   record: Record<string, unknown>,
 ): FicheRemoveMessage {
   onlyKeys(record, REMOVE_KEYS, "message");
+  const vuByTab = whenPresent(record.vuByTab, (v) => asBoolean(v, "vuByTab"));
   return {
     type: "fiche-remove",
     contentId: asId(record.contentId, "contentId"),
     productId: asId(record.productId, "productId"),
+    ...(vuByTab === undefined ? {} : { vuByTab }),
   };
 }

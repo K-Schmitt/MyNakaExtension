@@ -2,7 +2,10 @@
 // Refused before any request unless the product is issued to the asking tab as that content's title.
 // The product's state is read again: a title with a critique or a recommendation (ProductUndone could
 // erase it) or with no rating is refused with no write. The binding is checked, then the one
-// ProductUndone takes the rating, « vu » and its date. No list is touched and the link stays; the cards
+// ProductUndone takes the rating, « vu » and its date. No list is touched and the link stays; a film's
+// Naka « Déjà vu » is then turned off (live mode only): by the tab's click when it said the button is on
+// screen (`dejaVu: "tab"`), else by the worker's client; a Naka failure answers `removed` with its code,
+// the removal staying a success on SensCritique. A series has no such button. The cards
 // naming the product lose its rating, and the undo record of this very title goes (« Annuler » would put
 // back the rating just taken off). A card or a record that cannot be saved then is not an error: the
 // removal is a fact on SensCritique, the card only shows it.
@@ -65,10 +68,27 @@ async function unrateTitle(deps: JobDeps, title: CardTitle): Promise<void> {
   }
 }
 
+/** A film's « Déjà vu » turned off after the removal (live only): the tab's click, or the client. */
+async function turnVuOff(
+  deps: JobDeps,
+  contentId: number,
+  byTab: boolean,
+): Promise<RemoveAnswer> {
+  try {
+    const settings = await deps.store.loadSettings();
+    if (settings.mode !== "live") return { ok: true };
+    if (byTab) return { ok: true, dejaVu: "tab" };
+    await jobNaka(deps).markUnwatched({ contentId });
+    return { ok: true };
+  } catch (error) {
+    return { removed: true, error: toJobError(error) };
+  }
+}
+
 export async function ficheRemoveJob(
   deps: JobDeps,
   asker: FicheAsker,
-  { contentId, productId }: FicheRemoveMessage,
+  { contentId, productId, vuByTab }: FicheRemoveMessage,
 ): Promise<RemoveAnswer> {
   const role = await issuedTitle(asker, contentId, productId);
   const failed = await removeOnSc(deps, productId);
@@ -76,5 +96,6 @@ export async function ficheRemoveJob(
   const title = { role, contentId, productId };
   await unrateTitle(deps, title);
   await forgetUndo(deps, title);
-  return { ok: true };
+  if (role !== "film") return { ok: true };
+  return turnVuOff(deps, contentId, vuByTab === true);
 }

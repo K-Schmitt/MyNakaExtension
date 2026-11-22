@@ -89,6 +89,9 @@ export const SENT_NOT_SAVED_LINE =
 export const DEJA_VU_FAILED_LINE =
   "Note envoyée, mais Naka n’a pas pu le marquer comme vu.";
 
+/** The rating is off on SensCritique; Naka's « Déjà vu » stayed on. No site is blamed. */
+export const REMOVE_VU_FAILED_LINE = `Note retirée, mais Naka n’a pas pu enlever le «${NB}Déjà vu${NB}».`;
+
 /** A film's rating that did not go out after its explicit finish wrote: « Annuler » puts the title back. */
 export const FINISH_WROTE_LINE = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}${UNDO_LABEL}${NB}» le remet comme avant.`;
 
@@ -132,6 +135,8 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
       return REFUSED_LINES[outcome.reason];
     case "undo-partial":
       return partialUndoLine(outcome.failed);
+    case "remove-vu-failed":
+      return REMOVE_VU_FAILED_LINE;
   }
 }
 
