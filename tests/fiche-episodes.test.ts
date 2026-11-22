@@ -71,6 +71,17 @@ describe("the episode number of a box", () => {
     expect(episodeNumber("Bonus")).toBeUndefined();
     expect(episodeNumber("E0")).toBeUndefined();
     expect(episodeNumber("E99999999999999999999")).toBeUndefined();
+    expect(episodeNumber("1".repeat(30))).toBeUndefined();
+  });
+
+  it("reads the number before trailing spaces, however many", () => {
+    expect(episodeNumber(`E3${" ".repeat(50)}`)).toBe(3);
+  });
+
+  it("reads a very long run of digits followed by a letter fast, as nothing", () => {
+    const start = performance.now();
+    expect(episodeNumber(`${"1".repeat(50_000)}x`)).toBeUndefined();
+    expect(performance.now() - start).toBeLessThan(100);
   });
 });
 
