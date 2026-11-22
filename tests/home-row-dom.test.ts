@@ -94,7 +94,12 @@ function page(...sections: Box[]) {
 
 const reprendre = (left = 0, h2Left = 0) =>
   new Box({
-    h2: { text: "Reprendre la lecture", id: "cw-title", nh: true, left: h2Left },
+    h2: {
+      text: "Reprendre la lecture",
+      id: "cw-title",
+      nh: true,
+      left: h2Left,
+    },
     left,
   });
 const carousel = () => new Box({ carousel: true });
