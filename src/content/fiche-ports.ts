@@ -51,6 +51,8 @@ export type FichePorts = {
   dejaVu(episode?: number): boolean | undefined;
   /** One programmatic click on that button when it is on screen and off. */
   clickDejaVu(episode?: number): void;
+  /** One programmatic click on the film's button when it is on screen and lit: Naka takes it out of the seen titles. */
+  clickDejaVuOff(): void;
   /** The tab's own tracker is told these ids are watched, just before the click that makes Naka say so. */
   noteOwnVu(ids: ContentIds): void;
   /** Same, for our own click that turns « Déjà vu » off: the page's "unwatched" that follows is not the owner's untick. */

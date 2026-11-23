@@ -57,4 +57,20 @@ describe("Naka's film « Déjà vu » button", () => {
   it("clicks nothing off screen", () => {
     expect(() => dejaVuPorts(docOf({}).doc).clickDejaVu()).not.toThrow();
   });
+
+  it("turns a lit button off with one click", () => {
+    const on = button();
+    dejaVuPorts(docOf({ [ON]: on }).doc).clickDejaVuOff();
+    expect(on.clicks).toBe(1);
+  });
+
+  it("never turns on a button that is off", () => {
+    const off = button();
+    dejaVuPorts(docOf({ [OFF]: off }).doc).clickDejaVuOff();
+    expect(off.clicks).toBe(0);
+  });
+
+  it("turns nothing off off screen", () => {
+    expect(() => dejaVuPorts(docOf({}).doc).clickDejaVuOff()).not.toThrow();
+  });
 });

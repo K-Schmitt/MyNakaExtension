@@ -212,7 +212,8 @@ describe("an undo and Naka's « Déjà vu » button", () => {
   it("the button on screen: sends vuByTab, and clicks a lit button once on « tab »", async () => {
     const t = await filmUndone(true, UNDO_TAB);
     expect(t.ofType("fiche-undo")[0]?.msg).toMatchObject({ vuByTab: true });
-    expect(t.page.vuLog).toEqual(["unvu:5::", "click:film"]);
+    expect(t.page.vuLog).toEqual(["unvu:5::", "off:film"]);
+    expect(t.page.vuFilm).toBe(false);
   });
 
   it("never notes the ids as watched: the click is not a finish to hide", async () => {
@@ -227,7 +228,8 @@ describe("an undo and Naka's « Déjà vu » button", () => {
       dejaVu: "tab",
       error: "unavailable",
     });
-    expect(t.page.vuLog).toEqual(["unvu:5::", "click:film"]);
+    expect(t.page.vuLog).toEqual(["unvu:5::", "off:film"]);
+    expect(t.page.vuFilm).toBe(false);
   });
 
   it("the button already off when the answer comes: no click", async () => {
@@ -294,7 +296,8 @@ describe("a removal and Naka's « Déjà vu » button", () => {
   it("the button on screen: sends vuByTab, and clicks a lit button once on « tab »", async () => {
     const t = await filmRemoved(true, REMOVE_TAB);
     expect(t.ofType("fiche-remove")[0]?.msg).toMatchObject({ vuByTab: true });
-    expect(t.page.vuLog).toEqual(["unvu:5::", "click:film"]);
+    expect(t.page.vuLog).toEqual(["unvu:5::", "off:film"]);
+    expect(t.page.vuFilm).toBe(false);
   });
 
   it("no button: no vuByTab", async () => {

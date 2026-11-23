@@ -125,6 +125,11 @@ export function fakePorts() {
         page.vuFilm = page.vuFilm === undefined ? undefined : true;
       else if (page.vuRows.has(episode)) page.vuRows.set(episode, true);
     },
+    // Like the real button: only a lit film button turns off; the log names the direction.
+    clickDejaVuOff: () => {
+      page.vuLog.push("off:film");
+      if (page.vuFilm === true) page.vuFilm = false;
+    },
     noteOwnVu: (ids) => {
       page.vuLog.push(
         `note:${ids.contentId}:${ids.season ?? ""}:${ids.episode ?? ""}`,

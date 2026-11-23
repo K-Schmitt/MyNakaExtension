@@ -60,5 +60,5 @@ export function clickVuOff(scope: FicheScope): void {
   const contentId = contentOf(scope.page);
   if (contentId === undefined) return;
   scope.ports.noteOwnUnvu({ contentId });
-  scope.ports.clickDejaVu();
+  scope.ports.clickDejaVuOff();
 }
