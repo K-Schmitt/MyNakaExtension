@@ -70,6 +70,7 @@ function recordOf(
       dateDone: state.dateDone,
       isWished: state.isWished,
       inMaListe: role === "film" ? (msg.inMaListe ?? null) : null,
+      dejaVuOn: role === "film" ? (msg.dejaVuOn ?? null) : null,
     },
     local,
   };

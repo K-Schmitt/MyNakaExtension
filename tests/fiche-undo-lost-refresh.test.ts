@@ -37,7 +37,7 @@ async function undoneThenLost(answer: unknown) {
   await settle();
   t.ofType("fiche-info")[1]?.answer(undefined);
   await settle();
-  const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.aside);
+  const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.about);
   return { ...t, parts, retry: () => buttonNamed(parts(), RETRY_LABEL) };
 }
 

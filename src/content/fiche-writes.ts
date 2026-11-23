@@ -8,6 +8,7 @@
 
 import type { RateAnswer } from "../ext/fiche-answers";
 import type { FicheRateMessage, FicheTarget } from "../ext/fiche-messages";
+import { clickVu, filmVuFields, vuField, vuLeftToTab } from "./fiche-deja-vu";
 import { askInfo } from "./fiche-info-reader";
 import { rateListFields, removedByTab, setMaListe } from "./fiche-ma-liste";
 import {
@@ -89,6 +90,7 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
   const msg = {
     ...rateMessage(contentId, target, product.id, rating),
     ...(film ? rateListFields(scope) : {}),
+    ...(film ? filmVuFields(scope) : {}),
   };
   const answer = await sendRate(scope, msg, (mine, sent) => {
     if (page.info?.product?.id !== product.id) return;
@@ -98,6 +100,7 @@ async function sendTitleRate(scope: FicheScope, rating: number) {
     watchUndoExpiry(scope);
   });
   if (msg.listByTab === true && removedByTab(answer)) setMaListe(scope, false);
+  if (msg.vuByTab === true && vuLeftToTab(answer)) clickVu(scope);
 }
 
 export function rateTitle(scope: FicheScope, rating: number): void {
@@ -141,13 +144,26 @@ export function rateEpisode(
   if (page.pending !== undefined || known === undefined) return;
   if (season === undefined || contentId === undefined) return;
   const place = { season, episode };
-  const msg = rateMessage(contentId, "épisode", known.productId, rating, place);
+  const msg = {
+    ...rateMessage(contentId, "épisode", known.productId, rating, place),
+    ...(season === scope.ports.shownSeason() ? vuField(scope, episode) : {}),
+  };
   const apply = (mine: number | undefined) => {
     if (mine === undefined) return;
     const episodes = page.read.get(season) ?? new Map();
     storeEpisodes(page, season, withMine(episodes, episode, mine));
   };
-  void sendRate(scope, msg, apply, place);
+  void sendEpisodeRate(scope, msg, apply, place);
+}
+
+async function sendEpisodeRate(
+  scope: FicheScope,
+  msg: FicheRateMessage,
+  apply: (rating: number | undefined) => void,
+  place: EpisodePlace,
+): Promise<void> {
+  const answer = await sendRate(scope, msg, apply, place);
+  if (msg.vuByTab === true && vuLeftToTab(answer)) clickVu(scope, place);
 }
 
 function offered(scope: FicheScope, productId: number): boolean {

@@ -5,6 +5,7 @@ import {
   PROTECTED_LINE,
   partialUndoLine,
   REFUSED_LINES,
+  REMOVE_VU_FAILED_LINE,
   REMOVING_LINE,
   UNDO_FAILED_LINES,
   UNDOING_LINE,
@@ -24,7 +25,7 @@ import {
   buttonNamed,
   checked,
   deepParts,
-  fakeAside,
+  fakeAbout,
   fakeUi,
   idleTimer,
   panelParts,
@@ -77,7 +78,7 @@ const star = (parts: FakeElement[], value: number) =>
 
 const linkOf = (parts: FakeElement[]) => parts.find((p) => p.tag === "a");
 
-describe("the actions under Naka's info panel", () => {
+describe("the actions under Naka's « À propos » facts", () => {
   it("draws the native controls dark: the reset of the host sets its color scheme back (the candidates scroll)", async () => {
     const t = await film();
     const css = (t.kept.actions() as FakeElement).style.cssText;
@@ -264,6 +265,12 @@ describe("the actions under Naka's info panel", () => {
     ],
     ["a protected removal", "remove", { refused: "protected" }, PROTECTED_LINE],
     [
+      "a removal that left « Déjà vu » on",
+      "remove",
+      { removed: true, error: "unavailable" },
+      REMOVE_VU_FAILED_LINE,
+    ],
+    [
       "a partial undo",
       "undo",
       {
@@ -301,6 +308,9 @@ describe("the undo and refusal copy", () => {
     );
     expect(partialUndoLine("markDone")).toBe(
       `L’annulation s’est arrêtée${NB}: le «${NB}vu${NB}» et sa date ne sont pas revenus, et la suite n’a pas été faite.`,
+    );
+    expect(partialUndoLine("dejaVu")).toBe(
+      `L’annulation s’est arrêtée${NB}: le «${NB}Déjà vu${NB}» de Naka est resté allumé, et la suite n’a pas été faite.`,
     );
     expect(partialUndoLine("maListe")).toContain(
       "le film n’est pas revenu dans Ma liste Naka",
@@ -425,7 +435,7 @@ describe("every rare state of a title with no product, in the actions host", () 
     t.controller.event(seriesEvent());
     t.ofType("fiche-info")[0]?.answer(productOf({ id: 66, canUndo: true }));
     await settle();
-    const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.aside);
+    const parts = () => deepParts(t.kept.actions()?.shadow ?? t.kept.about);
     expect(buttonNamed(parts(), "Annuler")).toBeDefined();
     t.controller.rateTitle(6);
     expect(parts().filter((p) => p.textContent === "Annuler")).toHaveLength(1);
@@ -622,7 +632,7 @@ describe("the actions between two views", () => {
 
   function actions() {
     const doc = new FakeDoc();
-    const aside = fakeAside(["Note TMDB"]);
+    const aside = fakeAbout(["Sortie"]);
     const shown = createFicheActions({
       doc,
       panel: aside.panel,

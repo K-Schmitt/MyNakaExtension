@@ -349,6 +349,7 @@ describe("fiche-info: the panel's flags", () => {
       dateDone: null,
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
     ...over,

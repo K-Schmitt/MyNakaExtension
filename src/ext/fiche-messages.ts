@@ -43,8 +43,12 @@ export type FicheMessage =
       episode?: number;
       /** A film's only: Naka's « Ma liste » button was active (read by the tab), for the undo record. */
       inMaListe?: boolean;
+      /** A film's only: Naka's « Déjà vu » button was lit before the rating (read by the tab), for the undo record. */
+      dejaVuOn?: boolean;
       /** A film's only: the button is on screen, so the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
+      /** A film's or an episode's: Naka's « Déjà vu » / « Vu » button is on screen: the tab clicks it if it is still off (`dejaVu: "tab"`). */
+      vuByTab?: boolean;
     }
   | { type: "fiche-link"; contentId: number; productId: number }
   | {
@@ -53,8 +57,16 @@ export type FicheMessage =
       productId: number;
       /** Naka's « Ma liste » button is on screen: the tab clicks it itself (`maListe: "tab"`). */
       listByTab?: boolean;
+      /** A film's only: Naka's « Déjà vu » button is on screen: the tab clicks it off if it is still lit (`dejaVu: "tab"`). */
+      vuByTab?: boolean;
     }
-  | { type: "fiche-remove"; contentId: number; productId: number }
+  | {
+      type: "fiche-remove";
+      contentId: number;
+      productId: number;
+      /** A film's only: Naka's « Déjà vu » button is on screen: the tab clicks it off if it is still lit (`dejaVu: "tab"`). */
+      vuByTab?: boolean;
+    }
   /** « Chercher » on the title page: the owner's own words, trimmed, a search query (isSearchQuery). */
   | { type: "fiche-search"; contentId: number; query: string };
 
@@ -146,16 +158,28 @@ const RATE_KEYS = valuesOf<keyof FicheRateMessage>({
   season: true,
   episode: true,
   inMaListe: true,
+  dejaVuOn: true,
   listByTab: true,
+  vuByTab: true,
 });
 const SEARCH_KEYS = valuesOf<keyof FicheSearchMessage>({
   type: true,
   contentId: true,
   query: true,
 });
-/** The rating's fields of Naka's « Ma liste » button: a film's only. */
-type FilmOnlyKey = Extract<keyof FicheRateMessage, "inMaListe" | "listByTab">;
-const FILM_ONLY = valuesOf<FilmOnlyKey>({ inMaListe: true, listByTab: true });
+/** The rating's fields of Naka's « Ma liste » button and the state of its « Déjà vu »: a film's only. */
+type FilmOnlyKey = Extract<
+  keyof FicheRateMessage,
+  "inMaListe" | "listByTab" | "dejaVuOn"
+>;
+const FILM_ONLY = valuesOf<FilmOnlyKey>({
+  inMaListe: true,
+  listByTab: true,
+  dejaVuOn: true,
+});
+/** The rating's field of Naka's « Déjà vu » button: any target but a series. */
+type NotSeriesKey = Extract<keyof FicheRateMessage, "vuByTab">;
+const NOT_SERIES = valuesOf<NotSeriesKey>({ vuByTab: true });
 
 export function isFicheType(type: string): type is FicheType {
   return FICHE_TYPES.some((known) => known === type);
@@ -195,6 +219,21 @@ function withMaListe(
   return read;
 }
 
+// « Déjà vu » is a film's or an episode's: present on a series, the field refuses the message.
+function withDejaVu(
+  message: FicheRateMessage,
+  record: Record<string, unknown>,
+): FicheRateMessage {
+  let read = message;
+  for (const key of NOT_SERIES) {
+    const raw = record[key];
+    if (raw === undefined) continue;
+    if (message.target === "série") return fail(key);
+    read = { ...read, [key]: asBoolean(raw, key) };
+  }
+  return read;
+}
+
 function parseRate(record: Record<string, unknown>): FicheRateMessage {
   onlyKeys(record, RATE_KEYS, "message");
   const target = asOneOf(record.target, TARGETS, "target");
@@ -208,14 +247,19 @@ function parseRate(record: Record<string, unknown>): FicheRateMessage {
   const place = target === "épisode";
   const hasPlace = record.season !== undefined || record.episode !== undefined;
   if (!place) {
-    return hasPlace ? fail("season") : withMaListe(base, record);
+    return hasPlace
+      ? fail("season")
+      : withDejaVu(withMaListe(base, record), record);
   }
-  return withMaListe(
-    {
-      ...base,
-      season: asId(record.season, "season"),
-      episode: asId(record.episode, "episode"),
-    },
+  return withDejaVu(
+    withMaListe(
+      {
+        ...base,
+        season: asId(record.season, "season"),
+        episode: asId(record.episode, "episode"),
+      },
+      record,
+    ),
     record,
   );
 }

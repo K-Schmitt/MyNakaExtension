@@ -1,32 +1,24 @@
 // The numbers the title page UI reads from Naka's page and writes in French: an episode's number from its
 // box's code, the season its dropdown names, a SensCritique average with a decimal comma.
 
-const TRAILING_NUMBER = /(\d+)\s*$/;
+const TRAILING_NUMBER = /(\d+)$/;
+// The end of a code the number is read in: past a safe integer's 16 digits, so a run of digits cut here is
+// no safe number either way, and the read stays short on any page text.
+const CODE_TAIL = 20;
 const SEASON_LABEL = /saison\s*(\d+)/i;
-const CODE_SEASON = /\bS(\d+)/i;
 
 function positiveInt(digits: string | undefined): number | undefined {
   const value = Number(digits);
   return Number.isSafeInteger(value) && value >= 1 ? value : undefined;
 }
 
-/** The number that ends `span.dcf-ep-code` (« S1 E3 » → 3); undefined when the code has none. */
+/** The number that ends `span.nh-ep-num` (« 12 » → 12); undefined when the code has none. */
 export function episodeNumber(
   code: string | null | undefined,
 ): number | undefined {
-  const match = TRAILING_NUMBER.exec(code ?? "");
+  const tail = (code ?? "").trimEnd().slice(-CODE_TAIL);
+  const match = TRAILING_NUMBER.exec(tail);
   return match === null ? undefined : positiveInt(match[1]);
-}
-
-/**
- * The season `span.dcf-ep-code` names (« S1 E3 », « S01E03 » → 1; « S0 » → 0), or undefined when the code
- * names none. Any digits count, so that a code for another season never passes for the shown one.
- */
-export function codeSeason(
-  code: string | null | undefined,
-): number | undefined {
-  const match = CODE_SEASON.exec(code ?? "");
-  return match === null ? undefined : Number(match[1]);
 }
 
 /** The season the dropdown names (« Saison 2 » → 2). */

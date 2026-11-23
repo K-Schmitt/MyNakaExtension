@@ -1,6 +1,6 @@
-// The keepers' ports over Naka's info panel (`div.dca-panel` in `aside.dcf-aside`): our two rows stay its
-// last children, in order, and the actions host stays right after it. The row keeper's rule serves as is:
-// for the rows, Naka's last row stands for its anchor; for the actions, the panel does. Without the panel,
+// The keepers' ports over Naka's « À propos » facts (`dl.nh-fiche-facts` in `section.nh-fiche-about`): our
+// two rows stay its last children, in order, and the actions host stays right after it. The row keeper's
+// rule serves as is: for the rows, Naka's last fact stands for its anchor; for the actions, the list does. Without the panel,
 // nothing is placed. Putting a part where it already is does nothing, so a keeper cannot loop on its own
 // insertion. Written against the slice of the DOM they use, so tests drive them on fakes.
 
@@ -18,7 +18,7 @@ export type PanelElement = {
 };
 
 export type PanelPlace = {
-  /** Naka's info panel, or null when the page shows none. */
+  /** Naka's « À propos » facts, or null when the page shows none. */
   panel(): PanelElement | null;
   watch(onChange: () => void): () => void;
   timer: EndTimer;

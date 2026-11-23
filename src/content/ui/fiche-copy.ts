@@ -1,6 +1,7 @@
 // Every sentence of the title page's rows and actions. French typography: U+202F before « : ; ? ! » and
 // inside « », apostrophe ’, « tu ». A rating that did not go out reuses the rating block's lines.
 
+import type { SentStep } from "../../ext/fiche-answers";
 import type { RunStep } from "../../ext/fiche-undo-answers";
 import type { JobError } from "../../ext/job-error";
 import type { ProductLabel } from "../../sc/product-label";
@@ -25,6 +26,7 @@ export const SEARCHING_LINE = "Recherche en cours\u2026";
 /** A row's value when SensCritique gives none (no average, nothing read yet). */
 export const NO_VALUE = "—";
 export const SERIES_CONFIRM = "SensCritique va retirer la série de tes envies.";
+export const HERO_CHIP_LABEL = "Voir la note SensCritique";
 export const SC_LINK_LABEL = "Voir sur SensCritique";
 export const UNDO_LABEL = "Annuler";
 export const REMOVE_LABEL = "Retirer la note";
@@ -56,6 +58,7 @@ const NOT_PUT_BACK: Record<RunStep["kind"], string> = {
   undone: `la note et le ${SEEN} n’ont pas été retirés`,
   wish: "le titre n’est pas revenu dans tes envies",
   maListe: "le film n’est pas revenu dans Ma liste Naka",
+  dejaVu: `le «${NB}Déjà vu${NB}» de Naka est resté allumé`,
   localRestore: "l’extension n’a pas repris son état d’avant",
 };
 
@@ -82,6 +85,13 @@ export function sentWithErrorLine(error: JobError): string {
 export const SENT_NOT_SAVED_LINE =
   "Note envoyée sur SensCritique, mais l’extension n’a pas pu l’enregistrer.";
 
+/** The rating went out; Naka's « Déjà vu » did not follow. No site is blamed: the owner can click it on Naka. */
+export const DEJA_VU_FAILED_LINE =
+  "Note envoyée, mais Naka n’a pas pu le marquer comme vu.";
+
+/** The rating is off on SensCritique; Naka's « Déjà vu » stayed on. No site is blamed. */
+export const REMOVE_VU_FAILED_LINE = `Note retirée, mais Naka n’a pas pu enlever le «${NB}Déjà vu${NB}».`;
+
 /** A film's rating that did not go out after its explicit finish wrote: « Annuler » puts the title back. */
 export const FINISH_WROTE_LINE = `La note n’est pas partie, mais SensCritique a déjà marqué le titre vu${NB}: «${NB}${UNDO_LABEL}${NB}» le remet comme avant.`;
 
@@ -94,6 +104,18 @@ export function episodeStarsName(title: string): string {
   return `Noter «${NB}${title}${NB}» sur SensCritique`;
 }
 
+/** The line of the step after the rating that failed. */
+function sentStepLine(step: SentStep, error: JobError): string {
+  switch (step) {
+    case "local-save":
+      return SENT_NOT_SAVED_LINE;
+    case "deja-vu":
+      return DEJA_VU_FAILED_LINE;
+    case "ma-liste":
+      return sentWithErrorLine(error);
+  }
+}
+
 /** The error line of a write's outcome; `failed` names what an unanswered or refused write was. */
 export function outcomeLine(outcome: FicheOutcome, failed: string): string {
   switch (outcome.kind) {
@@ -102,9 +124,7 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
     case "not-sent":
       return errorLine(outcome.error);
     case "sent-with-error":
-      return outcome.step === "local-save"
-        ? SENT_NOT_SAVED_LINE
-        : sentWithErrorLine(outcome.error);
+      return sentStepLine(outcome.step, outcome.error);
     case "finish-wrote":
       return FINISH_WROTE_LINE;
     case "finish-wrote-expired":
@@ -115,6 +135,8 @@ export function outcomeLine(outcome: FicheOutcome, failed: string): string {
       return REFUSED_LINES[outcome.reason];
     case "undo-partial":
       return partialUndoLine(outcome.failed);
+    case "remove-vu-failed":
+      return REMOVE_VU_FAILED_LINE;
   }
 }
 
@@ -125,4 +147,13 @@ export function nothingFoundLine(query: string): string {
 
 export function seasonFailedLine(season: number): string {
   return `Les notes de la saison ${season} n’ont pas pu être lues.`;
+}
+
+/** The hero chip: « ★ 7,4 SC · ta note 8 »; without an average « SC · ta note 8 »; without a rating no tail. */
+export function heroChipText(
+  average: number | null,
+  mine: number | null,
+): string {
+  const head = average === null ? "SC" : `★ ${frenchAverage(average)} SC`;
+  return mine === null ? head : `${head} · ta note ${mine}`;
 }

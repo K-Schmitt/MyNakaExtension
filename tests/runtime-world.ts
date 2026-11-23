@@ -396,6 +396,8 @@ function nakaClient(w: World): NakaClient {
       flaky(w, `remove naka ${id}`);
       w.playlist.delete(id);
     },
+    markWatched: async () => undefined,
+    markUnwatched: async () => undefined,
     search: async (q) => {
       nakaGate(w, "search");
       return TITLES.filter((n) => nakaItem(n).title === q).map(nakaItem);

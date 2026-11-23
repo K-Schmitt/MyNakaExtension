@@ -9,6 +9,13 @@ describe("the undo answer", () => {
     { ok: true, maListe: "tab" },
     { ok: true, maListe: "client" },
     { ok: true, maListe: "none" },
+    { ok: true, maListe: "none", dejaVu: "tab" },
+    {
+      partial: { done: [{ kind: "dejaVu" }], failed: { kind: "localRestore" } },
+      maListe: "none",
+      dejaVu: "tab",
+      error: "unavailable",
+    },
     { refused: "protected" },
     { refused: "expired" },
     { error: "sc-session" },
@@ -30,6 +37,11 @@ describe("the undo answer", () => {
       error: "other-account",
     },
     {
+      partial: { done: [{ kind: "maListe" }], failed: { kind: "dejaVu" } },
+      maListe: "client",
+      error: "unavailable",
+    },
+    {
       partial: {
         done: [{ kind: "maListe" }],
         failed: { kind: "localRestore" },
@@ -45,6 +57,16 @@ describe("the undo answer", () => {
     ["a bad « Ma liste »", { ok: true, maListe: "page" }],
     ["ok without « Ma liste »", { ok: true }],
     ["an extra key on ok", { ok: true, maListe: "tab", x: 1 }],
+    ["a bad dejaVu on ok", { ok: true, maListe: "none", dejaVu: "client" }],
+    [
+      "a bad dejaVu on a partial",
+      {
+        partial: { done: [], failed: { kind: "wish" } },
+        maListe: "none",
+        dejaVu: "none",
+        error: "unavailable",
+      },
+    ],
     ["a removal's refusal", { refused: "unrated" }],
     ["a bad error", { error: "nope" }],
     [
@@ -123,6 +145,8 @@ describe("the undo answer", () => {
 describe("the removal answer", () => {
   it.each([
     { ok: true },
+    { ok: true, dejaVu: "tab" },
+    { removed: true, error: "unavailable" },
     { refused: "protected" },
     { refused: "unrated" },
     { error: "unavailable" },
@@ -135,6 +159,14 @@ describe("the removal answer", () => {
     ["ok with « Ma liste »", { ok: true, maListe: "tab" }],
     ["ok false", { ok: false }],
     ["an error and ok", { ok: true, error: "unavailable" }],
+    ["a bad dejaVu", { ok: true, dejaVu: "client" }],
+    ["removed without an error", { removed: true }],
+    ["removed false", { removed: false, error: "unavailable" }],
+    ["removed with a bad error", { removed: true, error: "nope" }],
+    [
+      "removed with an extra key",
+      { removed: true, error: "unavailable", x: 1 },
+    ],
   ])("rejects %s", (_name, raw) => {
     expect(() => parseRemoveAnswer(raw)).toThrow();
   });

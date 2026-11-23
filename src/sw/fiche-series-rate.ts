@@ -12,9 +12,9 @@
 // series' only write, so nothing was written before it); its answer carries the panel. An episode's rating
 // keeps nothing and answers no panel. Once the rating went out, the local saves after it (the settled pair,
 // the cards) are best-effort: a failure is answered `{ sent: true, step: "local-save", error }`, never as not
-// sent.
+// sent. An episode's rating then marks it « vu » on Naka (naka-watched-step), never a series'.
 
-import { contentKeyOf } from "../core/finish-event";
+import { contentKeyOf, idsOf } from "../core/finish-event";
 import type { Pair } from "../core/list-diff";
 import {
   applyRating,
@@ -31,6 +31,7 @@ import { afterRating } from "./fiche-panel-flags";
 import { putBackReplaced, recordBefore } from "./fiche-undo-record";
 import { finishJob } from "./finish-job";
 import type { JobDeps } from "./job-deps";
+import { withWatched } from "./naka-watched-step";
 import { sendRating } from "./rating-jobs";
 import { toJobError } from "./to-job-error";
 
@@ -142,5 +143,10 @@ async function ratedEpisode(
   const unsaved = await savedAfterSent(() =>
     rateCards(deps, (card) => card.key === key, "épisode", msg),
   );
-  return sentAnswer(unsaved);
+  return withWatched(
+    deps,
+    idsOf(msg),
+    msg.vuByTab === true,
+    sentAnswer(unsaved),
+  );
 }

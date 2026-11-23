@@ -3,7 +3,7 @@
 // the steps done and the step that failed, so the tab can say what was not put back.
 
 import type { UndoStep } from "../core/fiche-undo";
-import type { NotSentAnswer, OkAnswer } from "./fiche-answers";
+import type { NotSentAnswer } from "./fiche-answers";
 import { asDateDone } from "./fiche-undo-schema";
 import {
   asList,
@@ -21,11 +21,20 @@ import { ERROR_CODES } from "./run-record-schema";
 export type UndoMaListe = "tab" | "client" | "none";
 /** A step the worker runs: never the refusal, which runs nothing. */
 export type RunStep = Exclude<UndoStep, { kind: "refused-protected" }>;
-export type UndoOkAnswer = { ok: true; maListe: UndoMaListe };
+/** Who turns Naka's « Déjà vu » off again: only the tab ever answers, the worker's client leaves no mark. */
+export type UndoDejaVu = "tab";
+export type UndoOkAnswer = {
+  ok: true;
+  maListe: UndoMaListe;
+  /** The tab clicks Naka's « Déjà vu » off itself; absent otherwise. */
+  dejaVu?: UndoDejaVu;
+};
 export type UndoPartialAnswer = {
   partial: { done: RunStep[]; failed: RunStep };
   /** Who gave « Ma liste » back before the failure: the tab still clicks on "tab". */
   maListe: UndoMaListe;
+  /** The « Déjà vu » step was left to the tab before the failure: the tab still clicks. */
+  dejaVu?: UndoDejaVu;
   error: JobError;
 };
 /** Refused with no write: a critique or recommendation to keep, the ten minutes gone, nothing to remove. */
@@ -36,7 +45,15 @@ export type UndoAnswer =
   | UndoPartialAnswer
   | UndoRefusedAnswer
   | NotSentAnswer;
-export type RemoveAnswer = OkAnswer | RemoveRefusedAnswer | NotSentAnswer;
+/** The rating is off on SensCritique; the tab clicks Naka's « Déjà vu » off itself when `dejaVu` is "tab". */
+export type RemoveOkAnswer = { ok: true; dejaVu?: UndoDejaVu };
+/** The rating is off on SensCritique, but the worker's Naka client could not turn « Déjà vu » off. */
+export type RemoveVuFailedAnswer = { removed: true; error: JobError };
+export type RemoveAnswer =
+  | RemoveOkAnswer
+  | RemoveVuFailedAnswer
+  | RemoveRefusedAnswer
+  | NotSentAnswer;
 
 const MA_LISTE = valuesOf<UndoMaListe>({ tab: true, client: true, none: true });
 const UNDO_REFUSALS = valuesOf<UndoRefusedAnswer["refused"]>({
@@ -52,6 +69,7 @@ const BARE_KINDS = valuesOf<Exclude<RunStep["kind"], "rate" | "markDone">>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 const KINDS = valuesOf<RunStep["kind"]>({
@@ -61,6 +79,7 @@ const KINDS = valuesOf<RunStep["kind"]>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 const RATE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "rate" }>>({
@@ -74,10 +93,16 @@ const DATE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "markDone" }>>({
 const BARE_STEP_KEYS = valuesOf<keyof Extract<RunStep, { kind: "wish" }>>({
   kind: true,
 });
-const OK_KEYS = valuesOf<keyof UndoOkAnswer>({ ok: true, maListe: true });
+const DEJA_VU = valuesOf<UndoDejaVu>({ tab: true });
+const OK_KEYS = valuesOf<keyof UndoOkAnswer>({
+  ok: true,
+  maListe: true,
+  dejaVu: true,
+});
 const PARTIAL_KEYS = valuesOf<keyof UndoPartialAnswer>({
   partial: true,
   maListe: true,
+  dejaVu: true,
   error: true,
 });
 const STEPS_KEYS = valuesOf<keyof UndoPartialAnswer["partial"]>({
@@ -86,7 +111,14 @@ const STEPS_KEYS = valuesOf<keyof UndoPartialAnswer["partial"]>({
 });
 const REFUSED_KEYS = valuesOf<keyof UndoRefusedAnswer>({ refused: true });
 const ERROR_KEYS = valuesOf<keyof NotSentAnswer>({ error: true });
-const REMOVE_OK_KEYS = valuesOf<keyof OkAnswer>({ ok: true });
+const REMOVE_OK_KEYS = valuesOf<keyof RemoveOkAnswer>({
+  ok: true,
+  dejaVu: true,
+});
+const REMOVE_VU_FAILED_KEYS = valuesOf<keyof RemoveVuFailedAnswer>({
+  removed: true,
+  error: true,
+});
 
 function parseStep(raw: unknown, path: string): RunStep {
   const record = asRecord(raw, path);
@@ -104,6 +136,14 @@ function parseStep(raw: unknown, path: string): RunStep {
   return { kind: asOneOf(kind, BARE_KINDS, `${path}.kind`) };
 }
 
+/** The answer's `dejaVu`, kept only when present. */
+function dejaVuOf(record: Record<string, unknown>): {
+  dejaVu?: UndoDejaVu;
+} {
+  if (record.dejaVu === undefined) return {};
+  return { dejaVu: asOneOf(record.dejaVu, DEJA_VU, "dejaVu") };
+}
+
 function parsePartial(record: Record<string, unknown>): UndoPartialAnswer {
   onlyKeys(record, PARTIAL_KEYS, "answer");
   const steps = asRecord(record.partial, "partial");
@@ -114,6 +154,7 @@ function parsePartial(record: Record<string, unknown>): UndoPartialAnswer {
       failed: parseStep(steps.failed, "partial.failed"),
     },
     maListe: asOneOf(record.maListe, MA_LISTE, "maListe"),
+    ...dejaVuOf(record),
     error: asOneOf(record.error, ERROR_CODES, "error"),
   };
 }
@@ -135,7 +176,11 @@ export function parseUndoAnswer(raw: unknown): UndoAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, OK_KEYS, "answer");
-    return { ok: true, maListe: asOneOf(record.maListe, MA_LISTE, "maListe") };
+    return {
+      ok: true,
+      maListe: asOneOf(record.maListe, MA_LISTE, "maListe"),
+      ...dejaVuOf(record),
+    };
   }
   if (record.partial !== undefined) return parsePartial(record);
   if (record.refused !== undefined) return parseRefused(record, UNDO_REFUSALS);
@@ -146,7 +191,15 @@ export function parseRemoveAnswer(raw: unknown): RemoveAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, REMOVE_OK_KEYS, "answer");
-    return { ok: true };
+    return { ok: true, ...dejaVuOf(record) };
+  }
+  if (record.removed !== undefined) {
+    onlyKeys(record, REMOVE_VU_FAILED_KEYS, "answer");
+    if (record.removed !== true) fail("removed");
+    return {
+      removed: true,
+      error: asOneOf(record.error, ERROR_CODES, "error"),
+    };
   }
   if (record.refused !== undefined) {
     return parseRefused(record, REMOVE_REFUSALS);

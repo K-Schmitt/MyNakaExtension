@@ -18,6 +18,8 @@ export type UndoBefore = {
   isWished: boolean;
   /** Naka's « Ma liste », read by the tab for a film; null when unknown (a series). */
   inMaListe: boolean | null;
+  /** Naka's « Déjà vu » button before the rating, read by the tab for a film; null when unknown (a series, an old record, no button). */
+  dejaVuOn: boolean | null;
 };
 
 /** The extension's own state of the title just before the rating. */
@@ -49,6 +51,7 @@ export type UndoStep =
   | { kind: "markDoneWithoutDate" }
   | { kind: "wish" }
   | { kind: "maListe" }
+  | { kind: "dejaVu" }
   | { kind: "localRestore" };
 
 export type ProtectedFlags = { isReviewed: boolean; isRecommended: boolean };
@@ -108,12 +111,13 @@ function ratingSteps(before: UndoBefore, current: UndoCurrent): UndoStep[] {
   return bare ? steps.filter((step) => step.kind !== "undone") : steps;
 }
 
-/** The wish unless it is back, Ma liste, then the extension's own state, always last. */
+/** The wish unless it is back, Ma liste, « Déjà vu » turned off, then the extension's own state, always last. */
 function listSteps(before: UndoBefore, current: UndoCurrent): UndoStep[] {
   const wish = before.isWished && !current.isWished;
   return [
     ...(wish ? [{ kind: "wish" } as const] : []),
     ...(before.inMaListe === true ? [{ kind: "maListe" } as const] : []),
+    ...(before.dejaVuOn === false ? [{ kind: "dejaVu" } as const] : []),
     { kind: "localRestore" },
   ];
 }

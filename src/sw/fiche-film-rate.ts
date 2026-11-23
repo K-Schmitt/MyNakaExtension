@@ -11,7 +11,8 @@
 // answer carries the panel read from the stored record, so « Annuler » shows at once). An answer of a
 // rating that went out carries the panel.
 // With Naka's « Ma liste » button on screen (listByTab), the tab removes the film itself (fiche-list-removal);
-// without it, a film the client removed is noted as listed on the undo record.
+// without it, a film the client removed is noted as listed on the undo record. Then « Déjà vu » on Naka
+// (naka-watched-step): the tab's click (vuByTab) or the client's write; the « Ma liste » error, if any, stays.
 
 import { contentKeyOf } from "../core/finish-event";
 import { cardFor } from "../core/rating-cards";
@@ -30,6 +31,7 @@ import {
   recordBefore,
 } from "./fiche-undo-record";
 import type { JobDeps } from "./job-deps";
+import { withWatched } from "./naka-watched-step";
 import { type RateEnd, rateJob } from "./rating-jobs";
 
 async function assertCardProduct(
@@ -107,8 +109,16 @@ export async function rateFilm(
   if (leaving.removed && msg.inMaListe === undefined) {
     await noteListed(deps, msg);
   }
+  // An unsaved rating is answered `local-save` first: the tab does not click, the client writes « vu ».
+  const saved = withUnsaved(leaving.answer, unsaved);
+  const watched = await withWatched(
+    deps,
+    { contentId },
+    msg.vuByTab === true && unsaved === undefined,
+    saved,
+  );
   return {
-    ...withUnsaved(leaving.answer, unsaved),
+    ...watched,
     panel: afterRating(kept.state, rating, kept.record, deps.now()),
   };
 }

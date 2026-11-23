@@ -28,6 +28,7 @@ export interface ElementLike extends NodeLike {
   addEventListener(type: string, listener: (event: EventLike) => void): void;
   attachShadow(init: { mode: "closed" }): ShadowRootLike;
   focus(): void;
+  scrollIntoView(options: { behavior: "smooth"; block: "center" }): void;
   remove(): void;
 }
 

@@ -223,6 +223,7 @@ describe("fiche undo store", () => {
       dateDone: null,
       isWished: true,
       inMaListe: true,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   };

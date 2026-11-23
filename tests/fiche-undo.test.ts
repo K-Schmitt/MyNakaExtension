@@ -23,6 +23,7 @@ function record(before: Partial<UndoBefore> = {}): FicheUndo {
       dateDone: null,
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
       ...before,
     },
     local: { handled: false, settled: false, cards: [] },
@@ -43,6 +44,7 @@ const at = (flags: typeof OPEN) => ({ ...RATED_NOW, ...flags });
 const LOCAL: UndoStep = { kind: "localRestore" };
 const WISH: UndoStep = { kind: "wish" };
 const MA_LISTE: UndoStep = { kind: "maListe" };
+const DEJA_VU: UndoStep = { kind: "dejaVu" };
 const UNDONE: UndoStep = { kind: "undone" };
 const REFUSED: UndoStep[] = [{ kind: "refused-protected" }];
 
@@ -262,5 +264,31 @@ describe("canRemove", () => {
 
   it("does not offer it when recommended", () => {
     expect(canRemove({ rating: 6, ...RECOMMENDED })).toBe(false);
+  });
+});
+
+describe("undoSteps and Naka's « Déjà vu »", () => {
+  it("turns it off, after « Ma liste » and before the local state, when it was off", () => {
+    const r = record({ inMaListe: true, dejaVuOn: false });
+    expect(undoSteps(r, at(OPEN))).toEqual([UNDONE, MA_LISTE, DEJA_VU, LOCAL]);
+  });
+
+  it("plans the step alone with the rating already back", () => {
+    const r = record({ dejaVuOn: false });
+    expect(undoSteps(r, { ...at(OPEN), isDone: false, rating: null })).toEqual([
+      DEJA_VU,
+      LOCAL,
+    ]);
+  });
+
+  it.each([true, null])("plans no step when it was %s", (dejaVuOn) => {
+    const steps = undoSteps(record({ dejaVuOn }), at(OPEN));
+    expect(steps.some((step) => step.kind === "dejaVu")).toBe(false);
+  });
+
+  it("stays a single refusal over a protected title", () => {
+    expect(undoSteps(record({ dejaVuOn: false }), at(REVIEWED))).toEqual(
+      REFUSED,
+    );
   });
 });

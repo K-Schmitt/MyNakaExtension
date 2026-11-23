@@ -39,6 +39,11 @@ export class FakeNode implements NodeLike {
     this.children.splice(this.children.indexOf(ref) + 1, 0, child);
   }
 
+  get lastElementChild(): FakeElement | null {
+    const all = this.children.filter((c) => c instanceof FakeElement);
+    return (all.at(-1) as FakeElement | undefined) ?? null;
+  }
+
   get parentElement(): FakeElement | null {
     return this.parent instanceof FakeElement ? this.parent : null;
   }
@@ -98,6 +103,8 @@ export class FakeElement extends FakeNode implements ElementLike {
   shadowInit: { mode: string }[] = [];
   shadow = new FakeShadow();
   focusCount = 0;
+  /** The options of each scrollIntoView call. */
+  scrolls: unknown[] = [];
   static focused: FakeElement | null = null;
   /** A text field's caret, as setSelectionRange last put it. */
   selection?: [number, number];
@@ -127,6 +134,10 @@ export class FakeElement extends FakeNode implements ElementLike {
   focus(): void {
     this.focusCount += 1;
     FakeElement.focused = this;
+  }
+
+  scrollIntoView(options: { behavior: "smooth"; block: "center" }): void {
+    this.scrolls.push(options);
   }
 
   remove(): void {

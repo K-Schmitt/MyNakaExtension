@@ -1,5 +1,5 @@
 // The stylesheets of the title page hosts, in Naka's palette (the theme tokens on :host): the actions under
-// the info panel (280 px wide), the average badge on an episode's thumb, the stars under its title (the
+// the facts list (the width of its column), the average badge on an episode's thumb, the stars under its title (the
 // panel's « Ta note » row uses them too).
 
 import { themeCss } from "../../ui/theme-tokens";
@@ -44,7 +44,7 @@ export const BADGE_SHEET: string = themeCss(":host") + BADGE_RULES.join("");
 export const EPISODE_STARS_SHEET: string =
   themeCss(":host") + [...BLOCK_RULES, ...EPISODE_STARS_RULES].join("");
 
-// The « Ta note » row of the info panel: ten stars beside the label leave no room for « 7/10 », which then
+// The « Ta note » row of the « À propos » facts: ten stars beside the label leave no room for « 7/10 », which then
 // wrapped under them and made the row taller than Naka's. The row shows the stars only,
 // right-aligned like Naka's values; the marked star still carries the rating (aria-checked).
 const PANEL_STARS_RULES = [
@@ -54,3 +54,9 @@ const PANEL_STARS_RULES = [
 
 export const PANEL_STARS_SHEET: string =
   EPISODE_STARS_SHEET + PANEL_STARS_RULES.join("");
+
+// The chip in the hero badges: 23 px, the height of Naka's own rating badge.
+export const CHIP_SHEET: string =
+  themeCss(":host") +
+  ".mn-chip{display:inline-flex;align-items:center;height:23px;box-sizing:border-box;padding:0 8px;font:600 13px/21px var(--mn-font);color:var(--mn-color-text);background:var(--mn-color-surface-raised);border:1px solid var(--mn-color-border);border-radius:var(--mn-radius-pill);cursor:pointer;}" +
+  ".mn-chip:focus-visible{outline:2px solid var(--mn-color-accent-text);outline-offset:2px;}";

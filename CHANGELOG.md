@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-11-23
+
+Naka's new website. Version 1.0.0 does not work with it.
+
+### Changed
+
+- **Naka's new pages**: the « À traiter » row sits on the new home page; on a title page, the SensCritique
+  rows join Naka's facts, a SensCritique chip shows in the title's header, and each episode row of the new
+  list gets its stars, kept bare until the newly chosen season is drawn; « Ma liste » is read and clicked
+  on the new button; the rating column in the player ends above Naka's next-episode card and hides while
+  Naka's panels are open; the hover colour follows Naka's new theme.
+
+### Added
+
+- **« Déjà vu » on Naka after a rating**: a film or an episode rated from its title page lights Naka's
+  « Déjà vu » (or the episode's « Vu ») with Naka's own button; a rating from the player's cards or the home
+  row marks the title watched on Naka. Live mode only; a series' button is never touched.
+- **« Annuler » and « Retirer la note » turn « Déjà vu » off**: « Annuler » turns it off again when it was
+  off before the rating; « Retirer la note » turns it off. Films only, live mode only.
+
+### Fixed
+
+- The extension's own « vu » and « non vu » on Naka are no longer taken for the user's: they no longer start
+  a second finish or forget the title.
+
 ## [1.0.0] — 2026-11-16
 
 First public release.
@@ -47,4 +72,5 @@ First public release.
 - Strict parsers on every message between contexts and every stored value; write budgets per sync and
   per hour; the jobs stop when another account is signed in on either site.
 
+[2.0.0]: https://github.com/K-Schmitt/MyNakaExtension/releases/tag/v2.0.0
 [1.0.0]: https://github.com/K-Schmitt/MyNakaExtension/releases/tag/v1.0.0

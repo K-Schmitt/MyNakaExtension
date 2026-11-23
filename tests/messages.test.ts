@@ -345,6 +345,71 @@ describe("parseToNakaTab", () => {
     }
   });
 
+  it("accepts markWatched with its ids: a film, or an episode with both numbers", () => {
+    const watched = (extra: object) =>
+      parseToNakaTab({
+        type: "naka-call",
+        call: "markWatched",
+        contentId: 9,
+        ...extra,
+      });
+    expect(watched({})).toEqual({
+      type: "naka-call",
+      call: "markWatched",
+      contentId: 9,
+    });
+    expect(watched({ season: 2, episode: 5 })).toEqual({
+      type: "naka-call",
+      call: "markWatched",
+      contentId: 9,
+      season: 2,
+      episode: 5,
+    });
+  });
+
+  it("accepts markUnwatched with its ids, like markWatched", () => {
+    const unwatched = (extra: object) =>
+      parseToNakaTab({
+        type: "naka-call",
+        call: "markUnwatched",
+        contentId: 7,
+        ...extra,
+      });
+    expect(unwatched({})).toEqual({
+      type: "naka-call",
+      call: "markUnwatched",
+      contentId: 7,
+    });
+    expect(unwatched({ season: 2, episode: 5 })).toEqual({
+      type: "naka-call",
+      call: "markUnwatched",
+      contentId: 7,
+      season: 2,
+      episode: 5,
+    });
+    expect(unwatched({ season: 2 })).toBeUndefined();
+  });
+
+  it("rejects a markWatched with a lone or bad season or episode, or a bad id", () => {
+    const watched = (extra: object, contentId: unknown) =>
+      parseToNakaTab({
+        type: "naka-call",
+        call: "markWatched",
+        contentId,
+        ...extra,
+      });
+    expect(watched({ season: 2 }, 9)).toBeUndefined();
+    expect(watched({ episode: 5 }, 9)).toBeUndefined();
+    for (const v of [0, -1, 1.5, 2 ** 53, "3", null]) {
+      expect(watched({ season: v, episode: 5 }, 9)).toBeUndefined();
+      expect(watched({ season: 2, episode: v }, 9)).toBeUndefined();
+    }
+    for (const v of [0, -1, 1.5, "3", null]) {
+      expect(watched({}, v)).toBeUndefined();
+    }
+    expect(watched({}, undefined)).toBeUndefined();
+  });
+
   it("accepts search and trims the query", () => {
     expect(
       parseToNakaTab({ type: "naka-call", call: "search", query: "  dune  " }),

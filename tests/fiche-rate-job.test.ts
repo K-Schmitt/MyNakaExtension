@@ -756,3 +756,208 @@ describe("fiche-rate: the route", () => {
     expect(await answer).toBeUndefined();
   });
 });
+
+const watches = (calls: string[]) =>
+  calls.filter((c) => c.startsWith("markWatched:"));
+
+describe("fiche-rate: « Déjà vu » after the rating", () => {
+  it('a film with vuByTab: answered dejaVu "tab", the client called without', async () => {
+    const w = filmWorld();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate({ vuByTab: true }))).toEqual({
+      ...RATED,
+      dejaVu: "tab",
+    });
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+
+  it("a film without the button: the client writes « vu » for it", async () => {
+    const w = filmWorld();
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual(RATED);
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5"]);
+  });
+
+  it("a film in simulation: no « vu » write, no dejaVu", async () => {
+    const w = filmWorld({ settings: SIMULATION });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate({ vuByTab: true }))).toEqual(RATED);
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+
+  it("a film whose « vu » write fails: sent, step deja-vu, the panel kept", async () => {
+    const w = filmWorld({
+      naka: {
+        markWatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
+      sent: true,
+      step: "deja-vu",
+      error: "unavailable",
+      panel: RATED.panel,
+    });
+  });
+
+  it("a film whose Ma liste step failed: that error is kept and Naka's « vu » is not tried", async () => {
+    const w = filmWorld({
+      naka: {
+        playlistIds: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
+      sent: true,
+      step: "ma-liste",
+      error: "unavailable",
+      panel: RATED.panel,
+    });
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+
+  it("a rating that did not go out: Naka is left alone", async () => {
+    const w = filmWorld({
+      sc: {
+        rate: async () => {
+          throw new ScUnavailableError("down");
+        },
+      },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    await w.jobs.ficheRate(TAB, rate({ vuByTab: true }));
+    expect(watches(w.nk.calls)).toEqual([]);
+    expect(w.nk.calls).not.toContain("removeFromPlaylist:5");
+  });
+
+  it("an episode: the client writes « vu » with its season and episode, or the tab does", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(await w.jobs.ficheRate(TAB, episodeRate())).toEqual({ ok: true });
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5:1:1"]);
+    expect(
+      await w.jobs.ficheRate(TAB, { ...episodeRate(), vuByTab: true }),
+    ).toEqual({ ok: true, dejaVu: "tab" });
+    expect(watches(w.nk.calls)).toHaveLength(1);
+  });
+
+  it("a series: no « vu » at all", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.jobs.ficheRate(TAB, rate({ target: "série", productId: 13 }));
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+});
+
+describe("the player's rate job: « Déjà vu » best effort", () => {
+  const playerRate = (over: object) => ({
+    type: "rate" as const,
+    contentId: 5,
+    label: "film" as const,
+    rating: 6,
+    ...over,
+  });
+
+  const ownFilmCard = () =>
+    filmCard({
+      key: "movie:5",
+      contentId: 5,
+      targets: [target("film", null, 2005)],
+    });
+
+  it("a film: one markWatched call", async () => {
+    const w = filmWorld();
+    w.area.data.set("ratings", [ownFilmCard()]);
+    await w.jobs.rate(playerRate({}));
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5"]);
+  });
+
+  it("an episode: one markWatched call with its season and episode", async () => {
+    const w = filmWorld();
+    w.area.data.set("ratings", [episodeCard()]);
+    await w.jobs.rate(playerRate({ label: "épisode", season: 1, episode: 1 }));
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5:1:1"]);
+  });
+
+  it("a season: no call", async () => {
+    const w = filmWorld();
+    w.area.data.set("ratings", [episodeCard()]);
+    await w.jobs.rate(playerRate({ label: "saison", season: 1, episode: 1 }));
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+
+  it("a Naka failure: nothing comes up", async () => {
+    const w = filmWorld({
+      naka: {
+        markWatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    w.area.data.set("ratings", [ownFilmCard()]);
+    await expect(w.jobs.rate(playerRate({}))).resolves.toBeUndefined();
+    expect(rates(w.sk.calls)).toEqual(["rate:2005:6"]);
+  });
+});
+
+describe("fiche-rate: « Déjà vu » over a local save that failed", () => {
+  const SENT = {
+    sent: true,
+    step: "local-save",
+    error: "unavailable",
+  };
+
+  it("a film with vuByTab: the local-save error is kept, the client writes « vu »", async () => {
+    const w = filmWorld();
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate({ vuByTab: true }))).toEqual({
+      ...SENT,
+      panel: RATED.panel,
+    });
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5"]);
+  });
+
+  it("a film whose « vu » write fails too: the local-save error is kept", async () => {
+    const w = filmWorld({
+      naka: {
+        markWatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRate(TAB, rate())).toEqual({
+      ...SENT,
+      panel: RATED.panel,
+    });
+  });
+
+  it("an episode with vuByTab: the local-save error is kept, the client writes « vu »", async () => {
+    const w = filmWorld({ state: linkedTo(13) });
+    w.area.data.set("ratings", [episodeCard()]);
+    refuseSaves(w, "ratings");
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(
+      await w.jobs.ficheRate(TAB, { ...episodeRate(), vuByTab: true }),
+    ).toEqual(SENT);
+    expect(watches(w.nk.calls)).toEqual(["markWatched:5:1:1"]);
+  });
+
+  it("an episode in simulation: nothing written on Naka", async () => {
+    const w = filmWorld({ state: linkedTo(13), settings: SIMULATION });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    await w.registry.issue(TAB, 5, [11]);
+    expect(
+      await w.jobs.ficheRate(TAB, { ...episodeRate(), vuByTab: true }),
+    ).toEqual({ ok: true });
+    expect(watches(w.nk.calls)).toEqual([]);
+  });
+});

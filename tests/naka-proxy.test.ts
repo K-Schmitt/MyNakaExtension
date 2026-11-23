@@ -131,6 +131,24 @@ describe("round trip through a fake tab (real tab handler, fake fetch)", () => {
     ]);
   });
 
+  it("markWatched resolves with no value and PUTs the watched write", async () => {
+    const api = fakeApi(standardApi);
+    const { tabs } = tabRunning(clientOn(api.fetch), () => undefined);
+    const proxy = createNakaProxy(tabs, fakeTimer());
+    expect(await proxy.markWatched({ contentId: 5 })).toBeUndefined();
+    expect(api.calls.map((c) => `${c.init.method} ${c.url}`)).toEqual([
+      "PUT https://naka.cx/api/v1/history/watched",
+    ]);
+  });
+
+  it("markUnwatched sends its message and resolves on ok", async () => {
+    const { port, proxy } = proxyAnswering(() => ok());
+    expect(await proxy.markUnwatched({ contentId: 7 })).toBeUndefined();
+    expect(port.sent.map((s) => s.msg)).toEqual([
+      { type: "naka-call", call: "markUnwatched", contentId: 7 },
+    ]);
+  });
+
   it("account returns String(user.id)", async () => {
     const { proxy } = both();
     expect(await proxy.account()).toBe("42");
@@ -844,6 +862,8 @@ describe("messages sent to the tab", () => {
     await proxy.playlistIds();
     await proxy.addToPlaylist(5);
     await proxy.removeFromPlaylist(6);
+    await proxy.markWatched({ contentId: 8 });
+    await proxy.markWatched({ contentId: 8, season: 2, episode: 3 });
     await proxy.search("  titre  ");
     await proxy.contentById(7);
     await proxy.availableSeasons(7);
@@ -852,6 +872,14 @@ describe("messages sent to the tab", () => {
       { type: "naka-call", call: "playlistIds" },
       { type: "naka-call", call: "add", contentId: 5 },
       { type: "naka-call", call: "remove", contentId: 6 },
+      { type: "naka-call", call: "markWatched", contentId: 8 },
+      {
+        type: "naka-call",
+        call: "markWatched",
+        contentId: 8,
+        season: 2,
+        episode: 3,
+      },
       { type: "naka-call", call: "search", query: "titre" },
       { type: "naka-call", call: "contentById", contentId: 7 },
       { type: "naka-call", call: "availableSeasons", contentId: 7 },
@@ -863,6 +891,12 @@ describe("messages sent to the tab", () => {
     const { port, proxy } = proxyAnswering(() => ok());
     await expect(proxy.addToPlaylist(0)).rejects.toThrow(RangeError);
     await expect(proxy.removeFromPlaylist(1.5)).rejects.toThrow(RangeError);
+    await expect(proxy.markWatched({ contentId: 0 })).rejects.toThrow(
+      RangeError,
+    );
+    await expect(
+      proxy.markWatched({ contentId: 1, season: 2 }),
+    ).rejects.toThrow(RangeError);
     await expect(proxy.contentById(-1)).rejects.toThrow(RangeError);
     await expect(proxy.availableSeasons(0)).rejects.toThrow(RangeError);
     await expect(proxy.search("   ")).rejects.toThrow(RangeError);

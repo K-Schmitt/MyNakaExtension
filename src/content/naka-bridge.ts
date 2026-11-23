@@ -3,6 +3,7 @@
 // function) and never reaches this file: a reply carries a value or one of five fixed error codes, never the
 // text, the cause or a field of an error.
 
+import { idsOf } from "../core/finish-event";
 import type { NakaReply, NakaReplyError, ToNakaTab } from "../ext/messages";
 import type { NakaClient } from "../naka/naka-client";
 import { NakaUnavailableError } from "../naka/naka-errors";
@@ -60,6 +61,10 @@ async function run(
       return client.addToPlaylist(msg.contentId);
     case "remove":
       return client.removeFromPlaylist(msg.contentId);
+    case "markWatched":
+      return client.markWatched(idsOf(msg));
+    case "markUnwatched":
+      return client.markUnwatched(idsOf(msg));
     default:
       return unknownCall(msg);
   }

@@ -1,7 +1,8 @@
 // What the title page controller needs from the tab: the worker's eight fiche answers (already checked,
-// undefined when lost or refused), four readings of the page, the click on Naka's « Ma liste » button, the
+// undefined when lost or refused), four readings of the page, the reading and click of Naka's « Ma liste » and « Déjà vu » buttons (the « Déjà vu » ports), the
 // drawing of its view, the announcement of a visit to the page's relay and the page's timer.
 
+import type { ContentIds } from "../core/finish-event";
 import type {
   FicheInfo,
   FicheSearchAnswer,
@@ -35,7 +36,7 @@ export type FichePorts = {
   search(msg: FicheSearchMessage): Promise<FicheSearchAnswer | undefined>;
   /** The season the page's dropdown names (« Saison 2 » → 2), if one can be read. */
   shownSeason(): number | undefined;
-  /** Whether the page shows its episode grid (`div.dcf-ep-grid`). */
+  /** Whether the page shows its episode grid (`ol.nh-list > li.nh-ep-row`). */
   hasEpisodeGrid(): boolean;
   /** These episode numbers, the ones whose boxes are on screen first. */
   visibleFirst(numbers: readonly number[]): number[];
@@ -43,6 +44,19 @@ export type FichePorts = {
   maListe(): boolean | undefined;
   /** One programmatic click on that button, when it is on screen. */
   clickMaListe(): void;
+  /**
+   * Naka's « Déjà vu » (a film, no argument) or the « Vu » of an episode row (its number): undefined when not
+   * on screen, else whether it is lit.
+   */
+  dejaVu(episode?: number): boolean | undefined;
+  /** One programmatic click on that button when it is on screen and off. */
+  clickDejaVu(episode?: number): void;
+  /** One programmatic click on the film's button when it is on screen and lit: Naka takes it out of the seen titles. */
+  clickDejaVuOff(): void;
+  /** The tab's own tracker is told these ids are watched, just before the click that makes Naka say so. */
+  noteOwnVu(ids: ContentIds): void;
+  /** Same, for our own click that turns « Déjà vu » off: the page's "unwatched" that follows is not the owner's untick. */
+  noteOwnUnvu(ids: ContentIds): void;
   /** The tab's address path now; `path` learns it only at the next poll. */
   pathname(): string;
   /** The view of the title page, or undefined off a title page. */

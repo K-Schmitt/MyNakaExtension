@@ -22,6 +22,7 @@ const filmRecord = (local: Partial<UndoLocal> = {}): FicheUndo => ({
     dateDone: null,
     isWished: false,
     inMaListe: null,
+    dejaVuOn: null,
   },
   local: { handled: false, settled: false, cards: [], ...local },
 });

@@ -15,6 +15,7 @@ function sample(): FicheUndo {
       dateDone: "2026-11-02",
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: {
       handled: false,
@@ -45,6 +46,7 @@ describe("parseFicheUndo", () => {
         dateDone: null,
         isWished: true,
         inMaListe: true,
+        dejaVuOn: null,
       },
     };
     expect(parseFicheUndo(structuredClone(r))).toEqual(r);
@@ -83,8 +85,23 @@ describe("parseFicheUndo", () => {
     ["isWished", null],
     ["inMaListe", "true"],
     ["inMaListe", undefined],
+    ["dejaVuOn", "x"],
   ])("reads a bad before.%s (%j) as null", (key, value) => {
     expect(parseFicheUndo(withBefore({ [key]: value }))).toBeNull();
+  });
+
+  it("reads a record stored before 10c (no dejaVuOn) with dejaVuOn null", () => {
+    const r = sample();
+    const { dejaVuOn: _gone, ...before } = r.before;
+    expect(parseFicheUndo({ ...r, before })).toEqual(r);
+  });
+
+  it.each([true, false, null])("keeps dejaVuOn %s", (dejaVuOn) => {
+    const r = sample();
+    expect(parseFicheUndo(withBefore({ dejaVuOn }))).toEqual({
+      ...r,
+      before: { ...r.before, dejaVuOn },
+    });
   });
 
   it("rejects an unknown key on the record", () => {

@@ -18,6 +18,7 @@ import {
   fail,
   onlyKeys,
   valuesOf,
+  whenPresent,
 } from "./field-checks";
 import { parseRatings } from "./rating-schema";
 import { StoredStateError } from "./stored-error";
@@ -44,6 +45,7 @@ const BEFORE_KEYS = valuesOf<keyof UndoBefore>({
   dateDone: true,
   isWished: true,
   inMaListe: true,
+  dejaVuOn: true,
 });
 
 function asRating(raw: unknown, path: string): number | null {
@@ -74,6 +76,11 @@ function checkBefore(raw: unknown): UndoBefore {
       before.inMaListe,
       "ficheUndo.before.inMaListe",
     ),
+    // A record stored before 10c has no such key: unknown.
+    dejaVuOn:
+      whenPresent(before.dejaVuOn, (v) =>
+        asNullableBoolean(v, "ficheUndo.before.dejaVuOn"),
+      ) ?? null,
   };
 }
 

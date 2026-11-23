@@ -31,7 +31,9 @@ export type FicheOutcome =
   /** The worker refused it before any write. */
   | { kind: "undo-refused"; reason: "protected" | "expired" | "unrated" }
   /** « Annuler » stopped at this step: it and what came after were not put back. */
-  | { kind: "undo-partial"; failed: RunStep["kind"] };
+  | { kind: "undo-partial"; failed: RunStep["kind"] }
+  /** « Retirer la note » went out; Naka's « Déjà vu » stayed on. */
+  | { kind: "remove-vu-failed" };
 
 /** The panel's two writes that take a rating back: « Annuler » and « Retirer la note ». */
 export type UndoAction = "undo" | "remove";

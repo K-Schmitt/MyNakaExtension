@@ -10,7 +10,7 @@ import { NakaUnavailableError } from "./naka-errors";
 export type NakaDeps = { fetch: Fetch; token: () => string | undefined };
 
 export type Request = {
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   path: string;
   label: string;
   body?: unknown;

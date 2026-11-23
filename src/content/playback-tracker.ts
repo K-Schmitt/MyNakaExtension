@@ -1,4 +1,4 @@
-// Turns video samples into "finished" candidates for the worker. Pure: no `chrome.*`, no DOM, no clock.
+// Turns video samples into "finished" candidates for the worker. Pure: no `chrome.*`, no DOM; the clock is injected.
 // The tracker does not know the stored threshold. It offers each mark of PROGRESS_MARKS once per key and
 // the worker ignores the candidates below its threshold. A film left after 30 s never reaches a mark.
 //
@@ -15,8 +15,11 @@
 // counted in this context: a page script can post one for any id and pushState to any player URL. For any
 // other content (none playing, not yet sampled, another title, another episode, the whole series) it counts
 // only right after a real gesture on the page, and each « vu » uses up one gesture.
+//
+// Our own « Déjà vu » off-click is noted first (noteOwnUnwatched): the "unwatched" event it causes is taken
+// once by takeOwnUnwatched, so the tab does not relay it as the owner's untick. A mark expires after 10 s.
 
-import { contentKeyOf } from "../core/finish-event";
+import { type ContentIds, contentKeyOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
 import {
   type CreditsStarts,
@@ -38,6 +41,7 @@ export const PROGRESS_MARKS: readonly number[] = [0.8, 0.85, 0.9, 0.95, 0.99];
 export const DURATION_FLOOR_S = 300;
 const DURATION_TOLERANCE = 0.02;
 const MAX_KEYS = 200;
+const OWN_UNWATCHED_MS = 10_000;
 
 type Playing = { contentId: number; season?: number; episode?: number };
 
@@ -57,6 +61,12 @@ export type PlaybackTracker = {
   credits(ev: PageEvent): void;
   /** An unticked « vu »: that key can send its explicit finish again. */
   unwatched(ev: PageEvent): void;
+  /** Our own « Déjà vu » just ticked these ids on Naka: the page's « vu » that follows is ignored. */
+  noteWatched(ids: ContentIds): void;
+  /** Our own « Déjà vu » is about to be turned off for these ids: the page's "unwatched" that follows is ours. */
+  noteOwnUnwatched(ids: ContentIds): void;
+  /** True once for an "unwatched" event of a noted key (the mark is used up); false when none or expired. */
+  takeOwnUnwatched(ev: PageEvent): boolean;
 };
 
 // The worker keys the same content with the same function.
@@ -99,8 +109,12 @@ function finishedAt(
   return { type: "finished", source, progress, ...idsOf(playing) };
 }
 
-export function createPlaybackTracker(): PlaybackTracker {
+export function createPlaybackTracker(
+  now: () => number = () => Date.now(),
+): PlaybackTracker {
   const states = new Map<string, KeyState>();
+  // Own-untick marks: key -> when it was noted.
+  const ownUnwatched = new Map<string, number>();
   const starts: CreditsStarts = createCreditsStarts();
   let current: Playing | undefined;
   let creditsKey: string | undefined;
@@ -188,6 +202,19 @@ export function createPlaybackTracker(): PlaybackTracker {
       if (ev.kind !== "unwatched") return;
       const state = states.get(keyOf(idsOf(ev)));
       if (state !== undefined) state.watched = false;
+    },
+    noteWatched(ids) {
+      stateOf(idsOf(ids)).watched = true;
+    },
+    noteOwnUnwatched(ids) {
+      ownUnwatched.set(keyOf(idsOf(ids)), now());
+    },
+    takeOwnUnwatched(ev) {
+      if (ev.kind !== "unwatched") return false;
+      const key = keyOf(idsOf(ev));
+      const noted = ownUnwatched.get(key);
+      ownUnwatched.delete(key);
+      return noted !== undefined && now() - noted <= OWN_UNWATCHED_MS;
     },
     watched(ev, takeGesture = () => false) {
       if (ev.kind !== "watched") return undefined;

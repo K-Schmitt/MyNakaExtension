@@ -155,6 +155,116 @@ describe("fiche-remove", () => {
   });
 });
 
+describe("fiche-remove and Naka's « Déjà vu »", () => {
+  const unwatched = (w: ReturnType<typeof world>) =>
+    w.nk.calls.filter((c) => c.startsWith("markUnwatched"));
+
+  it('a film with vuByTab: answered dejaVu "tab", no client call', async () => {
+    const w = world(RATED);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove({ vuByTab: true }))).toEqual({
+      ok: true,
+      dejaVu: "tab",
+    });
+    expect(unwatched(w)).toEqual([]);
+  });
+
+  it("a film without vuByTab: the client marks it unwatched once", async () => {
+    const w = world(RATED);
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove())).toEqual({ ok: true });
+    expect(unwatched(w)).toEqual(["markUnwatched:5"]);
+  });
+
+  it("the binding check and the « non vu » write go through one pinned Naka tab", async () => {
+    let queries = 0;
+    const w = world(RATED, {
+      tabs: (real) => ({
+        query: (url) => {
+          queries += 1;
+          return real.query(url);
+        },
+        send: (id, msg) => real.send(id, msg),
+      }),
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove())).toEqual({ ok: true });
+    expect(unwatched(w)).toEqual(["markUnwatched:5"]);
+    expect(queries).toBe(1);
+  });
+
+  it("the client fails: removed with its error, cards unrated, record forgotten", async () => {
+    const w = world(RATED, {
+      naka: {
+        markUnwatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    w.area.data.set("ficheUndo", {
+      contentId: 5,
+      productId: 2005,
+      role: "film",
+      at: NOW - 1000,
+      before: {
+        rating: 6,
+        isDone: true,
+        dateDone: "2024-03-02",
+        isWished: false,
+        inMaListe: null,
+        dejaVuOn: null,
+      },
+      local: { handled: false, settled: false, cards: [] },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove())).toEqual({
+      removed: true,
+      error: "unavailable",
+    });
+    expect(w.cards()).toEqual([
+      { ...filmOf5, targets: [target("film", null, 2005)], given: {} },
+    ]);
+    expect(w.area.data.get("ficheUndo")).toBeNull();
+  });
+
+  it("simulation: no Naka call, no tab", async () => {
+    const w = world(RATED, {
+      settings: { mode: "simulation", binding: BOUND },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    expect(await w.jobs.ficheRemove(TAB, remove({ vuByTab: true }))).toEqual({
+      ok: true,
+    });
+    expect(unwatched(w)).toEqual([]);
+  });
+
+  it("a series: no Naka call, even with vuByTab", async () => {
+    const w = world(RATED, { state: linkedTo(13) });
+    await w.registry.open(TAB, 5, seriesTitle(13), []);
+    expect(
+      await w.jobs.ficheRemove(TAB, remove({ productId: 13, vuByTab: true })),
+    ).toEqual({ ok: true });
+    expect(unwatched(w)).toEqual([]);
+  });
+
+  it("a refusal or an SC failure: no Naka call", async () => {
+    const refused = world({ ...RATED, isReviewed: true });
+    await refused.registry.open(TAB, 5, filmTitle(2005), []);
+    await refused.jobs.ficheRemove(TAB, remove({ vuByTab: true }));
+    expect(unwatched(refused)).toEqual([]);
+    const failing = world(RATED, {
+      sc: {
+        unmarkDone: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    await failing.registry.open(TAB, 5, filmTitle(2005), []);
+    await failing.jobs.ficheRemove(TAB, remove());
+    expect(unwatched(failing)).toEqual([]);
+  });
+});
+
 describe("fiche-remove and the undo record", () => {
   const record = (contentId: number, productId: number): FicheUndo => ({
     contentId,
@@ -167,6 +277,7 @@ describe("fiche-remove and the undo record", () => {
       dateDone: "2024-03-02",
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   });

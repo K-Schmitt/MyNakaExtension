@@ -365,6 +365,16 @@ describe("keys", () => {
   });
 });
 
+describe("noteWatched", () => {
+  it("ignores a « vu » for ids noted watched", () => {
+    const t = playingFilm();
+    t.noteWatched({ contentId: 5 });
+    expect(
+      t.watched({ channel: CH, kind: "watched", contentId: 5 }, () => true),
+    ).toBeUndefined();
+  });
+});
+
 describe("unwatched", () => {
   const ev: Watched = { channel: CH, kind: "watched", contentId: 5 };
   const off: PageEvent = { channel: CH, kind: "unwatched", contentId: 5 };

@@ -62,8 +62,8 @@ describe("manifest", () => {
     ]);
   });
 
-  it("is version 1.0.0, the same as package.json", () => {
-    expect(manifest.version).toBe("1.0.0");
+  it("is version 2.0.0, the new front's release, the same as package.json", () => {
+    expect(manifest.version).toBe("2.0.0");
     expect(pkg.version).toBe(manifest.version);
   });
 

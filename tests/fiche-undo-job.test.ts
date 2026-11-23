@@ -459,6 +459,7 @@ describe("fiche-undo: « Ma liste »", () => {
       dateDone: null,
       isWished: false,
       inMaListe: true,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   };
@@ -613,6 +614,7 @@ describe("fiche-undo: refused before any request", () => {
       dateDone: null,
       isWished: false,
       inMaListe: null,
+      dejaVuOn: null,
     },
     local: { handled: false, settled: false, cards: [] },
   };
@@ -650,5 +652,119 @@ describe("fiche-undo: refused before any request", () => {
     await w.registry.open(TAB, 5, seriesTitle(2005), []);
     expect(await w.jobs.ficheUndo(TAB, undo())).toEqual({ refused: "expired" });
     expect(w.network()).toEqual([]);
+  });
+});
+
+describe("fiche-undo: « Déjà vu »", () => {
+  const dejaVuRecord = (dejaVuOn: boolean | null): FicheUndo => ({
+    contentId: 5,
+    productId: 2005,
+    role: "film",
+    at: NOW - 1000,
+    before: {
+      rating: null,
+      isDone: false,
+      dateDone: null,
+      isWished: false,
+      inMaListe: null,
+      dejaVuOn,
+    },
+    local: { handled: false, settled: false, cards: [] },
+  });
+  const ready = async (
+    settings: Settings,
+    dejaVuOn: boolean | null,
+    o: WorldOpts = {},
+    settled = false,
+  ) => {
+    const w = world({ now: RATED_SEEN }, { settings, ...o });
+    const record = dejaVuRecord(dejaVuOn);
+    w.area.data.set("ficheUndo", {
+      ...record,
+      local: { ...record.local, settled },
+    });
+    await w.registry.open(TAB, 5, filmTitle(2005), []);
+    return w;
+  };
+
+  it("the button on screen (vuByTab): answered « tab », and no client call", async () => {
+    const w = await ready(LIVE, false);
+    expect(await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }))).toEqual({
+      ok: true,
+      maListe: "none",
+      dejaVu: "tab",
+    });
+    expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
+  });
+
+  it("no button: the client marks the film unwatched once, and no « tab » is answered", async () => {
+    const w = await ready(LIVE, false);
+    expect(await w.jobs.ficheUndo(TAB, undo())).toEqual({
+      ok: true,
+      maListe: "none",
+    });
+    expect(w.nk.calls.filter((c) => c.startsWith("markUnwatched"))).toEqual([
+      "markUnwatched:5",
+    ]);
+  });
+
+  it("in simulation: no Naka write, no « tab »", async () => {
+    const w = await ready(SIMULATION, false);
+    expect(await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }))).toEqual({
+      ok: true,
+      maListe: "none",
+    });
+    expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
+  });
+
+  it("the client fails: partial at « Déjà vu », the record kept", async () => {
+    const w = await ready(LIVE, false, {
+      naka: {
+        markUnwatched: async () => {
+          throw new Error("down");
+        },
+      },
+    });
+    const answer = await w.jobs.ficheUndo(TAB, undo());
+    expect(answer).toMatchObject({
+      partial: { failed: { kind: "dejaVu" } },
+      error: "unavailable",
+    });
+    expect(answer).not.toHaveProperty("dejaVu");
+    expect(stored(w)).not.toBeNull();
+  });
+
+  it("localRestore fails after a « tab » step: the partial still carries « tab »", async () => {
+    const w = await ready(LIVE, false, {}, true);
+    const set = w.area.set;
+    w.area.set = async (items) => {
+      if (Object.keys(items).some((key) => key !== "ficheUndo")) {
+        throw new Error("storage");
+      }
+      await set(items);
+    };
+    const answer = await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }));
+    expect(answer).toMatchObject({
+      partial: { failed: { kind: "localRestore" } },
+      dejaVu: "tab",
+    });
+  });
+
+  it("an old record (dejaVuOn null): no Naka call", async () => {
+    const w = await ready(LIVE, null);
+    expect(await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }))).toEqual({
+      ok: true,
+      maListe: "none",
+    });
+    expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
+  });
+
+  it("a button already lit before the rating (true): no step, no « tab » answer", async () => {
+    const w = await ready(LIVE, true);
+    // The button is on screen on the real path: the tab sends vuByTab.
+    const answer = await w.jobs.ficheUndo(TAB, undo({ vuByTab: true }));
+    expect(answer).toEqual({ ok: true, maListe: "none" });
+    expect(answer).not.toHaveProperty("dejaVu");
+    expect(w.nk.calls.some((c) => c.startsWith("markUnwatched"))).toBe(false);
   });
 });

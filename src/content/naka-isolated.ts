@@ -10,12 +10,13 @@ import { createFicheController } from "./fiche-controller";
 import { guardFicheInput } from "./fiche-input-guard";
 import { createFicheWorkerPort } from "./fiche-worker-port";
 import { readAccount } from "./naka-bridge";
-import { startNakaTab } from "./naka-tab";
+import { type NakaTabHandle, startNakaTab } from "./naka-tab";
 import { createTabListener } from "./naka-tab-listener";
 import { readNakaToken } from "./naka-token";
 import { listenToPauses } from "./pause-events";
 import { createTitleLookup } from "./title-lookup";
 import { wireBlocks } from "./ui/blocks-wiring";
+import { dejaVuPorts } from "./ui/deja-vu-button";
 import { createEndUi } from "./ui/end-ui";
 import { gridPorts } from "./ui/fiche-grid-dom";
 import { fichePagePorts } from "./ui/fiche-page-ports";
@@ -23,6 +24,7 @@ import { createFicheUi } from "./ui/fiche-ui";
 import { homeRowPorts } from "./ui/home-row-page";
 import { createHomeRowUi } from "./ui/home-row-ui";
 import { maListePorts } from "./ui/ma-liste-button";
+import { observeBody, watchPlayerPanels } from "./ui/player-panels-dom";
 import { type ObserverWindow, pageSeenWatch } from "./ui/star-visibility-dom";
 import { createWorkerPort } from "./ui/worker-port";
 import { createGestureGate, listenToGestures } from "./user-gesture";
@@ -65,6 +67,7 @@ const blocks = wireBlocks({
   playerUi: createEndUi(
     document,
     pageSeenWatch(window as unknown as ObserverWindow),
+    (onChange) => watchPlayerPanels(document, observeBody, onChange),
   ),
   homeUi: createHomeRowUi(homeRowPorts(document)),
   now: () => Date.now(),
@@ -72,10 +75,15 @@ const blocks = wireBlocks({
 });
 
 const ficheUi = createFicheUi(fichePagePorts(document, pageTimer));
+let tab: NakaTabHandle | undefined;
 const fiche = createFicheController({
   ...createFicheWorkerPort((msg) => chrome.runtime.sendMessage(msg)),
   ...gridPorts(document, () => window.innerHeight),
   ...maListePorts(document),
+  ...dejaVuPorts(document),
+  // `tab` is bound once `startNakaTab` returns: a click comes long after, from an answer.
+  noteOwnVu: (ids) => tab?.noteWatched(ids),
+  noteOwnUnvu: (ids) => tab?.noteUnwatched(ids),
   pathname: () => location.pathname,
   // `fiche` is bound once the controller is made: the controller must not render while it is constructed.
   render: (view) => ficheUi.render(view, fiche),
@@ -91,7 +99,7 @@ listenToPauses(document, {
 const gestures = createGestureGate(() => Date.now());
 listenToGestures(window, gestures);
 
-startNakaTab({
+tab = startNakaTab({
   self: window,
   href: () => location.href,
   video: () => readVideo(document),
@@ -107,5 +115,6 @@ startNakaTab({
   pathChanged: blocks.pathChanged,
   removed: blocks.removed,
   takeGesture: gestures.take,
+  now: () => Date.now(),
   fiche: guardFicheInput(fiche),
 });

@@ -17,9 +17,9 @@ import {
 import {
   checked,
   deepParts,
-  FILM_ROWS,
+  FILM_FACTS,
   fakeUi,
-  SERIES_ROWS,
+  SERIES_FACTS,
   starsOf,
   texts,
 } from "./fiche-ui-world";
@@ -66,12 +66,12 @@ const titleStars = (t: ReturnType<typeof fakeUi>) =>
 const valueSpan = (row: FakeElement | undefined) =>
   row?.children[1] as FakeElement | undefined;
 
-describe("the SensCritique rows in Naka's info panel", () => {
+describe("the SensCritique rows in Naka's « À propos » facts", () => {
   it.each([
-    ["a film's 4-row panel", film, FILM_ROWS],
-    ["a series' 6-row panel", series, SERIES_ROWS],
+    ["a film's 7-fact list", film, FILM_FACTS],
+    ["a series' 7-fact list", series, SERIES_FACTS],
   ])(
-    "on %s, they are the last two children, after « Note TMDB »",
+    "on %s, they are the last two children, after Naka's facts",
     async (_n, open, naka) => {
       const t = await open();
       const panel = t.kept.panel();
@@ -80,16 +80,27 @@ describe("the SensCritique rows in Naka's info panel", () => {
     },
   );
 
-  it("copies Naka's row shape: div.dcf-info-row, a label span, a value span", async () => {
+  it("copies Naka's fact shape: a bare div, a dt label, a dd value", async () => {
     const t = await film();
     for (const row of t.kept.ours()) {
       expect(row.tag).toBe("div");
-      expect(row.className).toBe("dcf-info-row");
+      expect(row.className).toBe("");
       expect(row.children.map((c) => (c as FakeElement).tag)).toEqual([
-        "span",
-        "span",
+        "dt",
+        "dd",
       ]);
     }
+    expect(rowLabels(t.kept.panel()).slice(-2)).toEqual([
+      "SensCritique",
+      "Ta note",
+    ]);
+  });
+
+  it("lets the « Ta note » row span two columns of the facts grid", async () => {
+    const t = await film();
+    const [average, mine] = t.kept.ours();
+    expect(mine?.style.cssText).toBe("grid-column: span 2");
+    expect(average?.style.cssText).toBe("");
   });
 
   it("shows the average « 6,9 / 10 », and ten stars with the owner's rating", async () => {
@@ -220,8 +231,12 @@ describe("the SensCritique rows in Naka's info panel", () => {
     t.pageChanged();
     t.pageChanged();
     const panel = t.kept.panel();
-    expect(rowLabels(panel)).toEqual([...FILM_ROWS, "SensCritique", "Ta note"]);
-    const after = t.kept.aside.children;
+    expect(rowLabels(panel)).toEqual([
+      ...FILM_FACTS,
+      "SensCritique",
+      "Ta note",
+    ]);
+    const after = t.kept.about.children;
     expect(after.indexOf(t.kept.actions() as FakeElement)).toBe(
       after.indexOf(panel) + 1,
     );
@@ -236,7 +251,7 @@ describe("the SensCritique rows in Naka's info panel", () => {
     panel.appendChild(late);
     t.pageChanged();
     expect(panel.children.slice(-2)).toEqual(t.kept.ours());
-    expect(panel.children).toHaveLength(FILM_ROWS.length + 2);
+    expect(panel.children).toHaveLength(FILM_FACTS.length + 2);
   });
 
   it("come off with the actions when the tab leaves the title page", async () => {

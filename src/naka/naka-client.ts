@@ -4,9 +4,10 @@
 // cached. The token lives in a local variable of that call and goes only to naka-transport's `send`, in the
 // `authorization` header. See naka-transport.ts for the rules on the wire and in error messages.
 
+import type { ContentIds } from "../core/finish-event";
 import { checkQuery } from "../core/search-query";
 import { NakaUnavailableError } from "./naka-errors";
-import { checkContentId } from "./naka-input";
+import { checkContentId, checkWatchedIds } from "./naka-input";
 import { type NakaItem, toItem, toItems, toPlaylistIds } from "./naka-items";
 import { type NakaSeasons, toSeasons } from "./naka-seasons";
 import {
@@ -27,6 +28,10 @@ export type NakaClient = {
   playlistIds(): Promise<number[]>;
   addToPlaylist(contentId: number): Promise<void>;
   removeFromPlaylist(contentId: number): Promise<void>;
+  /** Ticks « Déjà vu » on Naka for a film, or an episode when the ids hold both numbers. */
+  markWatched(ids: ContentIds): Promise<void>;
+  /** Unticks « Déjà vu » on Naka: the same write with `watched: false`. */
+  markUnwatched(ids: ContentIds): Promise<void>;
   search(query: string): Promise<NakaItem[]>;
   contentById(contentId: number): Promise<NakaItem | undefined>;
   availableSeasons(contentId: number): Promise<NakaSeasons | undefined>;
@@ -61,6 +66,40 @@ async function removeFromPlaylist(deps: NakaDeps, contentId: number) {
     method: "DELETE",
     path: `/playlist/${contentId}`,
     label: "remove from playlist",
+  });
+}
+
+function watchedBody(
+  { contentId, season, episode }: ContentIds,
+  watched: boolean,
+) {
+  return season === undefined || episode === undefined
+    ? { contentId, watched }
+    : {
+        contentId,
+        seasonNumber: season,
+        episodeNumber: episode,
+        watched,
+      };
+}
+
+async function markWatched(deps: NakaDeps, ids: ContentIds) {
+  checkWatchedIds(ids);
+  await run(deps, {
+    method: "PUT",
+    path: "/history/watched",
+    label: "mark watched",
+    body: watchedBody(ids, true),
+  });
+}
+
+async function markUnwatched(deps: NakaDeps, ids: ContentIds) {
+  checkWatchedIds(ids);
+  await run(deps, {
+    method: "PUT",
+    path: "/history/watched",
+    label: "mark unwatched",
+    body: watchedBody(ids, false),
   });
 }
 
@@ -140,6 +179,8 @@ export function createNakaClient(deps: NakaDeps): NakaClient {
     playlistIds: () => playlistIds(deps),
     addToPlaylist: (contentId) => addToPlaylist(deps, contentId),
     removeFromPlaylist: (contentId) => removeFromPlaylist(deps, contentId),
+    markWatched: (ids) => markWatched(deps, ids),
+    markUnwatched: (ids) => markUnwatched(deps, ids),
     search: (query) => search(deps, query),
     contentById: (contentId) => contentById(deps, contentId),
     availableSeasons: (contentId) => availableSeasons(deps, contentId),

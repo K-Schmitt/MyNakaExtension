@@ -64,7 +64,9 @@ export type OkAnswer = { ok: true };
 type Paneled = { panel?: PanelFlags };
 /** A film's live rating with Naka's button on screen: the tab clicks « Ma liste » itself, the client did not. */
 type ListedByTab = { maListe?: "tab" };
-export type RateOkAnswer = OkAnswer & Paneled & ListedByTab;
+/** A film's or an episode's live rating with Naka's « Déjà vu » on screen: the tab clicks it itself. */
+type VuByTab = { dejaVu?: "tab" };
+export type RateOkAnswer = OkAnswer & Paneled & ListedByTab & VuByTab;
 /** The write did not go out. */
 export type NotSentAnswer = { error: JobError };
 /**
@@ -72,8 +74,8 @@ export type NotSentAnswer = { error: JobError };
  * the title is « vu » on SensCritique and its « Annuler » is live.
  */
 export type RateNotSentAnswer = NotSentAnswer & Paneled;
-/** The step after the rating that failed: a film's removal from « Ma liste », or the extension's own save. */
-export type SentStep = "ma-liste" | "local-save";
+/** The step after the rating that failed: a film's removal from « Ma liste », the extension's own save, or Naka's « Déjà vu ». */
+export type SentStep = "ma-liste" | "local-save" | "deja-vu";
 /** The rating went out and a later step, named, failed. */
 export type SentWithErrorAnswer = {
   sent: true;
@@ -133,8 +135,10 @@ const RATE_OK_KEYS = valuesOf<keyof RateOkAnswer>({
   ok: true,
   panel: true,
   maListe: true,
+  dejaVu: true,
 });
 const BY_TAB = valuesOf<NonNullable<ListedByTab["maListe"]>>({ tab: true });
+const VU_BY_TAB = valuesOf<NonNullable<VuByTab["dejaVu"]>>({ tab: true });
 const NOT_SENT_KEYS = valuesOf<keyof RateNotSentAnswer>({
   error: true,
   panel: true,
@@ -145,7 +149,11 @@ const SENT_WITH_ERROR_KEYS = valuesOf<keyof SentWithErrorAnswer>({
   error: true,
   panel: true,
 });
-const SENT_STEPS = valuesOf<SentStep>({ "ma-liste": true, "local-save": true });
+const SENT_STEPS = valuesOf<SentStep>({
+  "ma-liste": true,
+  "local-save": true,
+  "deja-vu": true,
+});
 
 function asAverage(raw: unknown, path: string): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return fail(path);
@@ -271,12 +279,17 @@ function withListedByTab(answer: RateOkAnswer, raw: unknown): RateOkAnswer {
   return maListe === undefined ? answer : { ...answer, maListe };
 }
 
+function withVuByTab(answer: RateOkAnswer, raw: unknown): RateOkAnswer {
+  const dejaVu = whenPresent(raw, (v) => asOneOf(v, VU_BY_TAB, "dejaVu"));
+  return dejaVu === undefined ? answer : { ...answer, dejaVu };
+}
+
 export function parseRateAnswer(raw: unknown): RateAnswer {
   const record = asRecord(raw, "answer");
   if (record.ok === true) {
     onlyKeys(record, RATE_OK_KEYS, "answer");
     const ok = withPanel({ ok: true as const }, record.panel);
-    return withListedByTab(ok, record.maListe);
+    return withVuByTab(withListedByTab(ok, record.maListe), record.dejaVu);
   }
   const error = asOneOf(record.error, ERROR_CODES, "error");
   if (record.sent === undefined) {

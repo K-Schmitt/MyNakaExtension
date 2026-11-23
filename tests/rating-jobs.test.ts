@@ -515,7 +515,8 @@ describe("rate", () => {
     w.nk.calls.length = 0;
     w.area.ops.length = 0;
     await w.jobs.rate(rate("film", 7));
-    expect(w.nk.calls).toEqual([]);
+    // Only « vu » goes to Naka (player-watched), never a content read.
+    expect(w.nk.calls).toEqual(["markWatched:3"]);
     expect(w.area.ops).not.toContain("get:state");
     expect(w.settings().finishWindow).toEqual(window);
   });
@@ -843,7 +844,7 @@ describe("rate a handled title that has no card", () => {
   it("its reads: one Naka content read first, through the Naka limiter, then the product's state", async () => {
     const w = handled({}, ["movie:3"]);
     await w.jobs.rate(rate("film", 8));
-    expect(w.nk.calls).toEqual(["contentById:3"]);
+    expect(w.nk.calls).toEqual(["contentById:3", "markWatched:3"]);
     expect(w.slots).toEqual(["limit:naka"]);
     expect(w.sk.calls).toEqual(["productState:1003", "rate:1003:8"]);
   });

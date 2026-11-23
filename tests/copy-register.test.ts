@@ -120,6 +120,7 @@ const RUN_STEPS = valuesOf<RunStep["kind"]>({
   markDoneWithoutDate: true,
   wish: true,
   maListe: true,
+  dejaVu: true,
   localRestore: true,
 });
 
@@ -131,6 +132,11 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
   ],
   sentWithErrorLine: () => CODES.map(ficheCopy.sentWithErrorLine),
   episodeStarsName: () => [ficheCopy.episodeStarsName("Pilote")],
+  heroChipText: () => [
+    ficheCopy.heroChipText(7.4, 8),
+    ficheCopy.heroChipText(7.4, null),
+    ficheCopy.heroChipText(null, 8),
+  ],
   outcomeLine: () => [
     ficheCopy.outcomeLine({ kind: "failed" }, ficheCopy.LINK_FAILED_LINE),
     ...CODES.flatMap((error) => [
@@ -141,6 +147,10 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
       ),
       ficheCopy.outcomeLine(
         { kind: "sent-with-error", step: "local-save", error },
+        "",
+      ),
+      ficheCopy.outcomeLine(
+        { kind: "sent-with-error", step: "deja-vu", error },
         "",
       ),
     ]),
@@ -155,6 +165,7 @@ const FICHE_CALLS: CopyCalls<typeof ficheCopy> = {
     ...RUN_STEPS.map((failed) =>
       ficheCopy.outcomeLine({ kind: "undo-partial", failed }, ""),
     ),
+    ficheCopy.outcomeLine({ kind: "remove-vu-failed" }, ""),
   ],
   seasonFailedLine: () => [ficheCopy.seasonFailedLine(2)],
   partialUndoLine: () => RUN_STEPS.map(ficheCopy.partialUndoLine),
@@ -363,6 +374,31 @@ describe("every shown sentence speaks in « tu » with ’", () => {
     const all = allShownTexts();
     expect(all.length).toBeGreaterThan(150);
     expect(all.flatMap(registerFaults)).toEqual([]);
+  });
+});
+
+describe("the line of a removal that left « Déjà vu » on", () => {
+  it("is the exact line, in the register", () => {
+    const line = ficheCopy.outcomeLine({ kind: "remove-vu-failed" }, "");
+    expect(line).toBe(ficheCopy.REMOVE_VU_FAILED_LINE);
+    expect(line).toBe(
+      "Note retirée, mais Naka n’a pas pu enlever le «\u202FDéjà vu\u202F».",
+    );
+    expect(registerFaults(line)).toEqual([]);
+  });
+});
+
+describe("the line of a rating sent but not passed to « Déjà vu »", () => {
+  it("is the exact line, whatever the error, in the register", () => {
+    const line = ficheCopy.outcomeLine(
+      { kind: "sent-with-error", step: "deja-vu", error: "naka-session" },
+      "",
+    );
+    expect(line).toBe(ficheCopy.DEJA_VU_FAILED_LINE);
+    expect(line).toBe(
+      "Note envoyée, mais Naka n’a pas pu le marquer comme vu.",
+    );
+    expect(registerFaults(line)).toEqual([]);
   });
 });
 

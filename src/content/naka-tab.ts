@@ -2,6 +2,7 @@
 // URL, samples the <video>, and relays what the MAIN world saw. Everything it sends is rebuilt by the
 // tracker or the parsers: ids and marks only, never page text. The title page events go to the fiche
 // controller, which sends only the parsed (capped) title of the title its own address names.
+// An "unwatched" is relayed as the owner's untick (forget-handled) unless the tab noted it as its own off-click.
 
 import { type ContentIds, contentKeyOf, idsOf } from "../core/finish-event";
 import type { PageEvent, ToWorker } from "../ext/messages";
@@ -42,6 +43,8 @@ export type TabEnv = {
   removed(contentId: number): void;
   /** Uses up the owner's last real gesture on the page: true when it was recent enough. */
   takeGesture(): boolean;
+  /** The clock, in ms: own-untick marks expire by it. */
+  now(): number;
   /** The title page controller: the pathname at every URL poll, and the page's fiche and season events. */
   fiche: FicheInput;
 };
@@ -66,7 +69,10 @@ function relay(env: TabEnv, tracker: PlaybackTracker, event: PageEvent) {
   }
   if (event.kind === "unwatched") {
     tracker.unwatched(event);
-    env.send({ type: "forget-handled", ...idsOf(event) });
+    // Our own « Déjà vu » off-click is not the owner unticking « vu »: the title stays handled.
+    if (!tracker.takeOwnUnwatched(event)) {
+      env.send({ type: "forget-handled", ...idsOf(event) });
+    }
     return;
   }
   if (event.kind === "credits") {
@@ -92,8 +98,13 @@ function pathOf(href: string): string {
 const keyOfIds = (ids: ContentIds | undefined): string =>
   ids === undefined ? "" : contentKeyOf(ids);
 
-export function startNakaTab(env: TabEnv): void {
-  const tracker = createPlaybackTracker();
+export type NakaTabHandle = {
+  noteWatched(ids: ContentIds): void;
+  noteUnwatched(ids: ContentIds): void;
+};
+
+export function startNakaTab(env: TabEnv): NakaTabHandle {
+  const tracker = createPlaybackTracker(env.now);
   let lastKey = "";
   // The tracker ignores a context it already follows, so the URL is handed over at every poll.
   const follow = (): void => {
@@ -123,4 +134,8 @@ export function startNakaTab(env: TabEnv): void {
     const event = acceptPageEvent(ev, env.self);
     if (event) relay(env, tracker, event);
   });
+  return {
+    noteWatched: tracker.noteWatched,
+    noteUnwatched: tracker.noteOwnUnwatched,
+  };
 }
